@@ -16,7 +16,7 @@ Flask-Migrate==4.0.5
 Flask-Caching==2.1.0
 flask-cors==3.0.10
 flask-babel==3.1.0
-Flask-WTF==1.1.1
+Flask-WTF==1.2.1
 
 # Security & Authentication
 cryptography==41.0.0
@@ -39,4 +39,5 @@ idna==3.4
 typing_extensions==4.7.1
 urllib3==2.0.5
 wheel==0.41.2
-setuptools==68.0.0
+setuptools==80.0.0
+gunicorn==21.2.0
