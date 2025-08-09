@@ -33,4 +33,5 @@ python-dotenv==1.0.0
 cryptography==41.0.0
 apscheduler==3.10.1
 gunicorn
-echo "3.11" > .python-version
+python==3.12
+
