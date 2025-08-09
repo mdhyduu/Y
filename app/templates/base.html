@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- إضافة CSRF Token للطلبات AJAX -->
+  <meta name="csrf-token" content="{{ csrf_token() }}">  
+  <title>{% block title %}لوحة التحكم{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #3b82f6;
+      --bg-light: #f8fafc;
+      --bg-dark: #1e1e2f;
+      --sidebar-dark: #0f172a;
+      --text-light: #f8f9fa;
+      --text-dark: #111827;
+      --border-radius: 8px;
+      --transition: all 0.3s ease;
+    }
+    
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: var(--bg-light);
+      color: var(--text-dark);
+      font-family: 'Tajawal', sans-serif;
+      overflow-x: hidden;
+    }
+    
+    body.dark-mode {
+      background-color: var(--bg-dark);
+      color: var(--text-light);
+    }
+    
+    .dashboard {
+      display: flex;
+      flex-direction: row;
+      min-height: 100vh;
+      width: 100%;
+    }
+    
+    /* Sidebar Improvements */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      right: -300px;
+      height: 100%;
+      width: 280px;
+      background-color: var(--sidebar-dark);
+      z-index: 1050;
+      display: flex;
+      flex-direction: column;
+      padding: 1.5rem 1rem;
+      transition: right 0.3s ease-in-out;
+      overflow-y: auto;
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .sidebar.show {
+      right: 0;
+    }
+    
+    .sidebar h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 2rem;
+      text-align: center;
+      color: #fff;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .nav-link {
+      color: #e0e0e0;
+      padding: 0.75rem 1rem;
+      margin: 0.25rem 0;
+      border-radius: var(--border-radius);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: var(--transition);
+      font-weight: 500;
+    }
+    
+    .nav-link:hover, .nav-link.active {
+      background-color: var(--primary-light);
+      color: #fff;
+      transform: translateX(-5px);
+    }
+    
+    .nav-link i {
+      width: 20px;
+      text-align: center;
+    }
+    
+    .main {
+      flex-grow: 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      margin-right: 0;
+      transition: margin-right 0.3s ease;
+    }
+    
+    @media (min-width: 992px) {
+      .sidebar {
+        position: sticky;
+        top: 0;
+        right: 0;
+        height: 100vh;
+      }
+      
+      .main {
+        margin-right: 280px;
+      }
+    }
+    
+    /* Topbar Improvements */
+    .topbar {
+      background-color: #fff;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 1040;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    
+    body.dark-mode .topbar {
+      background-color: #2c2f42;
+      border-bottom-color: #444;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .topbar .actions {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+    
+    .theme-toggle {
+      cursor: pointer;
+      color: var(--primary);
+      font-size: 1.25rem;
+      transition: var(--transition);
+    }
+    
+    .theme-toggle:hover {
+      transform: rotate(20deg);
+    }
+    
+    body.dark-mode .theme-toggle {
+      color: #facc15;
+    }
+    
+    .sidebar-toggle {
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--primary);
+      transition: var(--transition);
+    }
+    
+    .sidebar-toggle:hover {
+      color: var(--primary-light);
+    }
+    
+    body.dark-mode .sidebar-toggle {
+      color: #fff;
+    }
+    
+    .sidebar__backdrop {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0,0,0,0.5);
+      z-index: 1040;
+      opacity: 0;
+      visibility: hidden;
+      transition: var(--transition);
+    }
+    
+    .sidebar__backdrop.show {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    /* Content Area Improvements */
+    .content {
+      padding: 2.5rem;
+      flex-grow: 1;
+      width: 100%;
+      max-width: 100%;
+    }
+    
+    @media (max-width: 768px) {
+      .content {
+        padding: 1.5rem;
+      }
+    }
+    
+    .alert {
+      direction: rtl;
+      border-radius: var(--border-radius);
+    }
+    
+    /* Full Width Container */
+    .container-fluid {
+      width: 100%;
+      padding-right: 0;
+      padding-left: 0;
+      margin-right: auto;
+      margin-left: auto;
+    }
+    
+    /* Card Styling */
+    .card {
+      border-radius: var(--border-radius);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      border: none;
+      margin-bottom: 1.5rem;
+    }
+    
+    body.dark-mode .card {
+      background-color: #2a2e42;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+    
+    .card-header {
+      background-color: #f8f9fa;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      font-weight: 700;
+      padding: 1.25rem 1.5rem;
+      border-radius: var(--border-radius) var(--border-radius) 0 0 !important;
+    }
+    
+    body.dark-mode .card-header {
+      background-color: #3a3f58;
+      border-bottom-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    /* Buttons */
+    .btn {
+      border-radius: var(--border-radius);
+      font-weight: 500;
+      padding: 0.5rem 1.25rem;
+      transition: var(--transition);
+    }
+    
+    .btn-primary {
+      background-color: var(--primary);
+      border-color: var(--primary);
+    }
+    
+    .btn-primary:hover {
+      background-color: var(--primary-light);
+      border-color: var(--primary-light);
+      transform: translateY(-2px);
+    }
+    
+    /* Forms */
+    .form-control {
+      border-radius: var(--border-radius);
+      padding: 0.5rem 1rem;
+    }
+    
+    body.dark-mode .form-control {
+      background-color: #2a2e42;
+      border-color: #444;
+      color: #fff;
+    }
+    
+    /* Tables */
+    .table {
+      border-radius: var(--border-radius);
+      overflow: hidden;
+    }
+    
+    body.dark-mode .table {
+      color: #fff;
+    }
+    
+    body.dark-mode .table th,
+    body.dark-mode .table td {
+      border-color: #444;
+    }
+    
+    body.dark-mode .table-striped tbody tr:nth-of-type(odd) {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    /* Responsive Adjustments */
+    @media (max-width: 991.98px) {
+      .sidebar {
+        right: -280px;
+        width: 280px;
+      }
+      
+      .sidebar.show {
+        right: 0;
+      }
+      
+      .main {
+        margin-right: 0;
+      }
+    }
+    
+    /* Animation for page transitions */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .content-container {
+      animation: fadeIn 0.3s ease-out;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <h2>لوحة التحكم</h2>
+      <!-- عناصر القائمة المشتركة لجميع المستخدمين -->
+      <a class="nav-link {% if request.path == url_for('orders.index') %}active{% endif %}" href="{{ url_for('orders.index') }}">
+        <i class="fas fa-shopping-bag"></i> الطلبات
+      </a>
+      
+      <a class="nav-link {% if request.path == url_for('orders.scan_barcode') %}active{% endif %}" href="{{ url_for('orders.scan_barcode') }}">
+        <i class="fas fa-camera"></i> مسح الباركود
+      </a>
+      
+      <a class="nav-link {% if request.path == url_for('orders.manage_employee_status') %}active{% endif %}" href="{{ url_for('orders.manage_employee_status') }}">
+        <i class="fas fa-tags"></i> حالاتي المخصصة
+      </a>
+      
+      <!-- عناصر القائمة الخاصة بالموظفين العاديين -->
+      {% if not session.get('is_admin') %}
+        <a class="nav-link {% if request.path == url_for('orders.employee_dashboard') %}active{% endif %}" href="{{ url_for('orders.employee_dashboard') }}">
+          <i class="fas fa-tachometer-alt"></i> لوحتي
+        </a>
+      {% endif %}
+      
+      <!-- عناصر القائمة الخاصة بالمديرين فقط -->
+      {% if session.get('is_admin') %}
+        <a class="nav-link {% if request.path == url_for('employees.list_employees') %}active{% endif %}" href="{{ url_for('employees.list_employees') }}">
+          <i class="fas fa-users"></i> الموظفين
+        </a>
+        
+        <a class="nav-link {% if request.path == url_for('products.list_products') %}active{% endif %}" href="{{ url_for('products.list_products') }}">
+          <i class="fas fa-boxes"></i> المنتجات
+        </a>
+        
+        <a class="nav-link {% if request.path == url_for('auth.link_store') %}active{% endif %}" href="{{ url_for('auth.link_store') }}">
+          <i class="fas fa-link"></i> ربط المتجر
+        </a>
+      {% endif %}
+      
+      <hr class="text-white my-3 opacity-25" />
+      
+      <a class="nav-link" href="{{ url_for('user_auth.logout') }}">
+        <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
+      </a>
+    </aside>
+    
+    <div class="sidebar__backdrop" onclick="toggleSidebar()"></div>
+
+    <!-- Main Content -->
+    <div class="main">
+      <!-- Topbar -->
+      <div class="topbar">
+        <div class="sidebar-toggle d-lg-none" onclick="toggleSidebar()">
+          <i class="fas fa-bars"></i>
+        </div>
+        <strong class="fs-5">مرحبًا بك، {{ session.get('username', 'زائر') }}</strong>
+        <div class="actions">
+          <i class="fas fa-moon theme-toggle" id="themeToggle" onclick="toggleDarkMode()"></i>
+        </div>
+      </div>
+
+      <!-- Page Content -->
+      <div class="content container-fluid" id="content-area">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        
+        <!-- محتوى الصفحات سيكون هنا -->
+        <div class="content-container">
+          {% block content %}{% endblock %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script>
+    // تحسينات تجربة المستخدم
+    function toggleDarkMode() {
+      document.body.classList.toggle('dark-mode');
+      const isDark = document.body.classList.contains('dark-mode');
+      localStorage.setItem('darkMode', isDark);
+      document.getElementById('themeToggle').className = isDark ? 'fas fa-sun theme-toggle' : 'fas fa-moon theme-toggle';
+      
+      // إضافة تأثير للتبديل
+      const icon = document.getElementById('themeToggle');
+      icon.style.transform = 'scale(1.2)';
+      setTimeout(() => {
+        icon.style.transform = 'scale(1)';
+      }, 200);
+    }
+    
+    // تحميل وضع الظلام إذا كان مفعلًا سابقًا
+    window.addEventListener('DOMContentLoaded', () => {
+      // وضع الظلام
+      if (localStorage.getItem('darkMode') === 'true') {
+        document.body.classList.add('dark-mode');
+        document.getElementById('themeToggle').className = 'fas fa-sun theme-toggle';
+      }
+      
+      // إضافة تأثيرات hover للعناصر
+      document.querySelectorAll('.btn, .nav-link, .card').forEach(el => {
+        el.style.transition = 'var(--transition)';
+      });
+      
+      // تمييز العنصر النشط في القائمة الجانبية
+      const currentPath = window.location.pathname;
+      document.querySelectorAll('.nav-link').forEach(link => {
+        if (link.getAttribute('href') === currentPath) {
+          link.classList.add('active');
+        }
+      });
+    });
+    
+    // تحسينات القائمة الجانبية
+    const sidebar = document.querySelector('.sidebar');
+    const backdrop = document.querySelector('.sidebar__backdrop');
+    
+    function toggleSidebar() {
+      sidebar.classList.toggle('show');
+      backdrop.classList.toggle('show');
+      
+      // منع التمرير عند فتح القائمة الجانبية
+      if (sidebar.classList.contains('show')) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = '';
+      }
+    }
+    
+    // إغلاق القائمة عند النقر على رابط
+    document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+      link.addEventListener('click', () => {
+        if (window.innerWidth < 992) toggleSidebar();
+      });
+    });
+    
+    // إعداد CSRF Token لجميع طلبات AJAX
+    document.addEventListener('DOMContentLoaded', function() {
+      const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+      
+      // إعداد للـ fetch
+      if (window.fetch) {
+        const originalFetch = window.fetch;
+        window.fetch = function(url, options = {}) {
+          options.headers = options.headers || {};
+          options.headers['X-CSRFToken'] = csrfToken;
+          return originalFetch(url, options);
+        };
+      }
+      
+      // إعداد لـ jQuery AJAX إذا كان مستخدمًا
+      if (window.jQuery) {
+        $.ajaxSetup({
+          headers: {
+            'X-CSRFToken': csrfToken
+          }
+        });
+      }
+    });
+    
+    // تحسينات للشاشات الكبيرة
+    function handleResize() {
+      if (window.innerWidth >= 992) {
+        sidebar.classList.remove('show');
+        backdrop.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+    }
+    
+    window.addEventListener('resize', handleResize);
+  </script>
+  
+  {% block scripts %}{% endblock %}
+</body>
+</html>

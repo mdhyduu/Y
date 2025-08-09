@@ -1,0 +1,282 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid p-4">
+    
+    <!-- قسم الإحصائيات العامة -->
+    <div class="scrolling-stats-container mb-3">
+        <h6 class="mb-2 fw-bold"><i class="fas fa-chart-bar me-2"></i>إحصائيات الطلبات</h6>
+        <div class="d-flex flex-nowrap">
+            <div class="stat-card-item">
+                <div class="stat-card h-100 bg-danger text-white">
+                    <div class="stat-card-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="stat-card-content">
+                        <h5 class="mb-0 fw-bolder">{{ stats.missing_orders }}</h5>
+                        <p class="mb-0 small">واصل ناقص</p>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-card-item">
+                <div class="stat-card h-100 bg-warning text-dark">
+                    <div class="stat-card-icon"><i class="fas fa-clock"></i></div>
+                    <div class="stat-card-content">
+                        <h5 class="mb-0 fw-bolder">{{ stats.late_orders }}</h5>
+                        <p class="mb-0 small">طلبات متأخرة</p>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-card-item">
+                <div class="stat-card h-100 bg-primary text-white">
+                    <div class="stat-card-icon"><i class="fas fa-shopping-cart"></i></div>
+                    <div class="stat-card-content">
+                        <h5 class="mb-0 fw-bolder">{{ stats.new_orders }}</h5>
+                        <p class="mb-0 small">طلبات جديدة</p>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-card-item">
+                <div class="stat-card h-100 bg-dark text-white">
+                    <div class="stat-card-icon"><i class="fas fa-undo-alt"></i></div>
+                    <div class="stat-card-content">
+                        <h5 class="mb-0 fw-bolder">{{ stats.refunded_orders }}</h5>
+                        <p class="mb-0 small">مسترجع</p>
+                    </div>
+                </div>
+            </div>
+            <div class="stat-card-item">
+                <div class="stat-card h-100 bg-info text-dark">
+                    <div class="stat-card-icon"><i class="fas fa-truck"></i></div>
+                    <div class="stat-card-content">
+                        <h5 class="mb-0 fw-bolder">{{ stats.not_shipped_orders }}</h5>
+                        <p class="mb-0 small">لم يتم الشحن</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- قسم الحالات المخصصة للموظف -->
+    <div class="scrolling-stats-container mb-4">
+        <h6 class="mb-2 fw-bold"><i class="fas fa-tags me-2"></i>حالاتي لمتابعة الطلبات</h6>
+        <div class="d-flex flex-nowrap">
+            {% for item in custom_status_stats %}
+            <div class="stat-card-item">
+                <div class="stat-card h-100" style="background-color: {{ item.status.color }}; color: {% if item.status.color in ['#ffffff', '#f8f9fa'] %}black{% else %}white{% endif %}">
+                    <div class="stat-card-icon"><i class="fas fa-tag"></i></div>
+                    <div class="stat-card-content">
+                        <h5 class="mb-0 fw-bolder">{{ item.count }}</h5>
+                        <p class="mb-0 small">{{ item.status.name }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <!-- قسم الطلبات المسندة -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
+                    <h5 class="mb-0 fs-5"><i class="fas fa-tasks me-2"></i>الطلبات المسندة إليك</h5>
+                    <span class="badge bg-primary rounded-pill">{{ assigned_orders|length }}</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>رقم الطلب</th>
+                                    <th>العميل</th>
+                                    <th>التاريخ</th>
+                                    <th>المجموع</th>
+                                    <th>الحالة</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in assigned_orders %}
+                                <tr>
+                                    <td class="fw-bold">#{{ order.id }}</td>
+                                    <td>{{ order.customer_name }}</td>
+                                    <td>
+  {% if order.created_at %}
+    {{ order.created_at.strftime('%Y-%m-%d %H:%M') }}
+  {% else %}
+    غير محدد
+  {% endif %}
+</td>
+                                    <td>{{ order.total_amount }} {{ order.currency }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ order.status_slug | replace('under_review', 'warning') | replace('processing', 'info') | replace('completed', 'success') | replace('awaiting_payment', 'warning') | replace('shipped', 'primary') | replace('delivered', 'success') | replace('canceled', 'danger') | replace('refunded', 'secondary') }}">
+                                            {{ order.status }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('orders.order_details', order_id=order.id) }}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye me-1"></i>عرض
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">
+                                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                        <p>لا توجد طلبات مسندة إليك حالياً</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white py-2">
+                    <h6 class="mb-0"><i class="fas fa-chart-pie text-primary me-2"></i>توزيع الحالات الحرجة</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="statusChart" height="200"></canvas>
+                </div>
+            </div>
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-2">
+                    <h6 class="mb-0"><i class="fas fa-stream text-primary me-2"></i>آخر النشاطات</h6>
+                </div>
+                <div class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
+                    {% for status in recent_statuses %}
+                    <a href="{{ url_for('orders.order_details', order_id=status.order_id) }}" class="list-group-item list-group-item-action border-0 py-2">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 fw-bold">
+                                طلب #{{ status.order_id }} -
+                                {% if status.status_flag == 'late' %} <span class="text-warning small">متأخر</span>
+                                {% elif status.status_flag == 'missing' %} <span class="text-danger small">ناقص</span>
+                                {% elif status.status_flag == 'refunded' %} <span class="text-secondary small">مسترجع</span>
+                                {% elif status.status_flag == 'not_shipped' %} <span class="text-info small">لم يتم الشحن</span>
+                                {% endif %}
+                            </h6>
+                            <small class="text-muted flex-shrink-0 ms-2">{{ status.created_at|time_ago }}</small>
+                        </div>
+                        <p class="mb-1 small text-muted">
+                            {{ status.note|truncate(80) if status.note else 'تم تحديث الحالة بدون ملاحظات.' }}
+                        </p>
+                    </a>
+                    {% else %}
+                    <div class="list-group-item text-center p-4">
+                        <p class="text-muted small mb-0">لا توجد نشاطات حديثة.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    body {
+        background-color: #f9fafb;
+    }
+    .card {
+        border-radius: 0.5rem;
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+    .card-header {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    .scrolling-stats-container {
+        overflow-x: auto;
+        padding-bottom: 1rem;
+        scrollbar-width: thin;
+        scrollbar-color: #d1d5db #f9fafb;
+    }
+    .scrolling-stats-container::-webkit-scrollbar { height: 6px; }
+    .scrolling-stats-container::-webkit-scrollbar-track { background: #f9fafb; border-radius: 10px; }
+    .scrolling-stats-container::-webkit-scrollbar-thumb { background-color: #d1d5db; border-radius: 10px; }
+    
+    .stat-card-item {
+        flex: 0 0 auto;
+        width: 100px; /* تصغير حجم البطاقات */
+        margin-left: 0.5rem;
+    }
+    .stat-card-item:first-child { margin-left:2; }
+    .stat-card {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        border-radius: 0.5rem;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        height: 100%;
+    }
+    .stat-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 0.25rem 0.75rem rgba(0,0,0,0.1);
+    }
+    .stat-card-icon {
+        margin-left: 0.5rem;
+        font-size: 1rem;
+    }
+    .stat-card-content {
+        line-height: 1.2;
+    }
+    .stat-card-content h5 {
+        font-size: 1.1rem;
+    }
+    .badge {
+        font-weight: 500;
+        padding: 0.35em 0.65em;
+        font-size: 0.75rem;
+    }
+    .table th, .table td {
+        padding: 0.75rem;
+        font-size: 0.85rem;
+    }
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const statusCtx = document.getElementById('statusChart').getContext('2d');
+        const statusChart = new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['متأخر', 'واصل ناقص', 'مسترجع', 'لم يتم الشحن'],
+                datasets: [{
+                    data: [
+                        {{ stats.late_orders }},
+                        {{ stats.missing_orders }},
+                        {{ stats.refunded_orders }},
+                        {{ stats.not_shipped_orders }}
+                    ],
+                    backgroundColor: ['#ffc107', '#dc3545', '#6c757d', '#0dcaf0'],
+                    borderColor: '#fff',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true, position: 'bottom',
+                        labels: { font: { family: 'inherit', size: 11 }, padding: 12, usePointStyle: true }
+                    },
+                    tooltip: {
+                        rtl: true, backgroundColor: '#212529',
+                        titleFont: { size: 12, family: 'inherit' }, bodyFont: { size: 11, family: 'inherit' },
+                        padding: 8,
+                    }
+                },
+                cutout: '70%'
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,235 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: #f4f4f4;
+    color: #333;
+    direction: rtl;
+    text-align: right;
+}
+
+.container {
+    max-width: 900px;
+    margin: auto;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+h1 {
+    text-align: center;
+    color: #007bff;
+}
+
+.message {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 1.1em;
+}
+
+.install-link {
+    display: block;
+    text-align: center;
+    margin-top: 30px;
+}
+
+.install-button {
+    background-color: #28a745;
+    color: white;
+    padding: 10px 20px;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 1.1em;
+    transition: background-color 0.3s ease;
+}
+
+.install-button:hover {
+    background-color: #218838;
+}
+
+.order-list {
+    margin-top: 20px;
+}
+
+.order-card {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 15px;
+    background-color: #fff;
+}
+
+.order-info h3 {
+    margin: 0 0 10px 0;
+    color: #007bff;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+}
+
+.order-info p {
+    margin: 5px 0;
+    font-size: 0.9em;
+    color: #666;
+}
+
+.order-details {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+}
+
+.order-amounts, .order-customer {
+    width: 48%;
+}
+
+.order-amounts h4, .order-customer h4 {
+    margin: 10px 0 5px 0;
+    color: #555;
+}
+
+.order-status {
+    font-weight: bold;
+    padding: 5px 10px;
+    border-radius: 5px;
+    color: white;
+    margin-top: 10px;
+    display: inline-block;
+}
+
+.status-new { background-color: #007bff; }
+.status-pending { background-color: #ffc107; }
+.status-completed { background-color: #28a745; }
+.status-cancelled { background-color: #dc3545; }
+.status-under_review { background-color: #6c757d; }
+.status-in_progress { background-color: #17a2b8; }
+
+.clear-session-button {
+    background-color: #dc3545;
+    color: white;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.clear-session-button:hover {
+    background-color: #c82333;
+}
+
+.alert {
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.alert-error {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    color: #155724;
+}
+/* إضافة هذه الأنماط إلى ملف styles.css */
+.order-details-container {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    margin-top: 20px;
+}
+
+.order-summary, .order-amounts, .customer-info, .order-actions {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    padding: 8px 0;
+}
+
+.detail-label {
+    font-weight: bold;
+    color: #555;
+}
+
+.detail-value {
+    color: #333;
+}
+
+.total-row {
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+    margin-top: 10px;
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.status-completed {
+    color: #28a745;
+}
+
+.status-pending {
+    color: #ffc107;
+}
+
+.status-cancelled {
+    color: #dc3545;
+}
+
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.action-button {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+    color: #333;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.action-button:hover {
+    background-color: #e9ecef;
+}
+
+.reorder-button {
+    background-color: #28a745;
+    color: white;
+}
+
+.reorder-button:hover {
+    background-color: #218838;
+}
+
+.cancel-button {
+    background-color: #dc3545;
+    color: white;
+}
+
+.cancel-button:hover {
+    background-color: #c82333;
+}
+
+.back-button {
+    display: inline-block;
+    margin-bottom: 20px;
+    color: #007bff;
+    text-decoration: none;
+}
+
+.back-button:hover {
+    text-decoration: underline;
+}

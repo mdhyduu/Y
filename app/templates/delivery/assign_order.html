@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">إسناد الطلب #{{ order_id }}</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            <div class="mb-3">
+                <label for="employee_id" class="form-label">اختر مندوب التوصيل</label>
+                <select class="form-select" id="employee_id" name="employee_id" required>
+                    <option value="">اختر المندوب</option>
+                    {% for emp in employees %}
+                    <option value="{{ emp.id }}">{{ emp.email }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">إسناد</button>
+            <a href="{{ url_for('delivery.delivery_orders') }}" class="btn btn-secondary">إلغاء</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

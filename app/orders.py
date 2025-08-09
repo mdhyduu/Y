@@ -1,0 +1,1149 @@
+# orders.py
+from flask_wtf.csrf import CSRFProtect
+csrf = CSRFProtect() 
+from flask import Blueprint, render_template, session, flash, redirect, url_for, request, send_from_directory, current_app, jsonify
+import requests
+from .models import (
+    db, User, Employee, Department, EmployeePermission, 
+    Product, OrderDelivery, SallaOrder, OrderAssignment,
+    OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus
+)
+from .config import Config
+from .utils import process_order_data, format_date, generate_barcode, humanize_time
+import os
+from datetime import datetime, timedelta
+import logging
+import time
+from math import ceil
+import json
+
+# إعداد تسجيل الأخطاء
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+orders_bp = Blueprint('orders', __name__)
+
+def refresh_salla_token(user):
+    """تجديد توكن الوصول لسلة باستخدام refresh token"""
+    try:
+        # التحقق من وجود refresh token
+        if not user.salla_refresh_token:
+            logger.error("No refresh token available for user")
+            return None
+            
+        # فك تشفير refresh token
+        refresh_token = user.get_refresh_token()
+        
+        # إذا فشل فك التشفير، نطلب إعادة المصادقة
+        if not refresh_token:
+            logger.error("Failed to decrypt refresh token")
+            # حذف التوكنات القديمة
+            user.salla_refresh_token = None
+            user.salla_access_token = None
+            db.session.commit()
+            return None
+
+        # ... باقي الكود ...
+        payload = {
+        'grant_type': 'refresh_token',
+        'refresh_token': refresh_token,
+        'client_id': Config.SALLA_CLIENT_ID,  # تصحيح هنا
+        'client_secret': Config.SALLA_CLIENT_SECRET,
+        'redirect_uri': Config.REDIRECT_URI
+        }
+        
+        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+        
+        response = requests.post(
+            Config.SALLA_TOKEN_URL,
+            data=payload,
+            headers=headers,
+            timeout=10
+        )
+         
+        if response.status_code == 200:
+            token_data = response.json()
+            # حفظ التوكنات الجديدة
+            user.set_tokens(
+                token_data['access_token'],
+                token_data.get('refresh_token', refresh_token)
+            )
+            db.session.commit()
+            
+            # إرجاع التوكن الجديد
+            return token_data['access_token']
+        
+        # معالجة أخطاء محددة
+        error_data = response.json()
+        logger.error(f"فشل تجديد التوكن: {response.status_code} - {error_data}")
+        
+        # إذا كان الخطأ بسبب refresh token غير صالح
+        if response.status_code == 400 and error_data.get('error') == 'invalid_grant':
+            # مسح التوكنات القديمة
+            user.salla_access_token = None
+            user.salla_refresh_token = None
+            db.session.commit()
+            logger.warning("تم مسح التوكنات القديمة بسبب refresh token غير صالح")
+    
+    except Exception as e:
+        logger.error(f"خطأ في تجديد التوكن: {str(e)}", exc_info=True)
+    
+    return None
+
+@orders_bp.route('/sync_orders', methods=['POST'])
+@csrf.exempt
+def sync_orders():
+    """مزامنة الطلبات من سلة إلى قاعدة البيانات المحلية"""
+    try:
+        # التحقق من صحة الجلسة
+        if 'user_id' not in session:
+            return jsonify({
+                'success': False, 
+                'error': 'الرجاء تسجيل الدخول أولاً',
+                'code': 'UNAUTHORIZED'
+            }), 401
+        
+        # الحصول على معرف المتجر
+        store_id = None
+        access_token = None
+        
+        if session.get('is_admin'):
+            user = User.query.get(session['user_id'])
+            if not user:
+                return jsonify({
+                    'success': False,
+                    'error': 'المستخدم غير موجود',
+                    'code': 'USER_NOT_FOUND'
+                }), 404
+            store_id = user.store_id
+            access_token = user.salla_access_token
+        else:
+            employee = Employee.query.get(session['user_id'])
+            if not employee:
+                return jsonify({
+                    'success': False,
+                    'error': 'الموظف غير موجود',
+                    'code': 'EMPLOYEE_NOT_FOUND'
+                }), 404
+            
+            # الحصول على المستخدم الرئيسي للمتجر
+            user = User.query.filter_by(store_id=employee.store_id).first()
+            if not user:
+                return jsonify({
+                    'success': False,
+                    'error': 'المتجر غير مرتبط بحساب رئيسي',
+                    'code': 'STORE_NOT_LINKED'
+                }), 400
+                
+            store_id = employee.store_id
+            access_token = user.salla_access_token
+        
+        # التحقق من وجود توكن الوصول
+        if not access_token:
+            return jsonify({
+                'success': False,
+                'error': 'يجب ربط المتجر مع سلة أولاً',
+                'code': 'MISSING_ACCESS_TOKEN'
+            }), 400
+        
+        # تحديد وقت آخر مزامنة
+        last_sync = getattr(user, 'last_sync', None)
+        if not last_sync:
+            last_sync = datetime.utcnow() - timedelta(days=7)
+        else:
+            # تأخير لمدة دقيقة لتجنب فقدان الطلبات
+            last_sync = last_sync - timedelta(minutes=1)
+        
+        # جلب الطلبات من سلة
+        headers = {'Authorization': f'Bearer {access_token}'}
+        params = {
+            'per_page': 100,
+            'page': 1,
+            'updated_at[start]': last_sync.isoformat() + 'Z'
+        }
+        
+        current_app.logger.info(f"بدء مزامنة الطلبات للمتجر {store_id} منذ {last_sync}")
+        
+        all_orders = []
+        page = 1
+        total_pages = 1
+        
+        token_refreshed = False  # تتبع إذا تم تجديد التوكن
+        
+        while page <= total_pages:
+            params['page'] = page
+            response = requests.get(
+                Config.SALLA_ORDERS_ENDPOINT,
+                headers=headers,
+                params=params,
+                timeout=30
+            )
+            
+            # معالجة الأخطاء الخاصة بالتوكن
+            if response.status_code == 401 and not token_refreshed:
+                # محاولة تجديد التوكن مرة واحدة فقط
+                new_token = refresh_salla_token(user)
+                if new_token:
+                    # تحديث التوكن في الرأس
+                    headers['Authorization'] = f'Bearer {new_token}'
+                    access_token = new_token
+                    token_refreshed = True
+                    
+                    # إعادة المحاولة بنفس الصفحة
+                    response = requests.get(
+                        Config.SALLA_ORDERS_API,
+                        headers=headers,
+                        params=params,
+                        timeout=30
+                    )
+                else:
+                    # فشل تجديد التوكن
+                    return jsonify({
+                        'success': False,
+                        'error': "انتهت صلاحية الجلسة، الرجاء إعادة الربط مع سلة",
+                        'code': 'TOKEN_EXPIRED'
+                    }), 401
+            
+            # التحقق من استجابة API بعد التجديد
+            if response.status_code != 200:
+                error_msg = f"خطأ في استجابة سلة: {response.status_code} - {response.text}"
+                current_app.logger.error(error_msg)
+                return jsonify({
+                    'success': False,
+                    'error': error_msg,
+                    'code': 'SALLA_API_ERROR'
+                }), 500
+            
+            data = response.json()
+            orders = data.get('data', [])
+            all_orders.extend(orders)
+            
+            # تحديث معلومات الترحيل
+            pagination = data.get('pagination', {})
+            total_pages = pagination.get('pages', 1)
+            page += 1
+            
+            # إضافة تأخير لتجنب تجاوز معدل الطلبات
+            time.sleep(0.3)
+        
+        current_app.logger.info(f"تم جلب {len(all_orders)} طلب للمزامنة")
+        
+        # معالجة الطلبات وتخزينها
+        new_count = 0
+        updated_count = 0
+        
+        for order in all_orders:
+            order_id = str(order.get('id'))
+            existing_order = SallaOrder.query.get(order_id)
+            
+            # تحويل تاريخ الإنشاء
+            created_at_str = order.get('created_at')
+            created_at = None
+            try:
+                if created_at_str:
+                    if '.' in created_at_str:
+                        created_at = datetime.strptime(created_at_str, '%Y-%m-%d %H:%M:%S.%f')
+                    else:
+                        created_at = datetime.strptime(created_at_str, '%Y-%m-%d %H:%M:%S')
+            except (TypeError, ValueError) as e:
+                logger.warning(f"خطأ في تحويل التاريخ للطلب {order_id}: {str(e)}")
+                created_at = datetime.utcnow()
+            
+            if existing_order:
+                # تحديث الطلب الموجود
+                existing_order.status = order.get('status', {}).get('name', '')
+                existing_order.status_slug = order.get('status', {}).get('slug', '')
+                existing_order.updated_at = datetime.utcnow()
+                updated_count += 1
+            else:
+                # إنشاء طلب جديد
+                customer = order.get('customer', {})
+                new_order = SallaOrder(
+                    id=order_id,
+                    store_id=store_id,
+                    customer_name=f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip(),
+                    created_at=created_at,
+                    total_amount=float(order.get('amount', 0)),
+                    currency=order.get('currency', 'SAR'),
+                    payment_method=order.get('payment_method', ''),
+                    status=order.get('status', {}).get('name', ''),
+                    status_slug=order.get('status', {}).get('slug', ''),
+                    raw_data=json.dumps(order)  # حفظ البيانات الخام كـ JSON
+                )
+                db.session.add(new_order)
+                new_count += 1
+        
+        # تحديث وقت آخر مزامنة
+        user.last_sync = datetime.utcnow()
+        db.session.commit()
+        
+        current_app.logger.info(f"تمت المزامنة بنجاح: {new_count} جديد، {updated_count} محدث")
+        
+        return jsonify({
+            'success': True,
+            'message': f'تمت المزامنة بنجاح: {new_count} طلب جديد، {updated_count} طلب محدث',
+            'new_orders': new_count,
+            'updated_orders': updated_count
+        })
+    
+    except requests.exceptions.RequestException as e:
+        error_msg = f"خطأ في الاتصال بسلة: {str(e)}"
+        current_app.logger.error(error_msg, exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': error_msg,
+            'code': 'NETWORK_ERROR'
+        }), 500
+        
+    except Exception as e:
+        error_msg = f"خطأ غير متوقع: {str(e)}"
+        current_app.logger.error(error_msg, exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': error_msg,
+            'code': 'INTERNAL_ERROR'
+        }), 500
+
+
+# في orders.py
+
+@orders_bp.route('/')
+def index():
+    """عرض قائمة الطلبات مع نظام الترحيل الكامل"""
+    if 'user_id' not in session:
+        flash('الرجاء تسجيل الدخول أولاً', 'error')
+        return redirect(url_for('user_auth.login'))
+    
+    # جلب معلمات الترحيل والتصفية
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    status_filter = request.args.get('status', '')
+    employee_filter = request.args.get('employee', '')
+    custom_status_filter = request.args.get('custom_status', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    search_query = request.args.get('search', '')
+    
+    # التحقق من صحة معاملات الترحيل
+    if page < 1: 
+        page = 1
+    if per_page not in [10, 20, 50, 100]: 
+        per_page = 20
+    
+    # جلب بيانات المستخدم والمتجر
+    user, employee = None, None
+    is_general_employee = False
+    is_reviewer = False
+    
+    if session.get('is_admin'):
+        user = User.query.get(session['user_id'])
+        is_reviewer = True
+        if not user or not user.salla_access_token:
+            flash('يجب ربط المتجر مع سلة أولاً', 'error')
+            return redirect(url_for('auth.link_store'))
+    else:
+        employee = Employee.query.get(session['user_id'])
+        if not employee:
+            flash('غير مصرح لك بالوصول', 'error')
+            return redirect(url_for('user_auth.login'))
+        
+        user = User.query.filter_by(store_id=employee.store_id).first()
+        if not user or not user.salla_access_token:
+            flash('المتجر غير مرتبط بسلة', 'error')
+            return redirect(url_for('user_auth.logout'))
+        
+        is_general_employee = employee.role == 'general'
+        is_reviewer = employee.role in ['reviewer', 'manager']
+    
+    try:
+        # جلب الطلبات من قاعدة البيانات المحلية
+        query = SallaOrder.query.filter_by(store_id=user.store_id)
+        
+        # تطبيق الفلاتر المشتركة
+        if status_filter:
+            query = query.filter_by(status_slug=status_filter)
+        
+        if search_query:
+            query = query.filter(
+                SallaOrder.customer_name.ilike(f'%{search_query}%') | 
+                SallaOrder.id.ilike(f'%{search_query}%')
+            )
+        
+        # فلترة حسب التاريخ
+        if date_from:
+            try:
+                date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
+                query = query.filter(SallaOrder.created_at >= date_from_obj)
+            except ValueError:
+                pass
+        
+        if date_to:
+            try:
+                date_to_obj = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+                query = query.filter(SallaOrder.created_at <= date_to_obj)
+            except ValueError:
+                pass
+        
+        # فلترة خاصة بالمديرين والمراجعين
+        if is_reviewer:
+            if employee_filter:
+                # جلب الطلبات المسندة لموظف معين
+                assigned_order_ids = [a.order_id for a in 
+                                    OrderAssignment.query.filter_by(employee_id=employee_filter).all()]
+                query = query.filter(SallaOrder.id.in_(assigned_order_ids))
+            
+            if custom_status_filter:
+                # جلب الطلبات بحالة مخصصة معينة
+                status_order_ids = [s.order_id for s in 
+                                  OrderEmployeeStatus.query.filter_by(status_id=custom_status_filter).all()]
+                query = query.filter(SallaOrder.id.in_(status_order_ids))
+        
+        # فلترة خاصة بالموظفين العاديين
+        elif is_general_employee:
+            # جلب الطلبات المسندة لهذا الموظف فقط
+            assigned_order_ids = [a.order_id for a in 
+                                OrderAssignment.query.filter_by(employee_id=employee.id).all()]
+            query = query.filter(SallaOrder.id.in_(assigned_order_ids))
+            
+            # فلترة حسب الحالات المخصصة التي أضافها الموظف
+            if custom_status_filter:
+                status_order_ids = [s.order_id for s in 
+                                  OrderEmployeeStatus.query.filter_by(
+                                      status_id=custom_status_filter,
+                                      order_id=SallaOrder.id
+                                  ).all()]
+                query = query.filter(SallaOrder.id.in_(status_order_ids))
+            
+            # فلترة حسب ملاحظات الحالة (متأخر، واصل ناقص، إلخ)
+            if status_filter in ['late', 'missing', 'refunded', 'not_shipped']:
+                query = query.join(OrderStatusNote).filter(
+                    OrderStatusNote.status_flag == status_filter,
+                    OrderStatusNote.order_id == SallaOrder.id
+                )
+        
+        # الترحيل
+        pagination_obj = query.order_by(SallaOrder.created_at.desc()).paginate(page=page, per_page=per_page)
+        
+        # جلب البيانات الإضافية
+        assigned_order_ids = [order.id for order in pagination_obj.items]
+        
+        # جلب جميع الإسنادات دفعة واحدة لتحسين الأداء
+        assignments = OrderAssignment.query.filter(
+            OrderAssignment.order_id.in_(assigned_order_ids)
+        ).options(
+            db.joinedload(OrderAssignment.employee)
+        ).all()
+        
+        # تجميع الإسنادات حسب order_id
+        assignments_dict = {}
+        for assignment in assignments:
+            if assignment.order_id not in assignments_dict:
+                assignments_dict[assignment.order_id] = []
+            assignments_dict[assignment.order_id].append(assignment)
+        
+        # جلب جميع الحالات المخصصة للطلبات
+        employee_statuses = db.session.query(
+            OrderEmployeeStatus,
+            EmployeeCustomStatus,
+            Employee
+        ).join(
+            EmployeeCustomStatus,
+            OrderEmployeeStatus.status_id == EmployeeCustomStatus.id
+        ).join(
+            Employee,
+            EmployeeCustomStatus.employee_id == Employee.id
+        ).filter(
+            OrderEmployeeStatus.order_id.in_(assigned_order_ids)
+        ).all()
+        
+        # تجميع الحالات المخصصة حسب order_id
+        statuses_dict = {}
+        for status in employee_statuses:
+            if status.OrderEmployeeStatus.order_id not in statuses_dict:
+                statuses_dict[status.OrderEmployeeStatus.order_id] = []
+            statuses_dict[status.OrderEmployeeStatus.order_id].append(status)
+        
+        # جلب جميع ملاحظات الحالة
+        status_notes = OrderStatusNote.query.filter(
+            OrderStatusNote.order_id.in_(assigned_order_ids)
+        ).all()
+        
+        # تجميع ملاحظات الحالة حسب order_id
+        notes_dict = {}
+        for note in status_notes:
+            if note.order_id not in notes_dict:
+                notes_dict[note.order_id] = []
+            notes_dict[note.order_id].append(note)
+        
+        # معالجة البيانات للعرض
+        processed_orders = []
+        for order in pagination_obj.items:
+            processed_orders.append({
+                'id': order.id,
+                'customer_name': order.customer_name,
+                'created_at': humanize_time(order.created_at) if order.created_at else '',
+                'status': {
+                    'slug': order.status_slug,
+                    'name': order.status
+                },
+                'status_notes': notes_dict.get(order.id, []),
+                'employee_statuses': statuses_dict.get(order.id, []),
+                'assignments': assignments_dict.get(order.id, []),
+                'raw_created_at': order.created_at
+            })
+        
+        # جلب الموظفين للإسناد (للمديرين والمراجعين فقط)
+        employees = []
+        if is_reviewer:
+            employees = Employee.query.filter_by(store_id=user.store_id, is_active=True).all()
+        
+        # جلب الحالات المخصصة (للعرض في الفلاتر)
+        custom_statuses = []
+        if is_reviewer:
+            # للمديرين/المراجعين: جميع الحالات في المتجر
+            custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(
+                Employee.store_id == user.store_id
+            ).all()
+        elif employee:
+            # للموظفين العاديين: حالاتهم الخاصة فقط
+            custom_statuses = employee.custom_statuses
+        
+        # إعداد بيانات الترحيل للقالب
+        pagination = {
+            'page': pagination_obj.page,
+            'per_page': pagination_obj.per_page,
+            'total_items': pagination_obj.total,
+            'total_pages': pagination_obj.pages,
+            'has_prev': pagination_obj.has_prev,
+            'has_next': pagination_obj.has_next,
+            'prev_page': pagination_obj.prev_num,
+            'next_page': pagination_obj.next_num,
+            'start_item': (pagination_obj.page - 1) * pagination_obj.per_page + 1,
+            'end_item': min(pagination_obj.page * pagination_obj.per_page, pagination_obj.total)
+        }
+        
+        # إعداد بيانات الفلاتر للقالب
+        filters = {
+            'status': status_filter,
+            'employee': employee_filter,
+            'custom_status': custom_status_filter,
+            'date_from': date_from,
+            'date_to': date_to,
+            'search': search_query
+        }
+        
+        # إذا كان الطلب AJAX، نرجع القالب الجزئي فقط
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return render_template('orders_partial.html', 
+                                orders=processed_orders, 
+                                employees=employees,
+                                custom_statuses=custom_statuses,
+                                pagination=pagination,
+                                filters=filters,
+                                is_reviewer=is_reviewer,
+                                current_employee=employee)
+        
+        return render_template('orders.html', 
+                            orders=processed_orders, 
+                            employees=employees,
+                            custom_statuses=custom_statuses,
+                            pagination=pagination,
+                            filters=filters,
+                            is_reviewer=is_reviewer,
+                            current_employee=employee)
+    
+    except Exception as e:
+        error_msg = f'حدث خطأ غير متوقع: {str(e)}'
+        flash(error_msg, 'error')
+        logger.exception(error_msg)
+        return redirect(url_for('orders.index'))
+
+
+
+@orders_bp.route('/assign', methods=['POST'])
+def assign_orders():
+    """إسناد طلبات إلى موظف مع تحسينات للتحقق"""
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
+    
+    # التحقق من الصلاحيات بشكل صارم
+    is_admin = session.get('is_admin', False)
+    employee_role = session.get('employee_role', '')
+    
+    # السماح للمديرين والمراجعين فقط
+    if not (is_admin or employee_role == 'reviewer'):
+        return jsonify({
+            'success': False,
+            'error': 'غير مصرح لك بهذا الإجراء',
+            'details': 'يجب أن تكون مديرًا أو مراجعًا'
+        }), 403
+    
+    data = request.get_json()
+    employee_id = data.get('employee_id')
+    order_ids = data.get('order_ids', [])
+    current_user_id = session.get('user_id')
+    
+    if not employee_id or not order_ids:
+        return jsonify({
+            'success': False,
+            'error': 'بيانات ناقصة (يجب تحديد موظف وطلبات)'
+        }), 400
+    
+    try:
+        # بدء معاملة جديدة
+        db.session.begin()
+        
+        # التحقق من وجود الموظف
+        employee = Employee.query.get(employee_id)
+        if not employee or employee.role != 'general':
+            return jsonify({
+                'success': False,
+                'error': 'الموظف غير موجود أو ليس موظفًا عامًا'
+            }), 404
+        
+        # إسناد كل طلب مع التحقق من وجوده
+        assigned_count = 0
+        failed_assignments = []
+        
+        for order_id in order_ids:
+            order_id_str = str(order_id)
+            
+            # التحقق من وجود الطلب
+            order = SallaOrder.query.get(order_id_str)
+            if not order:
+                failed_assignments.append({'order_id': order_id, 'reason': 'الطلب غير موجود'})
+                continue
+            
+            # التحقق من عدم تكرار الإسناد
+            existing_assignment = OrderAssignment.query.filter_by(
+                order_id=order_id_str,
+                employee_id=employee_id
+            ).first()
+            
+            if existing_assignment:
+                failed_assignments.append({'order_id': order_id, 'reason': 'تم الإسناد مسبقًا'})
+                continue
+            
+            # إنشاء إسناد جديد
+            new_assignment = OrderAssignment(
+                order_id=order_id_str,
+                employee_id=employee_id,
+                assigned_by=current_user_id
+            )
+            db.session.add(new_assignment)
+            assigned_count += 1
+        
+        # إضافة سجل للإسناد
+        if assigned_count > 0:
+            db.session.commit()
+            
+            # إرسال إشعارات أو تحديثات حسب الحاجة
+            return jsonify({
+                'success': True, 
+                'message': f'تم إسناد {assigned_count} طلب(ات) بنجاح',
+                'assigned_count': assigned_count,
+                'failed_assignments': failed_assignments
+            }), 200
+        else:
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'error': 'لم يتم إسناد أي طلب',
+                'details': failed_assignments
+            }), 400
+            
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error assigning orders: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'حدث خطأ أثناء الإسناد: {str(e)}',
+            'code': 'ASSIGNMENT_ERROR'
+        }), 500
+            
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error assigning orders: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'حدث خطأ أثناء الإسناد: {str(e)}',
+            'code': 'ASSIGNMENT_ERROR'
+        }), 500
+@orders_bp.route('/<int:order_id>')
+def order_details(order_id):
+    """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة"""
+    if 'user_id' not in session:
+        flash("الرجاء تسجيل الدخول أولاً", "error")
+        return redirect(url_for('user_auth.login'))
+
+    try:
+        # ========== [1] التحقق من صلاحية المستخدم ==========
+        user = None
+        is_reviewer = False
+        current_employee = None
+        
+        if session.get('is_admin'):
+            user = User.query.get(session['user_id'])
+            is_reviewer = True
+        else:
+            current_employee = Employee.query.get(session['user_id'])
+            if not current_employee:
+                flash('غير مصرح لك بالوصول', 'error')
+                return redirect(url_for('user_auth.login'))
+                
+            user = User.query.filter_by(store_id=current_employee.store_id).first()
+            if current_employee.role in ['reviewer', 'manager']:
+                is_reviewer = True
+
+        if not user:
+            flash('المستخدم غير موجود', 'error')
+            return redirect(url_for('user_auth.login'))
+
+        # ========== [2] التحقق من صلاحية التوكن ==========
+        def refresh_and_get_token():
+            """دالة مساعدة لتجديد التوكن"""
+            new_token = refresh_salla_token(user)
+            if not new_token:
+                flash("انتهت صلاحية الجلسة، الرجاء إعادة الربط مع سلة", "error")
+                if session.get('is_admin'):
+                    return redirect(url_for('auth.link_store'))
+                else:
+                    return redirect(url_for('user_auth.logout'))
+            return new_token
+
+        access_token = user.salla_access_token
+        if not access_token:
+            flash('يجب ربط متجرك مع سلة أولاً', 'error')
+            if session.get('is_admin'):
+                return redirect(url_for('auth.link_store'))
+            else:
+                return redirect(url_for('user_auth.logout'))
+
+        # ========== [3] جلب بيانات الطلب من Salla API ==========
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+
+        # دالة مساعدة للتعامل مع طلبات API
+        def make_salla_api_request(url, params=None):
+            try:
+                response = requests.get(url, headers=headers, params=params, timeout=15)
+                
+                # إذا كان التوكن منتهي الصلاحية، حاول تجديده
+                if response.status_code == 401:
+                    new_token = refresh_and_get_token()
+                    if isinstance(new_token, str):  # إذا كان التوكن الجديد نصًا (تم تجديده بنجاح)
+                        headers['Authorization'] = f'Bearer {new_token}'
+                        response = requests.get(url, headers=headers, params=params, timeout=15)
+                    else:  # إذا كان redirect (فشل التجديد)
+                        return new_token  # هذا سيكون redirect response
+                
+                response.raise_for_status()
+                return response
+            except requests.exceptions.RequestException as e:
+                raise e
+
+        # جلب بيانات الطلب الأساسية
+        order_response = make_salla_api_request(f"{Config.SALLA_ORDERS_API}/{order_id}")
+        if not isinstance(order_response, requests.Response):  # إذا كان redirect
+            return order_response
+        order_data = order_response.json().get('data', {})
+
+        # جلب عناصر الطلب
+        items_response = make_salla_api_request(
+            f"{Config.SALLA_BASE_URL}/orders/items",
+            params={'order_id': order_id, 'include': 'images'}
+        )
+        if not isinstance(items_response, requests.Response):
+            return items_response
+        items_data = items_response.json().get('data', [])
+
+        # ========== [4] معالجة بيانات الطلب ==========
+        processed_order = process_order_data(order_id, items_data)
+
+        # استخراج بيانات الشحن بشكل آمن
+        shipping_data = order_data.get('shipping', {}) or {}
+
+        # تحديث بيانات الطلب المعالجة
+        processed_order.update({
+            'id': order_id,
+            'customer': {
+                'first_name': order_data.get('customer', {}).get('first_name', ''),
+                'last_name': order_data.get('customer', {}).get('last_name', ''),
+                'email': order_data.get('customer', {}).get('email', ''),
+                'phone': f"{order_data.get('customer', {}).get('mobile_code', '')}{order_data.get('customer', {}).get('mobile', '')}"
+            },
+            'status': {
+                'name': order_data.get('status', {}).get('name', 'غير معروف'),
+                'slug': order_data.get('status', {}).get('slug', 'unknown')
+            },
+            'created_at': format_date(order_data.get('created_at', '')),
+            'payment_method': order_data.get('payment_method', 'غير محدد'),
+            'receiver': {
+                'name': order_data.get('receiver', {}).get('name') if order_data.get('receiver') else order_data.get('customer', {}).get('first_name', '') + ' ' + order_data.get('customer', {}).get('last_name', ''),
+                'phone': order_data.get('receiver', {}).get('phone', '') if order_data.get('receiver') else order_data.get('customer', {}).get('mobile_code', '') + str(order_data.get('customer', {}).get('mobile', '')),
+                'email': order_data.get('receiver', {}).get('email', '') if order_data.get('receiver') else order_data.get('customer', {}).get('email', '')
+                    },
+                'shipping': {
+                    'method': order_data.get('delivery_method', ''),
+                    'branch_id': order_data.get('branch_id'),
+                    'courier_id': order_data.get('courier_id'),
+                    'address': shipping_data.get('address', ''),
+                    'address_line': shipping_data.get('address_line', ''),
+                    'block': shipping_data.get('block', ''),
+                    'street_number': shipping_data.get('street_number', ''),
+                    'postal_code': shipping_data.get('postal_code', ''),
+                    'geo_coordinates': shipping_data.get('geo_coordinates', {}),
+                    'city_id': shipping_data.get('city'),
+                    'country_id': shipping_data.get('country')
+                },
+                'payment': {
+                    'status': order_data.get('payment', {}).get('status', ''),
+                    'method': order_data.get('payment', {}).get('method', '')
+                },
+            'amount': {
+                'sub_total': order_data.get('amounts', {}).get('sub_total', {'amount': 0, 'currency': 'SAR'}),
+                'shipping_cost': order_data.get('amounts', {}).get('shipping_cost', {'amount': 0, 'currency': 'SAR'}),
+                'discount': order_data.get('amounts', {}).get('discount', {'amount': 0, 'currency': 'SAR'}),
+                'total': order_data.get('amounts', {}).get('total', {'amount': 0, 'currency': 'SAR'})
+            }
+        })
+
+        # إنشاء الباركود إذا لم يكن موجوداً
+        if not processed_order.get('barcode'):
+            barcode_filename = generate_barcode(order_id)
+            if barcode_filename:
+                processed_order['barcode'] = barcode_filename
+
+        # ========== [5] جلب البيانات الإضافية من قاعدة البيانات ==========
+        # جلب الملاحظات الخاصة بالطلب (للمراجعين فقط)
+        status_notes = []
+        if is_reviewer:
+            status_notes = OrderStatusNote.query.filter_by(order_id=str(order_id))\
+                .order_by(OrderStatusNote.created_at.desc()).all()
+        
+        # جلب الحالات المخصصة لهذا الطلب
+        employee_statuses = db.session.query(
+            OrderEmployeeStatus,
+            EmployeeCustomStatus,
+            Employee
+        ).join(
+            EmployeeCustomStatus,
+            OrderEmployeeStatus.status_id == EmployeeCustomStatus.id
+        ).join(
+            Employee,
+            EmployeeCustomStatus.employee_id == Employee.id
+        ).filter(
+            OrderEmployeeStatus.order_id == str(order_id)
+        ).order_by(
+            OrderEmployeeStatus.created_at.desc()
+        ).all()
+
+        # ========== [6] عرض صفحة التفاصيل ==========
+        return render_template('order_details.html', 
+                            order=processed_order, 
+                            status_notes=status_notes,
+                            employee_statuses=employee_statuses,
+                            current_employee=current_employee,
+                            is_reviewer=is_reviewer)
+
+    except requests.exceptions.HTTPError as http_err:
+        error_msg = f"خطأ في جلب تفاصيل الطلب: {http_err}"
+        if http_err.response.status_code == 401:
+            error_msg = "انتهت صلاحية الجلسة، الرجاء إعادة الربط مع سلة"
+        flash(error_msg, "error")
+        logger.error(f"HTTP Error: {http_err} - Status Code: {http_err.response.status_code}")
+        return redirect(url_for('orders.index'))
+
+    except requests.exceptions.RequestException as e:
+        error_msg = f"حدث خطأ في الاتصال: {str(e)}"
+        flash(error_msg, "error")
+        logger.error(f"Request Exception: {str(e)}")
+        return redirect(url_for('orders.index'))
+
+    except Exception as e:
+        error_msg = f"حدث خطأ غير متوقع: {str(e)}"
+        flash(error_msg, "error")
+        logger.exception(f"Unexpected error: {str(e)}")
+        return redirect(url_for('orders.index'))
+
+
+
+@orders_bp.route('/<int:order_id>/update_status', methods=['POST'])
+def update_order_status(order_id):
+    """تحديث حالة الطلب في سلة"""
+    if 'user_id' not in session:
+        flash("الرجاء تسجيل الدخول أولاً", "error")
+        return redirect(url_for('user_auth.login'))
+    
+    user = User.query.get(session['user_id'])
+    if not user or not user.salla_access_token:
+        flash('يجب ربط متجرك مع سلة أولاً', 'error')
+        return redirect(url_for('auth.link_store'))
+    
+    try:
+        new_status = request.form.get('status_slug')
+        note = request.form.get('note', '')
+
+        if not new_status:
+            flash("يجب اختيار حالة جديدة", "error")
+            return redirect(url_for('orders.order_details', order_id=order_id))
+
+        headers = {
+            'Authorization': f'Bearer {user.salla_access_token}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+
+        payload = {
+            'slug': new_status,
+            'note': note
+        }
+
+        response = requests.post(
+            f"{Config.SALLA_ORDERS_API}/{order_id}/status",
+            headers=headers,
+            json=payload,
+            timeout=10
+        )
+        response.raise_for_status()
+
+        flash("تم تحديث حالة الطلب بنجاح", "success")
+        return redirect(url_for('orders.order_details', order_id=order_id))
+
+    except requests.exceptions.HTTPError as http_err:
+        if http_err.response.status_code == 401:
+            flash("انتهت صلاحية الجلسة، الرجاء إعادة الربط مع سلة", "error")
+            return redirect(url_for('auth.link_store'))
+        
+        error_data = http_err.response.json()
+        error_message = error_data.get('error', {}).get('message', 'حدث خطأ أثناء تحديث الحالة')
+        
+        if http_err.response.status_code == 422:
+            field_errors = error_data.get('error', {}).get('fields', {})
+            for field, errors in field_errors.items():
+                for error in errors:
+                    flash(f"{field}: {error}", "error")
+        else:
+            flash(f"خطأ: {error_message}", "error")
+        return redirect(url_for('orders.order_details', order_id=order_id))
+    except Exception as e:
+        flash(f"حدث خطأ غير متوقع: {str(e)}", "error")
+        return redirect(url_for('orders.order_details', order_id=order_id))
+
+@orders_bp.route('/<int:order_id>/add_status_note', methods=['POST'])
+def add_status_note(order_id):
+    """إضافة ملاحظة خاصة بالطلب (متأخر، واصل ناقص، إلخ)"""
+    if 'user_id' not in session:
+        flash("الرجاء تسجيل الدخول أولاً", "error")
+        return redirect(url_for('user_auth.login'))
+    
+    # التحقق من الصلاحية: فقط المراجعون والمديرون
+    is_reviewer = False
+    if session.get('is_admin'):
+        is_reviewer = True
+    else:
+        employee = Employee.query.get(session['user_id'])
+        if employee and employee.role in ['reviewer', 'manager']:
+            is_reviewer = True
+    
+    if not is_reviewer:
+        flash('غير مصرح لك بهذا الإجراء', 'error')
+        return redirect(url_for('orders.order_details', order_id=order_id))
+    
+    status_flag = request.form.get('status_flag')
+    note = request.form.get('note', '')
+    
+    if not status_flag:
+        flash("يجب اختيار حالة", "error")
+        return redirect(url_for('orders.order_details', order_id=order_id))
+    
+    try:
+        new_note = OrderStatusNote(
+            order_id=str(order_id),
+            status_flag=status_flag,
+            note=note,
+            created_by=session['user_id']
+        )
+        db.session.add(new_note)
+        db.session.commit()
+        flash("تم حفظ الملاحظة بنجاح", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"حدث خطأ: {str(e)}", "error")
+    
+    return redirect(url_for('orders.order_details', order_id=order_id))
+
+@orders_bp.route('/static/barcodes/<filename>')
+def serve_barcode(filename):
+    """تخدم ملفات الباركود"""
+    barcode_folder = Config.BARCODE_FOLDER
+    return send_from_directory(barcode_folder, filename)
+
+@orders_bp.route('/scan')
+def scan_barcode():
+    """صفحة مسح الباركود"""
+    if 'user_id' not in session:
+        flash('الرجاء تسجيل الدخول أولاً', 'error')
+        return redirect(url_for('user_auth.login'))
+    return render_template('scan_barcode.html')
+# ... [الكود السابق] ...
+@orders_bp.route('/employee_dashboard')
+def employee_dashboard(): 
+    """لوحة تحكم الموظف"""
+    if 'user_id' not in session or session.get('is_admin'):
+        flash('غير مصرح لك بالوصول', 'error')
+        return redirect(url_for('user_auth.login'))
+    
+    employee = Employee.query.get(session['user_id'])
+    if not employee:
+        flash('غير مصرح لك بالوصول', 'error')
+        return redirect(url_for('user_auth.login'))
+    
+    # جلب الطلبات المسندة لهذا الموظف فقط
+    assignments = OrderAssignment.query.filter_by(employee_id=employee.id).all()
+    assigned_order_ids = [assignment.order_id for assignment in assignments]
+    
+    # جلب الطلبات المسندة
+    assigned_orders = SallaOrder.query.filter(SallaOrder.id.in_(assigned_order_ids)).all() if assigned_order_ids else []
+    
+    # حساب الإحصائيات بناءً على الطلبات المسندة فقط
+    stats = {
+        'new_orders': len([o for o in assigned_orders if o.status_slug == 'new']),
+        'late_orders': len([o for o in assigned_orders if any(note.status_flag == 'late' for note in o.status_notes)]),
+        'missing_orders': len([o for o in assigned_orders if any(note.status_flag == 'missing' for note in o.status_notes)]),
+        'refunded_orders': len([o for o in assigned_orders if any(note.status_flag == 'refunded' for note in o.status_notes)]),
+        'not_shipped_orders': len([o for o in assigned_orders if any(note.status_flag == 'not_shipped' for note in o.status_notes)]),
+        'completed_orders': len([o for o in assigned_orders if o.status_slug == 'completed'])
+    }
+    
+    # جلب الحالات المخصصة للموظف الحالي
+    custom_statuses = EmployeeCustomStatus.query.filter_by(employee_id=employee.id).all()
+    
+    # حساب عدد الطلبات لكل حالة مخصصة - التعديل هنا
+    custom_status_stats = []
+    for status in custom_statuses:
+        if assigned_order_ids:  # فقط إذا كانت هناك طلبات مسندة
+            count = OrderEmployeeStatus.query.filter(
+                OrderEmployeeStatus.status_id == status.id,
+                OrderEmployeeStatus.order_id.in_(assigned_order_ids)
+            ).count()
+        else:
+            count = 0
+            
+        custom_status_stats.append({
+            'status': status,
+            'count': count
+        })
+    
+    # جلب آخر النشاطات للطلبات المسندة فقط
+    recent_statuses = OrderStatusNote.query.filter(
+        OrderStatusNote.order_id.in_(assigned_order_ids)
+    ).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
+    
+    return render_template('employee_dashboard.html', 
+                          stats=stats,
+                          custom_status_stats=custom_status_stats,
+                          recent_statuses=recent_statuses,
+                          assigned_orders=assigned_orders)
+# إضافة فلتر لجينن لتحويل أسماء الحالات
+# في orders.py
+@orders_bp.route('/employee_status', methods=['GET', 'POST'])
+def manage_employee_status():
+    if 'user_id' not in session:
+        flash('الرجاء تسجيل الدخول أولاً', 'error')
+        return redirect(url_for('user_auth.login'))
+    
+    # للموظفين العاديين: جلب بيانات الموظف
+    employee = None
+    if not session.get('is_admin'):
+        employee = Employee.query.get(session['user_id'])
+        if not employee:
+            flash('غير مصرح لك بالوصول', 'error')
+            return redirect(url_for('user_auth.login'))
+    
+    if request.method == 'POST':
+        name = request.form.get('name')
+        color = request.form.get('color', '#6c757d')
+        
+        if name:
+            # للمديرين: استخدام user_id، للموظفين: استخدام employee.id
+            employee_id = session['user_id'] if session.get('is_admin') else employee.id
+            new_status = EmployeeCustomStatus(
+                name=name,
+                color=color,
+                employee_id=employee_id
+            )
+            db.session.add(new_status)
+            db.session.commit()
+            flash('تمت إضافة الحالة بنجاح', 'success')
+        return redirect(url_for('orders.manage_employee_status'))
+    
+    # جلب الحالات حسب نوع المستخدم
+    if session.get('is_admin'):
+        statuses = EmployeeCustomStatus.query.filter_by(employee_id=session['user_id']).all()
+    else:
+        statuses = employee.custom_statuses
+    
+    return render_template('manage_custom_status.html', statuses=statuses)
+@orders_bp.route('/employee_status/<int:status_id>/delete', methods=['POST'])
+def delete_employee_status(status_id):
+    if 'user_id' not in session:
+        flash('غير مصرح لك بالوصول', 'error')
+        return redirect(url_for('user_auth.login'))
+    
+    status = EmployeeCustomStatus.query.get(status_id)
+    if status and status.employee_id == session['user_id']:
+        db.session.delete(status)
+        db.session.commit()
+        flash('تم حذف الحالة بنجاح', 'success')
+    return redirect(url_for('orders.manage_employee_status'))
+@orders_bp.route('/<int:order_id>/add_employee_status', methods=['POST'])
+def add_employee_status(order_id):
+    if 'user_id' not in session:
+        flash('الرجاء تسجيل الدخول أولاً', 'error')
+        return redirect(url_for('user_auth.login'))
+    
+    # التحقق من أن المستخدم موظف وليس مديراً
+    if session.get('is_admin'):
+        flash('هذه الخدمة للموظفين فقط', 'error')
+        return redirect(url_for('orders.order_details', order_id=order_id))
+    
+    employee = Employee.query.get(session['user_id'])
+    if not employee:
+        flash('غير مصرح لك بهذا الإجراء', 'error')
+        return redirect(url_for('orders.order_details', order_id=order_id))
+    
+    status_id = request.form.get('status_id')
+    note = request.form.get('note', '')
+    
+    if not status_id:
+        flash('يجب اختيار حالة', 'error')
+        return redirect(url_for('orders.order_details', order_id=order_id))
+    
+    # التحقق أن الحالة تخص الموظف الحالي
+    custom_status = EmployeeCustomStatus.query.filter_by(
+        id=status_id,
+        employee_id=employee.id
+    ).first()
+    
+    if not custom_status:
+        flash('الحالة المحددة غير صالحة', 'error')
+        return redirect(url_for('orders.order_details', order_id=order_id))
+    
+    try:
+        new_status = OrderEmployeeStatus(
+            order_id=str(order_id),
+            status_id=status_id,
+            note=note
+        )
+        db.session.add(new_status)
+        db.session.commit()
+        flash('تم إضافة الحالة بنجاح', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ: {str(e)}', 'error')
+    
+    return redirect(url_for('orders.order_details', order_id=order_id))

@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3 class="mb-0">
+                <i class="fas fa-user-shield"></i> إدارة صلاحيات الموظفين
+            </h3>
+            <a href="{{ url_for('permissions.manage_departments') }}" class="btn btn-light btn-sm">
+                <i class="fas fa-sitemap"></i> إدارة الأقسام
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('permissions.update_permissions') }}">
+            <div class="form-group">
+                <label class="font-weight-bold">اختر الموظف:</label>
+                <select name="employee_id" class="form-control form-control-lg" required>
+                    <option value="">-- اختر موظف --</option>
+                    {% for employee in employees %}
+                        <option value="{{ employee.id }}" {% if selected_employee and selected_employee.id == employee.id %}selected{% endif %}>
+                            {{ employee.email }} ({{ employee.role }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            {% if departments %}
+            <div class="form-group">
+                <label class="font-weight-bold">الأقسام المسموحة:</label>
+                <div class="row">
+                    {% for department in departments %}
+                    <div class="col-md-4 mb-3">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input" 
+                                   id="department_{{ department.id }}"
+                                   name="department_{{ department.id }}"
+                                   {% if department in employee_permissions %}checked{% endif %}>
+                            <label class="custom-control-label" for="department_{{ department.id }}">
+                                {{ department.name }}
+                                {% if department.salla_id %}
+                                <span class="badge badge-info">سلة</span>
+                                {% endif %}
+                            </label>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-success btn-lg">
+                <i class="fas fa-save"></i> حفظ الصلاحيات
+            </button>
+            {% else %}
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                لا توجد أقسام. يرجى إضافة أقسام أولاً.
+            </div>
+            {% endif %}
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // عند تغيير الموظف، إعادة تحميل الصفحة مع معرف الموظف المحدد
+    document.querySelector('select[name="employee_id"]').addEventListener('change', function() {
+        if(this.value) {
+            window.location.href = "{{ url_for('permissions.manage_permissions') }}?employee_id=" + this.value;
+        }
+    });
+</script>
+{% endblock %}

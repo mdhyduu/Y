@@ -1,0 +1,33 @@
+<tr>
+    <td>
+        <div class="d-flex align-items-center">
+            <div style="padding-left: {% if department.parent_id %}20{% else %}0{% endif %}px;">
+                <i class="fas {% if department.children %}fa-folder-open{% else %}fa-folder{% endif %} text-warning me-2"></i>
+                {{ department.name }}
+            </div>
+        </div>
+    </td>
+    <td>
+        {% if department.salla_id %}
+        <span class="badge badge-info">سلة</span>
+        {% else %}
+        <span class="badge badge-secondary">محلي</span>
+        {% endif %}
+    </td>
+    <td>
+        {{ department.permissions|length }} موظف
+    </td>
+    <td class="text-center">
+        <div class="custom-control custom-checkbox">
+            <input type="checkbox" class="custom-control-input" 
+                   id="delete_{{ department.id }}"
+                   name="delete_{{ department.id }}">
+            <label class="custom-control-label" for="delete_{{ department.id }}"></label>
+        </div>
+    </td>
+</tr>
+{% for child in department.children %}
+    {% with department=child %}
+        {% include '_department_row.html' %}
+    {% endwith %}
+{% endfor %}

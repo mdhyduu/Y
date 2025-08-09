@@ -1,0 +1,45 @@
+<div class="mb-2">
+    <div class="custom-control custom-checkbox">
+        <input type="checkbox" class="custom-control-input" 
+               id="department_{{ department.id }}"
+               name="department_{{ department.id }}"
+               {% if department in employee_permissions %}checked{% endif %}>
+        <label class="custom-control-label font-weight-bold" for="department_{{ department.id }}">
+            {{ department.name }}
+            {% if department.salla_id %}
+            <span class="badge badge-info">سلة</span>
+            {% endif %}
+        </label>
+    </div>
+    
+    {% if department.children.count() > 0 %}
+    <div class="pl-4 mt-2">
+        {% for child in department.children %}
+            <div class="mb-2">
+                <div class="custom-control custom-checkbox">
+                    <input type="checkbox" class="custom-control-input" 
+                           id="department_{{ child.id }}"
+                           name="department_{{ child.id }}"
+                           {% if child in employee_permissions %}checked{% endif %}>
+                    <label class="custom-control-label" for="department_{{ child.id }}">
+                        {{ child.name }}
+                        {% if child.salla_id %}
+                        <span class="badge badge-info">سلة</span>
+                        {% endif %}
+                    </label>
+                </div>
+                
+                {% if child.children.count() > 0 %}
+                <div class="pl-4 mt-2">
+                    {% for subchild in child.children %}
+                        {% with department=subchild %}
+                            {% include '_department_tree.html' %}
+                        {% endwith %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>

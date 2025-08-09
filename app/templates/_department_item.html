@@ -1,0 +1,27 @@
+<div class="department-item">
+    <div class="d-flex align-items-center">
+        <input type="checkbox" class="department-checkbox" 
+               id="delete_{{ department.id }}"
+               name="delete_{{ department.id }}">
+        <span class="department-name">
+            {% if department.salla_id %}
+            <span class="badge badge-info department-badge">سلة</span>
+            {% else %}
+            <span class="badge badge-secondary department-badge">محلي</span>
+            {% endif %}
+            <i class="fas {% if department.children %}fa-folder-open text-warning{% else %}fa-file text-muted{% endif %}"></i>
+            {{ department.name }}
+            <small class="text-muted">({{ department.permissions|length }} موظف)</small>
+        </span>
+    </div>
+</div>
+
+{% if department.children %}
+<div class="sub-department">
+    {% for child in department.children %}
+        {% with department=child %}
+            {% include '_department_item.html' %}
+        {% endwith %}
+    {% endfor %}
+</div>
+{% endif %}

@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow border-0">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            {% if employee.role == 'delivery_manager' %}
+                            <i class="fas fa-user-shield me-2"></i>لوحة تحكم مدير التوصيل
+                            {% else %}
+                            <i class="fas fa-truck me-2"></i>لوحة تحكم مندوب التوصيل
+                            {% endif %}
+                        </h4>
+                        <span class="badge bg-light text-dark">
+                            <i class="fas fa-store me-1"></i> {{ current_user.store.name if current_user.store else 'متجر غير محدد' }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <!-- بطاقات الإحصائيات -->
+                    <div class="row mb-4">
+                        <div class="col-md-4 mb-3">
+                            <div class="card border-start border-primary border-4 h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h6 class="text-muted mb-2">طلبات اليوم</h6>
+                                            <h3 class="mb-0">15</h3>
+                                        </div>
+                                        <div class="bg-primary bg-opacity-10 p-3 rounded">
+                                            <i class="fas fa-calendar-day text-primary"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <div class="card border-start border-success border-4 h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h6 class="text-muted mb-2">طلبات مسلمة</h6>
+                                            <h3 class="mb-0">12</h3>
+                                        </div>
+                                        <div class="bg-success bg-opacity-10 p-3 rounded">
+                                            <i class="fas fa-check-circle text-success"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <div class="card border-start border-warning border-4 h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h6 class="text-muted mb-2">طلبات قيد التوصيل</h6>
+                                            <h3 class="mb-0">3</h3>
+                                        </div>
+                                        <div class="bg-warning bg-opacity-10 p-3 rounded">
+                                            <i class="fas fa-truck text-warning"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- أزرار الإجراءات الرئيسية -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <a href="{{ url_for('delivery.delivery_orders') }}" 
+                               class="btn btn-primary btn-lg w-100 py-3 d-flex align-items-center justify-content-center">
+                                <i class="fas fa-list-alt me-3 fa-lg"></i>
+                                <span>عرض جميع الطلبات</span>
+                            </a>
+                        </div>
+                        
+                        {% if employee.role == 'delivery_manager' %}
+                        <div class="col-md-6">
+                            <a href="{{ url_for('employees.add_employee') }}" 
+                               class="btn btn-success btn-lg w-100 py-3 d-flex align-items-center justify-content-center">
+                                <i class="fas fa-user-plus me-3 fa-lg"></i>
+                                <span>إدارة مناديب التوصيل</span>
+                            </a>
+                        </div>
+                        {% else %}
+                        <div class="col-md-6">
+                            <a href="{{ url_for('delivery.scan_barcode') }}" 
+                               class="btn btn-info btn-lg w-100 py-3 d-flex align-items-center justify-content-center">
+                                <i class="fas fa-barcode me-3 fa-lg"></i>
+                                <span>تسليم طلب جديد</span>
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- قسم الطلبات الحديثة -->
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">
+                                <i class="fas fa-clock me-2"></i>أحدث الطلبات
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="list-group list-group-flush">
+                                <a href="#" class="list-group-item list-group-item-action">
+                                    <div class="d-flex justify-content-between">
+                                        <span>#1254 - محمد أحمد</span>
+                                        <span class="badge bg-warning">قيد التوصيل</span>
+                                    </div>
+                                    <small class="text-muted">منطقة: الرياض - منذ 30 دقيقة</small>
+                                </a>
+                                <a href="#" class="list-group-item list-group-item-action">
+                                    <div class="d-flex justify-content-between">
+                                        <span>#1253 - علي محمد</span>
+                                        <span class="badge bg-success">تم التسليم</span>
+                                    </div>
+                                    <small class="text-muted">منطقة: الرياض - منذ ساعتين</small>
+                                </a>
+                                <a href="#" class="list-group-item list-group-item-action">
+                                    <div class="d-flex justify-content-between">
+                                        <span>#1252 - سعيد خالد</span>
+                                        <span class="badge bg-success">تم التسليم</span>
+                                    </div>
+                                    <small class="text-muted">منطقة: الرياض - منذ 3 ساعات</small>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- ملاحظات للمستخدم -->
+                    <div class="alert alert-{{ 'primary' if employee.role == 'delivery_manager' else 'info' }} d-flex">
+                        <i class="fas fa-info-circle me-3 fa-lg mt-1"></i>
+                        <div>
+                            <strong>ملاحظة:</strong>
+                            {% if employee.role == 'delivery_manager' %}
+                            أنت مسؤول عن إدارة وتوزيع طلبات التوصيل على المناديب في منطقة {{ employee.region }}.
+                            {% else %}
+                            أنت مسؤول عن توصيل الطلبات المسندة إليك في منطقة {{ employee.region }}.
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card-hover:hover {
+        transform: translateY(-5px);
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .btn-action {
+        transition: all 0.2s ease;
+    }
+    .btn-action:hover {
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}

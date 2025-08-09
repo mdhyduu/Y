@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h3 class="mb-0"><i class="fas fa-users"></i> إدارة الموظفين</h3>
+    </div>
+    <div class="card-body">
+        <a href="{{ url_for('employees.add_employee') }}" class="btn btn-success mb-3">
+            <i class="fas fa-plus"></i> إضافة موظف جديد
+        </a>
+        
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>البريد الإلكتروني</th>
+                        <th>الدور</th>
+                        <th>الحالة</th>
+                        <th>تاريخ الإيقاف</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for employee in employees %}
+                    <tr class="{% if not employee.is_active %}table-secondary{% endif %}">
+                        <td>{{ loop.index }}</td>
+                        <td>{{ employee.email }}</td>
+                        <td>
+                            {% if employee.role == 'general' %}
+                                موظف عام
+                            {% elif employee.role == 'delivery' %}
+                                مندوب توصيل
+                            {% elif employee.role == 'delivery_manager' %}
+                                مدير التوصيل
+                            {% elif employee.role == 'reviewer' %}
+                                مراجع الطلبات
+                            {% else %}
+                                {{ employee.role }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if employee.is_active %}
+                                <span class="badge badge-success">نشط</span>
+                            {% else %}
+                                <span class="badge badge-danger">موقوف</span>
+                            {% endif %}
+                        </td>
+<td>
+    {% if employee.deactivated_at %}
+        {{ employee.deactivated_at|format_date }}
+    {% else %}
+        -
+    {% endif %}
+</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('employees.toggle_employee_active', employee_id=employee.id) }}" style="display:inline;">
+                                {% if employee.is_active %}
+                                    <button type="submit" class="btn btn-warning btn-sm">
+                                        <i class="fas fa-user-slash"></i> إيقاف
+                                    </button>
+                                {% else %}
+                                    <button type="submit" class="btn btn-success btn-sm">
+                                        <i class="fas fa-user-check"></i> تفعيل
+                                    </button>
+                                {% endif %}
+                            </form>
+                            <form method="POST" action="{{ url_for('employees.delete_employee', employee_id=employee.id) }}" style="display:inline;" onsubmit="return confirm('هل أنت متأكد من حذف الموظف؟');">
+                                <button type="submit" class="btn btn-danger btn-sm">
+                                    <i class="fas fa-trash-alt"></i> حذف
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

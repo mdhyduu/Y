@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>طلبات منطقة الرياض</h2>
+{% if is_delivery_manager %}
+<div class="alert alert-info">
+    <strong>ملاحظة:</strong> أنت تشاهد جميع طلبات منطقة الرياض
+</div>
+{% else %}
+<div class="alert alert-info">
+    <strong>ملاحظة:</strong> أنت تشاهد فقط الطلبات المسندة لك أو التي قمت بتسليمها
+</div>
+{% endif %}
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>رقم الطلب</th>
+            <th>العميل</th>
+            <th>المدينة</th>
+            <th>التاريخ</th>
+            <th>المبلغ</th>
+            <th>الحالة</th>
+            <th>مسند إلى</th>
+            <th>تم التسليم</th>
+            <th>الإجراءات</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for order in orders %}
+        <tr>
+            <td>{{ order.id }}</td>
+            <td>{{ order.customer.first_name }} {{ order.customer.last_name }}</td>
+            <td>{{ order.city }}</td>
+            <td>{{ order.created_at|format_date }}</td>
+            <td>{{ order.amount }} {{ order.currency }}</td>
+            <td>{{ order.status }}</td>
+            <td>
+                {% if order.assigned_to %}
+                    {{ order.assigned_to.email }}
+                {% else %}
+                    غير مسند
+                {% endif %}
+            </td>
+            <td>
+                {% if order.is_delivered %}
+                    <span class="badge bg-success">تم التسليم</span>
+                {% else %}
+                    <span class="badge bg-warning">قيد التوصيل</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if is_delivery_manager %}
+                    {% if not order.is_delivered %}
+                    <a href="{{ url_for('delivery.assign_order', order_id=order.id) }}" 
+                       class="btn btn-sm btn-warning">
+                        <i class="fas fa-user-plus"></i> إسناد
+                    </a>
+                    {% else %}
+                    <span class="text-muted">تم التسليم</span>
+                    {% endif %}
+                {% else %}
+                    {% if not order.is_delivered and order.assigned_to and order.assigned_to.id == employee.id %}
+                    <a href="{{ url_for('delivery.scan_barcode') }}" 
+                       class="btn btn-sm btn-success">
+                        <i class="fas fa-barcode"></i> تسليم
+                    </a>
+                    {% elif order.is_delivered %}
+                    <span class="text-muted">تم التسليم</span>
+                    {% endif %}
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="9">لا توجد طلبات في منطقة الرياض</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

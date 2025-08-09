@@ -1,0 +1,759 @@
+{% extends 'base.html' %}
+
+{% block content %} 
+<div class="card shadow-lg mb-4 border-0">
+    <div class="card-header py-3 bg-gradient-primary text-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold">
+                <i class="fas fa-tasks me-2"></i>لوحة تحكم الطلبات
+            </h6>
+            <div class="d-flex align-items-center">
+                <div id="sync-progress" class="me-3 d-none">
+                    <div class="progress" style="height: 6px; width: 150px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-white" 
+                             role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <small class="sync-details text-white-50 mt-1 d-block"></small>
+                </div>
+                <button class="btn btn-light btn-sm rounded-pill" id="sync-orders-btn">
+                    <i class="fas fa-sync-alt me-1"></i>
+                    <span class="sync-text">مزامنة الطلبات</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card-body p-0">
+        <!-- فلترة متقدمة -->
+        <div class="p-4 border-bottom">
+            <form id="advanced-filters" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label for="search-order-id" class="form-label small text-muted mb-1">بحث سريع</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent"><i class="fas fa-search"></i></span>
+                        <input type="text" id="search-order-id" class="form-control border-start-0" 
+                               placeholder="ابحث برقم الطلب..." value="{{ filters.search }}"
+                               data-debounce="500">
+                    </div>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="filter-order-status" class="form-label small text-muted mb-1">حالة الطلب</label>
+                    <select id="filter-order-status" class="form-select">
+                        <option value="">الكل</option>
+                        <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>قيد الانتظار</option>
+                        <option value="processing" {% if filters.status == 'processing' %}selected{% endif %}>قيد المعالجة</option>
+                        <option value="under_review" {% if filters.status == 'under_review' %}selected{% endif %}>قيد المراجعة</option>
+                        <option value="shipped" {% if filters.status == 'shipped' %}selected{% endif %}>تم الشحن</option>
+                        <option value="delivered" {% if filters.status == 'delivered' %}selected{% endif %}>تم التوصيل</option>
+                        <option value="canceled" {% if filters.status == 'canceled' %}selected{% endif %}>ملغي</option>
+                        <option value="awaiting_payment" {% if filters.status == 'awaiting_payment' %}selected{% endif %}>بانتظار الدفع</option>
+                    </select>
+                </div>
+                
+                {% if is_reviewer %}
+                <div class="col-md-2">
+                    <label for="filter-employee" class="form-label small text-muted mb-1">الموظف المسؤول</label>
+                    <select id="filter-employee" class="form-select">
+                        <option value="">الكل</option>
+                        {% for emp in employees %}
+                            <option value="{{ emp.id }}" {% if filters.employee == emp.id|string %}selected{% endif %}>{{ emp.email|truncate(15) }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                
+                <div class="col-md-2">
+                    <label for="filter-custom-status" class="form-label small text-muted mb-1">حالة مخصصة</label>
+                    <select id="filter-custom-status" class="form-select">
+                        <option value="">الكل</option>
+                        {% for status in custom_statuses %}
+                            <option value="{{ status.id }}" {% if filters.custom_status == status.id|string %}selected{% endif %}>{{ status.name|truncate(15) }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="filter-special-status" class="form-label small text-muted mb-1">حالات خاصة</label>
+                    <select id="filter-special-status" class="form-select">
+                        <option value="">الكل</option>
+                        <option value="late" {% if filters.status == 'late' %}selected{% endif %}>متأخرة</option>
+                        <option value="missing" {% if filters.status == 'missing' %}selected{% endif %}>واصل ناقص</option>
+                        <option value="not_shipped" {% if filters.status == 'not_shipped' %}selected{% endif %}>لم يشحن</option>
+                        <option value="refunded" {% if filters.status == 'refunded' %}selected{% endif %}>مرتجعات</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
+                    <label class="form-label small text-muted mb-1">الفترة الزمنية</label>
+                    <div class="input-daterange input-group">
+                        <input type="date" class="form-control form-control-sm rounded-start" 
+                               id="date-from" name="date_from" value="{{ filters.date_from }}">
+                        <span class="input-group-text bg-light">إلى</span>
+                        <input type="date" class="form-control form-control-sm rounded-end" 
+                               id="date-to" name="date_to" value="{{ filters.date_to }}">
+                    </div>
+                </div>
+                
+                <div class="col-md-2 d-flex">
+                    <button type="submit" class="btn btn-primary me-2 flex-grow-1">
+                        <i class="fas fa-filter me-1"></i> تطبيق
+                    </button>
+                    <button type="button" id="reset-filters" class="btn btn-outline-secondary">
+                        <i class="fas fa-undo"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {% if orders %}
+        <div class="table-responsive position-relative">
+            <!-- مؤشر تحميل للجدول -->
+            <div id="table-loading" class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center d-none" style="z-index: 10;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">جاري التحميل...</span>
+                </div>
+            </div>
+            
+            <table class="table table-hover mb-0" id="orders-table">
+                <thead class="table-light">
+                    <tr>
+                        {% if is_reviewer %}
+                        <th width="5%" class="ps-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="select-all">
+                            </div>
+                        </th>
+                        {% endif %}
+                        <th>رقم الطلب</th>
+                        <th>الحالة</th>
+                        <th>الحالة المخصصة</th>
+                        <th>العلامات</th>
+                        <th>التاريخ</th>
+                        {% if is_reviewer %}
+                        <th>المسند إليه</th>
+                        {% endif %}
+                        <th width="10%" class="text-end pe-4">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr data-order-id="{{ order.id }}" data-order-status="{{ order.status.slug }}" class="align-middle">
+                        {% if is_reviewer %}
+                        <td class="ps-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}">
+                            </div>
+                        </td>
+                        {% endif %}
+                        <td>
+                            <span class="fw-bold">#{{ order.id }}</span>
+                        </td>
+                        <td>
+                            <span class="status-badge status-{{ order.status.slug }}">
+                                <i class="fas fa-circle me-1 small"></i>
+                                {{ order.status.name }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if order.employee_statuses %}
+                                {% for status in order.employee_statuses %}
+                                    <span class="badge rounded-pill" style="background-color: {{ status.EmployeeCustomStatus.color }}; color: white">
+                                        {{ status.EmployeeCustomStatus.name }}
+                                    </span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="text-muted small">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if order.status_notes %}
+                                {% for note in order.status_notes %}
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary fw-normal me-1">{{ note.status_flag }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="text-muted small">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="time-ago small" data-bs-toggle="tooltip" title="{{ order.raw_created_at|format_date }}">
+                                {{ order.created_at }}
+                            </span>
+                        </td>
+                        {% if is_reviewer %}
+                        <td>
+                            {% if order.assignments %} 
+                                <div class="avatar-group">
+                                    {% for assignment in order.assignments[:3] %}
+                                    <div class="avatar avatar-xs" data-bs-toggle="tooltip" 
+                                         title="{{ assignment.employee.email }}">
+                                        <span class="avatar-text bg-primary text-white">
+                                            {{ assignment.employee.email|first|upper }}
+                                        </span>
+                                    </div>
+                                    {% endfor %}
+                                    {% if order.assignments|length > 3 %}
+                                    <div class="avatar avatar-xs" data-bs-toggle="tooltip" 
+                                         title="و {{ order.assignments|length - 3 }} أكثر">
+                                        <span class="avatar-text bg-light text-dark">
+                                            +{{ order.assignments|length - 3 }}
+                                        </span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span class="badge bg-light text-muted">غير مسند</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                        <td class="text-end pe-4">
+                            <div class="d-flex justify-content-end gap-2">
+                                <a href="{{ url_for('orders.order_details', order_id=order.id) }}"
+                                   class="btn btn-sm btn-icon btn-outline-primary rounded-circle"
+                                   title="عرض التفاصيل">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if is_reviewer %}
+                                <button class="btn btn-sm btn-icon btn-outline-success rounded-circle assign-single-btn" 
+                                        data-order-id="{{ order.id }}" title="إسناد سريع">
+                                    <i class="fas fa-user-plus"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="d-flex justify-content-between align-items-center p-4 border-top">
+            <div>
+            {% if is_reviewer and employees %}
+                <button type="button" class="btn btn-success rounded-pill px-4" id="assign-orders-btn" disabled>
+                    <i class="fas fa-user-check me-1"></i> 
+                    <span id="selected-orders-count">0</span> إسناد
+                </button>
+            {% endif %}
+            </div>
+            
+            <div class="d-flex flex-column align-items-end">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination pagination-sm justify-content-center mb-1">
+                        {% if pagination.has_prev %}
+                        <li class="page-item"><a class="page-link" href="?page={{ pagination.prev_page }}&per_page={{ pagination.per_page }}"><i class="fas fa-chevron-right"></i></a></li>
+                        {% else %}
+                        <li class="page-item disabled"><a class="page-link" href="#"><i class="fas fa-chevron-right"></i></a></li>
+                        {% endif %}
+                        
+                        {% set start_page = [1, pagination.page - 2]|max %}
+                        {% set end_page = [pagination.total_pages, pagination.page + 2]|min %}
+                        {% for p in range(start_page, end_page + 1) %}
+                            <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                                <a class="page-link" href="?page={{ p }}&per_page={{ pagination.per_page }}">{{ p }}</a>
+                            </li>
+                        {% endfor %}
+
+                        {% if pagination.has_next %}
+                        <li class="page-item"><a class="page-link" href="?page={{ pagination.next_page }}&per_page={{ pagination.per_page }}"><i class="fas fa-chevron-left"></i></a></li>
+                        {% else %}
+                        <li class="page-item disabled"><a class="page-link" href="#"><i class="fas fa-chevron-left"></i></a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                <div class="text-muted small">
+                    عرض {{ pagination.start_item }}-{{ pagination.end_item }} من {{ pagination.total_items }}
+                </div>
+            </div>
+        </div>
+
+        {% else %}
+        <div class="text-center py-5">
+            <div class="mb-4">
+                <i class="fas fa-shopping-bag fa-4x text-gray-300"></i>
+            </div>
+            <h4 class="mb-3 text-gray-600">لا توجد طلبات لعرضها</h4>
+            <p class="text-muted mb-4">
+                لم يتم العثور على طلبات تطابق معايير البحث الخاصة بك.
+            </p>
+            <button type="button" class="btn btn-primary rounded-pill px-4" id="reset-filters">
+                <i class="fas fa-undo me-2"></i>إعادة تعيين الفلاتر
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% block scripts %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dayjs@1/locale/ar.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+<style>
+    .status-badge {
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+    }
+    .status-pending { background-color: #fff3cd; color: #856404; }
+    .status-processing { background-color: #cce5ff; color: #004085; }
+    .status-under_review { background-color: #e2e3e5; color: #383d41; }
+    .status-shipped { background-color: #d4edda; color: #155724; }
+    .status-delivered { background-color: #d1ecf1; color: #0c5460; }
+    .status-canceled { background-color: #f8d7da; color: #721c24; }
+    .status-awaiting_payment { background-color: #fff3cd; color: #856404; }
+    
+    .avatar {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+    .avatar-text {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+    }
+    
+    .card {
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    
+    .card-header {
+        border-radius: 12px 12px 0 0 !important;
+    }
+    
+    .table th {
+        font-weight: 600;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6c757d;
+    }
+    
+    .table td {
+        vertical-align: middle;
+    }
+    
+    .btn-icon {
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+    }
+    
+    .bg-gradient-primary {
+        background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+    }
+    
+    /* تحسينات للجوال */
+    @media (max-width: 768px) {
+        .card-header h6 {
+            font-size: 0.9rem;
+        }
+        
+        #sync-orders-btn .sync-text {
+            display: none;
+        }
+        
+        #sync-orders-btn i {
+            margin-right: 0 !important;
+        }
+        
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .table td, .table th {
+            white-space: nowrap;
+        }
+    }
+    
+    /* تأثيرات تفاعلية */
+    .nav-link, .btn, .form-select, .form-control {
+        transition: all 0.2s ease;
+    }
+    
+    .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .btn:active {
+        transform: translateY(0);
+    }
+    
+    .order-checkbox:checked + label {
+        font-weight: bold;
+    }
+    
+    tr:hover {
+        background-color: rgba(0,0,0,0.02) !important;
+    }
+    
+    body.dark-mode tr:hover {
+        background-color: rgba(255,255,255,0.02) !important;
+    }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // --- تهيئة المكتبات ---
+    dayjs.extend(dayjs_plugin_relativeTime);
+    dayjs.locale('ar');
+    
+    // --- تهيئة الأدوات ---
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // --- الوظائف المساعدة ---
+    function updateTimestamps() {
+        document.querySelectorAll('.time-ago').forEach(el => {
+            const dateStr = el.getAttribute('title');
+            if (dateStr) {
+                el.textContent = dayjs(dateStr).fromNow();
+            }
+        });
+    }
+
+    function showSweetAlert(icon, title, text = '', timer = 3000) {
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: timer,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+                toast.addEventListener('mouseenter', Swal.stopTimer)
+                toast.addEventListener('mouseleave', Swal.resumeTimer)
+            }
+        });
+        
+        Toast.fire({
+            icon: icon,
+            title: title,
+            text: text
+        });
+    }
+    
+    function showConfirmDialog(title, text, confirmText, cancelText) {
+        return Swal.fire({
+            title: title,
+            text: text,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: confirmText,
+            cancelButtonText: cancelText,
+            customClass: {
+                confirmButton: 'btn btn-primary',
+                cancelButton: 'btn btn-outline-secondary ms-2'
+            },
+            buttonsStyling: false
+        });
+    }
+    
+    function updateAssignButtonState() {
+        const checkedCount = $('.order-checkbox:checked').length;
+        $('#selected-orders-count').text(checkedCount);
+        $('#assign-orders-btn').prop('disabled', checkedCount === 0);
+        
+        // إضافة تأثير عند تحديد الطلبات
+        if (checkedCount > 0) {
+            $('#assign-orders-btn').addClass('pulse-effect');
+            setTimeout(() => {
+                $('#assign-orders-btn').removeClass('pulse-effect');
+            }, 1000);
+        }
+    }
+
+    function buildQueryParams() {
+        const params = new URLSearchParams();
+        
+        const status = $('#filter-order-status').val();
+        const search = $('#search-order-id').val();
+        const dateFrom = $('#date-from').val();
+        const dateTo = $('#date-to').val();
+        
+        if (status) params.set('status', status);
+        if (search) params.set('search', search);
+        if (dateFrom) params.set('date_from', dateFrom);
+        if (dateTo) params.set('date_to', dateTo);
+        
+        {% if is_reviewer %}
+        const employee = $('#filter-employee').val();
+        if (employee) params.set('employee', employee);
+        {% endif %}
+        
+        const customStatus = $('#filter-custom-status').val();
+        if (customStatus) params.set('custom_status', customStatus);
+        
+        {% if not is_reviewer %}
+        const specialStatus = $('#filter-special-status').val();
+        if (specialStatus) params.set('status', specialStatus);
+        {% endif %}
+        
+        return params.toString();
+    }
+    
+    function reloadOrders(showLoading = true) {
+        if (showLoading) {
+            $('#table-loading').removeClass('d-none');
+        }
+        
+        const queryParams = buildQueryParams();
+        window.location.href = `?${queryParams}`;
+    }
+
+    // --- معالجات الأحداث ---
+    const csrfToken = "{{ csrf_token() }}";
+    
+    // 1. مزامنة الطلبات
+    $('#sync-orders-btn').on('click', function() {
+        const btn = $(this);
+        const icon = btn.find('i');
+        const progressContainer = $('#sync-progress');
+        const progressBar = progressContainer.find('.progress-bar');
+        const detailsText = progressContainer.find('.sync-details');
+
+        btn.prop('disabled', true);
+        icon.addClass('fa-spin');
+        btn.find('.sync-text').text('جاري المزامنة...');
+        progressContainer.removeClass('d-none');
+        progressBar.css('width', '10%');
+        detailsText.text('جاري الاتصال بالخادم...');
+
+        // محاكاة التقدم
+        progressBar.animate({ width: "70%" }, 1500);
+
+        $.ajax({
+            url: "{{ url_for('orders.sync_orders') }}",
+            type: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({}),
+            headers: { 'X-CSRFToken': csrfToken }
+        })
+        .done(function(response) {
+            progressBar.css('width', '100%');
+            if (response.success) {
+                detailsText.text(response.message);
+                showSweetAlert('success', 'نجحت المزامنة!', response.message);
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                showSweetAlert('error', 'فشلت المزامنة', response.error, 5000);
+                btn.prop('disabled', false);
+                icon.removeClass('fa-spin');
+                btn.find('.sync-text').text('مزامنة الطلبات');
+                progressContainer.addClass('d-none');
+            }
+        })
+        .fail(function(xhr) {
+            progressBar.css('width', '100%');
+            const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم. تحقق من الشبكة.';
+            showSweetAlert('error', 'حدث خطأ فادح', errorMsg, 5000);
+            btn.prop('disabled', false);
+            icon.removeClass('fa-spin');
+            btn.find('.sync-text').text('مزامنة الطلبات');
+            progressContainer.addClass('d-none');
+        });
+    });
+
+    // 2. تحديد الطلبات (الكل أو فردي)
+    $('#select-all').on('change', function() {
+        $('.order-checkbox').prop('checked', this.checked);
+        updateAssignButtonState();
+        
+        // إضافة تأثير عند التحديد
+        if (this.checked) {
+            $('.order-checkbox').closest('tr').addClass('selected-row');
+        } else {
+            $('.order-checkbox').closest('tr').removeClass('selected-row');
+        }
+    });
+
+    $('.order-checkbox').on('change', function() {
+        $('#select-all').prop('checked', $('.order-checkbox:checked').length === $('.order-checkbox').length);
+        updateAssignButtonState();
+        
+        // إضافة تأثير عند التحديد
+        if ($(this).is(':checked')) {
+            $(this).closest('tr').addClass('selected-row');
+        } else {
+            $(this).closest('tr').removeClass('selected-row');
+        }
+    });
+
+    // 3. إسناد الطلبات المحددة
+    $('#assign-orders-btn').on('click', function() {
+        const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
+        
+        const employeeOptions = {
+            '': 'اختر موظفًا...'
+            {% for employee in employees %}
+                {% if employee.role == 'general' %}
+                    ,"{{ employee.id }}": "{{ employee.email }}"
+                {% endif %}
+            {% endfor %}
+        };
+        
+        Swal.fire({
+            title: 'إسناد الطلبات المحددة',
+            html: `سيتم إسناد <span class="fw-bold text-primary">${orderIds.length}</span> طلب إلى الموظف المحدد.`,
+            input: 'select',
+            inputOptions: employeeOptions,
+            inputPlaceholder: 'اختر موظفًا...',
+            showCancelButton: true,
+            confirmButtonText: 'تأكيد الإسناد',
+            cancelButtonText: 'إلغاء',
+            showLoaderOnConfirm: true,
+            customClass: {
+                confirmButton: 'btn btn-primary',
+                cancelButton: 'btn btn-outline-secondary ms-2'
+            },
+            buttonsStyling: false,
+            inputValidator: (value) => {
+                if (!value) return 'يجب اختيار موظف للإسناد';
+            },
+            preConfirm: (employeeId) => {
+                return $.ajax({
+                    url: "{{ url_for('orders.assign_orders') }}",
+                    type: "POST",
+                    contentType: "application/json",
+                    headers: { 'X-CSRFToken': csrfToken },
+                    data: JSON.stringify({
+                        employee_id: employeeId,
+                        order_ids: orderIds,
+                        current_user_id: "{{ session.get('user_id') }}"
+                    }),
+                }).fail((xhr) => {
+                    const errorMsg = xhr.responseJSON?.error || 'فشل الإسناد لسبب غير معروف.';
+                    Swal.showValidationMessage(`فشل الطلب: ${errorMsg}`);
+                });
+            },
+            allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+            if (result.isConfirmed) {
+                if (result.value.success) {
+                    showSweetAlert('success', 'تم الإسناد بنجاح!', result.value.message);
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showSweetAlert('error', 'فشل الإسناد', result.value.error, 4000);
+                }
+            }
+        });
+    });
+    
+    // 4. إسناد سريع لطلب واحد
+    $('.assign-single-btn').on('click', function() {
+        const orderId = $(this).data('order-id');
+        
+        const employeeOptions = {
+            '': 'اختر موظفًا...'
+            {% for employee in employees %}
+                {% if employee.role == 'general' %}
+                    ,"{{ employee.id }}": "{{ employee.email }}"
+                {% endif %}
+            {% endfor %}
+        };
+        
+        Swal.fire({
+            title: 'إسناد الطلب #' + orderId,
+            input: 'select',
+            inputOptions: employeeOptions,
+            inputPlaceholder: 'اختر موظفًا...',
+            showCancelButton: true,
+            confirmButtonText: 'تأكيد الإسناد',
+            cancelButtonText: 'إلغاء',
+            showLoaderOnConfirm: true,
+            customClass: {
+                confirmButton: 'btn btn-primary',
+                cancelButton: 'btn btn-outline-secondary ms-2'
+            },
+            buttonsStyling: false,
+            inputValidator: (value) => {
+                if (!value) return 'يجب اختيار موظف للإسناد';
+            },
+            preConfirm: (employeeId) => {
+                return $.ajax({
+                    url: "{{ url_for('orders.assign_orders') }}",
+                    type: "POST",
+                    contentType: "application/json",
+                    headers: { 'X-CSRFToken': csrfToken },
+                    data: JSON.stringify({
+                        employee_id: employeeId,
+                        order_ids: [orderId],
+                        current_user_id: "{{ session.get('user_id') }}"
+                    }),
+                }).fail((xhr) => {
+                    const errorMsg = xhr.responseJSON?.error || 'فشل الإسناد لسبب غير معروف.';
+                    Swal.showValidationMessage(`فشل الطلب: ${errorMsg}`);
+                });
+            },
+            allowOutsideClick: () => !Swal.isLoading()
+        }).then((result) => {
+            if (result.isConfirmed) {
+                if (result.value.success) {
+                    showSweetAlert('success', 'تم الإسناد بنجاح!', result.value.message);
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showSweetAlert('error', 'فشل الإسناد', result.value.error, 4000);
+                }
+            }
+        });
+    });
+    
+    // 5. تطبيق الفلاتر مع تأخير للبحث
+    $('#advanced-filters').on('submit', function(e) {
+        e.preventDefault();
+        reloadOrders();
+    });
+    
+    // البحث مع تأخير لمنع طلبات متعددة
+    $('#search-order-id').on('input', _.debounce(function() {
+        reloadOrders();
+    }, 500));
+    
+    // تغيير الفلاتر مع تأخير
+    $('#filter-order-status, #filter-employee, #filter-custom-status, #filter-special-status').on('change', _.debounce(function() {
+        reloadOrders();
+    }, 300));
+    
+    // 6. إعادة تعيين الفلاتر
+    $('#reset-filters').on('click', function() {
+        window.location.href = "{{ url_for('orders.index') }}";
+    });
+
+    // --- التشغيل عند تحميل الصفحة ---
+    updateTimestamps();
+    updateAssignButtonState();
+    
+    // تحديث التواريخ كل دقيقة
+    setInterval(updateTimestamps, 60000);
+    
+    // تحسين تجربة الجوال
+    if (window.innerWidth < 768) {
+        $('.sidebar').removeClass('show');
+        $('.sidebar__backdrop').removeClass('show');
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}

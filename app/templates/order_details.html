@@ -1,0 +1,631 @@
+{% extends 'base.html' %}
+
+{% block content_class %}p-0{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid g-0 m-0 w-100 full-width-container">
+  <!-- رأس الصفحة -->
+  <div class="bg-light p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h2 class="mb-0 fs-4">
+      <i class="fas fa-file-invoice ms-2"></i>تفاصيل الطلب #{{ order.id | safe }}
+    </h2>
+    <div>
+      <a href="{{ url_for('orders.index') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left ms-1"></i> العودة للطلبات
+      </a>
+    </div>
+  </div> 
+
+  <div class="row g-0 mx-0">
+    <!-- القسم الرئيسي - تفاصيل الطلب -->
+    <div class="col-12 p-3">
+      <div class="card shadow-sm mb-3 border-0">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap py-2">
+          <h5 class="mb-0 fs-5">معلومات الطلب</h5>
+          <span class="badge rounded-pill bg-{{ order.status.slug | replace('under_review', 'warning') | replace('processing', 'info') | replace('completed', 'success') | replace('awaiting_payment', 'warning') | replace('shipped', 'primary') | replace('delivered', 'success') | replace('canceled', 'danger') | replace('refunded', 'secondary') }}">
+            {{ order.status.name | safe }}
+          </span>
+        </div>
+        <div class="card-body p-2">
+          <h5 class="border-bottom pb-2 mb-2 fs-5">
+            <i class="fas fa-boxes ms-2"></i>المنتجات ({{ order.order_items | length }})
+          </h5>
+
+          <!-- تعديل هنا لعرض المنتجات في صفوف مع تمرير أفقي -->
+          <div class="table-responsive">
+            <table class="table table-borderless">
+              <tbody>
+                {% for item in order.order_items %}
+     <tr class="border-bottom">
+  <!-- صورة المنتج -->
+  <td style="width: 120px; min-width: 120px;">
+    <div class="d-flex justify-content-center">
+      {% if item.main_image %}
+      <img src="{{ item.main_image | safe }}" alt="{{ item.name | safe }}"
+           class="img-fluid rounded product-image"
+           style="width: 160px; height: 160px; object-fit: cover;"
+           loading="lazy">
+      {% else %}
+      <div class="bg-light d-flex align-items-center justify-content-center rounded product-image-placeholder" 
+           style="width: 80px; height: 80px;">
+        <i class="fas fa-image fa-lg text-muted"></i>
+      </div>
+      {% endif %}
+    </div>
+    <div class="text-center mt-1 small text-muted">
+      الكمية: {{ item.quantity }}
+    </div>
+  </td>
+  
+  <!-- خيارات المنتج -->
+  <td style="min-width: 150px;">
+    <h6 class="mb-2">{{ item.name | safe }}</h6>
+    {% if item.options %}
+    <div class="text-start product-options">
+      <h6 class="mb-1 small text-muted"><i class="fas fa-cogs me-1"></i>خيارات</h6>
+      <ul class="list-group list-group-flush small" style="max-height: 120px; overflow-y: auto;">
+        {% for option in item.options %}
+        <li class="list-group-item d-flex justify-content-between py-1 px-0 option-item">
+          <span class="fw-bold">{{ option.name | safe }}</span>
+          <span>{{ option.value | safe }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </td>
+  
+  <!-- باركود المنتج -->
+  <td style="width: 150px; min-width: 150px;">
+    {% if item.barcode %}
+    <div class="d-flex flex-column align-items-center">
+      <h6 class="text-muted mb-1 small"><i class="fas fa-barcode me-1"></i>باركود المنتج</h6>
+      <div class="barcode-container p-1 border rounded">
+        <img src="{{ url_for('orders.serve_barcode', filename=item.barcode) | safe }}"
+             alt="باركود المنتج {{ item.name | safe }}"
+             class="img-fluid"
+             style="max-height: 40px;">
+        <div class="mt-1 small text-center">#{{ item.id | safe }}</div>
+      </div>
+    </div>
+    {% endif %}
+  </td>
+</tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- العمود الجانبي -->
+    <div class="col-lg-4 bg-light p-3">
+      <!-- قسم الحالات المخصصة للموظف -->
+      <div class="card shadow-sm mb-3 border-0">
+        <div class="card-header bg-white py-2">
+          <h5 class="mb-0 fs-5"><i class="fas fa-tags ms-2"></i>الحالات المخصصة</h5>
+        </div>
+        <div class="card-body p-2">
+          {% if current_employee %}
+          <form action="{{ url_for('orders.add_employee_status', order_id=order.id) }}" method="POST" id="employee-status-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-2">
+              <label class="form-label small">اختر حالة</label>
+              <select class="form-select form-select-sm" name="status_id" required>
+                <option value="">اختر حالة</option>
+                {% for status in current_employee.custom_statuses if status.is_active %}
+                <option value="{{ status.id }}">{{ status.name | safe }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-2">
+              <label for="custom-note" class="form-label small">ملاحظة (اختياري)</label>
+              <textarea class="form-control form-control-sm" id="custom-note" 
+                        name="note" rows="2" placeholder="أدخل ملاحظاتك هنا..." maxlength="500"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm w-100">
+              <i class="fas fa-plus me-1"></i> إضافة حالة
+            </button>
+          </form>
+          {% endif %}
+          
+          <div class="mt-3">
+            <h6 class="border-bottom pb-1 small">الحالات المسجلة</h6>
+            <ul class="list-group list-group-flush small">
+              {% if employee_statuses %}
+                {% for emp_status, custom_status, employee in employee_statuses %}
+                <li class="list-group-item d-flex justify-content-between py-1 px-0">
+                  <div>
+                    <span class="badge" style="background-color: {{ custom_status.color | safe }}; color: white;">
+                      {{ custom_status.name | safe }}
+                    </span>
+                    {% if emp_status.note %}
+                      <span class="ms-2">{{ emp_status.note | safe }}</span>
+                    {% endif %}
+                    <div class="text-muted small mt-1">
+                      <i class="fas fa-user me-1"></i>{{ employee.email | safe }}
+                    </div>
+                  </div>
+                  <div class="text-muted">{{ emp_status.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                </li>
+                {% endfor %}
+              {% else %}
+                <li class="list-group-item py-2 text-center text-muted">لا توجد حالات مسجلة</li>
+              {% endif %}
+            </ul>
+          </div> 
+        </div>
+      </div>
+
+      <!-- قسم الحالات الخاصة (للمراجعين فقط) -->
+      {% if is_reviewer %}
+      <div class="card shadow-sm mb-3 border-0">
+        <div class="card-header bg-white py-2">
+          <h5 class="mb-0 fs-5"><i class="fas fa-flag ms-2"></i>حالات خاصة</h5>
+        </div>
+        <div class="card-body p-2">
+          <form action="{{ url_for('orders.add_status_note', order_id=order.id) }}" method="POST" id="special-status-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-2">
+              <label class="form-label small">اختر الحالة</label>
+              <div class="d-flex flex-wrap gap-2">
+                {% for slug, label in [
+                  ('late', 'متأخر'),
+                  ('missing', 'واصل ناقص'),
+                  ('refunded', 'مسترجع'),
+                  ('not_shipped', 'لم يتم الشحن')
+                ] %}
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="status_flag" value="{{ slug }}" id="{{ slug }}-flag" required>
+                  <label class="form-check-label small" for="{{ slug }}-flag">{{ label }}</label>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="mb-2">
+              <label for="special-note" class="form-label small">ملاحظة خاصة</label>
+              <textarea class="form-control form-control-sm" id="special-note" name="note" rows="2" 
+                        placeholder="أدخل ملاحظاتك هنا..." maxlength="500"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm w-100">
+              <i class="fas fa-save me-1"></i> حفظ الحالة
+            </button>
+          </form>
+          <div class="mt-3">
+            <h6 class="border-bottom pb-1 small">الحالات المسجلة</h6>
+            <ul class="list-group list-group-flush small">
+              {% for note in status_notes %}
+              <li class="list-group-item d-flex justify-content-between py-1 px-0">
+                <div>
+                  <span class="badge bg-{{ 'warning text-dark' if note.status_flag == 'late' else
+                                             'danger' if note.status_flag == 'missing' else
+                                             'secondary' if note.status_flag == 'refunded' else
+                                             'info' }}">
+                    {{ note.status_flag | replace('late', 'متأخر') | replace('missing', 'واصل ناقص') | replace('refunded', 'مسترجع') | replace('not_shipped', 'لم يتم الشحن') }}
+                  </span>
+                  {% if note.note %}
+                    <span class="ms-2">{{ note.note | safe }}</span>
+                  {% endif %}
+                </div>
+                <div class="text-muted">{{ note.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+              </li>
+              {% else %}
+              <li class="list-group-item py-2 text-center text-muted">لا توجد حالات مسجلة</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- قسم تحديث حالة الطلب -->
+      <div class="card shadow-sm mb-3 border-0">
+        <div class="card-header bg-white py-2">
+          <h5 class="mb-0 fs-5"><i class="fas fa-sync-alt ms-2"></i>تحديث حالة الطلب</h5>
+        </div>
+        <div class="card-body p-2">
+          <form id="status-form" action="{{ url_for('orders.update_order_status', order_id=order.id) }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-2">
+              <label for="status" class="form-label small">الحالة الجديدة</label>
+              <select class="form-select form-select-sm" id="status" name="status_slug" required>
+                {% for slug, label in [
+                  ('under_review', 'بإنتظار المراجعة'),
+                  ('processing', 'قيد التنفيذ'),
+                  ('completed', 'تم التنفيذ'),
+                  ('awaiting_payment', 'بإنتظار الدفع'),
+                  ('shipped', 'تم الشحن'),
+                  ('delivered', 'تم التوصيل'),
+                  ('canceled', 'ملغي'),
+                  ('refunded', 'مسترجع')
+                ] %}
+                <option value="{{ slug }}" {% if order.status.slug == slug %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-2">
+              <label for="note" class="form-label small">ملاحظات</label>
+              <textarea class="form-control form-control-sm" id="note" name="note" rows="2" 
+                        placeholder="أدخل ملاحظاتك هنا..." maxlength="500"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm w-100">
+              <i class="fas fa-save me-1"></i> حفظ التغييرات
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- قسم المعلومات الإضافية -->
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white py-2">
+          <h5 class="mb-0 fs-5"><i class="fas fa-info-circle ms-2"></i>معلومات إضافية</h5>
+        </div>
+        
+        <!-- باركود الطلب -->
+        <div class="text-center mb-3 pt-3">
+          <h5 class="mb-2 fs-5"><i class="fas fa-barcode ms-2"></i>باركود الطلب</h5>
+          {% if order.barcode %}
+            <div class="barcode-container p-2 bg-white border rounded d-inline-block">
+              <img src="{{ url_for('orders.serve_barcode', filename=order.barcode) | safe }}"
+                   alt="باركود الطلب {{ order.id | safe }}"
+                   class="img-fluid"
+                   style="max-height: 50px;">
+              <div class="mt-1 fw-bold fs-6">#{{ order.id | safe }}</div>
+            </div>
+          {% else %}
+            <div class="alert alert-warning d-inline-block p-2">
+              <i class="fas fa-exclamation-triangle ms-2"></i>
+              لم يتم إنشاء باركود لهذا الطلب.
+            </div>
+          {% endif %}
+        </div>
+        
+        <div class="card-body p-2">
+          <ul class="list-group list-group-flush small">
+            <li class="list-group-item d-flex justify-content-between py-1 px-0">
+              <span class="fw-bold">تاريخ الطلب:</span>
+              <span>
+                {% if order.created_at is string %}
+                  {{ order.created_at | safe }}
+                {% elif order.created_at %}
+                  {{ order.created_at.strftime('%Y-%m-%d %H:%M') }}
+                {% else %}
+                  غير متوفر
+                {% endif %}
+              </span>
+            </li>
+
+            <!-- معلومات المستلم -->
+            <li class="list-group-item d-flex justify-content-between py-2 px-0">
+                <span class="fw-bold">اسم المستلم:</span>
+                <span>
+                    {% if order.receiver.name %}
+                        {{ order.receiver.name | safe }}
+                    {% else %}
+                        {{ order.customer.first_name | safe }} {{ order.customer.last_name | safe }}
+                    {% endif %}
+                </span>
+            </li>
+
+            <li class="list-group-item d-flex justify-content-between py-2 px-0">
+                <span class="fw-bold">هاتف المستلم:</span>
+                <span>
+                    {% if order.receiver.phone %}
+                        {{ order.receiver.phone | safe }}
+                    {% else %}
+                        {{ order.customer.mobile_code | safe }}{{ order.customer.mobile | safe }}
+                    {% endif %}
+                </span>
+            </li>
+            <li class="list-group-item d-flex justify-content-between py-2 px-0">
+                <span class="fw-bold">البريد الإلكتروني:</span>
+                <span>{{ order.receiver.email | safe }}</span>
+            </li>
+            
+            <!-- تفاصيل العنوان -->
+            <li class="list-group-item py-2 px-0">
+                <div class="fw-bold mb-1">عنوان الشحن الكامل:</div>
+                <div class="text-muted small">
+                    {% if order.shipping.address %}
+                        {{ order.shipping.address | safe }} 
+                    {% endif %}
+                    {% if order.customer.city %}
+                        {{ order.customer.city | safe }}،
+                    {% endif %}
+                    {% if order.customer.country %}
+                        {{ order.customer.country | safe }}
+                    {% endif %}
+                </div>
+            </li> 
+            
+            <!-- معلومات الشحن الإضافية -->
+            <li class="list-group-item d-flex justify-content-between py-2 px-0">
+                <span class="fw-bold">طريقة الشحن:</span>
+                <span>{{ order.shipping.company | default('غير محدد', true) | safe }}</span>
+            </li>
+            
+            <li class="list-group-item d-flex justify-content-between py-2 px-0">
+                <span class="fw-bold">تكلفة الشحن:</span>
+                <span>{{ order.amount.shipping_cost.amount | safe }} {{ order.amount.shipping_cost.currency | safe }}</span>
+            </li>
+            
+            <li class="list-group-item d-flex justify-content-between py-2 px-0">
+                <span class="fw-bold">الوزن الإجمالي:</span>
+                <span>{{ order.total_weight | safe }}</span>
+            </li>
+            
+            {% if order.shipping.address %}
+            <li class="list-group-item py-2 px-0">
+                <div class="fw-bold mb-2">الموقع على الخريطة:</div>
+                <iframe 
+                    width="100%" 
+                    height="200" 
+                    frameborder="0" 
+                    scrolling="no" 
+                    marginheight="0" 
+                    marginwidth="0" 
+                    src="https://maps.google.com/maps?q={{ order.shipping.address | urlencode }}&output=embed">
+                </iframe>
+            </li>
+            {% endif %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* أنماط عامة للجدول */
+  .table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 10px;
+  }
+  
+  .table tbody tr {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+  }
+  
+  /* أنماط الوضع الليلي للجدول */
+  body.dark-mode .table tbody tr {
+    background-color: #2c2f42;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  
+  body.dark-mode .table {
+    color: #f8f9fa;
+  }
+  
+  body.dark-mode .table .text-muted {
+    color: #adb5bd !important;
+  }
+  
+  body.dark-mode .table .text-secondary {
+    color: #a0aec0 !important;
+  }
+  
+  body.dark-mode .table .text-dark {
+    color: #f8f9fa !important;
+  }
+  
+  body.dark-mode .table .border-bottom {
+    border-bottom-color: #3a3f58 !important;
+  }
+  
+  /* تحسينات للصور في الوضع الليلي */
+  body.dark-mode .img-fluid {
+    border-color: #3a3f58;
+  }
+  
+  body.dark-mode .bg-light {
+    background-color: #3a3f58 !important;
+    border-color: #444;
+  }
+  
+  /* تحسينات للقوائم في الوضع الليلي */
+  body.dark-mode .list-group-flush {
+    background-color: #2c2f42;
+    border-color: #3a3f58;
+  }
+  
+  body.dark-mode .list-group-item {
+    background-color: #2c2f42 !important;
+    border-color: #3a3f58 !important;
+    color: #f8f9fa !important;
+  }
+  
+  /* تحسينات للفورمات في الوضع الليلي */
+  body.dark-mode .form-control,
+  body.dark-mode .form-select {
+    background-color: #3a3f58;
+    border-color: #444;
+    color: #f8f9fa;
+  }
+  
+  body.dark-mode .form-control:focus,
+  body.dark-mode .form-select:focus {
+    background-color: #3a3f58;
+    border-color: #4a4f66;
+    color: #f8f9fa;
+  }
+  
+  /* تحسينات للأزرار في الوضع الليلي */
+  body.dark-mode .btn-outline-secondary {
+    color: #f8f9fa;
+    border-color: #4a4f66;
+  }
+  
+  body.dark-mode .btn-outline-secondary:hover {
+    background-color: #4a4f66;
+    color: #f8f9fa;
+  }
+  
+  /* تحسينات للبطاقات (Cards) في الوضع الليلي */
+  body.dark-mode .card {
+    background-color: #2c2f42;
+    border-color: #3a3f58;
+  }
+  
+  body.dark-mode .card-header {
+    background-color: #3a3f58 !important;
+    border-bottom-color: #444 !important;
+    color: #f8f9fa;
+  }
+  
+  /* تحسينات للخريطة في الوضع الليلي */
+  body.dark-mode iframe {
+    filter: invert(90%) hue-rotate(180deg) brightness(85%) contrast(110%);
+  }
+  
+  /* تحسينات للنصوص في الوضع الليلي */
+  body.dark-mode .text-dark {
+    color: #f8f9fa !important;
+  }
+  
+  body.dark-mode .text-muted {
+    color: #adb5bd !important;
+  }
+  
+  /* تحسينات للتنبيهات (Alerts) في الوضع الليلي */
+  body.dark-mode .alert-warning {
+    background-color: #664d03;
+    border-color: #846404;
+    color: #ffecb5;
+  }
+  
+  /* تحسينات للشريط الجانبي الأيمن */
+  body.dark-mode .col-lg-4.bg-light {
+    background-color: #252836 !important;
+  }
+</style>
+<style>
+  /* أنماط المنتجات في الوضع الليلي */
+  body.dark-mode .table tbody tr {
+    background-color: #2c2f42 !important;
+    border-color: #3a3f58 !important;
+  }
+
+  body.dark-mode .table tbody td {
+    background-color: #2c2f42 !important;
+    border-color: #3a3f58 !important;
+  }
+
+  body.dark-mode .list-group-item {
+    background-color: #2c2f42 !important;
+    border-color: #3a3f58 !important;
+    color: #f8f9fa !important;
+  }
+
+  body.dark-mode .text-muted {
+    color: #adb5bd !important;
+  }
+
+  /* تحسين صورة المنتج في الوضع الليلي */
+  body.dark-mode .img-fluid {
+    border: 1px solid #3a3f58;
+  }
+
+  body.dark-mode .bg-light {
+    background-color: #3a3f58 !important;
+  }
+
+  /* تحسين خيارات المنتج */
+  body.dark-mode .product-options {
+    background-color: #3a3f58;
+    border-color: #444;
+  }
+
+  body.dark-mode .product-options li {
+    background-color: #2c2f42 !important;
+    border-color: #3a3f58 !important;
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  // التحقق قبل إرسال النماذج
+  document.getElementById('status-form').addEventListener('submit', function(e) {
+    const status = document.getElementById('status').value;
+    if (status === 'canceled') {
+      e.preventDefault();
+      Swal.fire({
+        title: 'تأكيد الإلغاء',
+        text: 'هل أنت متأكد أنك تريد إلغاء الطلب؟',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'نعم، إلغاء',
+        cancelButtonText: 'تراجع',
+        reverseButtons: true
+      }).then((result) => {
+        if (result.isConfirmed) {
+          this.submit();
+        }
+      });
+    }
+  });
+
+  // إضافة تحقق من الطول الأقصى للنصوص
+  document.querySelectorAll('textarea[maxlength]').forEach(textarea => {
+    textarea.addEventListener('input', function() {
+      if (this.value.length > this.maxLength) {
+        this.value = this.value.substring(0, this.maxLength);
+      }
+    });
+  });
+
+  // إضافة تحميل متأخر للصور
+  document.addEventListener('DOMContentLoaded', function() {
+    const lazyImages = document.querySelectorAll('img[loading="lazy"]');
+    
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const img = entry.target;
+          img.src = img.dataset.src || img.src;
+          observer.unobserve(img);
+        }
+      });
+    });
+
+    lazyImages.forEach(img => {
+      observer.observe(img);
+    });
+  });
+
+  // عرض رسائل التأكيد عند تغيير الحالة بنجاح
+  {% if request.args.get('status_updated') %}
+  Swal.fire({
+    title: 'تم التحديث!',
+    text: 'تم تحديث حالة الطلب بنجاح',
+    icon: 'success',
+    confirmButtonText: 'حسناً',
+    timer: 3000
+  });
+  {% endif %}
+  
+  {% if request.args.get('employee_status_added') %}
+  Swal.fire({
+    title: 'تمت الإضافة!',
+    text: 'تمت إضافة الحالة المخصصة بنجاح',
+    icon: 'success',
+    confirmButtonText: 'حسناً',
+    timer: 3000
+  });
+  {% endif %}
+  
+  {% if request.args.get('special_status_added') %}
+  Swal.fire({
+    title: 'تم الحفظ!',
+    text: 'تم حفظ الحالة الخاصة بنجاح',
+    icon: 'success',
+    confirmButtonText: 'حسناً',
+    timer: 3000
+  });
+  {% endif %}
+</script>
+{% endblock %} 

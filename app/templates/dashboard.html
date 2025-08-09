@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>html, body {
+  height: auto !important;
+  overflow: auto !important;
+}</style>
+<div class="row">
+    <div class="col-md-8">
+        <h1 class="mb-4">لوحة تحكم المتجر</h1>
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">مرحباً بك، {{ current_user.email }}</h5>
+                <p class="card-text">يمكنك إدارة متجرك والطلبات والموظفين والمنتجات من هنا.</p>  <!-- تم تحديث النص -->
+                
+                <div class="row mt-4">
+                    <div class="col-md-4">  <!-- تغيير من col-md-6 إلى col-md-4 -->
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h5 class="card-title">الطلبات</h5>
+                                <p class="card-text">عرض وإدارة طلبات المتجر</p>
+                                <a href="{{ url_for('orders.index') }}" class="btn btn-primary">عرض الطلبات</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">  <!-- تغيير من col-md-6 إلى col-md-4 -->
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h5 class="card-title">الموظفين</h5>
+                                <p class="card-text">إدارة موظفي المتجر</p>
+                                <a href="{{ url_for('employees.list_employees') }}" class="btn btn-primary">عرض الموظفين</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">  <!-- إضافة بطاقة جديدة للمنتجات -->
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h5 class="card-title">المنتجات</h5>
+                                <p class="card-text">إدارة منتجات المتجر</p>
+                                <a href="{{ url_for('products.list_products') }}" class="btn btn-primary">عرض المنتجات</a>
+                            </div>
+                        </div>
+                        <!-- في قسم بطاقات لوحة التحكم -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                إحصائيات سريعة
+            </div>
+            <div class="card-body">
+                <p>عدد الطلبات اليوم: 15</p>
+                <p>عدد الموظفين: {{ employees_count }}</p>
+                <p>عدد المنتجات: {{ products_count }}</p>  <!-- إضافة إحصائية للمنتجات -->
+                <p>حالة الربط مع سلة: {% if current_user.salla_access_token %}مرتبط{% else %}غير مرتبط{% endif %}</p>
+                <a href="{{ url_for('auth.link_store') }}" class="btn btn-sm btn-outline-secondary">ربط المتجر</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
