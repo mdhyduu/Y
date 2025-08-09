@@ -1,7 +1,6 @@
 from app import create_app
 
-app = create_app()
-application = app  # إضافة هذا السطر
+application = create_app()  # تغيير الاسم إلى `application`
 
 if __name__ == "__main__":
-    app.run()
+    application.run()  # تحديث هنا أيضًا إذا كنت تستخدم التشغيل المباشر
