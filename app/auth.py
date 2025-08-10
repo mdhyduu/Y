@@ -19,17 +19,19 @@ def login_required(view_func):
             return redirect(url_for('user_auth.login'))
         return view_func(*args, **kwargs)
     return wrapper
-
 @auth_bp.route('/link_store')
 @login_required
 def link_store():
     logger.info("بدء عملية ربط المتجر")
     
-    # إذا كان المتجر مربوط بالفعل
+    user = User.query.get(session['user_id'])
+    if user and user.salla_access_token and user.token_expires_at > datetime.utcnow():
+        session['store_linked'] = True  # تحديث حالة الجلسة
+        return redirect(url_for('orders.index'))  # توجيه مباشر
+    
     if session.get('store_linked'):
-        flash("متجرك مربوط بالفعل", "info")
-        return redirect(url_for('dashboard.index'))
-
+        flash("يوجد مشكلة في توكن الربط، يرجى إعادة الربط", "warning")
+    
     oauth_state = secrets.token_urlsafe(32)
     session['oauth_state'] = oauth_state
     
@@ -44,7 +46,6 @@ def link_store():
     
     logger.info(f"إعادة توجيه إلى عنوان سلة: {auth_url}")
     return redirect(auth_url)
-
 @auth_bp.route('/callback')
 @login_required
 def callback():
