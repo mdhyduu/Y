@@ -5,7 +5,8 @@ from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
 from .config import Config
 from apscheduler.schedulers.background import BackgroundScheduler
-from datetime import datetime
+from datetime import datetime, timedelta
+
 # إنشاء كائنات الإضافات
 db = SQLAlchemy()
 migrate = Migrate()
@@ -14,22 +15,24 @@ csrf = CSRFProtect()
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
-    
+
+    # جعل الجلسة تدوم 30 يوم
+    app.permanent_session_lifetime = timedelta(days=30)
+
     # تهيئة الإضافات مع التطبيق
     db.init_app(app)
     migrate.init_app(app, db)
     csrf.init_app(app)
-    
+
     # تسجيل النماذج مع سياق التطبيق
     with app.app_context():
         from . import models
-        db.create_all() 
-        # هذا سيضمن تسجيل النماذج
-        
-    # تسجيل 
-    
-    
-    # باقي الكود كما هو...
+        db.create_all()
+
+    # استيراد الوظائف المطلوبة
+    from .token_utils import refresh_salla_token
+    from .models import User
+
     # تسجيل البلوبيرنتات
     from .employees import employees_bp
     from .dashboard import dashboard_bp
@@ -41,7 +44,7 @@ def create_app():
     from .permissions import permissions_bp
     from .products import products_bp
     from .delivery_orders import delivery_bp
-    
+
     app.register_blueprint(employees_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(user_auth_bp)
@@ -51,10 +54,10 @@ def create_app():
     app.register_blueprint(permissions_bp)
     app.register_blueprint(products_bp)
     app.register_blueprint(delivery_bp)
-    
+
     # فلترات القوالب
     app.jinja_env.filters['format_date'] = format_date
-    
+
     @app.template_filter('time_ago')
     def time_ago_filter(dt):
         if not dt:
@@ -78,23 +81,25 @@ def create_app():
             return f"منذ {int(months)} شهر"
         years = months // 12
         return f"منذ {int(years)} سنة"
-    
+
     def refresh_tokens_job():
-        """مهمة مجدولة لتجديد التوكنات"""
+        """مهمة مجدولة لتجديد التوكنات إذا قربت تنتهي"""
         with app.app_context():
             users = User.query.filter(User.salla_refresh_token.isnot(None)).all()
             for user in users:
                 try:
-                    # تجديد التوكن إذا انقضى أكثر من 7 أيام
-                    if (datetime.utcnow() - user.token_refreshed_at).days > 7:
-                        refresh_salla_token(user)
+                    # إذا باقي أقل من ساعة على انتهاء التوكن
+                    if not user.token_expires_at or (user.token_expires_at - datetime.utcnow()).total_seconds() < 3600:
+                        new_token = refresh_salla_token(user)
+                        if new_token:
+                            app.logger.info(f"تم تجديد التوكن للمستخدم {user.id}")
                 except Exception as e:
                     app.logger.error(f"فشل تجديد التوكن للمستخدم {user.id}: {str(e)}")
-    
+
+    # تشغيل الـ scheduler
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         scheduler = BackgroundScheduler()
-        scheduler.add_job(refresh_tokens_job, 'interval', hours=24)
+        scheduler.add_job(refresh_tokens_job, 'interval', hours=1)  # تحقق كل ساعة
         scheduler.start()
-        # إنشاء جداول قاعدة البيانات إذا لم تكن 
-        
+
     return app
