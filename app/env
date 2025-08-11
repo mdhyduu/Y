@@ -1,90 +1,39 @@
-# ==============================================
-# الإعدادات الأساسية للتطبيق
-# ==============================================
-
-# المفتاح السري للتطبيق (توليده بالأمر: python -c "import os; print(os.urandom(24).hex()")
+# ===== الإعدادات الأساسية =====
 SECRET_KEY=db9089c8a8641350e5998526fc9ed74611f622b3277d302f
+ENCRYPTION_KEY=zQ1kmrd1lmqC2hzoQr1z_ruC0NFO8oG09dy1dLNY_Nc=
+FLASK_DEBUG=False
+FLASK_CONFIG=production
+FLASK_ENV=production
 
-# مفتاح التشفير (توليده بالأمر: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode()")
-ENCRYPTION_KEY=cEoOSML_wjUrBKuc6ykCtdefcTOoiwAsjrsc1Gi-WvE=
-
-# وضع التطوير (True/False)
-FLASK_DEBUG=True
-
-# ==============================================
-# إعدادات قاعدة البيانات
-# ==============================================
-
-# رابط اتصال قاعدة البيانات (SQLite مثال)
+# ===== قاعدة البيانات =====
+# إذا ما زلت على SQLite خليه زي ما هو، لكن الأفضل MySQL أو PostgreSQL
 SQLALCHEMY_DATABASE_URI=sqlite:///app.db
-
-# تتبع التعديلات (يفضل تعطيله في الإنتاج)
 SQLALCHEMY_TRACK_MODIFICATIONS=False
 
-# ==============================================
-# إعدادات API منصة سلة
-# ==============================================
-
-# معرّف العميل (Client ID)
-SALLA_CLIENT_ID = 'feddce3c-e7c6-4eb7-a45a-b2dc8ad9b7d6'
-SALLA_CLIENT_SECRET = 'b1cf7d77ac40924602878bcd8d8ec4ec'
-
-# رابط إعادة التوجيه بعد المصادقة
-REDIRECT_URI=http://localhost:5000/callback
-
-# روابط API سلة (لا تغيرها إلا إذا طلب منك)
+# ===== سلة =====
+SALLA_CLIENT_ID=feddce3c-e7c6-4eb7-a45a-b2dc8ad9b7d6
+SALLA_CLIENT_SECRET=b1cf7d77ac40924602878bcd8d8ec4ec
+REDIRECT_URI=https://yourdomain.com/callback
 SALLA_AUTH_URL=https://accounts.salla.sa/oauth2/auth
 SALLA_TOKEN_URL=https://accounts.salla.sa/oauth2/token
 SALLA_BASE_URL=https://api.salla.dev/admin/v2
 
-# ==============================================
-# إعدادات الأمان والجلسات
-# ==============================================
-
-# مفتاح CSRF السري
+# ===== أمان الجلسات =====
 CSRF_SECRET_KEY=7ca8917861fdac2820aa403f114b4d07f08190c2fc61f0ff
+SESSION_COOKIE_SECURE=True
+SESSION_COOKIE_SAMESITE=Strict
+PERMANENT_SESSION_LIFETIME=2592000
 
-# تأمين كوكيز الجلسة (True في الإنتاج)
-SESSION_COOKIE_SECURE=False
-
-# سياسة SameSite للكوكيز (Lax/Strict/None)
-SESSION_COOKIE_SAMESITE=Lax
-
-# عمر الجلسة (بالثواني)
-PERMANENT_SESSION_LIFETIME=2592000  # 30 يوم
-
-# ==============================================
-# إعدادات البريد الإلكتروني
-# ==============================================
-
-# خادم البريد
+# ===== البريد =====
 MAIL_SERVER=smtp.example.com
 MAIL_PORT=587
 MAIL_USE_TLS=True
 MAIL_USERNAME=your_email@example.com
 MAIL_PASSWORD=your_email_password
 MAIL_DEFAULT_SENDER=noreply@example.com
-
-# قائمة المسؤولين (مفصولة بفواصل)
 ADMINS=admin1@example.com,admin2@example.com
 
-# ==============================================
-# إعدادات التطبيق الإضافية
-# ==============================================
-
-# مجلد حفظ ملفات الباركود
+# ===== إضافية =====
 BARCODE_FOLDER=./static/barcodes
-
-# الحد الأقصى لحجم الملفات (بايت)
-MAX_CONTENT_LENGTH=16777216  # 16MB
-
-# مستوى تسجيل الأحداث (DEBUG/INFO/WARNING/ERROR/CRITICAL)
-LOG_LEVEL=DEBUG
-
-# ==============================================
-# إعدادات خاصة بالدفع (إن وجدت)
-# ==============================================
-
-# مفاتيح API الدفع (مثال)
-PAYMENT_API_KEY=your_payment_api_key
-PAYMENT_SECRET_KEY=your_payment_secret_key
+MAX_CONTENT_LENGTH=16777216
+LOG_LEVEL=INFO

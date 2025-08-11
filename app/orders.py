@@ -1,7 +1,7 @@
 # orders.py
 from flask_wtf.csrf import CSRFProtect
 csrf = CSRFProtect() 
-from flask import Blueprint, render_template, session, flash, redirect, url_for, request, send_from_directory, current_app, jsonify
+from flask import Blueprint, render_template, flash, redirect, url_for, request, send_from_directory, current_app, jsonify, make_response
 import requests
 from .models import (
     db, User, Employee, Department, EmployeePermission, 
@@ -10,6 +10,7 @@ from .models import (
 )
 from .config import Config
 from .utils import process_order_data, format_date, generate_barcode, humanize_time
+from .token_utils import exchange_code_for_token, get_store_info, set_token_cookies, refresh_salla_token
 import os
 from datetime import datetime, timedelta
 import logging
@@ -23,117 +24,55 @@ logger = logging.getLogger(__name__)
 
 orders_bp = Blueprint('orders', __name__)
 
-def refresh_salla_token(user):
-    """تجديد توكن الوصول لسلة باستخدام refresh token"""
-    try:
-        # التحقق من وجود refresh token
-        if not user.salla_refresh_token:
-            logger.error("No refresh token available for user")
-            return None
-            
-        # فك تشفير refresh token
-        refresh_token = user.get_refresh_token()
-        
-        # إذا فشل فك التشفير، نطلب إعادة المصادقة
-        if not refresh_token:
-            logger.error("Failed to decrypt refresh token")
-            # حذف التوكنات القديمة
-            user.salla_refresh_token = None
-            user.salla_access_token = None
-            db.session.commit()
-            return None
-
-        # ... باقي الكود ...
-        payload = {
-        'grant_type': 'refresh_token',
-        'refresh_token': refresh_token,
-        'client_id': Config.SALLA_CLIENT_ID,  # تصحيح هنا
-        'client_secret': Config.SALLA_CLIENT_SECRET,
-        'redirect_uri': Config.REDIRECT_URI
-        }
-        
-        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-        
-        response = requests.post(
-            Config.SALLA_TOKEN_URL,
-            data=payload,
-            headers=headers,
-            timeout=10
-        )
-         
-        if response.status_code == 200:
-            token_data = response.json()
-            # حفظ التوكنات الجديدة
-            user.set_tokens(
-                token_data['access_token'],
-                token_data.get('refresh_token', refresh_token)
-            )
-            db.session.commit()
-            
-            # إرجاع التوكن الجديد
-            return token_data['access_token']
-        
-        # معالجة أخطاء محددة
-        error_data = response.json()
-        logger.error(f"فشل تجديد التوكن: {response.status_code} - {error_data}")
-        
-        # إذا كان الخطأ بسبب refresh token غير صالح
-        if response.status_code == 400 and error_data.get('error') == 'invalid_grant':
-            # مسح التوكنات القديمة
-            user.salla_access_token = None
-            user.salla_refresh_token = None
-            db.session.commit()
-            logger.warning("تم مسح التوكنات القديمة بسبب refresh token غير صالح")
+def get_user_from_cookies():
+    """استخراج بيانات المستخدم من الكوكيز"""
+    user_id = request.cookies.get('user_id')
+    is_admin = request.cookies.get('is_admin') == 'true'
     
-    except Exception as e:
-        logger.error(f"خطأ في تجديد التوكن: {str(e)}", exc_info=True)
+    if not user_id:
+        return None, None
     
-    return None
+    if is_admin:
+        user = User.query.get(user_id)
+        return user, None
+    else:
+        employee = Employee.query.get(user_id)
+        if employee:
+            user = User.query.filter_by(store_id=employee.store_id).first()
+            return user, employee
+        return None, None
 
 @orders_bp.route('/sync_orders', methods=['POST'])
-@csrf.exempt
 def sync_orders():
     """مزامنة الطلبات من سلة إلى قاعدة البيانات المحلية"""
     try:
-        # التحقق من صحة الجلسة
-        if 'user_id' not in session:
-            return jsonify({
+        user, employee = get_user_from_cookies()
+        
+        # التحقق من صحة الكوكيز
+        if not user:
+            response = jsonify({
                 'success': False, 
                 'error': 'الرجاء تسجيل الدخول أولاً',
                 'code': 'UNAUTHORIZED'
-            }), 401
+            })
+            response.set_cookie('user_id', '', expires=0)
+            response.set_cookie('is_admin', '', expires=0)
+            return response, 401
         
         # الحصول على معرف المتجر
         store_id = None
         access_token = None
         
-        if session.get('is_admin'):
-            user = User.query.get(session['user_id'])
-            if not user:
-                return jsonify({
-                    'success': False,
-                    'error': 'المستخدم غير موجود',
-                    'code': 'USER_NOT_FOUND'
-                }), 404
+        if request.cookies.get('is_admin') == 'true':
             store_id = user.store_id
             access_token = user.salla_access_token
         else:
-            employee = Employee.query.get(session['user_id'])
             if not employee:
                 return jsonify({
                     'success': False,
                     'error': 'الموظف غير موجود',
                     'code': 'EMPLOYEE_NOT_FOUND'
                 }), 404
-            
-            # الحصول على المستخدم الرئيسي للمتجر
-            user = User.query.filter_by(store_id=employee.store_id).first()
-            if not user:
-                return jsonify({
-                    'success': False,
-                    'error': 'المتجر غير مرتبط بحساب رئيسي',
-                    'code': 'STORE_NOT_LINKED'
-                }), 400
                 
             store_id = employee.store_id
             access_token = user.salla_access_token
@@ -200,8 +139,10 @@ def sync_orders():
                     # فشل تجديد التوكن
                     return jsonify({
                         'success': False,
-                        'error': "انتهت صلاحية الجلسة، الرجاء إعادة الربط مع سلة",
-                        'code': 'TOKEN_EXPIRED'
+                        'error': "انتهت صلاحية الجلسة، الرجاء تسجيل الخروج وإعادة تسجيل الدخول",
+                        'code': 'TOKEN_EXPIRED',
+                        'action_required': True,
+                        'redirect_url': url_for('user_auth.logout')
                     }), 401
             
             # التحقق من استجابة API بعد التجديد
@@ -304,15 +245,17 @@ def sync_orders():
             'code': 'INTERNAL_ERROR'
         }), 500
 
-
-# في orders.py
-
 @orders_bp.route('/')
 def index():
     """عرض قائمة الطلبات مع نظام الترحيل الكامل"""
-    if 'user_id' not in session:
+    user, employee = get_user_from_cookies()
+    
+    if not user:
         flash('الرجاء تسجيل الدخول أولاً', 'error')
-        return redirect(url_for('user_auth.login'))
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
     
     # جلب معلمات الترحيل والتصفية
     page = request.args.get('page', 1, type=int)
@@ -331,24 +274,23 @@ def index():
         per_page = 20
     
     # جلب بيانات المستخدم والمتجر
-    user, employee = None, None
     is_general_employee = False
     is_reviewer = False
     
-    if session.get('is_admin'):
-        user = User.query.get(session['user_id'])
+    if request.cookies.get('is_admin') == 'true':
         is_reviewer = True
-        if not user or not user.salla_access_token:
+        if not user.salla_access_token:
             flash('يجب ربط المتجر مع سلة أولاً', 'error')
             return redirect(url_for('auth.link_store'))
     else:
-        employee = Employee.query.get(session['user_id'])
         if not employee:
             flash('غير مصرح لك بالوصول', 'error')
-            return redirect(url_for('user_auth.login'))
+            response = make_response(redirect(url_for('user_auth.login')))
+            response.set_cookie('user_id', '', expires=0)
+            response.set_cookie('is_admin', '', expires=0)
+            return response
         
-        user = User.query.filter_by(store_id=employee.store_id).first()
-        if not user or not user.salla_access_token:
+        if not user.salla_access_token:
             flash('المتجر غير مرتبط بسلة', 'error')
             return redirect(url_for('user_auth.logout'))
         
@@ -558,17 +500,20 @@ def index():
         logger.exception(error_msg)
         return redirect(url_for('orders.index'))
 
-
-
 @orders_bp.route('/assign', methods=['POST'])
 def assign_orders():
     """إسناد طلبات إلى موظف مع تحسينات للتحقق"""
-    if 'user_id' not in session:
-        return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        response = jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'})
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response, 401
     
     # التحقق من الصلاحيات بشكل صارم
-    is_admin = session.get('is_admin', False)
-    employee_role = session.get('employee_role', '')
+    is_admin = request.cookies.get('is_admin') == 'true'
+    employee_role = employee.role if employee else ''
     
     # السماح للمديرين والمراجعين فقط
     if not (is_admin or employee_role == 'reviewer'):
@@ -581,7 +526,7 @@ def assign_orders():
     data = request.get_json()
     employee_id = data.get('employee_id')
     order_ids = data.get('order_ids', [])
-    current_user_id = session.get('user_id')
+    current_user_id = request.cookies.get('user_id')
     
     if not employee_id or not order_ids:
         return jsonify({
@@ -590,9 +535,6 @@ def assign_orders():
         }), 400
     
     try:
-        # بدء معاملة جديدة
-        db.session.begin()
-        
         # التحقق من وجود الموظف
         employee = Employee.query.get(employee_id)
         if not employee or employee.role != 'general':
@@ -660,44 +602,27 @@ def assign_orders():
             'error': f'حدث خطأ أثناء الإسناد: {str(e)}',
             'code': 'ASSIGNMENT_ERROR'
         }), 500
-            
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error assigning orders: {str(e)}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': f'حدث خطأ أثناء الإسناد: {str(e)}',
-            'code': 'ASSIGNMENT_ERROR'
-        }), 500
 @orders_bp.route('/<int:order_id>')
 def order_details(order_id):
     """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة"""
-    if 'user_id' not in session:
+    user, current_employee = get_user_from_cookies()
+    
+    if not user:
         flash("الرجاء تسجيل الدخول أولاً", "error")
-        return redirect(url_for('user_auth.login'))
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
 
     try:
         # ========== [1] التحقق من صلاحية المستخدم ==========
-        user = None
         is_reviewer = False
-        current_employee = None
         
-        if session.get('is_admin'):
-            user = User.query.get(session['user_id'])
+        if request.cookies.get('is_admin') == 'true':
             is_reviewer = True
-        else:
-            current_employee = Employee.query.get(session['user_id'])
-            if not current_employee:
-                flash('غير مصرح لك بالوصول', 'error')
-                return redirect(url_for('user_auth.login'))
-                
-            user = User.query.filter_by(store_id=current_employee.store_id).first()
+        elif current_employee:
             if current_employee.role in ['reviewer', 'manager']:
                 is_reviewer = True
-
-        if not user:
-            flash('المستخدم غير موجود', 'error')
-            return redirect(url_for('user_auth.login'))
 
         # ========== [2] التحقق من صلاحية التوكن ==========
         def refresh_and_get_token():
@@ -705,19 +630,19 @@ def order_details(order_id):
             new_token = refresh_salla_token(user)
             if not new_token:
                 flash("انتهت صلاحية الجلسة، الرجاء إعادة الربط مع سلة", "error")
-                if session.get('is_admin'):
-                    return redirect(url_for('auth.link_store'))
-                else:
-                    return redirect(url_for('user_auth.logout'))
+                response = make_response(redirect(url_for('auth.link_store' if request.cookies.get('is_admin') == 'true' else 'user_auth.logout')))
+                response.set_cookie('user_id', '', expires=0)
+                response.set_cookie('is_admin', '', expires=0)
+                return response
             return new_token
 
         access_token = user.salla_access_token
         if not access_token:
             flash('يجب ربط متجرك مع سلة أولاً', 'error')
-            if session.get('is_admin'):
-                return redirect(url_for('auth.link_store'))
-            else:
-                return redirect(url_for('user_auth.logout'))
+            response = make_response(redirect(url_for('auth.link_store' if request.cookies.get('is_admin') == 'true' else 'user_auth.logout')))
+            response.set_cookie('user_id', '', expires=0)
+            response.set_cookie('is_admin', '', expires=0)
+            return response
 
         # ========== [3] جلب بيانات الطلب من Salla API ==========
         headers = {
@@ -869,17 +794,19 @@ def order_details(order_id):
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
 
-
-
 @orders_bp.route('/<int:order_id>/update_status', methods=['POST'])
 def update_order_status(order_id):
     """تحديث حالة الطلب في سلة"""
-    if 'user_id' not in session:
-        flash("الرجاء تسجيل الدخول أولاً", "error")
-        return redirect(url_for('user_auth.login'))
+    user, _ = get_user_from_cookies()
     
-    user = User.query.get(session['user_id'])
-    if not user or not user.salla_access_token:
+    if not user:
+        flash("الرجاء تسجيل الدخول أولاً", "error")
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
+    
+    if not user.salla_access_token:
         flash('يجب ربط متجرك مع سلة أولاً', 'error')
         return redirect(url_for('auth.link_store'))
     
@@ -933,19 +860,24 @@ def update_order_status(order_id):
         flash(f"حدث خطأ غير متوقع: {str(e)}", "error")
         return redirect(url_for('orders.order_details', order_id=order_id))
 
+
 @orders_bp.route('/<int:order_id>/add_status_note', methods=['POST'])
 def add_status_note(order_id):
     """إضافة ملاحظة خاصة بالطلب (متأخر، واصل ناقص، إلخ)"""
-    if 'user_id' not in session:
+    user, employee = get_user_from_cookies()
+    
+    if not user:
         flash("الرجاء تسجيل الدخول أولاً", "error")
-        return redirect(url_for('user_auth.login'))
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
     
     # التحقق من الصلاحية: فقط المراجعون والمديرون
     is_reviewer = False
-    if session.get('is_admin'):
+    if request.cookies.get('is_admin') == 'true':
         is_reviewer = True
     else:
-        employee = Employee.query.get(session['user_id'])
         if employee and employee.role in ['reviewer', 'manager']:
             is_reviewer = True
     
@@ -965,7 +897,7 @@ def add_status_note(order_id):
             order_id=str(order_id),
             status_flag=status_flag,
             note=note,
-            created_by=session['user_id']
+            created_by=request.cookies.get('user_id')
         )
         db.session.add(new_note)
         db.session.commit()
@@ -985,22 +917,34 @@ def serve_barcode(filename):
 @orders_bp.route('/scan')
 def scan_barcode():
     """صفحة مسح الباركود"""
-    if 'user_id' not in session:
+    user, _ = get_user_from_cookies()
+    
+    if not user:
         flash('الرجاء تسجيل الدخول أولاً', 'error')
-        return redirect(url_for('user_auth.login'))
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
     return render_template('scan_barcode.html')
-# ... [الكود السابق] ...
+
 @orders_bp.route('/employee_dashboard')
 def employee_dashboard(): 
     """لوحة تحكم الموظف"""
-    if 'user_id' not in session or session.get('is_admin'):
-        flash('غير مصرح لك بالوصول', 'error')
-        return redirect(url_for('user_auth.login'))
+    user, employee = get_user_from_cookies()
     
-    employee = Employee.query.get(session['user_id'])
+    if not user or request.cookies.get('is_admin') == 'true':
+        flash('غير مصرح لك بالوصول', 'error')
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
+    
     if not employee:
         flash('غير مصرح لك بالوصول', 'error')
-        return redirect(url_for('user_auth.login'))
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
     
     # جلب الطلبات المسندة لهذا الموظف فقط
     assignments = OrderAssignment.query.filter_by(employee_id=employee.id).all()
@@ -1048,21 +992,26 @@ def employee_dashboard():
                           custom_status_stats=custom_status_stats,
                           recent_statuses=recent_statuses,
                           assigned_orders=assigned_orders)
-# إضافة فلتر لجينن لتحويل أسماء الحالات
-# في orders.py
+
 @orders_bp.route('/employee_status', methods=['GET', 'POST'])
 def manage_employee_status():
-    if 'user_id' not in session:
+    user, employee = get_user_from_cookies()
+    
+    if not user:
         flash('الرجاء تسجيل الدخول أولاً', 'error')
-        return redirect(url_for('user_auth.login'))
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
     
     # للموظفين العاديين: جلب بيانات الموظف
-    employee = None
-    if not session.get('is_admin'):
-        employee = Employee.query.get(session['user_id'])
+    if not request.cookies.get('is_admin') == 'true':
         if not employee:
             flash('غير مصرح لك بالوصول', 'error')
-            return redirect(url_for('user_auth.login'))
+            response = make_response(redirect(url_for('user_auth.login')))
+            response.set_cookie('user_id', '', expires=0)
+            response.set_cookie('is_admin', '', expires=0)
+            return response
     
     if request.method == 'POST':
         name = request.form.get('name')
@@ -1070,7 +1019,7 @@ def manage_employee_status():
         
         if name:
             # للمديرين: استخدام user_id، للموظفين: استخدام employee.id
-            employee_id = session['user_id'] if session.get('is_admin') else employee.id
+            employee_id = request.cookies.get('user_id') if request.cookies.get('is_admin') == 'true' else employee.id
             new_status = EmployeeCustomStatus(
                 name=name,
                 color=color,
@@ -1082,36 +1031,47 @@ def manage_employee_status():
         return redirect(url_for('orders.manage_employee_status'))
     
     # جلب الحالات حسب نوع المستخدم
-    if session.get('is_admin'):
-        statuses = EmployeeCustomStatus.query.filter_by(employee_id=session['user_id']).all()
+    if request.cookies.get('is_admin') == 'true':
+        statuses = EmployeeCustomStatus.query.filter_by(employee_id=request.cookies.get('user_id')).all()
     else:
         statuses = employee.custom_statuses
     
     return render_template('manage_custom_status.html', statuses=statuses)
+
 @orders_bp.route('/employee_status/<int:status_id>/delete', methods=['POST'])
 def delete_employee_status(status_id):
-    if 'user_id' not in session:
+    user, _ = get_user_from_cookies()
+    
+    if not user:
         flash('غير مصرح لك بالوصول', 'error')
-        return redirect(url_for('user_auth.login'))
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
     
     status = EmployeeCustomStatus.query.get(status_id)
-    if status and status.employee_id == session['user_id']:
+    if status and status.employee_id == request.cookies.get('user_id'):
         db.session.delete(status)
         db.session.commit()
         flash('تم حذف الحالة بنجاح', 'success')
     return redirect(url_for('orders.manage_employee_status'))
+
 @orders_bp.route('/<int:order_id>/add_employee_status', methods=['POST'])
 def add_employee_status(order_id):
-    if 'user_id' not in session:
+    user, employee = get_user_from_cookies()
+    
+    if not user:
         flash('الرجاء تسجيل الدخول أولاً', 'error')
-        return redirect(url_for('user_auth.login'))
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
     
     # التحقق من أن المستخدم موظف وليس مديراً
-    if session.get('is_admin'):
+    if request.cookies.get('is_admin') == 'true':
         flash('هذه الخدمة للموظفين فقط', 'error')
         return redirect(url_for('orders.order_details', order_id=order_id))
     
-    employee = Employee.query.get(session['user_id'])
     if not employee:
         flash('غير مصرح لك بهذا الإجراء', 'error')
         return redirect(url_for('orders.order_details', order_id=order_id))

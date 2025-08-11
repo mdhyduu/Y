@@ -37,6 +37,10 @@
       color: var(--text-light);
     }
     
+    body.dark-mode * {
+      color: var(--text-light) !important;
+    }
+    
     .dashboard {
       display: flex;
       flex-direction: row;
@@ -341,14 +345,14 @@
       </a>
       
       <!-- عناصر القائمة الخاصة بالموظفين العاديين -->
-      {% if not session.get('is_admin') %}
+      {% if not request.cookies.get('is_admin') == 'true' %}
         <a class="nav-link {% if request.path == url_for('orders.employee_dashboard') %}active{% endif %}" href="{{ url_for('orders.employee_dashboard') }}">
           <i class="fas fa-tachometer-alt"></i> لوحتي
         </a>
       {% endif %}
       
       <!-- عناصر القائمة الخاصة بالمديرين فقط -->
-      {% if session.get('is_admin') %}
+      {% if request.cookies.get('is_admin') == 'true' %}
         <a class="nav-link {% if request.path == url_for('employees.list_employees') %}active{% endif %}" href="{{ url_for('employees.list_employees') }}">
           <i class="fas fa-users"></i> الموظفين
         </a>
@@ -378,7 +382,7 @@
         <div class="sidebar-toggle d-lg-none" onclick="toggleSidebar()">
           <i class="fas fa-bars"></i>
         </div>
-        <strong class="fs-5">مرحبًا بك، {{ session.get('username', 'زائر') }}</strong>
+        <strong class="fs-5">مرحبًا بك، {{ request.cookies.get('username', 'زائر') }}</strong>
         <div class="actions">
           <i class="fas fa-moon theme-toggle" id="themeToggle" onclick="toggleDarkMode()"></i>
         </div>
@@ -413,7 +417,7 @@
     function toggleDarkMode() {
       document.body.classList.toggle('dark-mode');
       const isDark = document.body.classList.contains('dark-mode');
-      localStorage.setItem('darkMode', isDark);
+      document.cookie = `darkMode=${isDark}; path=/; max-age=${60*60*24*365}`;
       document.getElementById('themeToggle').className = isDark ? 'fas fa-sun theme-toggle' : 'fas fa-moon theme-toggle';
       
       // إضافة تأثير للتبديل
@@ -427,7 +431,8 @@
     // تحميل وضع الظلام إذا كان مفعلًا سابقًا
     window.addEventListener('DOMContentLoaded', () => {
       // وضع الظلام
-      if (localStorage.getItem('darkMode') === 'true') {
+      const darkModeCookie = document.cookie.split('; ').find(row => row.startsWith('darkMode='));
+      if (darkModeCookie && darkModeCookie.split('=')[1] === 'true') {
         document.body.classList.add('dark-mode');
         document.getElementById('themeToggle').className = 'fas fa-sun theme-toggle';
       }

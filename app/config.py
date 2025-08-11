@@ -7,36 +7,32 @@ basedir = Path(__file__).parent.absolute()
 from dotenv import load_dotenv
 load_dotenv()  # تحميل المتغيرات
 
-# في config.py
-
 # تحديد مسار الملف بشكل مطلق
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
-class Config:
 
+class Config:
     # ------ الإعدادات الأساسية ------
     SECRET_KEY = os.environ.get('SECRET_KEY')
+    if not SECRET_KEY:
+        raise ValueError("يجب تعيين SECRET_KEY في متغيرات البيئة للإنتاج")
+    
     ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')
-    @staticmethod
-    def init_app(app):
-        """تهيئة إضافية للتطبيق"""
-        # لا تقم بتوليد مفتاح جديد إذا كان موجوداً
-        if not os.environ.get('ENCRYPTION_KEY'):
-            key = Fernet.generate_key().decode()
-            os.environ['ENCRYPTION_KEY'] = key
-            app.config['ENCRYPTION_KEY'] = key
-            print(f"تم توليد مفتاح تشفير جديد: {key}")
+    if not ENCRYPTION_KEY:
+        raise ValueError("يجب تعيين ENCRYPTION_KEY في متغيرات البيئة للإنتاج")
+
     # ------ إعدادات قاعدة البيانات ------
-    SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI') or \
-                             f"sqlite:///{basedir/'app.db'}"
+    SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI')
+    if not SQLALCHEMY_DATABASE_URI:
+        raise ValueError("يجب تعيين SQLALCHEMY_DATABASE_URI في متغيرات البيئة للإنتاج")
+    
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
         'pool_recycle': 3600,
-        'pool_size': 10,
-        'max_overflow': 20
+        'pool_size': 20,
+        'max_overflow': 40
     }
-    
     
     # ------ إعدادات الترحيل (Pagination) ------
     DEFAULT_PER_PAGE = 20
@@ -45,52 +41,59 @@ class Config:
     # ------ إعدادات Salla API ------
     SALLA_CLIENT_ID = os.environ.get('SALLA_CLIENT_ID')
     SALLA_CLIENT_SECRET = os.environ.get('SALLA_CLIENT_SECRET')
+    if not SALLA_CLIENT_ID or not SALLA_CLIENT_SECRET:
+        raise ValueError("يجب تعيين SALLA_CLIENT_ID و SALLA_CLIENT_SECRET في متغيرات البيئة")
+    
     SALLA_AUTH_URL = os.environ.get('SALLA_AUTH_URL', 'https://accounts.salla.sa/oauth2/auth')
     SALLA_TOKEN_URL = os.environ.get('SALLA_TOKEN_URL', 'https://accounts.salla.sa/oauth2/token')
     SALLA_API_BASE_URL = os.environ.get('SALLA_API_BASE_URL', 'https://api.salla.dev/admin/v2')
-    SALLA_BASE_URL = SALLA_API_BASE_URL  # للإبقاء على التوافق مع الكود القديم
+    SALLA_BASE_URL = SALLA_API_BASE_URL
     SALLA_ORDERS_API = os.environ.get('SALLA_ORDERS_API', f"{SALLA_API_BASE_URL}/orders")
     
     SALLA_ORDERS_ENDPOINT = f"{SALLA_API_BASE_URL}/orders"
     SALLA_PRODUCTS_ENDPOINT = f"{SALLA_API_BASE_URL}/products"
     SALLA_STORE_INFO_ENDPOINT = f"{SALLA_API_BASE_URL}/store/info"
-    REDIRECT_URI = os.environ.get('REDIRECT_URI', 'http://localhost:5000/callback')
+    REDIRECT_URI = os.environ.get('REDIRECT_URI')
+    if not REDIRECT_URI:
+        raise ValueError("يجب تعيين REDIRECT_URI في متغيرات البيئة للإنتاج")
+    
     # ------ إعدادات الباركود ------
     BARCODE_FOLDER = basedir / 'static' / 'barcodes'
-    if not ENCRYPTION_KEY:
-        ENCRYPTION_KEY = Fernet.generate_key().decode()
-        # استبدال logger بـ print مؤقتاً
-        print("WARNING: تم توليد مفتاح تشفير جديد. يجب حفظه في ملف .env!")
-    # ------ إعدادات الجلسات والأمان ------
-    SESSION_COOKIE_NAME = 'secure_session'
-    SESSION_COOKIE_SECURE =False
-    SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = 'Lax'
-    PERMANENT_SESSION_LIFETIME = timedelta(days=30)
-    SESSION_REFRESH_EACH_REQUEST = True
+    
+    # ------ إعدادات الكوكيز والأمان ------
+    COOKIE_NAME = 'app_session'
+    COOKIE_SECURE = True  # ضروري للإنتاج
+    COOKIE_HTTPONLY = True
+    COOKIE_SAMESITE = 'Strict'
+    COOKIE_LIFETIME = timedelta(days=30)
+    COOKIE_REFRESH_EACH_REQUEST = True
+    SESSION_COOKIE_SECURE = True
     
     # ------ إعدادات CSRF ------
     WTF_CSRF_ENABLED = True
-    WTF_CSRF_SECRET_KEY = os.environ.get('WTF_CSRF_SECRET_KEY') or os.urandom(24)
-    WTF_CSRF_TIME_LIMIT = 3600  # ساعة واحدة بالثواني
+    WTF_CSRF_SECRET_KEY = os.environ.get('WTF_CSRF_SECRET_KEY')
+    if not WTF_CSRF_SECRET_KEY:
+        raise ValueError("يجب تعيين WTF_CSRF_SECRET_KEY في متغيرات البيئة للإنتاج")
+    WTF_CSRF_TIME_LIMIT = 3600
     
     # ------ إعدادات التشفير ------
     DATA_ENCRYPTION_KEYS = {
         'default': ENCRYPTION_KEY,
-        'fallback': Fernet.generate_key().decode()
+        'fallback': os.environ.get('ENCRYPTION_KEY_FALLBACK') or Fernet.generate_key().decode()
     }
     
     # ------ إعدادات التطوير ------
-    DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    DEBUG = False
     TESTING = False
     
     # ------ إعدادات البريد الإلكتروني ------
-    MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.example.com')
+    MAIL_SERVER = os.environ.get('MAIL_SERVER')
     MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))
     MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'True').lower() == 'true'
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
-    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER', 'noreply@example.com')
+    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER')
+    ADMINS = [email.strip() for email in os.environ.get('ADMINS', '').split(',') if email.strip()]
     
     @staticmethod
     def init_app(app):
@@ -105,30 +108,48 @@ class Config:
         # إضافة رؤوس الأمان
         @app.after_request
         def add_security_headers(response):
+            # سياسة أمان المحتوى
+            csp = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "img-src 'self' data: https:; "
+                "font-src 'self' https://cdn.jsdelivr.net; "
+                "connect-src 'self'; "
+                "frame-ancestors 'none'; "
+                "form-action 'self'; "
+                "base-uri 'self'; "
+                "object-src 'none'; "
+            )
+            
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
             response.headers['X-Content-Type-Options'] = 'nosniff'
             response.headers['X-Frame-Options'] = 'DENY'
             response.headers['X-XSS-Protection'] = '1; mode=block'
-            response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'"
+            response.headers['Content-Security-Policy'] = csp
+            response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+            response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
             return response
 
 
 class DevelopmentConfig(Config):
     """إعدادات بيئة التطوير"""
     DEBUG = True
-    SQLALCHEMY_ECHO = True  # يعرض استعلامات SQL في السجلات
+    SQLALCHEMY_ECHO = False
+    COOKIE_SECURE = False
+    WTF_CSRF_ENABLED = True
 
 
 class TestingConfig(Config):
     """إعدادات بيئة الاختبار"""
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
-    WTF_CSRF_ENABLED = False  # تعطيل CSRF للاختبارات
+    WTF_CSRF_ENABLED = False
+    COOKIE_SECURE = False
 
 
 class ProductionConfig(Config):
     """إعدادات بيئة الإنتاج"""
-    SESSION_COOKIE_SECURE = True
-    SESSION_COOKIE_SAMESITE = 'Strict'
     PREFERRED_URL_SCHEME = 'https'
     
     @classmethod
@@ -137,26 +158,40 @@ class ProductionConfig(Config):
         
         # معالجة المشاكل في السجلات
         import logging
-        from logging.handlers import SMTPHandler
+        from logging.handlers import SMTPHandler, RotatingFileHandler
         
-        credentials = None
-        secure = None
-        
-        if app.config.get('MAIL_USERNAME'):
-            credentials = (app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
-            if app.config.get('MAIL_USE_TLS'):
-                secure = ()
-        
-        mail_handler = SMTPHandler(
-            mailhost=(app.config['MAIL_SERVER'], app.config['MAIL_PORT']),
-            fromaddr=app.config['MAIL_DEFAULT_SENDER'],
-            toaddrs=app.config['ADMINS'],
-            subject='Application Error',
-            credentials=credentials,
-            secure=secure
+        # تسجيل الأخطاء في ملف
+        file_handler = RotatingFileHandler(
+            'logs/app.log',
+            maxBytes=1024 * 1024 * 10,  # 10MB
+            backupCount=10
         )
-        mail_handler.setLevel(logging.ERROR)
-        app.logger.addHandler(mail_handler)
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+        ))
+        file_handler.setLevel(logging.INFO)
+        app.logger.addHandler(file_handler)
+        
+        # إرسال الأخطاء بالبريد
+        if app.config.get('MAIL_SERVER') and app.config.get('ADMINS'):
+            credentials = None
+            secure = None
+            
+            if app.config.get('MAIL_USERNAME'):
+                credentials = (app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
+                if app.config.get('MAIL_USE_TLS'):
+                    secure = ()
+            
+            mail_handler = SMTPHandler(
+                mailhost=(app.config['MAIL_SERVER'], app.config['MAIL_PORT']),
+                fromaddr=app.config['MAIL_DEFAULT_SENDER'],
+                toaddrs=app.config['ADMINS'],
+                subject='Application Error',
+                credentials=credentials,
+                secure=secure
+            )
+            mail_handler.setLevel(logging.ERROR)
+            app.logger.addHandler(mail_handler)
 
 
 # تهيئة إعدادات البيئات المختلفة
@@ -164,5 +199,5 @@ config = {
     'development': DevelopmentConfig,
     'testing': TestingConfig,
     'production': ProductionConfig,
-    'default': DevelopmentConfig
+    'default': ProductionConfig  # تغيير الافتراضي إلى الإنتاج
 }

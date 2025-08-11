@@ -1,6 +1,6 @@
 from flask_wtf.csrf import CSRFProtect
 csrf = CSRFProtect()
-from flask import Blueprint, render_template, redirect, url_for, request, flash, session
+from flask import Blueprint, render_template, redirect, url_for, request, flash, make_response
 from .models import db, User, Employee
 from datetime import datetime
 
@@ -8,11 +8,18 @@ employees_bp = Blueprint('employees', __name__, url_prefix='/dashboard')
 
 @employees_bp.route('/employees')
 def list_employees():
-    if 'user_id' not in session:
+    user_id = request.cookies.get('user_id')
+    is_admin = request.cookies.get('is_admin') == 'true'
+    
+    if not user_id:
         flash('غير مصرح لك بالوصول', 'error')
         return redirect(url_for('user_auth.login'))
     
-    user = User.query.get(session['user_id'])
+    user = User.query.get(user_id)
+    if not user:
+        flash('المستخدم غير موجود', 'error')
+        return redirect(url_for('user_auth.login'))
+    
     employees = Employee.query.filter_by(store_id=user.store_id).all()
     return render_template('employees/list.html', 
                         employees=employees,
@@ -20,14 +27,15 @@ def list_employees():
 
 @employees_bp.route('/employees/add', methods=['GET', 'POST'])
 def add_employee():
-    if 'user_id' not in session:
+    user_id = request.cookies.get('user_id')
+    is_admin = request.cookies.get('is_admin') == 'true'
+    is_delivery_manager = request.cookies.get('employee_role') == 'delivery_manager'
+    
+    if not user_id:
         flash('غير مصرح لك بالوصول', 'error')
         return redirect(url_for('user_auth.login'))
     
-    current_employee = Employee.query.get(session['user_id'])
-    is_delivery_manager = session.get('is_delivery_manager', False)
-    
-    if not (session.get('is_admin') or is_delivery_manager):
+    if not (is_admin or is_delivery_manager):
         flash('ليس لديك صلاحية إضافة موظفين', 'error')
         return redirect(url_for('dashboard.index'))
     
@@ -45,7 +53,7 @@ def add_employee():
             flash('البريد الإلكتروني موجود مسبقاً', 'error')
             return redirect(url_for('employees.add_employee'))
         
-        user = User.query.get(session['user_id'])
+        user = User.query.get(user_id)
         region = 'الرياض' if role in ('delivery', 'delivery_manager') else None
         
         new_employee = Employee(
@@ -68,7 +76,7 @@ def add_employee():
             ('general', 'موظف عام'),
             ('delivery', 'مندوب توصيل'),
             ('delivery_manager', 'مدير التوصيل'),
-            ('reviewer', 'مراجع الطلبات')  # الدور الجديد
+            ('reviewer', 'مراجع الطلبات')
         ]
     
     return render_template('employees/add.html', 
@@ -77,7 +85,11 @@ def add_employee():
 
 @employees_bp.route('/employees/<int:employee_id>/delete', methods=['POST'])
 def delete_employee(employee_id):
-    if 'user_id' not in session or not (session.get('is_admin') or session.get('is_delivery_manager')):
+    user_id = request.cookies.get('user_id')
+    is_admin = request.cookies.get('is_admin') == 'true'
+    is_delivery_manager = request.cookies.get('employee_role') == 'delivery_manager'
+    
+    if not user_id or not (is_admin or is_delivery_manager):
         flash('غير مصرح لك بهذا الإجراء', 'error')
         return redirect(url_for('user_auth.login'))
     
@@ -86,7 +98,7 @@ def delete_employee(employee_id):
         flash('الموظف غير موجود', 'error')
         return redirect(url_for('employees.list_employees'))
     
-    if session.get('is_delivery_manager') and employee.role == 'delivery_manager':
+    if is_delivery_manager and employee.role == 'delivery_manager':
         flash('لا يمكنك حذف مدراء آخرين', 'error')
         return redirect(url_for('employees.list_employees'))
     
@@ -98,7 +110,11 @@ def delete_employee(employee_id):
 
 @employees_bp.route('/employees/<int:employee_id>/toggle_active', methods=['POST'])
 def toggle_employee_active(employee_id):
-    if 'user_id' not in session or not (session.get('is_admin') or session.get('is_delivery_manager')):
+    user_id = request.cookies.get('user_id')
+    is_admin = request.cookies.get('is_admin') == 'true'
+    is_delivery_manager = request.cookies.get('employee_role') == 'delivery_manager'
+    
+    if not user_id or not (is_admin or is_delivery_manager):
         flash('غير مصرح لك بهذا الإجراء', 'error')
         return redirect(url_for('user_auth.login'))
     
@@ -107,7 +123,7 @@ def toggle_employee_active(employee_id):
         flash('الموظف غير موجود', 'error')
         return redirect(url_for('employees.list_employees'))
     
-    if session.get('is_delivery_manager') and employee.role == 'delivery_manager':
+    if is_delivery_manager and employee.role == 'delivery_manager':
         flash('لا يمكنك تعديل حالة مدراء آخرين', 'error')
         return redirect(url_for('employees.list_employees'))
     
