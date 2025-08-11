@@ -420,7 +420,37 @@ class OrderEmployeeStatus(db.Model):
     
     status = relationship('EmployeeCustomStatus', back_populates='order_statuses')
     order = relationship('SallaOrder', back_populates='employee_statuses')
+# أضف هذا في نهاية models.py قبل @event.listens_for
 
+def get_user_from_cookies(request):
+    """
+    استخراج بيانات المستخدم/الموظف من الكوكيز
+    يُنصح باستدعائها من كائن الطلب (request) مباشرة
+    
+    Returns:
+        tuple: (user, employee) - أحدها قد يكون None حسب نوع المستخدم
+    """
+    user_id = request.cookies.get('user_id')
+    if not user_id:
+        return None, None
+    
+    is_admin = request.cookies.get('is_admin') == 'true'
+    
+    try:
+        if is_admin:
+            user = User.query.get(user_id)
+            return user, None
+        else:
+            employee = Employee.query.get(user_id)
+            if employee:
+                user = User.query.filter_by(store_id=employee.store_id).first()
+                return user, employee
+            return None, None
+    except Exception as e:
+        current_app.logger.error(f"خطأ في جلب بيانات المستخدم من الكوكيز: {str(e)}")
+        return None, None
+
+# تبقى أحداث SQLAlchemy كما هي
 @event.listens_for(User, 'before_insert')
 def validate_user(mapper, connection, target):
     if not target.email:
