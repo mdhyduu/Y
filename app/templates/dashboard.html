@@ -52,6 +52,8 @@
             </div>
             <div class="card-body">
                 <p>عدد الطلبات اليوم: 15</p>
+                <p>عدد الموظفين: {{ employees_count }}</p>
+                <p>عدد المنتجات: {{ products_count }}</p>  <!-- إضافة إحصائية للمنتجات -->
                 <p>حالة الربط مع سلة: {% if current_user.salla_access_token %}مرتبط{% else %}غير مرتبط{% endif %}</p>
                 <a href="{{ url_for('auth.link_store') }}" class="btn btn-sm btn-outline-secondary">ربط المتجر</a>
             </div>

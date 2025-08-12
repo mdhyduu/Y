@@ -149,8 +149,9 @@ class TestingConfig(Config):
 
 
 class ProductionConfig(Config):
- 
+    """إعدادات بيئة الإنتاج"""
     PREFERRED_URL_SCHEME = 'https'
+    
     @classmethod
     def init_app(cls, app):
         Config.init_app(app)

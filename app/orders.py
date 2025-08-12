@@ -30,7 +30,7 @@ def get_user_from_cookies():
     is_admin = request.cookies.get('is_admin') == 'true'
     
     if not user_id:
-        return None, None 
+        return None, None
     
     if is_admin:
         user = User.query.get(user_id)
