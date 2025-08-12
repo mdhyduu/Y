@@ -29,7 +29,7 @@ def create_app():
         REMEMBER_COOKIE_SAMESITE='Lax',
         
         # إعدادات إضافية
-        PERMANENT_SESSION_LIFETIME=timedelta(days=30),  # مدة الجلسة
+        PERMANENT_SESSION_LIFETIME=timedelta(days=30))  # مدة الجلسة
 
     # معالجة البروكسي
     from werkzeug.middleware.proxy_fix import ProxyFix
