@@ -82,9 +82,7 @@ class Config:
         'fallback': os.environ.get('ENCRYPTION_KEY_FALLBACK') or Fernet.generate_key().decode()
     }
     
-    # ------ إعدادات التطوير ------
-    DEBUG = False
-    TESTING = False
+
     
     # ------ إعدادات البريد الإلكتروني ------
     MAIL_SERVER = os.environ.get('MAIL_SERVER')
@@ -132,24 +130,10 @@ class Config:
             return response
 
 
-class DevelopmentConfig(Config):
-    """إعدادات بيئة التطوير"""
-    DEBUG = True
-    SQLALCHEMY_ECHO = False
-    COOKIE_SECURE = False
-    WTF_CSRF_ENABLED = True
 
-
-class TestingConfig(Config):
-    """إعدادات بيئة الاختبار"""
-    TESTING = True
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
-    WTF_CSRF_ENABLED = False
-    COOKIE_SECURE = False
 
 
 class ProductionConfig(Config):
-    SERVER_NAME = 'plankton-app-9im8u.ondigitalocean.app'
     PREFERRED_URL_SCHEME = 'https'
     @classmethod
     def init_app(cls, app):
