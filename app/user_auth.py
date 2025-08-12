@@ -1,49 +1,45 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, g
+from flask import Blueprint, render_template, redirect, url_for, flash, request, make_response, current_app
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField
 from wtforms.validators import DataRequired, EqualTo, Length, ValidationError
 import re
 import logging
-import json
+from .models import db, User, Employee
 from datetime import datetime, timedelta
 from functools import wraps
-from cryptography.fernet import Fernet, InvalidToken
-from .models import db, User, Employee
 
 user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
 
-# فلتر يمنع الوصول إذا المستخدم مسجل دخول
+# فلتر حماية يمنع الوصول إذا المستخدم مسجل دخول
 def redirect_if_authenticated(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
-        if request.headers.get('Authorization') or request.args.get('token'):
+        if request.cookies.get('user_id'):
             return redirect(url_for('dashboard.index'))
         return view_func(*args, **kwargs)
     return wrapper
 
+# التحقق من صحة البريد
+def validate_email(form, field):
+    email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+    if not re.match(email_regex, field.data):
+        raise ValidationError('يجب إدخال بريد إلكتروني صالح')
+
 # نموذج تسجيل الدخول
 class LoginForm(FlaskForm):
-    email = StringField('البريد الإلكتروني', validators=[DataRequired()])
+    email = StringField('البريد الإلكتروني', validators=[DataRequired(), validate_email])
     password = PasswordField('كلمة المرور', validators=[DataRequired()])
 
-# دالة إنشاء توكن الجلسة
-def create_session_token(user):
-    try:
-        fernet = Fernet(current_app.config['ENCRYPTION_KEY'])
-        auth_data = {
-            'user_id': user.id,
-            'is_admin': getattr(user, 'is_admin', False),
-            'email': user.email,
-            'role': getattr(user, 'role', None),
-            'store_id': getattr(user, 'store_id', None),
-            'exp': (datetime.utcnow() + timedelta(days=30)).timestamp(),
-            'iat': datetime.utcnow().timestamp()
-        }
-        return fernet.encrypt(json.dumps(auth_data).encode('utf-8')).decode('utf-8')
-    except Exception as e:
-        logger.error(f"فشل إنشاء توكن الجلسة: {str(e)}")
-        raise
+# نموذج التسجيل
+class RegisterForm(FlaskForm):
+    email = StringField('البريد الإلكتروني', validators=[DataRequired(), validate_email])
+    password = PasswordField('كلمة المرور', 
+                           validators=[DataRequired(), 
+                                      Length(min=8, message='يجب أن تكون كلمة المرور 8 أحرف على الأقل')])
+    confirm_password = PasswordField('تأكيد كلمة المرور', 
+                                   validators=[DataRequired(), 
+                                              EqualTo('password', message='كلمتا المرور غير متطابقتين')])
 
 @user_auth_bp.route('/login', methods=['GET', 'POST'])
 @redirect_if_authenticated
@@ -51,25 +47,50 @@ def login():
     form = LoginForm()
     
     if form.validate_on_submit():
-        email = form.email.data.lower()
+        email = form.email.data
         password = form.password.data
         
         try:
-            # محاولة تسجيل الدخول كمشرف
+            # تسجيل دخول كمشرف
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
-                return handle_successful_login(user, is_admin=True)
+                response = make_response(redirect(url_for('dashboard.index')))
+                response.set_cookie('user_id', str(user.id), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+                response.set_cookie('is_admin', 'true' if user.is_admin else 'false', max_age=timedelta(days=30).total_seconds())  # تأكد من تعيين هذه القيمة
+                response.set_cookie('employee_role', '', max_age=timedelta(days=30).total_seconds())
+                
+                if user.salla_access_token:
+                    response.set_cookie('salla_access_token', user.get_access_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+                    response.set_cookie('salla_refresh_token', user.salla_refresh_token, max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+                
+                flash('تم تسجيل دخول المشرف بنجاح!', 'success')
+                logger.info(f"تم تسجيل دخول المشرف: {user.email}")
+                return response
             
-            # محاولة تسجيل الدخول كموظف
+            # تسجيل دخول كموظف
             employee = Employee.query.filter_by(email=email).first()
             if employee and employee.check_password(password):
                 if not employee.is_active:
                     flash('حسابك موقوف. يرجى الاتصال بالإدارة', 'danger')
                     logger.warning(f"محاولة تسجيل دخول لحساب موقوف: {email}")
                     return redirect(url_for('user_auth.login'))
-                return handle_successful_login(employee, is_admin=False)
+                
+                response = make_response(redirect(url_for('dashboard.index')))
+                response.set_cookie('user_id', str(employee.id), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+                response.set_cookie('is_admin', 'false', max_age=timedelta(days=30).total_seconds())  # تأكد من تعيين هذه القيمة
+                response.set_cookie('employee_role', employee.role, max_age=timedelta(days=30).total_seconds())
+                response.set_cookie('store_id', str(employee.store_id), max_age=timedelta(days=30).total_seconds())
+                
+                store_admin = User.query.filter_by(store_id=employee.store_id).first()
+                if store_admin and store_admin.salla_access_token:
+                    response.set_cookie('salla_access_token', store_admin.get_access_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+                    response.set_cookie('salla_refresh_token', store_admin.get_refresh_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+                
+                flash('تم تسجيل دخول الموظف بنجاح!', 'success')
+                logger.info(f"تم تسجيل دخول الموظف: {employee.email} - المتجر: {employee.store_id}")
+                return response
             
-            # إذا فشل تسجيل الدخول
+            # إذا البيانات غلط
             flash('بيانات الدخول غير صحيحة', 'danger')
             logger.warning(f"محاولة تسجيل دخول فاشلة للبريد: {email}")
             
@@ -79,92 +100,41 @@ def login():
             logger.error(f"خطأ في تسجيل الدخول: {str(e)}", exc_info=True)
     
     return render_template('auth/login.html', form=form)
-
-def handle_successful_login(user, is_admin):
-    """معالجة تسجيل الدخول الناجح"""
-    try:
-        # إنشاء توكن الجلسة
-        session_token = create_session_token(user)
+@user_auth_bp.route('/register', methods=['GET', 'POST'])
+@redirect_if_authenticated
+def register():
+    form = RegisterForm()
+    if form.validate_on_submit():
+        email = form.email.data
+        password = form.password.data
+         
+        with current_app.app_context():
+            if User.query.filter_by(email=email).first():
+                flash('البريد الإلكتروني مسجل مسبقاً', 'danger')
+                return redirect(url_for('user_auth.register'))
+            
+            new_user = User(email=email)
+            new_user.set_password(password)
+            
+            # إذا كان هذا هو المستخدم الأول، اجعله مسؤولاً
+            if User.query.count() == 0:
+                new_user.is_admin = True
+            
+            db.session.add(new_user)
+            db.session.commit()
         
-        # إعداد بيانات الجلسة
-        auth_data = {
-            'token': session_token,
-            'user_info': {
-                'id': user.id,
-                'email': user.email,
-                'is_admin': is_admin,
-                'role': getattr(user, 'role', None),
-                'store_id': getattr(user, 'store_id', None)
-            }
-        }
-        
-        # إذا كان مشرفاً ولديه توكن سلة
-        salla_token = None
-        if is_admin and hasattr(user, 'salla_access_token') and user.salla_access_token:
-            salla_token = user.salla_access_token
-        
-        # إذا كان موظفاً، نحصل على توكن سلة من مشرف المتجر
-        elif not is_admin and hasattr(user, 'store_id'):
-            store_admin = User.query.filter_by(store_id=user.store_id).first()
-            if store_admin and store_admin.salla_access_token:
-                salla_token = store_admin.salla_access_token
-        
-        # تسجيل معلومات الدخول
-        user_type = "مشرف" if is_admin else "موظف"
-        logger.info(f"تم تسجيل دخول {user_type}: {user.email}")
-        
-        # إرجاع صفحة نجاح التسجيل مع البيانات
-        return render_template('auth/login_success.html',
-                            auth_data=json.dumps(auth_data),
-                            salla_token=salla_token)
-    
-    except Exception as e:
-        db.session.rollback()
-        flash('حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة لاحقًا', 'danger')
-        logger.error(f"خطأ في معالجة تسجيل الدخول: {str(e)}", exc_info=True)
+        flash('تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول', 'success')
         return redirect(url_for('user_auth.login'))
-
-# دالة للتحقق من صحة التوكن
-def token_required(view_func):
-    @wraps(view_func)
-    def wrapper(*args, **kwargs):
-        token = None
-        
-        # الحصول على التوكن من رؤوس الطلب أو الباراميترات
-        if 'Authorization' in request.headers:
-            token = request.headers['Authorization'].split()[1]
-        elif 'token' in request.args:
-            token = request.args['token']
-        
-        if not token:
-            return jsonify({'error': 'التوكن مطلوب'}), 401
-        
-        try:
-            # فك تشفير التوكن
-            fernet = Fernet(current_app.config['ENCRYPTION_KEY'])
-            decrypted = fernet.decrypt(token.encode('utf-8')).decode('utf-8')
-            token_data = json.loads(decrypted)
-            
-            # التحقق من صلاحية التوكن
-            if datetime.utcnow().timestamp() > token_data['exp']:
-                return jsonify({'error': 'انتهت صلاحية الجلسة'}), 401
-            
-            # تخزين بيانات المستخدم في g للوصول في الدوال الأخرى
-            g.current_user = token_data
-            
-        except InvalidToken:
-            return jsonify({'error': 'توكن غير صالح'}), 401
-        except Exception as e:
-            return jsonify({'error': 'خطأ في المصادقة'}), 401
-        
-        return view_func(*args, **kwargs)
-    return wrapper
-
+    
+    return render_template('auth/register.html', form=form)
 @user_auth_bp.route('/logout')
-@token_required
 def logout():
-    # يمكنك هنا إضافة أي منطق لإبطال التوكن في السيرفر إذا لزم الأمر
-    return jsonify({
-        'success': True,
-        'message': 'قم بحذف التوكن من localStorage في الواجهة الأمامية'
-    })
+    response = make_response(redirect(url_for('user_auth.login')))
+    response.delete_cookie('user_id')
+    response.delete_cookie('is_admin')
+    response.delete_cookie('employee_role')
+    response.delete_cookie('store_id')
+    response.delete_cookie('salla_access_token')
+    response.delete_cookie('salla_refresh_token')
+    flash('تم تسجيل الخروج بنجاح', 'success')
+    return response

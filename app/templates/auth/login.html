@@ -8,7 +8,7 @@
                 <h4 class="mb-0"><i class="fas fa-sign-in-alt me-2"></i>تسجيل الدخول</h4>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('user_auth.login') }}" id="loginForm">
+                <form method="POST" action="{{ url_for('user_auth.login') }}">
                     {{ form.hidden_tag() }}
                     
                     <div class="form-group mb-3">
@@ -35,97 +35,14 @@
                         {% endif %}
                     </div>
                     
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="rememberMe">
-                        <label class="form-check-label" for="rememberMe">تذكرني</label>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary w-100" id="loginBtn">
-                        <span id="loginText">تسجيل الدخول</span>
-                        <span id="loginSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                    </button>
+                    <button type="submit" class="btn btn-primary w-100">تسجيل الدخول</button>
                 </form>
                 
                 <div class="mt-3 text-center">
                     <p>ليس لديك حساب؟ <a href="{{ url_for('user_auth.register') }}">سجل الآن</a></p>
-                    <p><a href="{{ url_for('user_auth.forgot_password') }}" class="text-muted">نسيت كلمة المرور؟</a></p>
                 </div>
             </div>
         </div>
     </div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const loginForm = document.getElementById('loginForm');
-    const loginBtn = document.getElementById('loginBtn');
-    const loginText = document.getElementById('loginText');
-    const loginSpinner = document.getElementById('loginSpinner');
-    
-    // التحقق من وجود جلسة سابقة
-    if (localStorage.getItem('auth_token')) {
-        window.location.href = "{{ url_for('dashboard.index') }}";
-    }
-    
-    loginForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        // عرض زر التحميل
-        loginText.classList.add('d-none');
-        loginSpinner.classList.remove('d-none');
-        loginBtn.disabled = true;
-        
-        try {
-            const formData = new FormData(loginForm);
-            const response = await fetch(loginForm.action, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
-            
-            if (response.redirected) {
-                // إذا كان هناك تحويل (نجاح أو فشل)
-                window.location.href = response.url;
-            } else {
-                const data = await response.json();
-                if (data.error) {
-                    showError(data.error);
-                }
-            }
-        } catch (error) {
-            showError('حدث خطأ أثناء الاتصال بالخادم');
-            console.error('Login error:', error);
-        } finally {
-            // إعادة عرض الزر الطبيعي
-            loginText.classList.remove('d-none');
-            loginSpinner.classList.add('d-none');
-            loginBtn.disabled = false;
-        }
-    });
-    
-    function showError(message) {
-        // عرض رسالة الخطأ في واجهة المستخدم
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'alert alert-danger mt-3';
-        errorDiv.textContent = message;
-        
-        // إزالة أي رسائل خطأ سابقة
-        const oldAlert = document.querySelector('.alert.alert-danger');
-        if (oldAlert) oldAlert.remove();
-        
-        loginForm.appendChild(errorDiv);
-    }
-});
-</script>
-
-<style>
-.spinner-border {
-    vertical-align: middle;
-}
-.d-none {
-    display: none;
-}
-</style>
-{% endblock %}
+{% endblock %} 
