@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 def redirect_if_authenticated(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
-        if request.cookies.get('user_id'):
+        if request.cookies.get('remember_token') or request.cookies.get('employee_token'):
             return redirect(url_for('dashboard.index'))
         return view_func(*args, **kwargs)
     return wrapper
@@ -55,22 +55,17 @@ def login():
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
                 response = make_response(redirect(url_for('dashboard.index')))
+                user.set_auth_cookie(response, 'remember_token')
                 
-                # إعداد الكوكيز مع Secure و HttpOnly و SameSite
-                cookie_settings = {
-                    'max_age': int(timedelta(days=30).total_seconds(),
-                    'httponly': True,
-                    'secure': True,
-                    'samesite': 'Lax'
-                }
-                
-                response.set_cookie('user_id', str(user.id), **cookie_settings)
-                response.set_cookie('is_admin', 'true' if user.is_admin else 'false', **cookie_settings)
-                response.set_cookie('employee_role', '', **cookie_settings)
+                # إعدادات إضافية للجلسة
+                response.set_cookie('is_admin', 'true' if user.is_admin else 'false', 
+                                  secure=True, httponly=True, samesite='Lax',
+                                  max_age=timedelta(days=30).total_seconds())
                 
                 if user.salla_access_token:
-                    response.set_cookie('salla_access_token', user.get_access_token(), **cookie_settings)
-                    response.set_cookie('salla_refresh_token', user.salla_refresh_token, **cookie_settings)
+                    response.set_cookie('salla_access_token', user.get_access_token(), 
+                                      secure=True, httponly=True, samesite='Lax',
+                                      max_age=timedelta(days=30).total_seconds())
                 
                 flash('تم تسجيل دخول المشرف بنجاح!', 'success')
                 logger.info(f"تم تسجيل دخول المشرف: {user.email}")
@@ -85,30 +80,31 @@ def login():
                     return redirect(url_for('user_auth.login'))
                 
                 response = make_response(redirect(url_for('dashboard.index')))
+                employee.set_auth_cookie(response, 'employee_token')
                 
-                # نفس إعدادات الكوكيز للموظف
-                cookie_settings = {
-                    'max_age': int(timedelta(days=30).total_seconds()),
-                    'httponly': True,
-                    'secure': True,
-                    'samesite': 'Lax'
-                }
+                # إعدادات إضافية للجلسة
+                response.set_cookie('is_admin', 'false', 
+                                  secure=True, httponly=True, samesite='Lax',
+                                  max_age=timedelta(days=30).total_seconds())
+                response.set_cookie('employee_role', employee.role, 
+                                  secure=True, httponly=True, samesite='Lax',
+                                  max_age=timedelta(days=30).total_seconds())
+                response.set_cookie('store_id', str(employee.store_id), 
+                                  secure=True, httponly=True, samesite='Lax',
+                                  max_age=timedelta(days=30).total_seconds())
                 
-                response.set_cookie('user_id', str(employee.id), **cookie_settings)
-                response.set_cookie('is_admin', 'false', **cookie_settings)
-                response.set_cookie('employee_role', employee.role, **cookie_settings)
-                response.set_cookie('store_id', str(employee.store_id), **cookie_settings)
-                
+                # مشاركة توكنات Salla من مدير المتجر
                 store_admin = User.query.filter_by(store_id=employee.store_id).first()
                 if store_admin and store_admin.salla_access_token:
-                    response.set_cookie('salla_access_token', store_admin.get_access_token(), **cookie_settings)
-                    response.set_cookie('salla_refresh_token', store_admin.get_refresh_token(), **cookie_settings)
+                    response.set_cookie('salla_access_token', store_admin.get_access_token(), 
+                                      secure=True, httponly=True, samesite='Lax',
+                                      max_age=timedelta(days=30).total_seconds())
                 
                 flash('تم تسجيل دخول الموظف بنجاح!', 'success')
                 logger.info(f"تم تسجيل دخول الموظف: {employee.email} - المتجر: {employee.store_id}")
                 return response
             
-            # إذا كانت بيانات الدخول غير صحيحة
+            # إذا البيانات غلط
             flash('بيانات الدخول غير صحيحة', 'danger')
             logger.warning(f"محاولة تسجيل دخول فاشلة للبريد: {email}")
             
@@ -118,6 +114,7 @@ def login():
             logger.error(f"خطأ في تسجيل الدخول: {str(e)}", exc_info=True)
     
     return render_template('auth/login.html', form=form)
+
 @user_auth_bp.route('/register', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def register():
@@ -145,14 +142,20 @@ def register():
         return redirect(url_for('user_auth.login'))
     
     return render_template('auth/register.html', form=form)
+
 @user_auth_bp.route('/logout')
 def logout():
     response = make_response(redirect(url_for('user_auth.login')))
-    response.delete_cookie('user_id')
-    response.delete_cookie('is_admin')
-    response.delete_cookie('employee_role')
-    response.delete_cookie('store_id')
-    response.delete_cookie('salla_access_token')
-    response.delete_cookie('salla_refresh_token')
+    
+    # حذف جميع الكوكيز بطريقة آمنة
+    cookies_to_delete = [
+        'remember_token', 'employee_token', 'is_admin',
+        'employee_role', 'store_id', 'salla_access_token',
+        'salla_refresh_token'
+    ]
+    
+    for cookie_name in cookies_to_delete:
+        response.delete_cookie(cookie_name)
+    
     flash('تم تسجيل الخروج بنجاح', 'success')
     return response

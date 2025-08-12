@@ -14,7 +14,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship, backref, validates
-
+from flask import make_response
 # Local application imports
 from . import db
 
@@ -65,7 +65,20 @@ class User(db.Model):
     status_notes = relationship('OrderStatusNote', back_populates='user', 
                               foreign_keys='OrderStatusNote.created_by')
     # === دوال إدارة التوكنات ===
+    def set_auth_cookie(self, response, cookie_name='remember_token', expires_days=30):
+    """تعيين كوكيز آمنة للتوثيق"""
+    if not self.remember_token:
+        self.generate_remember_token(expires_days)
     
+    response.set_cookie(
+        cookie_name,
+        self.remember_token,
+        secure=True,
+        httponly=True,
+        samesite='Lax',
+        max_age=expires_days * 24 * 60 * 60  # تحويل الأيام إلى ثواني
+    )
+    return response
     @property
     def salla_access_token(self):
         """فك تشفير توكن الوصول عند الطلب"""
@@ -257,6 +270,20 @@ class Employee(db.Model):
     custom_statuses = relationship('EmployeeCustomStatus', back_populates='employee')
     assignments = relationship('OrderAssignment', back_populates='employee')
     
+    def set_auth_cookie(self, response, cookie_name='employee_token', expires_days=30):
+    """تعيين كوكيز آمنة للموظفين"""
+    if not self.remember_token:
+        self.generate_remember_token()
+    
+    response.set_cookie(
+        cookie_name,
+        self.remember_token,
+        secure=True,
+        httponly=True,
+        samesite='Lax',
+        max_age=expires_days * 24 * 60 * 60  # تحويل الأيام إلى ثواني
+    )
+    return response
     def set_password(self, password: str):
         if len(password) < 8:
             raise ValueError("كلمة المرور يجب أن تكون 8 أحرف على الأقل")
