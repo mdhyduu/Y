@@ -423,6 +423,8 @@ class OrderEmployeeStatus(db.Model):
 # أضف هذا في نهاية models.py قبل @event.listens_for
 
 
+
+# تبقى أحداث SQLAlchemy كما هي
 @event.listens_for(User, 'before_insert')
 def validate_user(mapper, connection, target):
     if not target.email:
