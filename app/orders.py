@@ -929,8 +929,7 @@ def scan_barcode():
 
 @orders_bp.route('/employee_dashboard')
 def employee_dashboard(): 
-
-    user, employee = get_user_from_cookies(request)
+    user, employee = get_user_from_cookies()
     
     if not user or request.cookies.get('is_admin') == 'true':
         flash('غير مصرح لك بالوصول', 'error')
