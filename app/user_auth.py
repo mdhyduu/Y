@@ -15,8 +15,14 @@ logger = logging.getLogger(__name__)
 def redirect_if_authenticated(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
-        if request.cookies.get('user_id'):
-            return redirect(url_for('dashboard.index'))
+        user_id = request.cookies.get('user_id')
+        if user_id:
+            # التحقق من وجود المستخدم في قاعدة البيانات
+            user = User.query.get(user_id)
+            employee = Employee.query.get(user_id)
+            
+            if user or employee:
+                return redirect(url_for('dashboard.index'))
         return view_func(*args, **kwargs)
     return wrapper
 
@@ -41,13 +47,115 @@ class RegisterForm(FlaskForm):
                                    validators=[DataRequired(), 
                                               EqualTo('password', message='كلمتا المرور غير متطابقتين')])
 
+def set_auth_cookies(response, user=None, employee=None):
+    """دالة مساعدة لتعيين كوكيز المصادقة"""
+    if user:
+        response.set_cookie(
+            'user_id', 
+            str(user.id), 
+            max_age=timedelta(days=30).total_seconds(), 
+            httponly=True, 
+            secure=True,
+            path='/',
+            samesite='Lax'
+        )
+        response.set_cookie(
+            'is_admin', 
+            'true' if user.is_admin else 'false', 
+            max_age=timedelta(days=30).total_seconds(),
+            path='/',
+            samesite='Lax'
+        )
+        response.set_cookie(
+            'employee_role', 
+            '', 
+            max_age=timedelta(days=30).total_seconds(),
+            path='/',
+            samesite='Lax'
+        )
+        
+        if user.salla_access_token:
+            response.set_cookie(
+                'salla_access_token', 
+                user.get_access_token(), 
+                max_age=timedelta(days=30).total_seconds(), 
+                httponly=True, 
+                secure=True,
+                path='/',
+                samesite='Lax'
+            )
+            response.set_cookie(
+                'salla_refresh_token', 
+                user.salla_refresh_token, 
+                max_age=timedelta(days=30).total_seconds(), 
+                httponly=True, 
+                secure=True,
+                path='/',
+                samesite='Lax'
+            )
+    
+    elif employee:
+        response.set_cookie(
+            'user_id', 
+            str(employee.id), 
+            max_age=timedelta(days=30).total_seconds(), 
+            httponly=True, 
+            secure=True,
+            path='/',
+            samesite='Lax'
+        )
+        response.set_cookie(
+            'is_admin', 
+            'false', 
+            max_age=timedelta(days=30).total_seconds(),
+            path='/',
+            samesite='Lax'
+        )
+        response.set_cookie(
+            'employee_role', 
+            employee.role, 
+            max_age=timedelta(days=30).total_seconds(),
+            path='/',
+            samesite='Lax'
+        )
+        response.set_cookie(
+            'store_id', 
+            str(employee.store_id), 
+            max_age=timedelta(days=30).total_seconds(),
+            path='/',
+            samesite='Lax'
+        )
+        
+        store_admin = User.query.filter_by(store_id=employee.store_id).first()
+        if store_admin and store_admin.salla_access_token:
+            response.set_cookie(
+                'salla_access_token', 
+                store_admin.get_access_token(), 
+                max_age=timedelta(days=30).total_seconds(), 
+                httponly=True, 
+                secure=True,
+                path='/',
+                samesite='Lax'
+            )
+            response.set_cookie(
+                'salla_refresh_token', 
+                store_admin.get_refresh_token(), 
+                max_age=timedelta(days=30).total_seconds(), 
+                httponly=True, 
+                secure=True,
+                path='/',
+                samesite='Lax'
+            )
+    
+    return response
+
 @user_auth_bp.route('/login', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def login():
     form = LoginForm()
     
     if form.validate_on_submit():
-        email = form.email.data
+        email = form.email.data.lower().strip()
         password = form.password.data
         
         try:
@@ -55,13 +163,16 @@ def login():
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
                 response = make_response(redirect(url_for('dashboard.index')))
-                response.set_cookie('user_id', str(user.id), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                response.set_cookie('is_admin', 'true' if user.is_admin else 'false', max_age=timedelta(days=30).total_seconds())  # تأكد من تعيين هذه القيمة
-                response.set_cookie('employee_role', '', max_age=timedelta(days=30).total_seconds())
+                # حذف أي كوكيز قديمة أولاً
+                response.delete_cookie('user_id')
+                response.delete_cookie('is_admin')
+                response.delete_cookie('employee_role')
+                response.delete_cookie('store_id')
+                response.delete_cookie('salla_access_token')
+                response.delete_cookie('salla_refresh_token')
                 
-                if user.salla_access_token:
-                    response.set_cookie('salla_access_token', user.get_access_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                    response.set_cookie('salla_refresh_token', user.salla_refresh_token, max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+                # تعيين الكوكيز الجديدة
+                response = set_auth_cookies(response, user=user)
                 
                 flash('تم تسجيل دخول المشرف بنجاح!', 'success')
                 logger.info(f"تم تسجيل دخول المشرف: {user.email}")
@@ -76,21 +187,22 @@ def login():
                     return redirect(url_for('user_auth.login'))
                 
                 response = make_response(redirect(url_for('dashboard.index')))
-                response.set_cookie('user_id', str(employee.id), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                response.set_cookie('is_admin', 'false', max_age=timedelta(days=30).total_seconds())  # تأكد من تعيين هذه القيمة
-                response.set_cookie('employee_role', employee.role, max_age=timedelta(days=30).total_seconds())
-                response.set_cookie('store_id', str(employee.store_id), max_age=timedelta(days=30).total_seconds())
+                # حذف أي كوكيز قديمة أولاً
+                response.delete_cookie('user_id')
+                response.delete_cookie('is_admin')
+                response.delete_cookie('employee_role')
+                response.delete_cookie('store_id')
+                response.delete_cookie('salla_access_token')
+                response.delete_cookie('salla_refresh_token')
                 
-                store_admin = User.query.filter_by(store_id=employee.store_id).first()
-                if store_admin and store_admin.salla_access_token:
-                    response.set_cookie('salla_access_token', store_admin.get_access_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                    response.set_cookie('salla_refresh_token', store_admin.get_refresh_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+                # تعيين الكوكيز الجديدة
+                response = set_auth_cookies(response, employee=employee)
                 
                 flash('تم تسجيل دخول الموظف بنجاح!', 'success')
                 logger.info(f"تم تسجيل دخول الموظف: {employee.email} - المتجر: {employee.store_id}")
                 return response
             
-            # إذا البيانات غلط
+            # إذا البيانات غير صحيحة
             flash('بيانات الدخول غير صحيحة', 'danger')
             logger.warning(f"محاولة تسجيل دخول فاشلة للبريد: {email}")
             
@@ -98,43 +210,54 @@ def login():
             db.session.rollback()
             flash('حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة لاحقًا', 'danger')
             logger.error(f"خطأ في تسجيل الدخول: {str(e)}", exc_info=True)
+            return redirect(url_for('user_auth.login'))
     
     return render_template('auth/login.html', form=form)
+
 @user_auth_bp.route('/register', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def register():
     form = RegisterForm()
     if form.validate_on_submit():
-        email = form.email.data
+        email = form.email.data.lower().strip()
         password = form.password.data
          
-        with current_app.app_context():
-            if User.query.filter_by(email=email).first():
-                flash('البريد الإلكتروني مسجل مسبقاً', 'danger')
-                return redirect(url_for('user_auth.register'))
+        try:
+            with current_app.app_context():
+                if User.query.filter_by(email=email).first():
+                    flash('البريد الإلكتروني مسجل مسبقاً', 'danger')
+                    return redirect(url_for('user_auth.register'))
+                
+                new_user = User(email=email)
+                new_user.set_password(password)
+                
+                # إذا كان هذا هو المستخدم الأول، اجعله مسؤولاً
+                if User.query.count() == 0:
+                    new_user.is_admin = True
+                
+                db.session.add(new_user)
+                db.session.commit()
             
-            new_user = User(email=email)
-            new_user.set_password(password)
-            
-            # إذا كان هذا هو المستخدم الأول، اجعله مسؤولاً
-            if User.query.count() == 0:
-                new_user.is_admin = True
-            
-            db.session.add(new_user)
-            db.session.commit()
+            flash('تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول', 'success')
+            return redirect(url_for('user_auth.login'))
         
-        flash('تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول', 'success')
-        return redirect(url_for('user_auth.login'))
+        except Exception as e:
+            db.session.rollback()
+            flash('حدث خطأ أثناء إنشاء الحساب. يرجى المحاولة لاحقًا', 'danger')
+            logger.error(f"خطأ في التسجيل: {str(e)}", exc_info=True)
+            return redirect(url_for('user_auth.register'))
     
     return render_template('auth/register.html', form=form)
+
 @user_auth_bp.route('/logout')
 def logout():
     response = make_response(redirect(url_for('user_auth.login')))
-    response.delete_cookie('user_id')
-    response.delete_cookie('is_admin')
-    response.delete_cookie('employee_role')
-    response.delete_cookie('store_id')
-    response.delete_cookie('salla_access_token')
-    response.delete_cookie('salla_refresh_token')
+    # حذف جميع كوكيز المصادقة
+    response.delete_cookie('user_id', path='/')
+    response.delete_cookie('is_admin', path='/')
+    response.delete_cookie('employee_role', path='/')
+    response.delete_cookie('store_id', path='/')
+    response.delete_cookie('salla_access_token', path='/')
+    response.delete_cookie('salla_refresh_token', path='/')
     flash('تم تسجيل الخروج بنجاح', 'success')
     return response
