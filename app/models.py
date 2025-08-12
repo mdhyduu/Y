@@ -422,21 +422,7 @@ class OrderEmployeeStatus(db.Model):
     order = relationship('SallaOrder', back_populates='employee_statuses')
 # أضف هذا في نهاية models.py قبل @event.listens_for
 
-def get_user_from_cookies():
-    user_id = request.cookies.get('user_id')
-    is_admin = request.cookies.get('is_admin') == 'true'
-    
-    user = None
-    employee = None
-    
-    if is_admin:
-        user = User.query.get(user_id)
-    else:
-        employee = Employee.query.get(user_id)
-        if employee:
-            user = User.query.filter_by(store_id=employee.store_id).first()
-    
-    return user, employee
+
 @event.listens_for(User, 'before_insert')
 def validate_user(mapper, connection, target):
     if not target.email:
