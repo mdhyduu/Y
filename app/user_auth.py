@@ -1,12 +1,13 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, make_response, current_app
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField
+from wtforms import StringField, PasswordField, BooleanField
 from wtforms.validators import DataRequired, EqualTo, Length, ValidationError
 import re
 import logging
 from .models import db, User, Employee
 from datetime import datetime, timedelta
 from functools import wraps
+
 
 user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
@@ -27,9 +28,11 @@ def validate_email(form, field):
         raise ValidationError('يجب إدخال بريد إلكتروني صالح')
 
 # نموذج تسجيل الدخول
+
 class LoginForm(FlaskForm):
     email = StringField('البريد الإلكتروني', validators=[DataRequired(), validate_email])
     password = PasswordField('كلمة المرور', validators=[DataRequired()])
+    remember_me = BooleanField('تذكرني')  # ✅ جديد
 
 # نموذج التسجيل
 class RegisterForm(FlaskForm):
@@ -44,61 +47,82 @@ class RegisterForm(FlaskForm):
 @user_auth_bp.route('/login', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def login():
+    class LoginForm(FlaskForm):
+        email = StringField('البريد الإلكتروني', validators=[DataRequired(), validate_email])
+        password = PasswordField('كلمة المرور', validators=[DataRequired()])
+        remember_me = BooleanField('تذكرني')  # ✅ زر التذكر
+
     form = LoginForm()
-    
+
     if form.validate_on_submit():
-        email = form.email.data
+        email = form.email.data.strip()
         password = form.password.data
-        
+        remember = form.remember_me.data  # إذا اختار تذكرني
+
         try:
-            # تسجيل دخول كمشرف
+            # ===== تسجيل دخول كمشرف =====
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
                 response = make_response(redirect(url_for('dashboard.index')))
+                # الكوكيز الأساسية
                 response.set_cookie('user_id', str(user.id), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                response.set_cookie('is_admin', 'true' if user.is_admin else 'false', max_age=timedelta(days=30).total_seconds())  # تأكد من تعيين هذه القيمة
-                response.set_cookie('employee_role', '', max_age=timedelta(days=30).total_seconds())
-                
+                response.set_cookie('is_admin', 'true' if user.is_admin else 'false', max_age=timedelta(days=30).total_seconds())
+
+                # إذا اختار تذكرني
+                if remember:
+                    remember_token = user.generate_remember_token()
+                    if remember_token:
+                        response.set_cookie('remember_token', remember_token, max_age=60*60*24*30, httponly=True, secure=True)
+
+                # تخزين توكنات سلة إذا موجودة
                 if user.salla_access_token:
                     response.set_cookie('salla_access_token', user.get_access_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
                     response.set_cookie('salla_refresh_token', user.salla_refresh_token, max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                
+
                 flash('تم تسجيل دخول المشرف بنجاح!', 'success')
                 logger.info(f"تم تسجيل دخول المشرف: {user.email}")
                 return response
-            
-            # تسجيل دخول كموظف
+
+            # ===== تسجيل دخول كموظف =====
             employee = Employee.query.filter_by(email=email).first()
             if employee and employee.check_password(password):
                 if not employee.is_active:
                     flash('حسابك موقوف. يرجى الاتصال بالإدارة', 'danger')
                     logger.warning(f"محاولة تسجيل دخول لحساب موقوف: {email}")
                     return redirect(url_for('user_auth.login'))
-                
+
                 response = make_response(redirect(url_for('dashboard.index')))
+                # الكوكيز الأساسية
                 response.set_cookie('user_id', str(employee.id), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                response.set_cookie('is_admin', 'false', max_age=timedelta(days=30).total_seconds())  # تأكد من تعيين هذه القيمة
+                response.set_cookie('is_admin', 'false', max_age=timedelta(days=30).total_seconds())
                 response.set_cookie('employee_role', employee.role, max_age=timedelta(days=30).total_seconds())
                 response.set_cookie('store_id', str(employee.store_id), max_age=timedelta(days=30).total_seconds())
-                
+
+                # إذا اختار تذكرني
+                if remember:
+                    remember_token = employee.generate_remember_token()
+                    if remember_token:
+                        response.set_cookie('remember_token', remember_token, max_age=60*60*24*30, httponly=True, secure=True)
+
+                # جلب توكنات سلة من صاحب المتجر
                 store_admin = User.query.filter_by(store_id=employee.store_id).first()
                 if store_admin and store_admin.salla_access_token:
                     response.set_cookie('salla_access_token', store_admin.get_access_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
                     response.set_cookie('salla_refresh_token', store_admin.get_refresh_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                
+
                 flash('تم تسجيل دخول الموظف بنجاح!', 'success')
                 logger.info(f"تم تسجيل دخول الموظف: {employee.email} - المتجر: {employee.store_id}")
                 return response
-            
-            # إذا البيانات غلط
+
+            # ===== بيانات غير صحيحة =====
             flash('بيانات الدخول غير صحيحة', 'danger')
             logger.warning(f"محاولة تسجيل دخول فاشلة للبريد: {email}")
-            
+
         except Exception as e:
             db.session.rollback()
             flash('حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة لاحقًا', 'danger')
             logger.error(f"خطأ في تسجيل الدخول: {str(e)}", exc_info=True)
-    
+
     return render_template('auth/login.html', form=form)
 @user_auth_bp.route('/register', methods=['GET', 'POST'])
 @redirect_if_authenticated

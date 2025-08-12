@@ -25,22 +25,33 @@ logger = logging.getLogger(__name__)
 orders_bp = Blueprint('orders', __name__)
 
 def get_user_from_cookies():
-    """استخراج بيانات المستخدم من الكوكيز"""
     user_id = request.cookies.get('user_id')
     is_admin = request.cookies.get('is_admin') == 'true'
-    
-    if not user_id:
-        return None, None
-    
-    if is_admin:
-        user = User.query.get(user_id)
-        return user, None
-    else:
-        employee = Employee.query.get(user_id)
-        if employee:
-            user = User.query.filter_by(store_id=employee.store_id).first()
-            return user, employee
-        return None, None
+    remember_token = request.cookies.get('remember_token')
+
+    # إذا موجود user_id في الكوكيز
+    if user_id:
+        if is_admin:
+            user = User.query.get(user_id)
+            return user, None
+        else:
+            employee = Employee.query.get(user_id)
+            if employee:
+                user = User.query.filter_by(store_id=employee.store_id).first()
+                return user, employee
+
+    # إذا ما فيه user_id لكن فيه remember_token
+    if remember_token:
+        if is_admin:
+            user = User.verify_remember_token(remember_token)
+            return user, None
+        else:
+            employee = Employee.verify_remember_token(remember_token.encode('utf-8'))
+            if employee:
+                user = User.query.filter_by(store_id=employee.store_id).first()
+                return user, employee
+
+    return None, None
 
 @orders_bp.route('/sync_orders', methods=['POST'])
 def sync_orders():
