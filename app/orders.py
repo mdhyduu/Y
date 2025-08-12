@@ -6,7 +6,7 @@ import requests
 from .models import (
     db, User, Employee, Department, EmployeePermission, 
     Product, OrderDelivery, SallaOrder, OrderAssignment,
-    OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, get_user_from_cookies
+    OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus
 )
 from .config import Config
 from .utils import process_order_data, format_date, generate_barcode, humanize_time
@@ -991,7 +991,7 @@ def employee_dashboard():
                           custom_status_stats=custom_status_stats,
                           recent_statuses=recent_statuses,
                           assigned_orders=assigned_orders)
-
+ 
 @orders_bp.route('/employee_status', methods=['GET', 'POST'])
 def manage_employee_status():
     user, employee = get_user_from_cookies()
