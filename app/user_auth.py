@@ -2,139 +2,213 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField
 from wtforms.validators import DataRequired, EqualTo, Length, ValidationError
+from sqlalchemy import func
 import re
 import logging
-from .models import db, User, Employee
-from datetime import datetime, timedelta
+from datetime import timedelta
 from functools import wraps
+from .models import db, User, Employee
 
+# Initialize Blueprint
 user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
 
-# فلتر حماية يمنع الوصول إذا المستخدم مسجل دخول
+# ==============================================
+# Helper Functions and Decorators
+# ==============================================
+
 def redirect_if_authenticated(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
-        if request.cookies.get('user_id'):
-            return redirect(url_for('dashboard.index'))
+        # لا تتحقق من الكوكيز مباشرة، بل استخدم الدوال المخصصة للتحقق
+        if 'user_type' in request.cookies:
+            if request.cookies.get('user_type') == 'admin' and User.verify_remember_token(request.cookies.get('remember_token')):
+                return redirect(url_for('dashboard.index'))
+            elif request.cookies.get('user_type') == 'employee' and Employee.verify_remember_token(request.cookies.get('employee_token')):
+                return redirect(url_for('dashboard.index'))
         return view_func(*args, **kwargs)
     return wrapper
 
-# التحقق من صحة البريد
+def login_required(view_func):
+    """Restrict access to authenticated users only"""
+    @wraps(view_func)
+    def wrapper(*args, **kwargs):
+        # Check employee token
+        emp_token = request.cookies.get('employee_token')
+        if emp_token:
+            employee = Employee.verify_remember_token(emp_token)
+            if employee and employee.is_active:
+                return view_func(*args, **kwargs)
+        
+        # Check admin token
+        user_token = request.cookies.get('remember_token')
+        if user_token:
+            user = User.verify_remember_token(user_token)
+            if user:
+                return view_func(*args, **kwargs)
+        
+        flash('يجب تسجيل الدخول للوصول إلى هذه الصفحة', 'danger')
+        return redirect(url_for('user_auth.login'))
+    return wrapper
+
 def validate_email(form, field):
-    email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
-    if not re.match(email_regex, field.data):
-        raise ValidationError('يجب إدخال بريد إلكتروني صالح')
+    """Email validation"""
+    if not re.match(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', field.data):
+        raise ValidationError('بريد إلكتروني غير صالح')
 
-# نموذج تسجيل الدخول
+# ==============================================
+# Forms
+# ==============================================
+
 class LoginForm(FlaskForm):
-    email = StringField('البريد الإلكتروني', validators=[DataRequired(), validate_email])
-    password = PasswordField('كلمة المرور', validators=[DataRequired()])
+    email = StringField('البريد الإلكتروني', validators=[
+        DataRequired(),
+        validate_email
+    ])
+    password = PasswordField('كلمة المرور', validators=[
+        DataRequired()
+    ])
 
-# نموذج التسجيل
 class RegisterForm(FlaskForm):
-    email = StringField('البريد الإلكتروني', validators=[DataRequired(), validate_email])
-    password = PasswordField('كلمة المرور', 
-                           validators=[DataRequired(), 
-                                      Length(min=8, message='يجب أن تكون كلمة المرور 8 أحرف على الأقل')])
-    confirm_password = PasswordField('تأكيد كلمة المرور', 
-                                   validators=[DataRequired(), 
-                                              EqualTo('password', message='كلمتا المرور غير متطابقتين')])
+    email = StringField('البريد الإلكتروني', validators=[
+        DataRequired(),
+        validate_email
+    ])
+    password = PasswordField('كلمة المرور', validators=[
+        DataRequired(),
+        Length(min=8, message='يجب أن تكون كلمة المرور 8 أحرف على الأقل')
+    ])
+    confirm_password = PasswordField('تأكيد كلمة المرور', validators=[
+        DataRequired(),
+        EqualTo('password', message='كلمتا المرور غير متطابقتين')
+    ])
 
+# ==============================================
+# Routes
+# ==============================================
 @user_auth_bp.route('/login', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def login():
     form = LoginForm()
     
     if form.validate_on_submit():
-        email = form.email.data
+        email = form.email.data.lower().strip()
         password = form.password.data
         
         try:
-            # تسجيل دخول كمشرف
-            user = User.query.filter_by(email=email).first()
+            # تسجيل الدخول كمشرف
+            user = User.query.filter(func.lower(User.email) == email).first()
             if user and user.check_password(password):
                 response = make_response(redirect(url_for('dashboard.index')))
-                response.set_cookie('user_id', str(user.id), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                response.set_cookie('is_admin', 'true' if user.is_admin else 'false', max_age=timedelta(days=30).total_seconds())  # تأكد من تعيين هذه القيمة
-                response.set_cookie('employee_role', '', max_age=timedelta(days=30).total_seconds())
                 
-                if user.salla_access_token:
-                    response.set_cookie('salla_access_token', user.get_access_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                    response.set_cookie('salla_refresh_token', user.salla_refresh_token, max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+                # إعداد الكوكيز بشكل صارم
+                response.set_cookie(
+                    'remember_token',
+                    user.generate_remember_token(),
+                    secure=True,
+                    httponly=True,
+                    samesite='Lax',
+                    max_age=timedelta(days=30).total_seconds(),
+                    path='/'
+                )
+                response.set_cookie(
+                    'user_type',
+                    'admin',
+                    secure=True,
+                    httponly=True,
+                    samesite='Lax',
+                    max_age=timedelta(days=30).total_seconds(),
+                    path='/'
+                )
                 
-                flash('تم تسجيل دخول المشرف بنجاح!', 'success')
-                logger.info(f"تم تسجيل دخول المشرف: {user.email}")
+                flash('تم تسجيل دخول المشرف بنجاح', 'success')
                 return response
             
-            # تسجيل دخول كموظف
-            employee = Employee.query.filter_by(email=email).first()
+            # تسجيل الدخول كموظف
+            employee = Employee.query.filter(func.lower(Employee.email) == email).first()
             if employee and employee.check_password(password):
                 if not employee.is_active:
-                    flash('حسابك موقوف. يرجى الاتصال بالإدارة', 'danger')
-                    logger.warning(f"محاولة تسجيل دخول لحساب موقوف: {email}")
+                    flash('حسابك معطل، يرجى التواصل مع المدير', 'danger')
                     return redirect(url_for('user_auth.login'))
                 
                 response = make_response(redirect(url_for('dashboard.index')))
-                response.set_cookie('user_id', str(employee.id), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                response.set_cookie('is_admin', 'false', max_age=timedelta(days=30).total_seconds())  # تأكد من تعيين هذه القيمة
-                response.set_cookie('employee_role', employee.role, max_age=timedelta(days=30).total_seconds())
-                response.set_cookie('store_id', str(employee.store_id), max_age=timedelta(days=30).total_seconds())
                 
-                store_admin = User.query.filter_by(store_id=employee.store_id).first()
-                if store_admin and store_admin.salla_access_token:
-                    response.set_cookie('salla_access_token', store_admin.get_access_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                    response.set_cookie('salla_refresh_token', store_admin.get_refresh_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+                response.set_cookie(
+                    'employee_token',
+                    employee.generate_remember_token(),
+                    secure=True,
+                    httponly=True,
+                    samesite='Lax',
+                    max_age=timedelta(days=30).total_seconds(),
+                    path='/'
+                )
+                response.set_cookie(
+                    'user_type',
+                    'employee',
+                    secure=True,
+                    httponly=True,
+                    samesite='Lax',
+                    max_age=timedelta(days=30).total_seconds(),
+                    path='/'
+                )
                 
-                flash('تم تسجيل دخول الموظف بنجاح!', 'success')
-                logger.info(f"تم تسجيل دخول الموظف: {employee.email} - المتجر: {employee.store_id}")
+                flash('تم تسجيل دخول الموظف بنجاح', 'success')
                 return response
             
-            # إذا البيانات غلط
             flash('بيانات الدخول غير صحيحة', 'danger')
-            logger.warning(f"محاولة تسجيل دخول فاشلة للبريد: {email}")
             
         except Exception as e:
             db.session.rollback()
-            flash('حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة لاحقًا', 'danger')
-            logger.error(f"خطأ في تسجيل الدخول: {str(e)}", exc_info=True)
+            logger.error(f"Login error: {str(e)}", exc_info=True)
+            flash('حدث خطأ أثناء تسجيل الدخول', 'danger')
     
     return render_template('auth/login.html', form=form)
 @user_auth_bp.route('/register', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def register():
     form = RegisterForm()
+    
     if form.validate_on_submit():
-        email = form.email.data
+        email = form.email.data.lower().strip()
         password = form.password.data
-         
-        with current_app.app_context():
-            if User.query.filter_by(email=email).first():
-                flash('البريد الإلكتروني مسجل مسبقاً', 'danger')
+        
+        try:
+            if User.query.filter(func.lower(User.email) == email).first():
+                flash('هذا البريد الإلكتروني مسجل بالفعل', 'danger')
                 return redirect(url_for('user_auth.register'))
             
             new_user = User(email=email)
             new_user.set_password(password)
             
-            # إذا كان هذا هو المستخدم الأول، اجعله مسؤولاً
+            # First user becomes admin
             if User.query.count() == 0:
                 new_user.is_admin = True
             
             db.session.add(new_user)
             db.session.commit()
-        
-        flash('تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول', 'success')
-        return redirect(url_for('user_auth.login'))
+            
+            flash('تم إنشاء الحساب بنجاح، يرجى تسجيل الدخول', 'success')
+            return redirect(url_for('user_auth.login'))
+            
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Registration error: {str(e)}", exc_info=True)
+            flash('حدث خطأ أثناء إنشاء الحساب', 'danger')
     
     return render_template('auth/register.html', form=form)
+
 @user_auth_bp.route('/logout')
 def logout():
     response = make_response(redirect(url_for('user_auth.login')))
-    response.delete_cookie('user_id')
-    response.delete_cookie('is_admin')
-    response.delete_cookie('employee_role')
-    response.delete_cookie('store_id')
-    response.delete_cookie('salla_access_token')
-    response.delete_cookie('salla_refresh_token')
+    
+    # Clear all auth cookies securely
+    cookies_to_clear = [
+        'remember_token', 'employee_token', 'user_type',
+        'employee_role', 'salla_access_token', 'salla_refresh_token'
+    ]
+    
+    for cookie in cookies_to_clear:
+        response.delete_cookie(cookie)
+    
     flash('تم تسجيل الخروج بنجاح', 'success')
     return response
