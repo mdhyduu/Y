@@ -24,14 +24,16 @@ logger = logging.getLogger(__name__)
 
 orders_bp = Blueprint('orders', __name__)
 
+
 def get_user_from_cookies():
+    """استخراج بيانات المستخدم أو الموظف مع دعم remember_token وإعادة تعيين الكوكيز"""
     user_id = request.cookies.get('user_id')
-    is_admin = request.cookies.get('is_admin') == 'true'
+    is_admin_flag = request.cookies.get('is_admin') == 'true'
     remember_token = request.cookies.get('remember_token')
 
-    # إذا موجود user_id في الكوكيز
+    # إذا موجود user_id
     if user_id:
-        if is_admin:
+        if is_admin_flag:
             user = User.query.get(user_id)
             return user, None
         else:
@@ -39,20 +41,30 @@ def get_user_from_cookies():
             if employee:
                 user = User.query.filter_by(store_id=employee.store_id).first()
                 return user, employee
+            return None, None
 
-    # إذا ما فيه user_id لكن فيه remember_token
+    # إذا مافيه user_id لكن فيه remember_token
     if remember_token:
-        if is_admin:
-            user = User.verify_remember_token(remember_token)
+        secure_flag = request.is_secure  # لتحديد إذا نحط secure=True
+
+        # إذا مشرف
+        user = User.verify_remember_token(remember_token)
+        if user:
+            resp = make_response()
+            resp.set_cookie('user_id', str(user.id), max_age=60*60*24*30, httponly=True, secure=secure_flag)
+            resp.set_cookie('is_admin', 'true' if user.is_admin else 'false', max_age=60*60*24*30, secure=secure_flag)
             return user, None
-        else:
-            employee = Employee.verify_remember_token(remember_token.encode('utf-8'))
-            if employee:
-                user = User.query.filter_by(store_id=employee.store_id).first()
-                return user, employee
 
+        # إذا موظف
+        employee = Employee.verify_remember_token(remember_token.encode('utf-8'))
+        if employee:
+            store_admin = User.query.filter_by(store_id=employee.store_id).first()
+            resp = make_response()
+            resp.set_cookie('user_id', str(employee.id), max_age=60*60*24*30, httponly=True, secure=secure_flag)
+            resp.set_cookie('is_admin', 'false', max_age=60*60*24*30, secure=secure_flag)
+            return store_admin, employee
+ 
     return None, None
-
 @orders_bp.route('/sync_orders', methods=['POST'])
 def sync_orders():
     """مزامنة الطلبات من سلة إلى قاعدة البيانات المحلية"""
