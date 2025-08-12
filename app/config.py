@@ -149,9 +149,8 @@ class TestingConfig(Config):
 
 
 class ProductionConfig(Config):
-    """إعدادات بيئة الإنتاج"""
+    SERVER_NAME = 'plankton-app-9im8u.ondigitalocean.app'
     PREFERRED_URL_SCHEME = 'https'
-    
     @classmethod
     def init_app(cls, app):
         Config.init_app(app)
