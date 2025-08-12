@@ -16,7 +16,22 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # أضف هذا الجزء لمعالجة البروكسي
+    # ======== إعدادات أمان الجلسة والكوكيز ========
+    app.config.update(
+        # إعدادات أساسية للكوكيز
+        SESSION_COOKIE_SECURE=True,      # يفرض استخدام HTTPS للكوكيز
+        SESSION_COOKIE_HTTPONLY=True,    # يمنع الوصول عبر JavaScript
+        SESSION_COOKIE_SAMESITE='Lax',   # يحمي من هجمات CSRF
+        
+        # إعدادات كوكيز التذكر
+        REMEMBER_COOKIE_SECURE=True,
+        REMEMBER_COOKIE_HTTPONLY=True,
+        REMEMBER_COOKIE_SAMESITE='Lax',
+        
+        # إعدادات إضافية
+        PERMANENT_SESSION_LIFETIME=timedelta(days=30),  # مدة الجلسة
+
+    # معالجة البروكسي
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(
         app.wsgi_app, 
@@ -29,6 +44,9 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
     csrf.init_app(app)
+
+    # ... (بقية الكود كما هو)
+
 
     # تسجيل النماذج مع سياق التطبيق
     with app.app_context():

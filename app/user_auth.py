@@ -55,13 +55,22 @@ def login():
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
                 response = make_response(redirect(url_for('dashboard.index')))
-                response.set_cookie('user_id', str(user.id), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                response.set_cookie('is_admin', 'true' if user.is_admin else 'false', max_age=timedelta(days=30).total_seconds())  # تأكد من تعيين هذه القيمة
-                response.set_cookie('employee_role', '', max_age=timedelta(days=30).total_seconds())
+                
+                # إعداد الكوكيز مع Secure و HttpOnly و SameSite
+                cookie_settings = {
+                    'max_age': int(timedelta(days=30).total_seconds(),
+                    'httponly': True,
+                    'secure': True,
+                    'samesite': 'Lax'
+                }
+                
+                response.set_cookie('user_id', str(user.id), **cookie_settings)
+                response.set_cookie('is_admin', 'true' if user.is_admin else 'false', **cookie_settings)
+                response.set_cookie('employee_role', '', **cookie_settings)
                 
                 if user.salla_access_token:
-                    response.set_cookie('salla_access_token', user.get_access_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                    response.set_cookie('salla_refresh_token', user.salla_refresh_token, max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+                    response.set_cookie('salla_access_token', user.get_access_token(), **cookie_settings)
+                    response.set_cookie('salla_refresh_token', user.salla_refresh_token, **cookie_settings)
                 
                 flash('تم تسجيل دخول المشرف بنجاح!', 'success')
                 logger.info(f"تم تسجيل دخول المشرف: {user.email}")
@@ -76,21 +85,30 @@ def login():
                     return redirect(url_for('user_auth.login'))
                 
                 response = make_response(redirect(url_for('dashboard.index')))
-                response.set_cookie('user_id', str(employee.id), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                response.set_cookie('is_admin', 'false', max_age=timedelta(days=30).total_seconds())  # تأكد من تعيين هذه القيمة
-                response.set_cookie('employee_role', employee.role, max_age=timedelta(days=30).total_seconds())
-                response.set_cookie('store_id', str(employee.store_id), max_age=timedelta(days=30).total_seconds())
+                
+                # نفس إعدادات الكوكيز للموظف
+                cookie_settings = {
+                    'max_age': int(timedelta(days=30).total_seconds()),
+                    'httponly': True,
+                    'secure': True,
+                    'samesite': 'Lax'
+                }
+                
+                response.set_cookie('user_id', str(employee.id), **cookie_settings)
+                response.set_cookie('is_admin', 'false', **cookie_settings)
+                response.set_cookie('employee_role', employee.role, **cookie_settings)
+                response.set_cookie('store_id', str(employee.store_id), **cookie_settings)
                 
                 store_admin = User.query.filter_by(store_id=employee.store_id).first()
                 if store_admin and store_admin.salla_access_token:
-                    response.set_cookie('salla_access_token', store_admin.get_access_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
-                    response.set_cookie('salla_refresh_token', store_admin.get_refresh_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+                    response.set_cookie('salla_access_token', store_admin.get_access_token(), **cookie_settings)
+                    response.set_cookie('salla_refresh_token', store_admin.get_refresh_token(), **cookie_settings)
                 
                 flash('تم تسجيل دخول الموظف بنجاح!', 'success')
                 logger.info(f"تم تسجيل دخول الموظف: {employee.email} - المتجر: {employee.store_id}")
                 return response
             
-            # إذا البيانات غلط
+            # إذا كانت بيانات الدخول غير صحيحة
             flash('بيانات الدخول غير صحيحة', 'danger')
             logger.warning(f"محاولة تسجيل دخول فاشلة للبريد: {email}")
             
