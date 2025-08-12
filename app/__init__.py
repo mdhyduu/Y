@@ -50,7 +50,8 @@ def create_app():
     from .permissions import permissions_bp
     from .products import products_bp
     from .delivery_orders import delivery_bp
-
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.register_blueprint(employees_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(user_auth_bp)
