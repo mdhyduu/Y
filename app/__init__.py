@@ -6,7 +6,7 @@ from flask_wtf.csrf import CSRFProtect
 from .config import Config
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
-from wtforms import BooleanField  # تأكيد استيراد BooleanField
+
 # إنشاء كائنات الإضافات
 db = SQLAlchemy()
 migrate = Migrate()
