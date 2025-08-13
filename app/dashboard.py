@@ -11,15 +11,6 @@ dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 # ==============================================
 
 
-def admin_required(view_func):
-    """ديكوراتور للتحقق من صلاحيات المدير"""
-    @wraps(view_func)
-    def wrapper(*args, **kwargs):
-        if not session.get('is_admin'):
-            flash('ليس لديك صلاحية الوصول', 'danger')
-            return redirect(url_for('dashboard.index'))
-        return view_func(*args, **kwargs)
-    return wrapper
 
 # ==============================================
 # دوال المساعدة
