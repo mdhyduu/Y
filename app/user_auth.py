@@ -154,7 +154,7 @@ def login():
             # محاولة تسجيل الدخول كمشرف
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
-                response = make_response(redirect(url_for('dashboard.index')))
+                response = make_response(redirect(url_for('dashboard.index', _scheme='https')))
                 set_auth_session(user=user)
                 set_auth_cookies(response, user=user)
                 flash('تم تسجيل الدخول بنجاح', 'success')
@@ -167,7 +167,7 @@ def login():
                     flash('الحساب غير نشط', 'danger')
                     return redirect(url_for('user_auth.login'))
 
-                response = make_response(redirect(url_for('dashboard.index')))
+                response = make_response(redirect(url_for('employee_dashboard.index')))
                 set_auth_session(employee=employee)
                 set_auth_cookies(response, employee=employee)
                 flash('تم تسجيل الدخول بنجاح', 'success')

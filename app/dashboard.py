@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from .models import User, Employee, OrderStatusNote, db
 from datetime import datetime
 from functools import wraps
+from .user_auth import auth_required  # استيراد من user_auth بدلاً من التعريف المحلي
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
