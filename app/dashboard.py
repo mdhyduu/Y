@@ -15,11 +15,7 @@ def login_required(view_func):
             return redirect(request.url.replace('http://', 'https://'), code=301)
         
         user_id = request.cookies.get('user_id')
-        if not user_id:
-            flash('يجب تسجيل الدخول أولاً', 'warning')
-            return redirect(url_for('user_auth.login', _scheme='https'))
-        
-        is_admin = request.cookies.get('is_admin') == 'true'
+ 
         
         if is_admin:
             user = User.query.get(user_id)
@@ -52,11 +48,8 @@ def index():
         
         if is_admin:
             user = User.query.get(user_id)
-            if not user:
-                resp = make_response(redirect(url_for('user_auth.login', _scheme='https')))
-                resp.delete_cookie('user_id', secure=True, httponly=True, samesite='Lax')
-                resp.delete_cookie('is_admin', secure=True, httponly=True, samesite='Lax')
-                return resp
+      
+      
                 
             return render_template('dashboard.html', 
                                 current_user=user,
