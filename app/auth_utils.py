@@ -27,9 +27,12 @@ def get_current_user():
     is_admin = session.get('is_admin') or request.cookies.get('is_admin') == 'true'
     
     try:
+        # تحويل user_id إلى عدد صحيح
+        user_id = int(user_id)
+        
         if is_admin:
             return User.query.get(user_id)
         return Employee.query.get(user_id)
-    except Exception as e:
+    except (ValueError, Exception) as e:
         current_app.logger.error(f"Error getting current user: {str(e)}")
         return None

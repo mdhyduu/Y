@@ -56,10 +56,14 @@ def auth_required(admin_only=False):
 
             # التحقق من صحة المستخدم في قاعدة البيانات
             user = None
-            if is_admin:
-                user = User.query.get(user_id)
-            else:
-                user = Employee.query.get(user_id)
+            try:
+                user_id = int(user_id)  # تحويل إلى عدد صحيح
+                if is_admin:
+                    user = User.query.get(user_id)
+                else:
+                    user = Employee.query.get(user_id)
+            except ValueError:
+                return redirect_to_login()
 
             if not user:
                 return redirect_to_login()
@@ -68,35 +72,33 @@ def auth_required(admin_only=False):
             return view_func(*args, **kwargs)
         return wrapper
     return decorator
-
 def redirect_if_authenticated(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
-        # First check if already logged in via session
         if 'user_id' in session:
             return redirect(url_for('dashboard.index'))
             
-        # Then check cookies only if no session
         user_id = request.cookies.get('user_id')
         if not user_id:
             return view_func(*args, **kwargs)
             
-        # Verify user in database
         is_admin = request.cookies.get('is_admin') == 'true'
         current_user = None
         
         try:
+            user_id = int(user_id)  # تحويل إلى عدد صحيح
             if is_admin:
                 current_user = User.query.get(user_id)
             else:
                 current_user = Employee.query.get(user_id)
             
             if current_user:
-                # Set session to avoid future cookie checks
-                set_auth_session(user=current_user if is_admin else None, 
-                               employee=None if is_admin else current_user)
+                set_auth_session(
+                    user=current_user if is_admin else None,
+                    employee=None if is_admin else current_user
+                )
                 return redirect(url_for('dashboard.index'))
-        except Exception as e:
+        except (ValueError, Exception) as e:
             logger.error(f"Error verifying user: {str(e)}")
         
         return view_func(*args, **kwargs)
@@ -126,7 +128,7 @@ def set_auth_session(user=None, employee=None):
         session['employee_role'] = employee.role
         session['store_id'] = employee.store_id
 
-def set_auth_cookies(response, user=None, employee=None):
+def set_auth_cookies(response, user=None, employee=None): 
     clear_auth_cookies(response)
     cookie_settings = get_cookie_settings()
     expires = int((datetime.now() + timedelta(days=1)).timestamp())
@@ -152,7 +154,6 @@ def login():
         password = form.password.data
 
         try:
-            # محاولة تسجيل الدخول كمشرف
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
                 response = make_response(redirect(url_for('dashboard.index', _scheme='https')))
@@ -161,7 +162,6 @@ def login():
                 flash('تم تسجيل الدخول بنجاح', 'success')
                 return response
 
-            # محاولة تسجيل الدخول كموظف
             employee = Employee.query.filter_by(email=email).first()
             if employee and employee.check_password(password):
                 if not employee.is_active:
