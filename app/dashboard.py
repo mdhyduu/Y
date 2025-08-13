@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, session
 from .models import User, Employee, OrderStatusNote, db
 from datetime import datetime
-from functools import wraps
+from functools import 
+from .auth_utils import admin_required, get_current_user
 from .user_auth import auth_required  # استيراد من user_auth بدلاً من التعريف المحلي
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
@@ -11,28 +12,6 @@ dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 # ==============================================
 
 
-def admin_required(view_func):
-    """ديكوراتور للتحقق من صلاحيات المدير"""
-    @wraps(view_func)
-    def wrapper(*args, **kwargs):
-        if not session.get('is_admin'):
-            flash('ليس لديك صلاحية الوصول', 'danger')
-            return redirect(url_for('dashboard.index'))
-        return view_func(*args, **kwargs)
-    return wrapper
-
-# ==============================================
-# دوال المساعدة
-# ==============================================
-
-def get_current_user():
-    """الحصول على المستخدم الحالي من الجلسة"""
-    if 'user_id' not in session:
-        return None 
-    
-    if session.get('is_admin'):
-        return User.query.get(session['user_id'])
-    return Employee.query.get(session['user_id'])
 
 def redirect_to_login():
     """إعادة توجيه إلى صفحة تسجيل الدخول مع تنظيف الجلسة"""
