@@ -83,7 +83,7 @@ def index():
             store_id=current_user.store_id
         ).order_by(OrderStatusNote.created_at.desc()).limit(50).all()
         
-        return render_template('dashboard/employee.html',
+        return render_template('employee_dashboard.html',
                             current_user=store_admin,
                             employee=current_user,
                             stats=stats,
