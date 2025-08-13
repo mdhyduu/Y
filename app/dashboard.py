@@ -1,10 +1,13 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, session
 from .models import User, Employee, OrderStatusNote, db
+import logging
 from datetime import datetime
 from functools import wraps
 from .user_auth import auth_required, redirect_to_login  # استيراد من user_auth بدلاً من التعريف المحلي
 from .auth_utils import admin_required, get_current_user
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # ==============================================
 # ديكوراتورات المصادقة المدمجة (بدون ملف منفصل)
