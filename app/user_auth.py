@@ -15,8 +15,9 @@ from wtforms.validators import DataRequired, Email
 from .models import db, User, Employee
 from datetime import datetime, timedelta
 from functools import wraps
+from .forms import RegisterForm  # If defined in forms.py
 import os
-import re
+import re 
 user_auth_bp = Blueprint('user_auth', __name__, url_prefix='/auth')
 
 logger = logging.getLogger(__name__)

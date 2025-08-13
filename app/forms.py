@@ -12,3 +12,8 @@ class LoginForm(FlaskForm):
         Length(min=8, message='يجب أن تكون كلمة المرور 8 أحرف على الأقل')
     ])
     remember = BooleanField('تذكرني')
+class RegisterForm(FlaskForm):
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    password = PasswordField('Password', validators=[DataRequired()])
+    confirm_password = PasswordField('Confirm Password', 
+                                   validators=[DataRequired(), EqualTo('password')])
