@@ -8,8 +8,9 @@
                 <h4 class="mb-0"><i class="fas fa-sign-in-alt me-2"></i>تسجيل الدخول</h4>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('user_auth.login') }}">
-                    {{ form.hidden_tag() }}
+<form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    <!-- بقية حقول النموذج -->
                     
                     <div class="form-group mb-3">
                         <label for="email" class="form-label">البريد الإلكتروني</label>

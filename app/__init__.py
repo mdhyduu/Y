@@ -16,7 +16,9 @@ csrf = CSRFProtect()
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
-    
+    # في ملف الإعدادات الرئيسي لتطبيقك
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+
 
     app.secret_key = os.environ.get('SECRET_KEY'),
     app.config['SESSION_COOKIE_SECURE'] = True
