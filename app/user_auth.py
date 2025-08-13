@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, make_response, current_app, session
 from flask_wtf import FlaskForm
+from flask_wtf.csrf import CSRFProtect, generate_csrf
 from wtforms import StringField, PasswordField
 from wtforms.validators import DataRequired, EqualTo, Length, ValidationError
 import re
@@ -11,6 +12,16 @@ import os
 
 user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
+
+# تهيئة الحماية من CSRF
+csrf = CSRFProtect()
+
+@user_auth_bp.before_app_request
+def before_request():
+    """توليد وتحديث CSRF token قبل كل طلب"""
+    if 'csrf_token' not in session:
+        session['csrf_token'] = generate_csrf()
+    current_app.jinja_env.globals['csrf_token'] = session.get('csrf_token')
 
 # إعدادات الأمان للكوكيز
 def get_cookie_settings():
@@ -80,6 +91,7 @@ def set_auth_session(user=None, employee=None):
         session['email'] = user.email
         session['is_admin'] = user.is_admin
         session['store_id'] = user.store_id if hasattr(user, 'store_id') else None
+        session['csrf_token'] = generate_csrf()  # تجديد CSRF token عند تسجيل الدخول
         logger.info(f"تم تعيين جلسة المشرف: user_id={user.id}, email={user.email}")
     
     elif employee:
@@ -89,12 +101,17 @@ def set_auth_session(user=None, employee=None):
         session['is_admin'] = False
         session['employee_role'] = employee.role
         session['store_id'] = employee.store_id
+        session['csrf_token'] = generate_csrf()  # تجديد CSRF token عند تسجيل الدخول
         logger.info(f"تم تعيين جلسة الموظف: user_id={employee.id}, email={employee.email}, role={employee.role}")
 
 @user_auth_bp.route('/login', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def login():
     form = LoginForm()
+    
+    # إضافة CSRF token يدوياً إذا لزم الأمر
+    if not form.csrf_token.data:
+        form.csrf_token.data = session.get('csrf_token')
     
     if form.validate_on_submit():
         email = form.email.data.lower().strip()
