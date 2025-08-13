@@ -1,5 +1,8 @@
+# Add this at the very top of user_auth.py
+import logging
 from flask import Blueprint, render_template, redirect, url_for, flash, request, make_response, current_app
-from flask_wtf import FlaskForm  # تأكد من وجود هذا الاستيراد
+from flask_wtf import FlaskForm
+# ... rest of your imports ...
 from wtforms import StringField, PasswordField
 from wtforms.validators import DataRequired, Email
 from .models import db, User, Employee
