@@ -17,7 +17,8 @@ from datetime import datetime, timedelta
 from functools import wraps
 import os
 import re
-
+from .user_auth import user_auth_bp
+app.register_blueprint(user_auth_bp)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -26,7 +27,7 @@ class LoginForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
 
-user_auth_bp = Blueprint('user_auth', __name__)
+user_auth_bp = Blueprint('user_auth', __name__, url_prefix='/auth')
 
 # ... (بقية الكود كما هو)
 def get_cookie_settings():
@@ -172,7 +173,33 @@ def login():
             flash('حدث خطأ أثناء تسجيل الدخول', 'danger')
 
     return render_template('auth/login.html', form=form)
-
+@user_auth_bp.route('/register', methods=['GET', 'POST'])
+@redirect_if_authenticated
+def register():
+    form = RegisterForm()
+    if form.validate_on_submit():
+        email = form.email.data
+        password = form.password.data
+         
+        with current_app.app_context():
+            if User.query.filter_by(email=email).first():
+                flash('البريد الإلكتروني مسجل مسبقاً', 'danger')
+                return redirect(url_for('user_auth.register'))
+            
+            new_user = User(email=email)
+            new_user.set_password(password)
+            
+            # إذا كان هذا هو المستخدم الأول، اجعله مسؤولاً
+            if User.query.count() == 0:
+                new_user.is_admin = True
+            
+            db.session.add(new_user)
+            db.session.commit()
+        
+        flash('تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول', 'success')
+        return redirect(url_for('user_auth.login'))
+    
+    return render_template('auth/register.html', form=form)
 @user_auth_bp.route('/logout')
 def logout():
     response = make_response(redirect(url_for('user_auth.login')))
