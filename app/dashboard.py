@@ -15,15 +15,7 @@ dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
 
 
-def get_order_stats(store_id):
-    """إحصائيات الطلبات للمتجر"""
-    return { 
-        'new_orders': OrderStatusNote.query.filter_by(store_id=store_id, status_flag='new').count(),
-        'late_orders': OrderStatusNote.query.filter_by(store_id=store_id, status_flag='late').count(),
-        'missing_orders': OrderStatusNote.query.filter_by(store_id=store_id, status_flag='missing').count(),
-        'refunded_orders': OrderStatusNote.query.filter_by(store_id=store_id, status_flag='refunded').count(),
-        'not_shipped_orders': OrderStatusNote.query.filter_by(store_id=store_id, status_flag='not_shipped').count(),
-    }
+
 
 # ==============================================
 # روابط لوحة التحكم
