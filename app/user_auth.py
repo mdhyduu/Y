@@ -21,13 +21,13 @@ from .user_auth import user_auth_bp
 app.register_blueprint(user_auth_bp)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+user_auth_bp = Blueprint('user_auth', __name__, url_prefix='/auth')
 
 # Define LoginForm within the file
 class LoginForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
 
-user_auth_bp = Blueprint('user_auth', __name__, url_prefix='/auth')
 
 # ... (بقية الكود كما هو)
 def get_cookie_settings():
