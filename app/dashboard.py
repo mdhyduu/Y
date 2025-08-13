@@ -10,15 +10,6 @@ dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 # ديكوراتورات المصادقة المدمجة (بدون ملف منفصل)
 # ==============================================
 
-def auth_required(view_func):
-    """ديكوراتور للتحقق من تسجيل الدخول"""
-    @wraps(view_func)
-    def wrapper(*args, **kwargs):
-        if 'user_id' not in session:
-            flash('يجب تسجيل الدخول أولاً', 'warning')
-            return redirect_to_login()
-        return view_func(*args, **kwargs)
-    return wrapper
 
 def admin_required(view_func):
     """ديكوراتور للتحقق من صلاحيات المدير"""
@@ -37,7 +28,7 @@ def admin_required(view_func):
 def get_current_user():
     """الحصول على المستخدم الحالي من الجلسة"""
     if 'user_id' not in session:
-        return None
+        return None 
     
     if session.get('is_admin'):
         return User.query.get(session['user_id'])
@@ -51,7 +42,7 @@ def redirect_to_login():
 
 def get_order_stats(store_id):
     """إحصائيات الطلبات للمتجر"""
-    return {
+    return { 
         'new_orders': OrderStatusNote.query.filter_by(store_id=store_id, status_flag='new').count(),
         'late_orders': OrderStatusNote.query.filter_by(store_id=store_id, status_flag='late').count(),
         'missing_orders': OrderStatusNote.query.filter_by(store_id=store_id, status_flag='missing').count(),
