@@ -1,151 +1,118 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response
+from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, session
 from .models import User, Employee, OrderStatusNote, db
-from datetime import datetime, timedelta
-from functools import wraps  # <-- أضف هذا الاستيراد
+from datetime import datetime
+from functools import wraps
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
-def login_required(view_func):
+# ==============================================
+# ديكوراتورات المصادقة المدمجة (بدون ملف منفصل)
+# ==============================================
+
+def auth_required(view_func):
     """ديكوراتور للتحقق من تسجيل الدخول"""
-    @wraps(view_func)  # <-- الآن ستعمل بشكل صحيح
+    @wraps(view_func)
     def wrapper(*args, **kwargs):
-        user_id = request.cookies.get('user_id')
-        if not user_id:
+        if 'user_id' not in session:
             flash('يجب تسجيل الدخول أولاً', 'warning')
-            return redirect(url_for('user_auth.login'))
-        
-        # تحقق من أن user_id رقمية
-        if not user_id.isdigit():
-            resp = make_response(redirect(url_for('user_auth.login')))
-            resp.delete_cookie('user_id')
-            resp.delete_cookie('is_admin')
-            resp.delete_cookie('employee_role')
-            resp.delete_cookie('store_id')
-            return resp
-        
-        is_admin = request.cookies.get('is_admin') == 'true'
-        
-        if is_admin:
-            user = User.query.get(user_id)
-            if not user:
-                resp = make_response(redirect(url_for('user_auth.login')))
-                resp.delete_cookie('user_id')
-                resp.delete_cookie('is_admin')
-                resp.delete_cookie('employee_role')
-                resp.delete_cookie('store_id')
-                return resp
-            request.current_user = user
-        else:
-            employee = Employee.query.get(user_id)
-            if not employee:
-                flash('بيانات الموظف غير موجودة', 'error')
-                resp = make_response(redirect(url_for('user_auth.login')))
-                resp.delete_cookie('user_id')
-                resp.delete_cookie('is_admin')
-                resp.delete_cookie('employee_role')
-                resp.delete_cookie('store_id')
-                return resp
-            request.current_user = employee
-        
+            return redirect_to_login()
         return view_func(*args, **kwargs)
     return wrapper
 
-# ... بقية الكود كما هو
+def admin_required(view_func):
+    """ديكوراتور للتحقق من صلاحيات المدير"""
+    @wraps(view_func)
+    def wrapper(*args, **kwargs):
+        if not session.get('is_admin'):
+            flash('ليس لديك صلاحية الوصول', 'danger')
+            return redirect(url_for('dashboard.index'))
+        return view_func(*args, **kwargs)
+    return wrapper
+
+# ==============================================
+# دوال المساعدة
+# ==============================================
+
+def get_current_user():
+    """الحصول على المستخدم الحالي من الجلسة"""
+    if 'user_id' not in session:
+        return None
+    
+    if session.get('is_admin'):
+        return User.query.get(session['user_id'])
+    return Employee.query.get(session['user_id'])
+
+def redirect_to_login():
+    """إعادة توجيه إلى صفحة تسجيل الدخول مع تنظيف الجلسة"""
+    response = make_response(redirect(url_for('user_auth.login')))
+    session.clear()
+    return response
+
+def get_order_stats(store_id):
+    """إحصائيات الطلبات للمتجر"""
+    return {
+        'new_orders': OrderStatusNote.query.filter_by(store_id=store_id, status_flag='new').count(),
+        'late_orders': OrderStatusNote.query.filter_by(store_id=store_id, status_flag='late').count(),
+        'missing_orders': OrderStatusNote.query.filter_by(store_id=store_id, status_flag='missing').count(),
+        'refunded_orders': OrderStatusNote.query.filter_by(store_id=store_id, status_flag='refunded').count(),
+        'not_shipped_orders': OrderStatusNote.query.filter_by(store_id=store_id, status_flag='not_shipped').count(),
+    }
+
+# ==============================================
+# روابط لوحة التحكم
+# ==============================================
 
 @dashboard_bp.route('/')
-@login_required
+@auth_required
 def index():
     """لوحة التحكم الرئيسية"""
     try:
-        is_admin = request.cookies.get('is_admin') == 'true'
-        user_id = request.cookies.get('user_id')
-        
-        if is_admin:
-            # للمستخدمين العامين (المدراء)
-            user = User.query.get(user_id)
-            if not user:
-                resp = make_response(redirect(url_for('user_auth.login')))
-                resp.delete_cookie('user_id')
-                resp.delete_cookie('is_admin')
-                return resp
-                
-            return render_template('dashboard.html', 
-                                current_user=user,
+        current_user = get_current_user()
+        if not current_user:
+            return redirect_to_login()
+
+        if isinstance(current_user, User):  # مدير
+            return render_template('dashboard/admin.html',
+                                current_user=current_user,
                                 is_admin=True)
         
-        else:
-            # للموظفين
-            employee = Employee.query.get(user_id)
-            if not employee:
-                flash('بيانات الموظف غير موجودة', 'error')
-                resp = make_response(redirect(url_for('user_auth.login')))
-                resp.delete_cookie('user_id')
-                resp.delete_cookie('is_admin')
-                return resp
-            
-            user = User.query.filter_by(store_id=employee.store_id).first()
-            
-            # تحديد نوع لوحة التحكم حسب الدور
-            if employee.role in ('delivery', 'delivery_manager'):
-                is_delivery_manager = (employee.role == 'delivery_manager')
-                return render_template('dashboard.html',
-                                    current_user=user,
-                                    is_delivery_manager=is_delivery_manager,
-                                    employee=employee)
-            else:
-                # جلب الإحصائيات والحالات المخصصة للموظفين (غير مسؤولي التوصيل)
-                stats = {
-                    'new_orders': 0,  # يمكن استبدالها ببيانات حقيقية
-                    'late_orders': OrderStatusNote.query.filter_by(status_flag='late').count(),
-                    'missing_orders': OrderStatusNote.query.filter_by(status_flag='missing').count(),
-                    'refunded_orders': OrderStatusNote.query.filter_by(status_flag='refunded').count(),
-                    'not_shipped_orders': OrderStatusNote.query.filter_by(status_flag='not_shipped').count(),
-                }
-                
-                # الحالات التي تحتاج متابعة (جميع الحالات المخصصة)
-                custom_statuses = OrderStatusNote.query.order_by(OrderStatusNote.created_at.desc()).all()
-                
-                # آخر 5 حالات مضافة
-                recent_statuses = OrderStatusNote.query.order_by(OrderStatusNote.created_at.desc()).limit(5).all()
-                
-                # إضافة معلومات المستخدم الذي أضاف الحالة
-                for status in custom_statuses + recent_statuses:
-                    status.user = User.query.get(status.created_by)
-                
-                return render_template('employee_dashboard.html',
-                                    current_user=user,
-                                    employee=employee,
-                                    stats=stats,
-                                    custom_statuses=custom_statuses,
-                                    recent_statuses=recent_statuses)
-    
+        # موظف
+        store_admin = User.query.filter_by(store_id=current_user.store_id).first()
+        
+        if current_user.role in ('delivery', 'delivery_manager'):
+            return render_template('dashboard/delivery.html',
+                                current_user=store_admin,
+                                is_delivery_manager=(current_user.role == 'delivery_manager'),
+                                employee=current_user)
+        
+        # موظف عادي
+        stats = get_order_stats(current_user.store_id)
+        status_notes = OrderStatusNote.query.filter_by(
+            store_id=current_user.store_id
+        ).order_by(OrderStatusNote.created_at.desc()).limit(50).all()
+        
+        return render_template('dashboard/employee.html',
+                            current_user=store_admin,
+                            employee=current_user,
+                            stats=stats,
+                            status_notes=status_notes)
+
     except Exception as e:
-        flash(f"حدث خطأ في جلب بيانات لوحة التحكم: {str(e)}", "error")
-        return redirect(url_for('user_auth.login'))
+        flash(f"خطأ في النظام: {str(e)}", "error")
+        return redirect_to_login()
 
 @dashboard_bp.route('/profile')
-@login_required
+@auth_required
 def profile():
     """صفحة الملف الشخصي"""
-    is_admin = request.cookies.get('is_admin') == 'true'
-    user_id = request.cookies.get('user_id')
-    
-    if is_admin:
-        user = User.query.get(user_id)
-        return render_template('profile.html', user=user)
-    else:
-        employee = Employee.query.get(user_id)
-        return render_template('employee_profile.html', employee=employee)
+    current_user = get_current_user()
+    if isinstance(current_user, User):
+        return render_template('profile.html', user=current_user)
+    return render_template('employee_profile.html', employee=current_user)
 
 @dashboard_bp.route('/settings')
-@login_required
+@admin_required
 def settings():
-    """صفحة الإعدادات"""
-    is_admin = request.cookies.get('is_admin') == 'true'
-    if not is_admin:
-        flash('ليس لديك صلاحية الوصول إلى هذه الصفحة', 'danger')
-        return redirect(url_for('dashboard.index'))
-    
-    user_id = request.cookies.get('user_id')
-    user = User.query.get(user_id)
-    return render_template('settings.html', user=user)
+    """صفحة الإعدادات (للمدراء فقط)"""
+    current_user = get_current_user()
+    return render_template('settings.html', user=current_user)
