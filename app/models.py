@@ -134,8 +134,6 @@ class User(db.Model):
             self._salla_access_token = fernet.encrypt(access_token.encode('utf-8'))
             self._salla_refresh_token = fernet.encrypt(refresh_token.encode('utf-8'))
             self.token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
-            if not User.query.filter_by(is_admin=True).first():
-                self.is_admin = True
             db.session.commit()
             
             
