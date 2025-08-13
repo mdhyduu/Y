@@ -128,7 +128,7 @@ def create_app():
                 User._salla_refresh_token.isnot(None),
                 User.token_expires_at < datetime.utcnow() + timedelta(hours=1)
             ).all()
-            
+             
             for user in users:
                 try:
                     if refresh_salla_token(user):
@@ -145,13 +145,13 @@ def create_app():
             minutes=30
         )
         scheduler.start()
-# تأكيد إعدادات الجلسة
-@app.before_request
-def ensure_session_settings():
-    session.permanent = True
-    app.permanent_session_lifetime = timedelta(hours=2)
-    if 'user_id' not in session and request.cookies.get('user_id'):
-        # مزامنة الكوكيز مع الجلسة
-        session['user_id'] = request.cookies.get('user_id')
-        session['is_admin'] = request.cookies.get('is_admin') == 'true'
+
+    @app.before_request
+    def ensure_session_settings():
+        session.permanent = True
+        app.permanent_session_lifetime = timedelta(hours=2)
+        if 'user_id' not in session and request.cookies.get('user_id'):
+            # مزامنة الكوكيز مع الجلسة
+            session['user_id'] = request.cookies.get('user_id')
+            session['is_admin'] = request.cookies.get('is_admin') == 'true'
     return app
