@@ -41,12 +41,13 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
     csrf.init_app(app)
-
+    from .utils import format_date
+    app.jinja_env.filters['format_date'] = format_date
     # Create database tables
     with app.app_context():
         from . import models
         db.create_all()
-
+    
     # Register blueprints
     from .employees import employees_bp
     from .dashboard import dashboard_bp
@@ -74,8 +75,7 @@ def create_app():
         app.register_blueprint(bp)
 
     # Template filters
-    from .utils import format_date
-    app.jinja_env.filters['format_date'] = format_date
+  
 
     @app.template_filter('time_ago')
     def time_ago_filter(dt):
