@@ -62,17 +62,15 @@ def create_app():
     from .delivery_orders import delivery_bp
     
     blueprints = [
-        user_auth_bp,
-        employees_bp,
-        dashboard_bp,
-
-        auth_bp,
-        orders_bp,
-        categories_bp,
-        permissions_bp,
-        products_bp,
-        delivery_bp
-    ]
+    user_auth_bp,  # أو auth_bp (الاختيار الذي اخترته أعلاه)
+    dashboard_bp,
+    employees_bp,
+    orders_bp,
+    categories_bp,
+    permissions_bp,
+    products_bp,
+    delivery_bp
+        ]
     
     for bp in blueprints:
         app.register_blueprint(bp)
