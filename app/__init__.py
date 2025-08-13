@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request
 import os
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -6,98 +6,119 @@ from flask_wtf.csrf import CSRFProtect
 from .config import Config
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
-from flask import session
-from .session_manager import init_session_manager  # <-- استيراد جديد
-from flask import request
-# إنشاء كائنات الإضافات
-db = SQLAlchemy() 
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+# Initialize extensions
+db = SQLAlchemy()
 migrate = Migrate()
 csrf = CSRFProtect()
 
 def create_app():
     app = Flask(__name__)
+    
+    # Load configuration
     app.config.from_object(Config)
     
-    # تحسين إعدادات الجلسات والأمان
+    # Enhanced security settings
     app.config.update(
         SECRET_KEY=os.environ.get('SECRET_KEY', os.urandom(24)),
         SESSION_COOKIE_SECURE=True,
         SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE='Strict',  # تغيير من Lax إلى Strict
-        PERMANENT_SESSION_LIFETIME=timedelta(hours=2),  # مدة صلاحية الجلسة
-        SESSION_REFRESH_EACH_REQUEST=True,
+        SESSION_COOKIE_SAMESITE='Strict',
+        PERMANENT_SESSION_LIFETIME=timedelta(hours=2),
         SQLALCHEMY_TRACK_MODIFICATIONS=False
     )
-    
-    # إصلاح البروكسي
-    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    # Proxy configuration
     app.wsgi_app = ProxyFix(
-        app.wsgi_app, 
-        x_for=1, 
-        x_proto=1, 
-        x_host=1,
-        x_prefix=1
+        app.wsgi_app,
+        x_for=1,
+        x_proto=1,
+        x_host=1
     )
-    
-    # تهيئة الإضافات
+
+    # Initialize extensions with app
     db.init_app(app)
     migrate.init_app(app, db)
     csrf.init_app(app)
-    init_session_manager(app)  # <-- تهيئة مدير الجلسات الجديد
 
-    # إنشاء الجداول
+    # Create database tables
     with app.app_context():
         from . import models
         db.create_all()
 
-    # تسجيل البلوبيرنتات
+    # Register blueprints
     from .employees import employees_bp
     from .dashboard import dashboard_bp
     from .user_auth import user_auth_bp
     from .auth import auth_bp
     from .orders import orders_bp
-    from .utils import format_date
     from .categories import categories_bp
     from .permissions import permissions_bp
     from .products import products_bp
     from .delivery_orders import delivery_bp
     
-    app.register_blueprint(employees_bp)
-    app.register_blueprint(dashboard_bp)
-    app.register_blueprint(user_auth_bp)
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(orders_bp)
-    app.register_blueprint(categories_bp)
-    app.register_blueprint(permissions_bp)
-    app.register_blueprint(products_bp)
-    app.register_blueprint(delivery_bp)
+    blueprints = [
+        employees_bp,
+        dashboard_bp,
+        user_auth_bp,
+        auth_bp,
+        orders_bp,
+        categories_bp,
+        permissions_bp,
+        products_bp,
+        delivery_bp
+    ]
+    
+    for bp in blueprints:
+        app.register_blueprint(bp)
 
-    # فلترات القوالب
+    # Template filters
+    from .utils import format_date
     app.jinja_env.filters['format_date'] = format_date
 
     @app.template_filter('time_ago')
     def time_ago_filter(dt):
-        # ... (ابقى الكود كما هو)
-        ...
+        if not dt:
+            return "بدون تاريخ"
+        now = datetime.utcnow()
+        diff = now - dt
+        seconds = diff.total_seconds()
+        if seconds < 60:
+            return "الآن"
+        minutes = seconds // 60
+        if minutes < 60:
+            return f"منذ {int(minutes)} دقيقة"
+        hours = minutes // 60
+        if hours < 24:
+            return f"منذ {int(hours)} ساعة"
+        days = hours // 24
+        if days < 30:
+            return f"منذ {int(days)} يوم"
+        months = days // 30
+        if months < 12:
+            return f"منذ {int(months)} شهر"
+        years = months // 12
+        return f"منذ {int(years)} سنة"
 
-    # إضافة رؤوس أمان
+    # Security headers
     @app.after_request
     def add_security_headers(response):
+        path = request.path if request else ''
+        
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'DENY'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         
-        # منع التخزين المؤقت للصفحات الحساسة
-        if request.path.startswith('/dashboard') or request.path.startswith('/auth'):
+        if path.startswith('/dashboard') or path.startswith('/auth'):
             response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
             response.headers['Pragma'] = 'no-cache'
             response.headers['Expires'] = '0'
         
         return response
- 
-    # مهمة تجديد التوكنات
+
+    # Token refresh job
     def refresh_tokens_job():
-        """مهمة مجدولة لتجديد التوكنات"""
         with app.app_context():
             from .models import User
             from .token_utils import refresh_salla_token
@@ -109,20 +130,18 @@ def create_app():
             
             for user in users:
                 try:
-                    new_token = refresh_salla_token(user)
-                    if new_token:
-                        app.logger.info(f"تم تجديد التوكن للمستخدم {user.email}")
+                    if refresh_salla_token(user):
+                        app.logger.info(f"Token refreshed for user: {user.email}")
                 except Exception as e:
-                    app.logger.error(f"خطأ في تجديد التوكن: {str(e)}")
+                    app.logger.error(f"Token refresh failed: {str(e)}")
 
-    # تشغيل المهمة المجدولة
+    # Start scheduler
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         scheduler = BackgroundScheduler()
         scheduler.add_job(
             func=refresh_tokens_job,
             trigger='interval',
-            minutes=30,  # التحقق كل 30 دقيقة
-            next_run_time=datetime.now() + timedelta(minutes=1)
+            minutes=30
         )
         scheduler.start()
 

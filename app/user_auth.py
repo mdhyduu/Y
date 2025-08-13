@@ -1,7 +1,14 @@
 # Add this at the very top of user_auth.py
+# Add these imports at the top
 import logging
 from flask import Blueprint, render_template, redirect, url_for, flash, request, make_response, current_app
 from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField
+from wtforms.validators import DataRequired, Email
+
+# Initialize logger
+
+# ... rest of your routes and logic ...
 # ... rest of your imports ...
 from wtforms import StringField, PasswordField
 from wtforms.validators import DataRequired, Email
@@ -11,18 +18,15 @@ from functools import wraps
 import os
 import re
 
-user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
-# تعريف نموذج تسجيل الدخول داخل الملف
+# Define LoginForm within the file
 class LoginForm(FlaskForm):
-    email = StringField('البريد الإلكتروني', validators=[
-        DataRequired(message='حقل البريد الإلكتروني مطلوب'),
-        Email(message='بريد إلكتروني غير صالح')
-    ])
-    password = PasswordField('كلمة المرور', validators=[
-        DataRequired(message='حقل كلمة المرور مطلوب')
-    ])
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    password = PasswordField('Password', validators=[DataRequired()])
+
+user_auth_bp = Blueprint('user_auth', __name__)
 
 # ... (بقية الكود كما هو)
 def get_cookie_settings():
