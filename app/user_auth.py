@@ -1,5 +1,6 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, make_response, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, make_response, current_app, session
 from flask_wtf import FlaskForm
+from flask_wtf.csrf import CSRFProtect, generate_csrf
 from wtforms import StringField, PasswordField
 from wtforms.validators import DataRequired, EqualTo, Length, ValidationError
 import re
@@ -12,11 +13,21 @@ import os
 user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
 
+# تهيئة الحماية من CSRF
+csrf = CSRFProtect()
+
+@user_auth_bp.before_app_request
+def before_request():
+    """توليد وتحديث CSRF token قبل كل طلب"""
+    if 'csrf_token' not in session:
+        session['csrf_token'] = generate_csrf()
+    current_app.jinja_env.globals['csrf_token'] = session.get('csrf_token')
+
 # إعدادات الأمان للكوكيز
 def get_cookie_settings():
     """إرجاع إعدادات الكوكيز بناءً على بيئة التشغيل"""
     return {
-        'secure': os.environ.get('FLASK_ENV') != 'development',  # تفعيل في الإنتاج فقط
+        'secure': os.environ.get('FLASK_ENV') != 'development',
         'httponly': True,
         'samesite': 'Lax',
         'path': '/'
@@ -28,15 +39,26 @@ def redirect_if_authenticated(view_func):
     def wrapper(*args, **kwargs):
         # التحقق من أن الاتصال آمن (HTTPS) في بيئة الإنتاج
         if not request.is_secure and current_app.env != 'development':
+            logger.info("إعادة التوجيه إلى HTTPS")
             return redirect(request.url.replace('http://', 'https://'), code=301)
         
+        # التحقق من الجلسة الحالية
+        if 'user_id' in session and 'user_type' in session:
+            logger.info(f"جلسة نشطة موجودة: user_id={session['user_id']}, user_type={session['user_type']}")
+            return redirect(url_for('dashboard.index', _scheme='https'))
+        
+        # التحقق من الكوكيز (للتوافق مع الإصدارات القديمة)
         user_id = request.cookies.get('user_id')
         if user_id:
+            logger.info(f"تم العثور على كوكي user_id: {user_id}")
             user = User.query.get(user_id)
             employee = Employee.query.get(user_id)
             
             if user or employee:
+                logger.info("المستخدم مسجل دخول بالفعل، إعادة التوجيه إلى لوحة التحكم")
                 return redirect(url_for('dashboard.index', _scheme='https'))
+        
+        logger.info("لا يوجد جلسة نشطة، السماح بالوصول إلى الصفحة")
         return view_func(*args, **kwargs)
     return wrapper
 
@@ -61,154 +83,102 @@ class RegisterForm(FlaskForm):
                                    validators=[DataRequired(), 
                                               EqualTo('password', message='كلمتا المرور غير متطابقتين')])
 
-def set_auth_cookies(response, user=None, employee=None):
-    """دالة مساعدة لتعيين كوكيز المصادقة بشكل آمن"""
-    cookie_settings = get_cookie_settings()
-    
+def set_auth_session(user=None, employee=None):
+    """تعيين بيانات الجلسة للمستخدم"""
     if user:
-        response.set_cookie(
-            'user_id', 
-            str(user.id), 
-            max_age=timedelta(days=30).total_seconds(),
-            **cookie_settings
-        )
-        response.set_cookie(
-            'is_admin', 
-            'true' if user.is_admin else 'false', 
-            max_age=timedelta(days=30).total_seconds(),
-            **cookie_settings
-        )
-        response.set_cookie(
-            'employee_role', 
-            '', 
-            max_age=timedelta(days=30).total_seconds(),
-            **cookie_settings
-        )
-        
-        if user.salla_access_token:
-            response.set_cookie(
-                'salla_access_token', 
-                user.get_access_token(), 
-                max_age=timedelta(days=30).total_seconds(),
-                **cookie_settings
-            )
-            response.set_cookie(
-                'salla_refresh_token', 
-                user.salla_refresh_token, 
-                max_age=timedelta(days=30).total_seconds(),
-                **cookie_settings
-            )
+        session['user_id'] = user.id
+        session['user_type'] = 'admin'
+        session['email'] = user.email
+        session['is_admin'] = user.is_admin
+        session['store_id'] = user.store_id if hasattr(user, 'store_id') else None
+        session['csrf_token'] = generate_csrf()  # تجديد CSRF token عند تسجيل الدخول
+        logger.info(f"تم تعيين جلسة المشرف: user_id={user.id}, email={user.email}")
     
     elif employee:
-        response.set_cookie(
-            'user_id', 
-            str(employee.id), 
-            max_age=timedelta(days=30).total_seconds(),
-            **cookie_settings
-        )
-        response.set_cookie(
-            'is_admin', 
-            'false', 
-            max_age=timedelta(days=30).total_seconds(),
-            **cookie_settings
-        )
-        response.set_cookie(
-            'employee_role', 
-            employee.role, 
-            max_age=timedelta(days=30).total_seconds(),
-            **cookie_settings
-        )
-        response.set_cookie(
-            'store_id', 
-            str(employee.store_id), 
-            max_age=timedelta(days=30).total_seconds(),
-            **cookie_settings
-        )
-        
-        store_admin = User.query.filter_by(store_id=employee.store_id).first()
-        if store_admin and store_admin.salla_access_token:
-            response.set_cookie(
-                'salla_access_token', 
-                store_admin.get_access_token(), 
-                max_age=timedelta(days=30).total_seconds(),
-                **cookie_settings
-            )
-            response.set_cookie(
-                'salla_refresh_token', 
-                store_admin.get_refresh_token(), 
-                max_age=timedelta(days=30).total_seconds(),
-                **cookie_settings
-            )
-    
-    return response
+        session['user_id'] = employee.id
+        session['user_type'] = 'employee'
+        session['email'] = employee.email
+        session['is_admin'] = False
+        session['employee_role'] = employee.role
+        session['store_id'] = employee.store_id
+        session['csrf_token'] = generate_csrf()  # تجديد CSRF token عند تسجيل الدخول
+        logger.info(f"تم تعيين جلسة الموظف: user_id={employee.id}, email={employee.email}, role={employee.role}")
 
 @user_auth_bp.route('/login', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def login():
     form = LoginForm()
     
+    # إضافة CSRF token يدوياً إذا لزم الأمر
+    if not form.csrf_token.data:
+        form.csrf_token.data = session.get('csrf_token')
+    
     if form.validate_on_submit():
         email = form.email.data.lower().strip()
         password = form.password.data
         
+        logger.info(f"محاولة تسجيل دخول بالبريد: {email}")
+        
         try:
+            # تنظيف الجلسة الحالية قبل تسجيل الدخول الجديد
+            session.clear()
+            logger.info("تم تنظيف الجلسة الحالية")
+            
+            # تسجيل دخول كمشرف
             user = User.query.filter_by(email=email).first()
-            employee = Employee.query.filter_by(email=email).first()
-
-            # تحديد المستخدم الذي نجح في تسجيل الدخول
-            logged_in_user = None
-            logged_in_employee = None
-
             if user and user.check_password(password):
-                logged_in_user = user
+                logger.info(f"تم التحقق من صحة مشرف: {email}")
+                
+                # تعيين الجلسة الجديدة
+                set_auth_session(user=user)
+                
+                response = make_response(redirect(url_for('dashboard.index', _scheme='https')))
+                
+                # حذف أي كوكيز قديمة أولاً
+                for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
+                             'salla_access_token', 'salla_refresh_token']:
+                    response.delete_cookie(cookie, path='/')
+                
                 flash('تم تسجيل دخول المشرف بنجاح!', 'success')
                 logger.info(f"تم تسجيل دخول المشرف: {user.email}")
-
-            elif employee and employee.check_password(password):
+                return response
+            
+            # تسجيل دخول كموظف
+            employee = Employee.query.filter_by(email=email).first()
+            if employee and employee.check_password(password):
                 if not employee.is_active:
                     flash('حسابك موقوف. يرجى الاتصال بالإدارة', 'danger')
                     logger.warning(f"محاولة تسجيل دخول لحساب موقوف: {email}")
                     return redirect(url_for('user_auth.login', _scheme='https'))
                 
-                logged_in_employee = employee
-                flash('تم تسجيل دخول الموظف بنجاح!', 'success')
-                logger.info(f"تم تسجيل دخول الموظف: {employee.email} - المتجر: {employee.store_id}")
-
-            # إذا نجح تسجيل دخول أي منهما
-            if logged_in_user or logged_in_employee:
-                # إنشاء استجابة إعادة التوجيه
+                logger.info(f"تم التحقق من صحة موظف: {email}")
+                
+                # تعيين الجلسة الجديدة
+                set_auth_session(employee=employee)
+                
                 response = make_response(redirect(url_for('dashboard.index', _scheme='https')))
                 
-                # حذف أي كوكيز قديمة أولاً (خطوة احترازية هامة)
-                cookies_to_delete = [
-                    'user_id', 'is_admin', 'employee_role', 'store_id', 
-                    'salla_access_token', 'salla_refresh_token'
-                ]
-                for cookie_name in cookies_to_delete:
-                    response.delete_cookie(cookie_name, path='/')
-
-                # تعيين الكوكيز الجديدة بناءً على نوع المستخدم
-                if logged_in_user:
-                    set_auth_cookies(response, user=logged_in_user)
-                elif logged_in_employee:
-                    set_auth_cookies(response, employee=logged_in_employee)
+                # حذف أي كوكيز قديمة أولاً
+                for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
+                             'salla_access_token', 'salla_refresh_token']:
+                    response.delete_cookie(cookie, path='/')
                 
+                flash('تم تسجيل دخول الموظف بنجاح!', 'success')
+                logger.info(f"تم تسجيل دخول الموظف: {employee.email} - المتجر: {employee.store_id}")
                 return response
-
-            # إذا لم تكن بيانات الدخول صحيحة لأي منهما
+            
+            # إذا البيانات غير صحيحة
             flash('بيانات الدخول غير صحيحة', 'danger')
             logger.warning(f"محاولة تسجيل دخول فاشلة للبريد: {email}")
             
         except Exception as e:
             db.session.rollback()
+            session.clear()
             flash('حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة لاحقًا', 'danger')
             logger.error(f"خطأ في تسجيل الدخول: {str(e)}", exc_info=True)
-        
-        # في حالة الفشل أو الخطأ، أعد التوجيه إلى صفحة الدخول
-        return redirect(url_for('user_auth.login', _scheme='https'))
+            return redirect(url_for('user_auth.login', _scheme='https'))
     
     return render_template('auth/login.html', form=form)
-
 
 @user_auth_bp.route('/register', methods=['GET', 'POST'])
 @redirect_if_authenticated
@@ -217,11 +187,14 @@ def register():
     if form.validate_on_submit():
         email = form.email.data.lower().strip()
         password = form.password.data
+        
+        logger.info(f"محاولة تسجيل حساب جديد: {email}")
          
         try:
             with current_app.app_context():
                 if User.query.filter_by(email=email).first():
                     flash('البريد الإلكتروني مسجل مسبقاً', 'danger')
+                    logger.warning(f"محاولة تسجيل بريد موجود مسبقًا: {email}")
                     return redirect(url_for('user_auth.register', _scheme='https'))
                 
                 new_user = User(email=email)
@@ -230,11 +203,13 @@ def register():
                 # إذا كان هذا هو المستخدم الأول، اجعله مسؤولاً
                 if User.query.count() == 0:
                     new_user.is_admin = True
+                    logger.info("تم تعيين المستخدم الأول كمسؤول")
                 
                 db.session.add(new_user)
                 db.session.commit()
             
             flash('تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول', 'success')
+            logger.info(f"تم إنشاء حساب جديد بنجاح: {email}")
             return redirect(url_for('user_auth.login', _scheme='https'))
         
         except Exception as e:
@@ -244,23 +219,21 @@ def register():
             return redirect(url_for('user_auth.register', _scheme='https'))
     
     return render_template('auth/register.html', form=form)
+
 @user_auth_bp.route('/logout')
 def logout():
-    # قم بإنشاء استجابة لإعادة التوجيه إلى صفحة تسجيل الدخول
-    response = make_response(redirect(url_for('user_auth.login', _scheme='https')))
+    logger.info(f"تسجيل الخروج: user_id={session.get('user_id')}, email={session.get('email')}")
     
-    # احصل على إعدادات الكوكيز
+    # تنظيف الجلسة
+    session.clear()
+    
+    response = make_response(redirect(url_for('user_auth.login', _scheme='https')))
     cookie_settings = get_cookie_settings()
     
-    # احذف كل كوكيز المصادقة
-    # تحديد المسار (path) مهم جدًا لضمان الحذف الصحيح
-    cookies_to_delete = [
-        'user_id', 'is_admin', 'employee_role', 'store_id', 
-        'salla_access_token', 'salla_refresh_token'
-    ]
-    for cookie_name in cookies_to_delete:
-        # تأكد من استخدام نفس إعدادات الـ path و domain التي استخدمتها عند تعيين الكوكيز
-        response.delete_cookie(cookie_name, path=cookie_settings['path'])
+    # حذف جميع كوكيز المصادقة
+    for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
+                 'salla_access_token', 'salla_refresh_token']:
+        response.delete_cookie(cookie, **cookie_settings)
     
     flash('تم تسجيل الخروج بنجاح', 'success')
     return response
