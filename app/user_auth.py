@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField
 from wtforms.validators import DataRequired, Email
-
+from flask import session  # أضف هذا مع بقية الاستيرادات
 # Initialize logger
 
 # ... rest of your routes and logic ...
