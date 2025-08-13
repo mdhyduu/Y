@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from .models import User, Employee, OrderStatusNote, db
 from datetime import datetime
 from functools import wraps
-from .user_auth import auth_required  # استيراد من user_auth بدلاً من التعريف المحلي
+from .user_auth import auth_required, redirect_to_login  # استيراد من user_auth بدلاً من التعريف المحلي
 from .auth_utils import admin_required, get_current_user
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
@@ -13,11 +13,7 @@ dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
 
 
-def redirect_to_login():
-    """إعادة توجيه إلى صفحة تسجيل الدخول مع تنظيف الجلسة"""
-    response = make_response(redirect(url_for('user_auth.login')))
-    session.clear()
-    return response
+
 
 def get_order_stats(store_id):
     """إحصائيات الطلبات للمتجر"""
