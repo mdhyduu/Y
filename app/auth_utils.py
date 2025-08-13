@@ -3,15 +3,7 @@ from functools import wraps
 from flask import session, redirect, url_for, flash
 from .models import User, Employee
 
-def auth_required(view_func):
-    """ديكوراتور للتحقق من تسجيل الدخول"""
-    @wraps(view_func)
-    def wrapper(*args, **kwargs):
-        if 'user_id' not in session:
-            flash('يجب تسجيل الدخول أولاً', 'warning')
-            return redirect(url_for('user_auth.login'))
-        return view_func(*args, **kwargs)
-    return wrapper
+
 
 def admin_required(view_func):
     """ديكوراتور للتحقق من صلاحيات المدير"""
