@@ -71,24 +71,32 @@ def auth_required(admin_only=False):
 def redirect_if_authenticated(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
-        if not request.is_secure and current_app.config.get("ENV") != 'development':
-            return redirect(request.url.replace('http://', 'https://'), code=301)
-        
+        # First check if already logged in via session
+        if 'user_id' in session:
+            return redirect(url_for('dashboard.index'))
+            
+        # Then check cookies only if no session
         user_id = request.cookies.get('user_id')
         if not user_id:
             return view_func(*args, **kwargs)
             
-        # التحقق من صحة الجلسة في قاعدة البيانات
+        # Verify user in database
         is_admin = request.cookies.get('is_admin') == 'true'
         current_user = None
         
-        if is_admin:
-            current_user = User.query.get(user_id)
-        else:
-            current_user = Employee.query.get(user_id)
-        
-        if current_user:
-            return redirect(url_for('dashboard.index', _scheme='https'))
+        try:
+            if is_admin:
+                current_user = User.query.get(user_id)
+            else:
+                current_user = Employee.query.get(user_id)
+            
+            if current_user:
+                # Set session to avoid future cookie checks
+                set_auth_session(user=current_user if is_admin else None, 
+                               employee=None if is_admin else current_user)
+                return redirect(url_for('dashboard.index'))
+        except Exception as e:
+            logger.error(f"Error verifying user: {str(e)}")
         
         return view_func(*args, **kwargs)
     return wrapper
