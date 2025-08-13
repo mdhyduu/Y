@@ -36,6 +36,7 @@ def create_app():
     x_proto=1,
     x_host=1,
     x_prefix=1
+    
     )
 
     # Initialize extensions with app
@@ -53,7 +54,7 @@ def create_app():
     from .employees import employees_bp
     from .dashboard import dashboard_bp
     from .user_auth import user_auth_bp
-    from .auth import auth_bp
+
     from .orders import orders_bp
     from .categories import categories_bp
     from .permissions import permissions_bp
@@ -61,9 +62,10 @@ def create_app():
     from .delivery_orders import delivery_bp
     
     blueprints = [
+        user_auth_bp,
         employees_bp,
         dashboard_bp,
-        user_auth_bp,
+
         auth_bp,
         orders_bp,
         categories_bp,
@@ -145,5 +147,13 @@ def create_app():
             minutes=30
         )
         scheduler.start()
-
+# تأكيد إعدادات الجلسة
+@app.before_request
+def ensure_session_settings():
+    session.permanent = True
+    app.permanent_session_lifetime = timedelta(hours=2)
+    if 'user_id' not in session and request.cookies.get('user_id'):
+        # مزامنة الكوكيز مع الجلسة
+        session['user_id'] = request.cookies.get('user_id')
+        session['is_admin'] = request.cookies.get('is_admin') == 'true'
     return app
