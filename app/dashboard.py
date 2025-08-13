@@ -63,6 +63,12 @@ def index():
         if is_admin:
             # للمستخدمين العامين (المدراء)
             user = User.query.get(user_id)
+            if not user:
+                resp = make_response(redirect(url_for('user_auth.login')))
+                resp.delete_cookie('user_id')
+                resp.delete_cookie('is_admin')
+                return resp
+                
             return render_template('dashboard.html', 
                                 current_user=user,
                                 is_admin=True)
