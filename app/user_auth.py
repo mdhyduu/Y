@@ -17,11 +17,10 @@ from datetime import datetime, timedelta
 from functools import wraps
 import os
 import re
-from .user_auth import user_auth_bp
-app.register_blueprint(user_auth_bp)
+user_auth_bp = Blueprint('user_auth', __name__, url_prefix='/auth')
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-user_auth_bp = Blueprint('user_auth', __name__, url_prefix='/auth')
 
 # Define LoginForm within the file
 class LoginForm(FlaskForm):
