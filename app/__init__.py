@@ -150,8 +150,12 @@ def create_app():
     def ensure_session_settings():
         session.permanent = True
         app.permanent_session_lifetime = timedelta(hours=2)
+        
+        # مزامنة الكوكيز مع الجلسة إذا لم تكن الجلسة موجودة
         if 'user_id' not in session and request.cookies.get('user_id'):
-            # مزامنة الكوكيز مع الجلسة
             session['user_id'] = request.cookies.get('user_id')
             session['is_admin'] = request.cookies.get('is_admin') == 'true'
+            session['store_id'] = request.cookies.get('store_id')
+            if not session.get('is_admin'):
+                session['employee_role'] = request.cookies.get('employee_role')
     return app
