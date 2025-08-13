@@ -1,74 +1,74 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response
 from .models import User, Employee, OrderStatusNote, db
 from datetime import datetime, timedelta
-from functools import wraps
-import logging
+from functools import wraps  # <-- أضف هذا الاستيراد
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
-logger = logging.getLogger(__name__)
 
 def login_required(view_func):
-    """ديكوراتور للتحقق من تسجيل الدخول باستخدام الجلسة"""
-    @wraps(view_func)
+    """ديكوراتور للتحقق من تسجيل الدخول"""
+    @wraps(view_func)  # <-- الآن ستعمل بشكل صحيح
     def wrapper(*args, **kwargs):
-        logger.info("===== بدء التحقق من تسجيل الدخول =====")
-        
-        # استخراج معلومات المستخدم من الجلسة
-        user_id = session.get('user_id')
-        user_type = session.get('user_type')
-        
-        if not user_id or not user_type:
-            logger.warning("لم يتم العثور على جلسة نشطة")
+        user_id = request.cookies.get('user_id')
+        if not user_id:
             flash('يجب تسجيل الدخول أولاً', 'warning')
             return redirect(url_for('user_auth.login'))
         
-        logger.info(f"جلسة نشطة موجودة: user_id={user_id}, user_type={user_type}")
+        # تحقق من أن user_id رقمية
+        if not user_id.isdigit():
+            resp = make_response(redirect(url_for('user_auth.login')))
+            resp.delete_cookie('user_id')
+            resp.delete_cookie('is_admin')
+            resp.delete_cookie('employee_role')
+            resp.delete_cookie('store_id')
+            return resp
         
-        if user_type == 'admin':
+        is_admin = request.cookies.get('is_admin') == 'true'
+        
+        if is_admin:
             user = User.query.get(user_id)
             if not user:
-                logger.error(f"المستخدم غير موجود في قاعدة البيانات: user_id={user_id}")
-                flash('بيانات المستخدم غير موجودة', 'error')
-                # تنظيف الجلسة غير الصالحة
-                session.clear()
-                return redirect(url_for('user_auth.login'))
+                resp = make_response(redirect(url_for('user_auth.login')))
+                resp.delete_cookie('user_id')
+                resp.delete_cookie('is_admin')
+                resp.delete_cookie('employee_role')
+                resp.delete_cookie('store_id')
+                return resp
             request.current_user = user
-            logger.info(f"تم تحميل بيانات المشرف: {user.email}")
-            
-        else:  # employee
+        else:
             employee = Employee.query.get(user_id)
             if not employee:
-                logger.error(f"الموظف غير موجود في قاعدة البيانات: user_id={user_id}")
                 flash('بيانات الموظف غير موجودة', 'error')
-                # تنظيف الجلسة غير الصالحة
-                session.clear()
-                return redirect(url_for('user_auth.login'))
+                resp = make_response(redirect(url_for('user_auth.login')))
+                resp.delete_cookie('user_id')
+                resp.delete_cookie('is_admin')
+                resp.delete_cookie('employee_role')
+                resp.delete_cookie('store_id')
+                return resp
             request.current_user = employee
-            logger.info(f"تم تحميل بيانات الموظف: {employee.email}")
         
-        logger.info("تم التحقق من تسجيل الدخول بنجاح")
         return view_func(*args, **kwargs)
     return wrapper
+
+# ... بقية الكود كما هو
 
 @dashboard_bp.route('/')
 @login_required
 def index():
     """لوحة التحكم الرئيسية"""
     try:
-        logger.info("===== الدخول إلى لوحة التحكم الرئيسية =====")
-        user_type = session.get('user_type')
-        user_id = session.get('user_id')
+        is_admin = request.cookies.get('is_admin') == 'true'
+        user_id = request.cookies.get('user_id')
         
-        if user_type == 'admin':
+        if is_admin:
             # للمستخدمين العامين (المدراء)
             user = User.query.get(user_id)
             if not user:
-                logger.error(f"المستخدم غير موجود في قاعدة البيانات: {user_id}")
-                flash('بيانات المستخدم غير موجودة', 'error')
-                session.clear()
-                return redirect(url_for('user_auth.login'))
+                resp = make_response(redirect(url_for('user_auth.login')))
+                resp.delete_cookie('user_id')
+                resp.delete_cookie('is_admin')
+                return resp
                 
-            logger.info(f"عرض لوحة تحكم المشرف للمستخدم: {user.email}")
             return render_template('dashboard.html', 
                                 current_user=user,
                                 is_admin=True)
@@ -77,24 +77,22 @@ def index():
             # للموظفين
             employee = Employee.query.get(user_id)
             if not employee:
-                logger.error(f"الموظف غير موجود في قاعدة البيانات: {user_id}")
                 flash('بيانات الموظف غير موجودة', 'error')
-                session.clear()
-                return redirect(url_for('user_auth.login'))
+                resp = make_response(redirect(url_for('user_auth.login')))
+                resp.delete_cookie('user_id')
+                resp.delete_cookie('is_admin')
+                return resp
             
             user = User.query.filter_by(store_id=employee.store_id).first()
             
             # تحديد نوع لوحة التحكم حسب الدور
             if employee.role in ('delivery', 'delivery_manager'):
                 is_delivery_manager = (employee.role == 'delivery_manager')
-                logger.info(f"عرض لوحة تحكم مسؤول التوصيل: {employee.email}, role={employee.role}")
                 return render_template('dashboard.html',
                                     current_user=user,
                                     is_delivery_manager=is_delivery_manager,
                                     employee=employee)
             else:
-                logger.info(f"عرض لوحة تحكم الموظفين: {employee.email}, role={employee.role}")
-                
                 # جلب الإحصائيات والحالات المخصصة للموظفين (غير مسؤولي التوصيل)
                 stats = {
                     'new_orders': 0,  # يمكن استبدالها ببيانات حقيقية
@@ -122,7 +120,6 @@ def index():
                                     recent_statuses=recent_statuses)
     
     except Exception as e:
-        logger.error(f"حدث خطأ في جلب بيانات لوحة التحكم: {str(e)}", exc_info=True)
         flash(f"حدث خطأ في جلب بيانات لوحة التحكم: {str(e)}", "error")
         return redirect(url_for('user_auth.login'))
 
@@ -130,31 +127,25 @@ def index():
 @login_required
 def profile():
     """صفحة الملف الشخصي"""
-    logger.info("===== الدخول إلى صفحة الملف الشخصي =====")
-    user_type = session.get('user_type')
-    user_id = session.get('user_id')
+    is_admin = request.cookies.get('is_admin') == 'true'
+    user_id = request.cookies.get('user_id')
     
-    if user_type == 'admin':
+    if is_admin:
         user = User.query.get(user_id)
-        logger.info(f"عرض ملف المشرف الشخصي: {user.email}")
         return render_template('profile.html', user=user)
     else:
         employee = Employee.query.get(user_id)
-        logger.info(f"عرض ملف الموظف الشخصي: {employee.email}")
         return render_template('employee_profile.html', employee=employee)
 
 @dashboard_bp.route('/settings')
 @login_required
 def settings():
     """صفحة الإعدادات"""
-    logger.info("===== الدخول إلى صفحة الإعدادات =====")
-    user_type = session.get('user_type')
-    if user_type != 'admin':
-        logger.warning(f"محاولة غير مصرح بها للوصول إلى الإعدادات: user_id={session.get('user_id')}")
+    is_admin = request.cookies.get('is_admin') == 'true'
+    if not is_admin:
         flash('ليس لديك صلاحية الوصول إلى هذه الصفحة', 'danger')
         return redirect(url_for('dashboard.index'))
     
-    user_id = session.get('user_id')
+    user_id = request.cookies.get('user_id')
     user = User.query.get(user_id)
-    logger.info(f"عرض صفحة الإعدادات للمشرف: {user.email}")
     return render_template('settings.html', user=user)
