@@ -1,18 +1,27 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, make_response, current_app, session
-from flask_wtf import FlaskForm
+from flask import Blueprint, render_template, redirect, url_for, flash, request, make_response, current_app
+from flask_wtf import FlaskForm  # تأكد من وجود هذا الاستيراد
 from wtforms import StringField, PasswordField
-from wtforms.validators import DataRequired, EqualTo, Length, ValidationError
-import re
-import logging
+from wtforms.validators import DataRequired, Email
+from .models import db, User, Employee
 from datetime import datetime, timedelta
 from functools import wraps
 import os
-from .models import db, User, Employee
+import re
 
 user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
 
-# إعدادات الكوكيز المحسنة
+# تعريف نموذج تسجيل الدخول داخل الملف
+class LoginForm(FlaskForm):
+    email = StringField('البريد الإلكتروني', validators=[
+        DataRequired(message='حقل البريد الإلكتروني مطلوب'),
+        Email(message='بريد إلكتروني غير صالح')
+    ])
+    password = PasswordField('كلمة المرور', validators=[
+        DataRequired(message='حقل كلمة المرور مطلوب')
+    ])
+
+# ... (بقية الكود كما هو)
 def get_cookie_settings():
     return {
         'secure': os.environ.get('FLASK_ENV') == 'production',
