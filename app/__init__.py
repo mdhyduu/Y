@@ -7,8 +7,7 @@ from .config import Config
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 from flask import session
-from .user_auth import user_auth_bp
-from .dashboard import dashboard_bp
+
 # إنشاء كائنات الإضافات
 db = SQLAlchemy()
 migrate = Migrate()
@@ -25,8 +24,7 @@ def create_app():
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     
     
-    app.register_blueprint(user_auth_bp)
-    app.register_blueprint(dashboard_bp)
+    
     
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(
@@ -64,6 +62,7 @@ def create_app():
     app.config['SESSION_COOKIE_SECURE'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.register_blueprint(employees_bp)
+
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(user_auth_bp)
     app.register_blueprint(auth_bp)
