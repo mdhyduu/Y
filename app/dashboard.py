@@ -30,7 +30,7 @@ def get_order_stats(store_id):
 # ==============================================
 
 @dashboard_bp.route('/')
-@auth_required
+@auth_required()
 def index():
     """لوحة التحكم الرئيسية"""
     try:
@@ -69,7 +69,7 @@ def index():
         return redirect_to_login()
 
 @dashboard_bp.route('/profile')
-@auth_required
+@auth_required()
 def profile():
     """صفحة الملف الشخصي"""
     current_user = get_current_user()
