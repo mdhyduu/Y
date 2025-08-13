@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, session 
 from .models import User, Employee, OrderStatusNote, db
 from datetime import datetime, timedelta
 from functools import wraps
@@ -17,7 +17,7 @@ def index():
         current_user = User.query.get(user_id)
         if not current_user:
             return redirect_to_login()
-        return render_template('dashboard/admin.html', current_user=current_user)
+        return render_template('dashboard.html', current_user=current_user)
     else:
         employee = Employee.query.get(user_id)
         if not employee:
