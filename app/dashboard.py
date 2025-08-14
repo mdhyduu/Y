@@ -22,11 +22,10 @@ logger.setLevel(logging.INFO)
 
 # ==============================================
 # روابط لوحة التحكم
-# ==============================================
 @dashboard_bp.route('/')
 @auth_required()
 def index():
-    """لوحة التحكم الرئيسية"""
+    """لوحة التحكم الرئيسية بدون إحصائيات الحالات"""
     try:
         # الحصول على المستخدم الحالي
         current_user = get_current_user()
@@ -36,7 +35,7 @@ def index():
             flash('جلسة العمل منتهية، يرجى تسجيل الدخول مرة أخرى', 'warning')
             return redirect_to_login()
         
-        # استخدام بيانات الجلسة مباشرة لتجنب مشاكل التوافق
+        # استخدام بيانات الجلسة مباشرة
         is_admin = session.get('is_admin', False)
         store_id = session.get('store_id', 0)
         employee_role = session.get('employee_role', '')
@@ -48,19 +47,17 @@ def index():
                 flash('خطأ في صلاحيات المستخدم', 'danger')
                 return redirect_to_login()
             
-            # إحصائيات الطلبات للمتجر
-            stats = get_order_stats(store_id)
-            
-            # ملاحظات حالة الطلب
-            status_notes = OrderStatusNote.query.filter_by(
-                store_id=store_id
-            ).order_by(OrderStatusNote.created_at.desc()).limit(50).all()
+            # إحصائيات بديلة للمدير (بدون استخدام OrderStatusNote)
+            stats = {
+                'welcome_message': 'مرحبًا بك في لوحة التحكم',
+                'last_login': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                'store_id': store_id
+            }
             
             return render_template('dashboard.html',
                                 current_user=current_user,
                                 is_admin=True,
-                                stats=stats,
-                                status_notes=status_notes)
+                                stats=stats)
         
         # للموظفين
         else:
@@ -83,23 +80,23 @@ def index():
                                     is_delivery_manager=(employee_role == 'delivery_manager'),
                                     employee=current_user)
             
-            # للموظفين العاديين
-            stats = get_order_stats(store_id)
-            status_notes = OrderStatusNote.query.filter_by(
-                store_id=store_id
-            ).order_by(OrderStatusNote.created_at.desc()).limit(50).all()
+            # للموظفين العاديين (بدون إحصائيات الحالات)
+            stats = {
+                'welcome_message': 'مرحبًا بك في لوحة التحكم',
+                'last_login': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                'store_id': store_id
+            }
             
             store_admin = User.query.filter_by(store_id=store_id).first()
             
             return render_template('employee_dashboard.html',
                                 current_user=store_admin,
                                 employee=current_user,
-                                stats=stats,
-                                status_notes=status_notes)
+                                stats=stats)
 
     except Exception as e:
-        logger.error(f"خطأ فادح في لوحة التحكم: {str(e)}")
-        flash('حدث خطأ جسيم في النظام، يرجى المحاولة لاحقاً', 'danger')
+        logger.error(f"خطأ في لوحة التحكم: {str(e)}")
+        flash('حدث خطأ في النظام، يرجى المحاولة لاحقاً', 'danger')
         return redirect_to_login()
 @dashboard_bp.route('/profile')
 @auth_required()
