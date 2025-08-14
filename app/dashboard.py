@@ -4,6 +4,7 @@ from .models import User, Employee, OrderStatusNote, db
 from datetime import datetime, timedelta
 from functools import wraps
 import os
+from sqlalchemy import text  # تمت الإضافة
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ def get_db_path():
     return db_path
 
 def login_required(view_func):
-    @wraps(view_func)
+    @wraps(view_func)  # تصحيح من @wraps إلى @wraps
     def wrapper(*args, **kwargs):
         try:
             logger.debug("التحقق من تسجيل الدخول...")
@@ -35,9 +36,10 @@ def login_required(view_func):
                 user = User.query.get(user_id)
                 if not user:
                     logger.warning(f"المشرف غير موجود في قاعدة البيانات: {user_id}")
-                    resp = make_response(redirect)
+                    resp = make_response(redirect(url_for('user_auth.login', _scheme='https')))  # تصحيح السطر
                     # حذف جميع الكوكيز
-                    for cookie in ['user_id', 'is_admin','employee_role', 'store_id','salla_access_token', 'salla_refresh_token']:
+                    for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id',
+                                 'salla_access_token', 'salla_refresh_token']:
                         resp.delete_cookie(cookie)
                     return resp
             else:
@@ -46,7 +48,7 @@ def login_required(view_func):
                     logger.warning(f"الموظف غير موجود في قاعدة البيانات: {user_id}")
                     resp = make_response(redirect(url_for('user_auth.login', _scheme='https')))
                     # حذف جميع الكوكيز
-                    for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
+                    for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id',
                                  'salla_access_token', 'salla_refresh_token']:
                         resp.delete_cookie(cookie)
                     return resp
@@ -57,6 +59,7 @@ def login_required(view_func):
             flash('حدث خطأ في التحقق من هويتك. يرجى تسجيل الدخول مرة أخرى', 'danger')
             return redirect(url_for('user_auth.login', _scheme='https'))
     return wrapper
+
 @dashboard_bp.route('/')
 @login_required
 def index():
@@ -68,7 +71,7 @@ def index():
         
         # التحقق من اتصال قاعدة البيانات
         try:
-            db.session.execute('SELECT 1').scalar()
+            db.session.execute(text('SELECT 1')).scalar()  # تم التصحيح هنا
         except Exception as db_error:
             logger.error(f"فشل الاتصال بقاعدة البيانات: {str(db_error)}")
             flash('حدث خطأ في الاتصال بالنظام. يرجى المحاولة لاحقاً', 'danger')
@@ -84,7 +87,7 @@ def index():
                 return resp
                 
             logger.info(f"عرض لوحة تحكم المشرف: {user.email}")
-            return render_template('dashboard.html', 
+            return render_template('dashboard.html',
                                 current_user=user,
                                 is_admin=True)
         
@@ -210,6 +213,7 @@ def settings():
         logger.error(f"خطأ في جلب الإعدادات: {str(e)}", exc_info=True)
         flash('حدث خطأ في جلب صفحة الإعدادات', 'danger')
         return redirect(url_for('dashboard.index'))
+
 @dashboard_bp.before_request
 @login_required
 def refresh_session():
@@ -224,14 +228,15 @@ def refresh_session():
             'samesite': 'Lax',
             'path': '/'
         }
-        resp.set_cookie('user_id', user_id, 
+        resp.set_cookie('user_id', user_id,
                        max_age=timedelta(days=1).total_seconds(),
                        **cookie_settings)
         return resp
+
 @dashboard_bp.before_app_request
 def check_db_connection():
     try:
-        db.session.execute('SELECT 1')
+        db.session.execute(text('SELECT 1'))  # تم التصحيح هنا
     except Exception as e:
         logger.error(f"فشل الاتصال بقاعدة البيانات: {str(e)}")
         # إعادة الاتصال
