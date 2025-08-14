@@ -11,7 +11,50 @@ import os
 
 user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
-
+def login_required(view_func):
+    """ديكوراتور للتحقق من تسجيل الدخول"""
+    @wraps(view_func)
+    def wrapper(*args, **kwargs):
+        user_id = request.cookies.get('user_id')
+        if not user_id:
+            flash('يجب تسجيل الدخول أولاً', 'warning')
+            return redirect(url_for('user_auth.login'))
+        
+        # تحقق من أن user_id رقمية
+        if not user_id.isdigit():
+            resp = make_response(redirect(url_for('user_auth.login')))
+            resp.delete_cookie('user_id')
+            resp.delete_cookie('is_admin')
+            resp.delete_cookie('employee_role')
+            resp.delete_cookie('store_id')
+            return resp
+        
+        is_admin = request.cookies.get('is_admin') == 'true'
+        
+        if is_admin:
+            user = User.query.get(user_id)
+            if not user:
+                resp = make_response(redirect(url_for('user_auth.login')))
+                resp.delete_cookie('user_id')
+                resp.delete_cookie('is_admin')
+                resp.delete_cookie('employee_role')
+                resp.delete_cookie('store_id')
+                return resp
+            g.current_user = user
+        else:
+            employee = Employee.query.get(user_id)
+            if not employee:
+                flash('بيانات الموظف غير موجودة', 'error')
+                resp = make_response(redirect(url_for('user_auth.login')))
+                resp.delete_cookie('user_id')
+                resp.delete_cookie('is_admin')
+                resp.delete_cookie('employee_role')
+                resp.delete_cookie('store_id')
+                return resp
+            g.current_user = employee
+        
+        return view_func(*args, **kwargs)
+    return wrapper
 # إعدادات الأمان للكوكيز
 def get_cookie_settings():
     """إرجاع إعدادات الكوكيز بناءً على بيئة التشغيل"""
@@ -142,8 +185,6 @@ def set_auth_cookies(response, user=None, employee=None):
     
     return response
 
-# إضافة دالة مساعدة جديدة
-
 @user_auth_bp.route('/login', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def login():
@@ -154,20 +195,17 @@ def login():
         password = form.password.data
         
         try:
-            # إنشاء response أولاً بدون توجيه
-            response = make_response()
-            
-            # حذف الكوكيز القديمة أولاً
-            response = clear_auth_cookies(response)
-            
             # تسجيل دخول كمشرف
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
+                response = make_response(redirect(url_for('dashboard.index', _scheme='https')))
+                # حذف أي كوكيز قديمة أولاً
+                for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
+                             'salla_access_token', 'salla_refresh_token']:
+                    response.delete_cookie(cookie, path='/')
+                
                 # تعيين الكوكيز الجديدة
                 response = set_auth_cookies(response, user=user)
-                # التوجيه بعد تعيين الكوكيز
-                response.headers['Location'] = url_for('dashboard.index', _scheme='https')
-                response.status_code = 302
                 
                 flash('تم تسجيل دخول المشرف بنجاح!', 'success')
                 logger.info(f"تم تسجيل دخول المشرف: {user.email}")
@@ -181,11 +219,14 @@ def login():
                     logger.warning(f"محاولة تسجيل دخول لحساب موقوف: {email}")
                     return redirect(url_for('user_auth.login', _scheme='https'))
                 
+                response = make_response(redirect(url_for('dashboard.index', _scheme='https')))
+                # حذف أي كوكيز قديمة أولاً
+                for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
+                             'salla_access_token', 'salla_refresh_token']:
+                    response.delete_cookie(cookie, path='/')
+                
                 # تعيين الكوكيز الجديدة
                 response = set_auth_cookies(response, employee=employee)
-                # التوجيه بعد تعيين الكوكيز
-                response.headers['Location'] = url_for('dashboard.index', _scheme='https')
-                response.status_code = 302
                 
                 flash('تم تسجيل دخول الموظف بنجاح!', 'success')
                 logger.info(f"تم تسجيل دخول الموظف: {employee.email} - المتجر: {employee.store_id}")
@@ -202,6 +243,8 @@ def login():
             return redirect(url_for('user_auth.login', _scheme='https'))
     
     return render_template('auth/login.html', form=form)
+
+@user_auth_bp.route('/register', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def register():
     form = RegisterForm()

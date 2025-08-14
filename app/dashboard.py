@@ -3,53 +3,10 @@ from .models import User, Employee, OrderStatusNote, db
 from datetime import datetime, timedelta
 from functools import wraps
 from sqlalchemy import func, case
-
+from .user_auth import login_required
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
-def login_required(view_func):
-    """ديكوراتور للتحقق من تسجيل الدخول"""
-    @wraps(view_func)
-    def wrapper(*args, **kwargs):
-        user_id = request.cookies.get('user_id')
-        if not user_id:
-            flash('يجب تسجيل الدخول أولاً', 'warning')
-            return redirect(url_for('user_auth.login'))
-        
-        # تحقق من أن user_id رقمية
-        if not user_id.isdigit():
-            resp = make_response(redirect(url_for('user_auth.login')))
-            resp.delete_cookie('user_id')
-            resp.delete_cookie('is_admin')
-            resp.delete_cookie('employee_role')
-            resp.delete_cookie('store_id')
-            return resp
-        
-        is_admin = request.cookies.get('is_admin') == 'true'
-        
-        if is_admin:
-            user = User.query.get(user_id)
-            if not user:
-                resp = make_response(redirect(url_for('user_auth.login')))
-                resp.delete_cookie('user_id')
-                resp.delete_cookie('is_admin')
-                resp.delete_cookie('employee_role')
-                resp.delete_cookie('store_id')
-                return resp
-            g.current_user = user
-        else:
-            employee = Employee.query.get(user_id)
-            if not employee:
-                flash('بيانات الموظف غير موجودة', 'error')
-                resp = make_response(redirect(url_for('user_auth.login')))
-                resp.delete_cookie('user_id')
-                resp.delete_cookie('is_admin')
-                resp.delete_cookie('employee_role')
-                resp.delete_cookie('store_id')
-                return resp
-            g.current_user = employee
-        
-        return view_func(*args, **kwargs)
-    return wrapper
+
 
 @dashboard_bp.route('/')
 @login_required
