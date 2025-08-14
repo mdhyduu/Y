@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from flask import session
 
 from .dashboard import init_db_checker
-init_db_checker(app)
+
 # إنشاء كائنات الإضافات
 db = SQLAlchemy()
 migrate = Migrate()
@@ -48,7 +48,7 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
     csrf.init_app(app)
-
+    init_db_checker(app)
     # تسجيل النماذج مع سياق التطبيق
     with app.app_context():
         from . import models
