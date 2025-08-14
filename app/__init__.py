@@ -18,7 +18,7 @@ def create_app():
     app.config.from_object(Config)
     
 
-    app.secret_key = os.environ.get('SECRET_KEY'),
+    app.secret_key = os.environ.get('SECRET_KEY')
     app.config['SESSION_COOKIE_SECURE'] = True
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
