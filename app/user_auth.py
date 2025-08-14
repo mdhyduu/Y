@@ -20,7 +20,7 @@ class LoginForm(FlaskForm):
 class RegisterForm(FlaskForm):
     email = StringField('البريد الإلكتروني', validators=[DataRequired(), Email()])
     password = PasswordField('كلمة المرور', validators=[DataRequired()])
-
+    confirm_password = PasswordField('تأكيد كلمة المرور', validators=[DataRequired()])
 # ============= دوال المصادقة والتحكم =============
 
 def auth_required(admin_only=False):
