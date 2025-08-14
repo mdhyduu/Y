@@ -1,13 +1,14 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response
+from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, g
 from .models import User, Employee, OrderStatusNote, db
 from datetime import datetime, timedelta
-from functools import wraps  # <-- أضف هذا الاستيراد
+from functools import wraps
+from sqlalchemy import func, case
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
 def login_required(view_func):
     """ديكوراتور للتحقق من تسجيل الدخول"""
-    @wraps(view_func)  # <-- الآن ستعمل بشكل صحيح
+    @wraps(view_func)
     def wrapper(*args, **kwargs):
         user_id = request.cookies.get('user_id')
         if not user_id:
@@ -34,7 +35,7 @@ def login_required(view_func):
                 resp.delete_cookie('employee_role')
                 resp.delete_cookie('store_id')
                 return resp
-            request.current_user = user
+            g.current_user = user
         else:
             employee = Employee.query.get(user_id)
             if not employee:
@@ -45,12 +46,10 @@ def login_required(view_func):
                 resp.delete_cookie('employee_role')
                 resp.delete_cookie('store_id')
                 return resp
-            request.current_user = employee
+            g.current_user = employee
         
         return view_func(*args, **kwargs)
     return wrapper
-
-# ... بقية الكود كما هو
 
 @dashboard_bp.route('/')
 @login_required
@@ -58,48 +57,36 @@ def index():
     """لوحة التحكم الرئيسية"""
     try:
         is_admin = request.cookies.get('is_admin') == 'true'
-        user_id = request.cookies.get('user_id')
+        current_user = g.current_user
         
         if is_admin:
-            # للمستخدمين العامين (المدراء)
-            user = User.query.get(user_id)
-            if not user:
-                resp = make_response(redirect(url_for('user_auth.login')))
-                resp.delete_cookie('user_id')
-                resp.delete_cookie('is_admin')
-                return resp
-                
             return render_template('dashboard.html', 
-                                current_user=user,
+                                current_user=current_user,
                                 is_admin=True)
         
         else:
-            # للموظفين
-            employee = Employee.query.get(user_id)
-            if not employee:
-                flash('بيانات الموظف غير موجودة', 'error')
-                resp = make_response(redirect(url_for('user_auth.login')))
-                resp.delete_cookie('user_id')
-                resp.delete_cookie('is_admin')
-                return resp
-            
-            user = User.query.filter_by(store_id=employee.store_id).first()
-            
             # تحديد نوع لوحة التحكم حسب الدور
-            if employee.role in ('delivery', 'delivery_manager'):
-                is_delivery_manager = (employee.role == 'delivery_manager')
+            if current_user.role in ('delivery', 'delivery_manager'):
+                is_delivery_manager = (current_user.role == 'delivery_manager')
                 return render_template('dashboard.html',
-                                    current_user=user,
+                                    current_user=current_user,
                                     is_delivery_manager=is_delivery_manager,
-                                    employee=employee)
+                                    employee=current_user)
             else:
-                # جلب الإحصائيات والحالات المخصصة للموظفين (غير مسؤولي التوصيل)
+                # استعلام واحد فعال للحصول على جميع الإحصائيات
+                counts = db.session.query(
+                    func.sum(case((OrderStatusNote.status_flag == 'late', 1), else_=0)).label('late'),
+                    func.sum(case((OrderStatusNote.status_flag == 'missing', 1), else_=0)).label('missing'),
+                    func.sum(case((OrderStatusNote.status_flag == 'refunded', 1), else_=0)).label('refunded'),
+                    func.sum(case((OrderStatusNote.status_flag == 'not_shipped', 1), else_=0)).label('not_shipped')
+                ).one()
+                
                 stats = {
                     'new_orders': 0,  # يمكن استبدالها ببيانات حقيقية
-                    'late_orders': OrderStatusNote.query.filter_by(status_flag='late').count(),
-                    'missing_orders': OrderStatusNote.query.filter_by(status_flag='missing').count(),
-                    'refunded_orders': OrderStatusNote.query.filter_by(status_flag='refunded').count(),
-                    'not_shipped_orders': OrderStatusNote.query.filter_by(status_flag='not_shipped').count(),
+                    'late_orders': counts[0] or 0,
+                    'missing_orders': counts[1] or 0,
+                    'refunded_orders': counts[2] or 0,
+                    'not_shipped_orders': counts[3] or 0,
                 }
                 
                 # الحالات التي تحتاج متابعة (جميع الحالات المخصصة)
@@ -108,13 +95,16 @@ def index():
                 # آخر 5 حالات مضافة
                 recent_statuses = OrderStatusNote.query.order_by(OrderStatusNote.created_at.desc()).limit(5).all()
                 
-                # إضافة معلومات المستخدم الذي أضاف الحالة
+                # تحسين جلب معلومات المستخدمين باستخدام استعلام واحد
+                user_ids = {status.created_by for status in custom_statuses + recent_statuses}
+                users = {user.id: user for user in User.query.filter(User.id.in_(user_ids)).all()}
+                
                 for status in custom_statuses + recent_statuses:
-                    status.user = User.query.get(status.created_by)
+                    status.user = users.get(status.created_by)
                 
                 return render_template('employee_dashboard.html',
-                                    current_user=user,
-                                    employee=employee,
+                                    current_user=current_user,
+                                    employee=current_user,
                                     stats=stats,
                                     custom_statuses=custom_statuses,
                                     recent_statuses=recent_statuses)
@@ -127,25 +117,25 @@ def index():
 @login_required
 def profile():
     """صفحة الملف الشخصي"""
-    is_admin = request.cookies.get('is_admin') == 'true'
-    user_id = request.cookies.get('user_id')
+    current_user = g.current_user
     
-    if is_admin:
-        user = User.query.get(user_id)
-        return render_template('profile.html', user=user)
+    if request.cookies.get('is_admin') == 'true':
+        return render_template('profile.html', user=current_user)
     else:
-        employee = Employee.query.get(user_id)
-        return render_template('employee_profile.html', employee=employee)
+        return render_template('employee_profile.html', employee=current_user)
 
 @dashboard_bp.route('/settings')
 @login_required
 def settings():
     """صفحة الإعدادات"""
-    is_admin = request.cookies.get('is_admin') == 'true'
-    if not is_admin:
+    if not request.cookies.get('is_admin') == 'true':
         flash('ليس لديك صلاحية الوصول إلى هذه الصفحة', 'danger')
         return redirect(url_for('dashboard.index'))
     
-    user_id = request.cookies.get('user_id')
-    user = User.query.get(user_id)
-    return render_template('settings.html', user=user)
+    return render_template('settings.html', user=g.current_user)
+
+# إضافة دالة لإدارة جلسات قاعدة البيانات
+@dashboard_bp.teardown_request
+def teardown_request(exception=None):
+    """إغلاق جلسة قاعدة البيانات عند انتهاء الطلب"""
+    db.session.remove()
