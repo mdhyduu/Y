@@ -1,90 +1,151 @@
-from flask import Blueprint, render_template, flash, redirect, url_for, session
-from .models import User, Employee
-import logging
-from datetime import datetime
-from .auth_utils import admin_required, get_current_user
-from .user_auth import auth_required
+from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response
+from .models import User, Employee, OrderStatusNote, db
+from datetime import datetime, timedelta
+from functools import wraps  # <-- أضف هذا الاستيراد
 
-# تهيئة البلوبنت والسجل
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
-logger = logging.getLogger(__name__)
+
+def login_required(view_func):
+    """ديكوراتور للتحقق من تسجيل الدخول"""
+    @wraps(view_func)  # <-- الآن ستعمل بشكل صحيح
+    def wrapper(*args, **kwargs):
+        user_id = request.cookies.get('user_id')
+        if not user_id:
+            flash('يجب تسجيل الدخول أولاً', 'warning')
+            return redirect(url_for('user_auth.login'))
+        
+        # تحقق من أن user_id رقمية
+        if not user_id.isdigit():
+            resp = make_response(redirect(url_for('user_auth.login')))
+            resp.delete_cookie('user_id')
+            resp.delete_cookie('is_admin')
+            resp.delete_cookie('employee_role')
+            resp.delete_cookie('store_id')
+            return resp
+        
+        is_admin = request.cookies.get('is_admin') == 'true'
+        
+        if is_admin:
+            user = User.query.get(user_id)
+            if not user:
+                resp = make_response(redirect(url_for('user_auth.login')))
+                resp.delete_cookie('user_id')
+                resp.delete_cookie('is_admin')
+                resp.delete_cookie('employee_role')
+                resp.delete_cookie('store_id')
+                return resp
+            request.current_user = user
+        else:
+            employee = Employee.query.get(user_id)
+            if not employee:
+                flash('بيانات الموظف غير موجودة', 'error')
+                resp = make_response(redirect(url_for('user_auth.login')))
+                resp.delete_cookie('user_id')
+                resp.delete_cookie('is_admin')
+                resp.delete_cookie('employee_role')
+                resp.delete_cookie('store_id')
+                return resp
+            request.current_user = employee
+        
+        return view_func(*args, **kwargs)
+    return wrapper
+
+# ... بقية الكود كما هو
 
 @dashboard_bp.route('/')
-@auth_required()
+@login_required
 def index():
     """لوحة التحكم الرئيسية"""
     try:
-        current_user = get_current_user()
-        if not current_user:
-            return redirect(url_for('user_auth.login'))
-
-        is_admin = session.get('is_admin', True)
-        store_id = session.get('store_id', 0)
-        employee_role = session.get('employee_role', '')
-
-        # إحصائيات أساسية
-        stats = {
-            'welcome_message': 'مرحباً بك في لوحة التحكم',
-            'last_login': datetime.now().strftime('%Y-%m-%d %H:%M'),
-            'store_id': store_id
-        }
-
-        # لوحة المدير
+        is_admin = request.cookies.get('is_admin') == 'true'
+        user_id = request.cookies.get('user_id')
+        
         if is_admin:
-            if not isinstance(current_user, User):
-                flash('خطأ في صلاحيات المستخدم', 'danger')
-                return redirect(url_for('user_auth.login'))
-
-            return render_template('dashboard.html', current_user=current_user)
-
-        # لوحة الموظف
+            # للمستخدمين العامين (المدراء)
+            user = User.query.get(user_id)
+            if not user:
+                resp = make_response(redirect(url_for('user_auth.login')))
+                resp.delete_cookie('user_id')
+                resp.delete_cookie('is_admin')
+                return resp
+                
+            return render_template('dashboard.html', 
+                                current_user=user,
+                                is_admin=True)
+        
         else:
-            if not isinstance(current_user, Employee):
-                flash('خطأ في صلاحيات المستخدم', 'danger')
-                return redirect(url_for('user_auth.login'))
-
-            if not current_user.is_active:
-                flash('حسابك غير مفعل، يرجى التواصل مع المدير', 'danger')
-                return redirect(url_for('user_auth.login'))
-
-            store_admin = User.query.filter_by(store_id=store_id).first()
-
-            # لوحة مندوب التوصيل
-            if employee_role in ('delivery', 'delivery_manager'):
-                return render_template('dashboard/delivery_dashboard.html',
-                                    admin=store_admin,
-                                    employee=current_user,
-                                    is_manager=(employee_role == 'delivery_manager'),
-                                    stats=stats)
-
-            # لوحة الموظف العادي
-            return render_template('dashboard/employee_dashboard.html',
-                                admin=store_admin,
-                                employee=current_user,
-                                stats=stats)
-
+            # للموظفين
+            employee = Employee.query.get(user_id)
+            if not employee:
+                flash('بيانات الموظف غير موجودة', 'error')
+                resp = make_response(redirect(url_for('user_auth.login')))
+                resp.delete_cookie('user_id')
+                resp.delete_cookie('is_admin')
+                return resp
+            
+            user = User.query.filter_by(store_id=employee.store_id).first()
+            
+            # تحديد نوع لوحة التحكم حسب الدور
+            if employee.role in ('delivery', 'delivery_manager'):
+                is_delivery_manager = (employee.role == 'delivery_manager')
+                return render_template('dashboard.html',
+                                    current_user=user,
+                                    is_delivery_manager=is_delivery_manager,
+                                    employee=employee)
+            else:
+                # جلب الإحصائيات والحالات المخصصة للموظفين (غير مسؤولي التوصيل)
+                stats = {
+                    'new_orders': 0,  # يمكن استبدالها ببيانات حقيقية
+                    'late_orders': OrderStatusNote.query.filter_by(status_flag='late').count(),
+                    'missing_orders': OrderStatusNote.query.filter_by(status_flag='missing').count(),
+                    'refunded_orders': OrderStatusNote.query.filter_by(status_flag='refunded').count(),
+                    'not_shipped_orders': OrderStatusNote.query.filter_by(status_flag='not_shipped').count(),
+                }
+                
+                # الحالات التي تحتاج متابعة (جميع الحالات المخصصة)
+                custom_statuses = OrderStatusNote.query.order_by(OrderStatusNote.created_at.desc()).all()
+                
+                # آخر 5 حالات مضافة
+                recent_statuses = OrderStatusNote.query.order_by(OrderStatusNote.created_at.desc()).limit(5).all()
+                
+                # إضافة معلومات المستخدم الذي أضاف الحالة
+                for status in custom_statuses + recent_statuses:
+                    status.user = User.query.get(status.created_by)
+                
+                return render_template('employee_dashboard.html',
+                                    current_user=user,
+                                    employee=employee,
+                                    stats=stats,
+                                    custom_statuses=custom_statuses,
+                                    recent_statuses=recent_statuses)
+    
     except Exception as e:
-        logger.error(f"خطأ في لوحة التحكم: {e}")
-        flash('حدث خطأ في النظام، يرجى المحاولة لاحقاً', 'danger')
+        flash(f"حدث خطأ في جلب بيانات لوحة التحكم: {str(e)}", "error")
         return redirect(url_for('user_auth.login'))
 
 @dashboard_bp.route('/profile')
-@auth_required()
+@login_required
 def profile():
     """صفحة الملف الشخصي"""
-    current_user = get_current_user()
-    if not current_user:
-        return redirect(url_for('user_auth.login'))
-
-    if session.get('is_admin'):
-        return render_template('dashboard/admin_profile.html', user=current_user)
-    return render_template('dashboard/employee_profile.html', employee=current_user)
+    is_admin = request.cookies.get('is_admin') == 'true'
+    user_id = request.cookies.get('user_id')
+    
+    if is_admin:
+        user = User.query.get(user_id)
+        return render_template('profile.html', user=user)
+    else:
+        employee = Employee.query.get(user_id)
+        return render_template('employee_profile.html', employee=employee)
 
 @dashboard_bp.route('/settings')
-@admin_required
+@login_required
 def settings():
-    """صفحة الإعدادات (للمدير فقط)"""
-    current_user = get_current_user()
-    if not current_user:
-        return redirect(url_for('user_auth.login'))
-    return render_template('dashboard/settings.html', user=current_user)
+    """صفحة الإعدادات"""
+    is_admin = request.cookies.get('is_admin') == 'true'
+    if not is_admin:
+        flash('ليس لديك صلاحية الوصول إلى هذه الصفحة', 'danger')
+        return redirect(url_for('dashboard.index'))
+    
+    user_id = request.cookies.get('user_id')
+    user = User.query.get(user_id)
+    return render_template('settings.html', user=user)

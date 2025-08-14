@@ -225,13 +225,6 @@ class User(db.Model):
     def __repr__(self):
         return f'<User {self.email}>'
     
-    def get_auth_data(self):
-        return {
-            'id': self.id,
-            'email': self.email,
-            'is_admin': True,
-            'store_id': self.store_id
-        }
     def to_dict(self):
         """تحويل بيانات المستخدم لقاموس (بدون معلومات حساسة)"""
         return {
@@ -269,14 +262,7 @@ class Employee(db.Model):
         
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
-    def get_auth_data(self):
-        return {
-            'id': self.id,
-            'email': self.email,
-            'is_admin': False,
-            'role': self.role,
-            'store_id': self.store_id
-        }
+    
     def generate_remember_token(self):
         """Generate a token for 'remember me' functionality"""
         fernet = Fernet(current_app.config['ENCRYPTION_KEY'])
