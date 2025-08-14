@@ -8,6 +8,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 from flask import session
 
+from .dashboard import init_db_checker
+init_db_checker(app)
 # إنشاء كائنات الإضافات
 db = SQLAlchemy()
 migrate = Migrate()

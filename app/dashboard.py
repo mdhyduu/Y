@@ -4,7 +4,8 @@ from .models import User, Employee, OrderStatusNote, db
 from datetime import datetime, timedelta
 from functools import wraps
 import os
-from sqlalchemy import text  # تمت الإضافة
+from sqlalchemy import text
+from apscheduler.schedulers.background import BackgroundScheduler
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 logger = logging.getLogger(__name__)
@@ -17,10 +18,46 @@ def get_db_path():
         raise RuntimeError("ملف قاعدة البيانات غير موجود")
     return db_path
 
+def check_db_connection():
+    """التحقق من اتصال قاعدة البيانات وإعادة الاتصال عند الحاجة"""
+    try:
+        db.session.execute(text('SELECT 1')).scalar()
+        logger.debug("اتصال قاعدة البيانات نشط")
+        return True
+    except Exception as e:
+        logger.error(f"فشل في التحقق من اتصال قاعدة البيانات: {str(e)}")
+        try:
+            db.session.rollback()
+            db.session.close()
+            if db.session.bind:
+                db.session.bind.pool.recreate()
+            logger.info("تمت إعادة الاتصال بقاعدة البيانات")
+            return True
+        except Exception as repair_error:
+            logger.error(f"فشل إصلاح اتصال قاعدة البيانات: {str(repair_error)}")
+            return False
+
+def init_db_checker(app):
+    """تهيئة مدقق اتصال قاعدة البيانات الدوري"""
+    if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(
+            check_db_connection,
+            'interval',
+            minutes=5,
+            misfire_grace_time=30
+        )
+        scheduler.start()
+
 def login_required(view_func):
-    @wraps(view_func)  # تصحيح من @wraps إلى @wraps
+    """ديكوراتور للتحقق من تسجيل الدخول واتصال قاعدة البيانات"""
+    @wraps(view_func)
     def wrapper(*args, **kwargs):
         try:
+            if not check_db_connection():
+                flash('فقدان الاتصال بالنظام. يرجى المحاولة لاحقاً', 'danger')
+                return redirect(url_for('user_auth.login', _scheme='https'))
+            
             logger.debug("التحقق من تسجيل الدخول...")
             user_id = request.cookies.get('user_id')
             
@@ -29,15 +66,13 @@ def login_required(view_func):
                 flash('يجب تسجيل الدخول أولاً', 'warning')
                 return redirect(url_for('user_auth.login', _scheme='https'))
             
-            # التحقق من صحة الجلسة في قاعدة البيانات
             is_admin = request.cookies.get('is_admin') == 'true'
             
             if is_admin:
                 user = User.query.get(user_id)
                 if not user:
                     logger.warning(f"المشرف غير موجود في قاعدة البيانات: {user_id}")
-                    resp = make_response(redirect(url_for('user_auth.login', _scheme='https')))  # تصحيح السطر
-                    # حذف جميع الكوكيز
+                    resp = make_response(redirect(url_for('user_auth.login', _scheme='https')))
                     for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id',
                                  'salla_access_token', 'salla_refresh_token']:
                         resp.delete_cookie(cookie)
@@ -47,7 +82,6 @@ def login_required(view_func):
                 if not employee:
                     logger.warning(f"الموظف غير موجود في قاعدة البيانات: {user_id}")
                     resp = make_response(redirect(url_for('user_auth.login', _scheme='https')))
-                    # حذف جميع الكوكيز
                     for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id',
                                  'salla_access_token', 'salla_refresh_token']:
                         resp.delete_cookie(cookie)
@@ -56,9 +90,17 @@ def login_required(view_func):
             return view_func(*args, **kwargs)
         except Exception as e:
             logger.error(f"خطأ في التحقق من تسجيل الدخول: {str(e)}", exc_info=True)
-            flash('حدث خطأ في التحقق من هويتك. يرجى تسجيل الدخول مرة أخرى', 'danger')
+            flash('حدث خطأ في النظام. يرجى تسجيل الدخول مرة أخرى', 'danger')
             return redirect(url_for('user_auth.login', _scheme='https'))
     return wrapper
+
+@dashboard_bp.before_app_request
+def before_request_handler():
+    """معالج قبل الطلب للتحقق من الاتصال"""
+    if request.endpoint and request.endpoint != 'static':
+        if not check_db_connection():
+            flash('فقدان الاتصال بالنظام. يرجى المحاولة لاحقاً', 'danger')
+            return redirect(url_for('user_auth.login', _scheme='https'))
 
 @dashboard_bp.route('/')
 @login_required
@@ -68,14 +110,6 @@ def index():
         logger.info("تحميل لوحة التحكم...")
         is_admin = request.cookies.get('is_admin') == 'true'
         user_id = request.cookies.get('user_id')
-        
-        # التحقق من اتصال قاعدة البيانات
-        try:
-            db.session.execute(text('SELECT 1')).scalar()  # تم التصحيح هنا
-        except Exception as db_error:
-            logger.error(f"فشل الاتصال بقاعدة البيانات: {str(db_error)}")
-            flash('حدث خطأ في الاتصال بالنظام. يرجى المحاولة لاحقاً', 'danger')
-            return redirect(url_for('user_auth.login', _scheme='https'))
         
         if is_admin:
             user = db.session.query(User).get(user_id)
@@ -87,7 +121,7 @@ def index():
                 return resp
                 
             logger.info(f"عرض لوحة تحكم المشرف: {user.email}")
-            return render_template('dashboard.html',
+            return render_template('dashboard.html', 
                                 current_user=user,
                                 is_admin=True)
         
@@ -103,7 +137,6 @@ def index():
             
             user = db.session.query(User).filter_by(store_id=employee.store_id).first()
             
-            # تحديد نوع لوحة التحكم حسب الدور
             if employee.role in ('delivery', 'delivery_manager'):
                 is_delivery_manager = (employee.role == 'delivery_manager')
                 logger.info(f"عرض لوحة تحكم التوصيل للموظف: {employee.email} (مدير: {is_delivery_manager})")
@@ -114,9 +147,7 @@ def index():
             else:
                 logger.info(f"عرض لوحة تحكم الموظف: {employee.email} (الدور: {employee.role})")
                 
-                # تحسين استعلامات SQLite لتجنب التحميل الزائد
                 try:
-                    # إحصائيات الطلبات - استعلام واحد لكل إحصائية
                     stats = {
                         'new_orders': db.session.query(OrderStatusNote).filter_by(status_flag='new').count(),
                         'late_orders': db.session.query(OrderStatusNote).filter_by(status_flag='late').count(),
@@ -125,13 +156,9 @@ def index():
                         'not_shipped_orders': db.session.query(OrderStatusNote).filter_by(status_flag='not_shipped').count(),
                     }
                     
-                    # الحالات التي تحتاج متابعة (جميع الحالات المخصصة)
                     custom_statuses = db.session.query(OrderStatusNote).order_by(OrderStatusNote.created_at.desc()).all()
-                    
-                    # آخر 5 حالات مضافة
                     recent_statuses = db.session.query(OrderStatusNote).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
                     
-                    # تحسين جلب بيانات المستخدمين بطلب واحد
                     user_ids = {status.created_by for status in custom_statuses + recent_statuses if status.created_by}
                     users = {user.id: user for user in db.session.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
                     
@@ -220,7 +247,6 @@ def refresh_session():
     """تجديد مدة الجلسة في كل طلب"""
     user_id = request.cookies.get('user_id')
     if user_id:
-        # تجديد مدة الجلسة
         resp = make_response()
         cookie_settings = {
             'secure': current_app.config['SESSION_COOKIE_SECURE'],
@@ -228,18 +254,7 @@ def refresh_session():
             'samesite': 'Lax',
             'path': '/'
         }
-        resp.set_cookie('user_id', user_id,
+        resp.set_cookie('user_id', user_id, 
                        max_age=timedelta(days=1).total_seconds(),
                        **cookie_settings)
         return resp
-
-@dashboard_bp.before_app_request
-def check_db_connection():
-    try:
-        db.session.execute(text('SELECT 1'))  # تم التصحيح هنا
-    except Exception as e:
-        logger.error(f"فشل الاتصال بقاعدة البيانات: {str(e)}")
-        # إعادة الاتصال
-        db.session.rollback()
-        db.session.close()
-        db.session.bind.pool.recreate()
