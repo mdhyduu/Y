@@ -3,9 +3,18 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from .models import User, Employee, OrderStatusNote, db
 from datetime import datetime, timedelta
 from functools import wraps
+import os
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 logger = logging.getLogger(__name__)
+
+def get_db_path():
+    """الحصول على مسار قاعدة البيانات مع التحقق من وجودها"""
+    db_path = os.path.join(current_app.instance_path, 'app.db')
+    if not os.path.exists(db_path):
+        logger.error(f"ملف قاعدة البيانات غير موجود في: {db_path}")
+        raise RuntimeError("ملف قاعدة البيانات غير موجود")
+    return db_path
 
 def login_required(view_func):
     """ديكوراتور للتحقق من تسجيل الدخول"""
@@ -23,7 +32,7 @@ def login_required(view_func):
             # تحقق من أن user_id رقمية
             if not user_id.isdigit():
                 logger.warning(f"معرف مستخدم غير صالح: {user_id}")
-                resp = make_response(redirect(url_for('user_auth.login', _scheme='https')))
+                resp = make_response(redirect(url_for('user_auth.login', _scheme='https'))
                 resp.delete_cookie('user_id')
                 resp.delete_cookie('is_admin')
                 resp.delete_cookie('employee_role')
@@ -32,8 +41,16 @@ def login_required(view_func):
             
             is_admin = request.cookies.get('is_admin') == 'true'
             
+            # التحقق من اتصال قاعدة البيانات
+            try:
+                db.session.execute('SELECT 1').scalar()
+            except Exception as db_error:
+                logger.error(f"فشل الاتصال بقاعدة البيانات: {str(db_error)}")
+                flash('حدث خطأ في الاتصال بالنظام. يرجى المحاولة لاحقاً', 'danger')
+                return redirect(url_for('user_auth.login', _scheme='https'))
+            
             if is_admin:
-                user = User.query.get(user_id)
+                user = db.session.query(User).get(user_id)
                 if not user:
                     logger.warning(f"المشرف غير موجود في قاعدة البيانات: {user_id}")
                     resp = make_response(redirect(url_for('user_auth.login', _scheme='https')))
@@ -45,7 +62,7 @@ def login_required(view_func):
                 request.current_user = user
                 logger.debug(f"تم التحقق من المشرف: {user.email}")
             else:
-                employee = Employee.query.get(user_id)
+                employee = db.session.query(Employee).get(user_id)
                 if not employee:
                     logger.warning(f"الموظف غير موجود في قاعدة البيانات: {user_id}")
                     flash('بيانات الموظف غير موجودة', 'error')
@@ -74,9 +91,16 @@ def index():
         is_admin = request.cookies.get('is_admin') == 'true'
         user_id = request.cookies.get('user_id')
         
+        # التحقق من اتصال قاعدة البيانات
+        try:
+            db.session.execute('SELECT 1').scalar()
+        except Exception as db_error:
+            logger.error(f"فشل الاتصال بقاعدة البيانات: {str(db_error)}")
+            flash('حدث خطأ في الاتصال بالنظام. يرجى المحاولة لاحقاً', 'danger')
+            return redirect(url_for('user_auth.login', _scheme='https'))
+        
         if is_admin:
-            # للمستخدمين العامين (المدراء)
-            user = User.query.get(user_id)
+            user = db.session.query(User).get(user_id)
             if not user:
                 logger.warning(f"المشرف غير موجود في قاعدة البيانات: {user_id}")
                 resp = make_response(redirect(url_for('user_auth.login', _scheme='https')))
@@ -90,8 +114,7 @@ def index():
                                 is_admin=True)
         
         else:
-            # للموظفين
-            employee = Employee.query.get(user_id)
+            employee = db.session.query(Employee).get(user_id)
             if not employee:
                 logger.warning(f"الموظف غير موجود في قاعدة البيانات: {user_id}")
                 flash('بيانات الموظف غير موجودة', 'error')
@@ -100,7 +123,7 @@ def index():
                 resp.delete_cookie('is_admin')
                 return resp
             
-            user = User.query.filter_by(store_id=employee.store_id).first()
+            user = db.session.query(User).filter_by(store_id=employee.store_id).first()
             
             # تحديد نوع لوحة التحكم حسب الدور
             if employee.role in ('delivery', 'delivery_manager'):
@@ -113,36 +136,44 @@ def index():
             else:
                 logger.info(f"عرض لوحة تحكم الموظف: {employee.email} (الدور: {employee.role})")
                 
-                # جلب الإحصائيات والحالات المخصصة للموظفين (غير مسؤولي التوصيل)
-                stats = {
-                    'new_orders': 0,  # يمكن استبدالها ببيانات حقيقية
-                    'late_orders': OrderStatusNote.query.filter_by(status_flag='late').count(),
-                    'missing_orders': OrderStatusNote.query.filter_by(status_flag='missing').count(),
-                    'refunded_orders': OrderStatusNote.query.filter_by(status_flag='refunded').count(),
-                    'not_shipped_orders': OrderStatusNote.query.filter_by(status_flag='not_shipped').count(),
-                }
+                # تحسين استعلامات SQLite لتجنب التحميل الزائد
+                try:
+                    # إحصائيات الطلبات - استعلام واحد لكل إحصائية
+                    stats = {
+                        'new_orders': db.session.query(OrderStatusNote).filter_by(status_flag='new').count(),
+                        'late_orders': db.session.query(OrderStatusNote).filter_by(status_flag='late').count(),
+                        'missing_orders': db.session.query(OrderStatusNote).filter_by(status_flag='missing').count(),
+                        'refunded_orders': db.session.query(OrderStatusNote).filter_by(status_flag='refunded').count(),
+                        'not_shipped_orders': db.session.query(OrderStatusNote).filter_by(status_flag='not_shipped').count(),
+                    }
+                    
+                    # الحالات التي تحتاج متابعة (جميع الحالات المخصصة)
+                    custom_statuses = db.session.query(OrderStatusNote).order_by(OrderStatusNote.created_at.desc()).all()
+                    
+                    # آخر 5 حالات مضافة
+                    recent_statuses = db.session.query(OrderStatusNote).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
+                    
+                    # تحسين جلب بيانات المستخدمين بطلب واحد
+                    user_ids = {status.created_by for status in custom_statuses + recent_statuses if status.created_by}
+                    users = {user.id: user for user in db.session.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
+                    
+                    for status in custom_statuses + recent_statuses:
+                        if status.created_by:
+                            status.user = users.get(status.created_by)
+                    
+                    logger.debug(f"تم تحميل {len(custom_statuses)} حالة مخصصة و{len(recent_statuses)} حالات حديثة")
+                    
+                    return render_template('employee_dashboard.html',
+                                        current_user=user,
+                                        employee=employee,
+                                        stats=stats,
+                                        custom_statuses=custom_statuses,
+                                        recent_statuses=recent_statuses)
                 
-                # الحالات التي تحتاج متابعة (جميع الحالات المخصصة)
-                custom_statuses = OrderStatusNote.query.order_by(OrderStatusNote.created_at.desc()).all()
-                
-                # آخر 5 حالات مضافة
-                recent_statuses = OrderStatusNote.query.order_by(OrderStatusNote.created_at.desc()).limit(5).all()
-                
-                # إضافة معلومات المستخدم الذي أضاف الحالة
-                user_ids = {status.created_by for status in custom_statuses + recent_statuses}
-                users = {user.id: user for user in User.query.filter(User.id.in_(user_ids)).all()}
-                
-                for status in custom_statuses + recent_statuses:
-                    status.user = users.get(status.created_by)
-                
-                logger.debug(f"تم تحميل {len(custom_statuses)} حالة مخصصة و{len(recent_statuses)} حالات حديثة")
-                
-                return render_template('employee_dashboard.html',
-                                    current_user=user,
-                                    employee=employee,
-                                    stats=stats,
-                                    custom_statuses=custom_statuses,
-                                    recent_statuses=recent_statuses)
+                except Exception as query_error:
+                    logger.error(f"خطأ في استعلامات قاعدة البيانات: {str(query_error)}", exc_info=True)
+                    flash('حدث خطأ في جلب بيانات الطلبات. يرجى المحاولة لاحقاً', 'danger')
+                    return redirect(url_for('dashboard.index'))
     
     except Exception as e:
         logger.error(f"خطأ في جلب لوحة التحكم: {str(e)}", exc_info=True)
@@ -159,11 +190,19 @@ def profile():
         user_id = request.cookies.get('user_id')
         
         if is_admin:
-            user = User.query.get(user_id)
+            user = db.session.query(User).get(user_id)
+            if not user:
+                logger.error(f"المستخدم غير موجود: {user_id}")
+                flash('المستخدم غير موجود', 'danger')
+                return redirect(url_for('dashboard.index'))
             logger.info(f"عرض ملف المشرف: {user.email}")
             return render_template('profile.html', user=user)
         else:
-            employee = Employee.query.get(user_id)
+            employee = db.session.query(Employee).get(user_id)
+            if not employee:
+                logger.error(f"الموظف غير موجود: {user_id}")
+                flash('الموظف غير موجود', 'danger')
+                return redirect(url_for('dashboard.index'))
             logger.info(f"عرض ملف الموظف: {employee.email}")
             return render_template('employee_profile.html', employee=employee)
     except Exception as e:
@@ -184,7 +223,12 @@ def settings():
             return redirect(url_for('dashboard.index'))
         
         user_id = request.cookies.get('user_id')
-        user = User.query.get(user_id)
+        user = db.session.query(User).get(user_id)
+        if not user:
+            logger.error(f"المستخدم غير موجود: {user_id}")
+            flash('المستخدم غير موجود', 'danger')
+            return redirect(url_for('dashboard.index'))
+        
         logger.info(f"عرض إعدادات المشرف: {user.email}")
         return render_template('settings.html', user=user)
     except Exception as e:
