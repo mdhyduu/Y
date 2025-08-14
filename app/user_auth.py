@@ -168,6 +168,7 @@ def login():
         try:
             # تسجيل دخول كمشرف
             user = User.query.filter_by(email=email).first()
+            max_age = timedelta(days=1).total_seconds()
             if user and user.check_password(password):
                 logger.info(f"تسجيل دخول ناجح للمشرف: {email}")
                 

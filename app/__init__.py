@@ -17,14 +17,16 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     
+    # تحديث إعدادات الجلسة
+    app.config.update(
+        SECRET_KEY=os.environ.get('SECRET_KEY'),
+        SESSION_COOKIE_SECURE=True,
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE='Lax',
+        PERMANENT_SESSION_LIFETIME=timedelta(days=1)  # زيادة مدة الجلسة
+    )
+    
 
-    app.secret_key = os.environ.get('SECRET_KEY')
-    app.config['SESSION_COOKIE_SECURE'] = True
-    app.config['SESSION_COOKIE_HTTPONLY'] = True
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    
-    
-    
     
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(

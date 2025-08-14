@@ -17,7 +17,6 @@ def get_db_path():
     return db_path
 
 def login_required(view_func):
-    """ديكوراتور للتحقق من تسجيل الدخول"""
     @wraps(view_func)
     def wrapper(*args, **kwargs):
         try:
@@ -29,51 +28,29 @@ def login_required(view_func):
                 flash('يجب تسجيل الدخول أولاً', 'warning')
                 return redirect(url_for('user_auth.login', _scheme='https'))
             
-            # تحقق من أن user_id رقمية
-            if not user_id.isdigit():
-                logger.warning(f"معرف مستخدم غير صالح: {user_id}")
-                resp = make_response(redirect(url_for('user_auth.login', _scheme='https')))
-                resp.delete_cookie('user_id')
-                resp.delete_cookie('is_admin')
-                resp.delete_cookie('employee_role')
-                resp.delete_cookie('store_id')
-                return resp
-            
+            # التحقق من صحة الجلسة في قاعدة البيانات
             is_admin = request.cookies.get('is_admin') == 'true'
             
-            # التحقق من اتصال قاعدة البيانات
-            try:
-                db.session.execute('SELECT 1').scalar()
-            except Exception as db_error:
-                logger.error(f"فشل الاتصال بقاعدة البيانات: {str(db_error)}")
-                flash('حدث خطأ في الاتصال بالنظام. يرجى المحاولة لاحقاً', 'danger')
-                return redirect(url_for('user_auth.login', _scheme='https'))
-            
             if is_admin:
-                user = db.session.query(User).get(user_id)
+                user = User.query.get(user_id)
                 if not user:
                     logger.warning(f"المشرف غير موجود في قاعدة البيانات: {user_id}")
-                    resp = make_response(redirect(url_for('user_auth.login', _scheme='https')))
-                    resp.delete_cookie('user_id')
-                    resp.delete_cookie('is_admin')
-                    resp.delete_cookie('employee_role')
-                    resp.delete_cookie('store_id')
+                    resp = make_response(redirect(url_for('user_auth.login', _scheme='https'))
+                    # حذف جميع الكوكيز
+                    for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
+                                 'salla_access_token', 'salla_refresh_token']:
+                        resp.delete_cookie(cookie)
                     return resp
-                request.current_user = user
-                logger.debug(f"تم التحقق من المشرف: {user.email}")
             else:
-                employee = db.session.query(Employee).get(user_id)
+                employee = Employee.query.get(user_id)
                 if not employee:
                     logger.warning(f"الموظف غير موجود في قاعدة البيانات: {user_id}")
-                    flash('بيانات الموظف غير موجودة', 'error')
-                    resp = make_response(redirect(url_for('user_auth.login', _scheme='https')))
-                    resp.delete_cookie('user_id')
-                    resp.delete_cookie('is_admin')
-                    resp.delete_cookie('employee_role')
-                    resp.delete_cookie('store_id')
+                    resp = make_response(redirect(url_for('user_auth.login', _scheme='https'))
+                    # حذف جميع الكوكيز
+                    for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
+                                 'salla_access_token', 'salla_refresh_token']:
+                        resp.delete_cookie(cookie)
                     return resp
-                request.current_user = employee
-                logger.debug(f"تم التحقق من الموظف: {employee.email}")
             
             return view_func(*args, **kwargs)
         except Exception as e:
@@ -81,7 +58,6 @@ def login_required(view_func):
             flash('حدث خطأ في التحقق من هويتك. يرجى تسجيل الدخول مرة أخرى', 'danger')
             return redirect(url_for('user_auth.login', _scheme='https'))
     return wrapper
-
 @dashboard_bp.route('/')
 @login_required
 def index():
@@ -235,3 +211,31 @@ def settings():
         logger.error(f"خطأ في جلب الإعدادات: {str(e)}", exc_info=True)
         flash('حدث خطأ في جلب صفحة الإعدادات', 'danger')
         return redirect(url_for('dashboard.index'))
+@dashboard_bp.before_request
+@login_required
+def refresh_session():
+    """تجديد مدة الجلسة في كل طلب"""
+    user_id = request.cookies.get('user_id')
+    if user_id:
+        # تجديد مدة الجلسة
+        resp = make_response()
+        cookie_settings = {
+            'secure': current_app.config['SESSION_COOKIE_SECURE'],
+            'httponly': True,
+            'samesite': 'Lax',
+            'path': '/'
+        }
+        resp.set_cookie('user_id', user_id, 
+                       max_age=timedelta(days=1).total_seconds(),
+                       **cookie_settings)
+        return resp
+@dashboard_bp.before_app_request
+def check_db_connection():
+    try:
+        db.session.execute('SELECT 1')
+    except Exception as e:
+        logger.error(f"فشل الاتصال بقاعدة البيانات: {str(e)}")
+        # إعادة الاتصال
+        db.session.rollback()
+        db.session.close()
+        db.session.bind.pool.recreate()
