@@ -32,7 +32,7 @@ def login_required(view_func):
             # تحقق من أن user_id رقمية
             if not user_id.isdigit():
                 logger.warning(f"معرف مستخدم غير صالح: {user_id}")
-                resp = make_response(redirect(url_for('user_auth.login', _scheme='https'))
+                resp = make_response(redirect(url_for('user_auth.login', _scheme='https')))
                 resp.delete_cookie('user_id')
                 resp.delete_cookie('is_admin')
                 resp.delete_cookie('employee_role')
