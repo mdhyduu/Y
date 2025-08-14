@@ -8,7 +8,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 from flask_session import Session
 import logging
-
+from werkzeug.middleware.proxy_fix import ProxyFix
 # إنشاء كائنات الإضافات
 db = SQLAlchemy()
 migrate = Migrate()
