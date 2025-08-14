@@ -143,13 +143,6 @@ def set_auth_cookies(response, user=None, employee=None):
     return response
 
 # إضافة دالة مساعدة جديدة
-def clear_auth_cookies(response):
-    """حذف جميع كوكيز المصادقة بشكل آمن"""
-    cookie_settings = get_cookie_settings()
-    for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
-                 'salla_access_token', 'salla_refresh_token']:
-        response.delete_cookie(cookie, **cookie_settings)
-    return response
 
 @user_auth_bp.route('/login', methods=['GET', 'POST'])
 @redirect_if_authenticated
