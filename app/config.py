@@ -83,8 +83,8 @@ class Config:
     }
     
     # ------ إعدادات التطوير ------
-    DEBUG = False
-    TESTING = False
+    DEBUG = True
+    TESTING = True
     
     # ------ إعدادات البريد الإلكتروني ------
     MAIL_SERVER = os.environ.get('MAIL_SERVER')
