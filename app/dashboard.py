@@ -14,6 +14,9 @@ def get_session_key(user_id):
     return f"user_{user_id}"
 
 # ديكوراتور التحقق من الدخول مع التخزين المؤقت
+from flask import g, session
+from datetime import datetime, timedelta
+
 def login_required(view_func):
     """ديكوراتور للتحقق من تسجيل الدخول مع تحسين الأداء"""
     @wraps(view_func)
@@ -29,47 +32,43 @@ def login_required(view_func):
             clear_auth_cookies(resp)
             return resp
         
-        # التحقق من التخزين المؤقت أولاً
-        session_key = get_session_key(user_id)
-        cached_user = session.get(session_key)
+        # استخدم معرف المستخدم فقط للتخزين المؤقت
+        session_key = f"user_{user_id}"
+        cached_user_id = session.get(session_key)
         
-        # إذا كانت الجلسة المؤقتة صالحة
-        if cached_user and cached_user.get('expires') > datetime.utcnow().timestamp():
-            g.current_user = cached_user['user']
-            return view_func(*args, **kwargs)
-        
-        # إذا لم توجد جلسة مؤقتة أو انتهت صلاحيتها
-        is_admin = request.cookies.get('is_admin') == 'true'
-        
-        if is_admin:
-            user = User.query.get(user_id)
-            if not user:
-                resp = make_response(redirect(url_for('user_auth.login')))
-                clear_auth_cookies(resp)
-                return resp
-            g.current_user = user
-            # تخزين مؤقت للجلسة (30 دقيقة)
-            session[session_key] = {
-                'user': user,
-                'expires': (datetime.utcnow() + timedelta(minutes=30)).timestamp()
-            }
+        # جلب بيانات المستخدم من قاعدة البيانات إذا لزم الأمر
+        if not cached_user_id:
+            is_admin = request.cookies.get('is_admin') == 'true'
+            
+            if is_admin:
+                user = User.query.get(user_id)
+                if not user:
+                    resp = make_response(redirect(url_for('user_auth.login')))
+                    clear_auth_cookies(resp)
+                    return resp
+                g.current_user = user
+            else:
+                employee = Employee.query.get(user_id)
+                if not employee:
+                    flash('بيانات الموظف غير موجودة', 'error')
+                    resp = make_response(redirect(url_for('user_auth.login')))
+                    clear_auth_cookies(resp)
+                    return resp
+                g.current_user = employee
+            
+            # تخزين المعرف فقط في الجلسة
+            session[session_key] = user_id
+            session.permanent = True
         else:
-            employee = Employee.query.get(user_id)
-            if not employee:
-                flash('بيانات الموظف غير موجودة', 'error')
-                resp = make_response(redirect(url_for('user_auth.login')))
-                clear_auth_cookies(resp)
-                return resp
-            g.current_user = employee
-            # تخزين مؤقت للجلسة (30 دقيقة)
-            session[session_key] = {
-                'user': employee,
-                'expires': (datetime.utcnow() + timedelta(minutes=30)).timestamp()
-            }
+            # إذا كان المعرف موجودًا في الجلسة، جلب البيانات من قاعدة البيانات
+            is_admin = request.cookies.get('is_admin') == 'true'
+            if is_admin:
+                g.current_user = User.query.get(cached_user_id)
+            else:
+                g.current_user = Employee.query.get(cached_user_id)
         
         return view_func(*args, **kwargs)
     return wrapper
-
 # دالة مساعدة لحذف الكوكيز
 def clear_auth_cookies(response):
     cookies = ['user_id', 'is_admin', 'employee_role', 'store_id', 
