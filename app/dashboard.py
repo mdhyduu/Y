@@ -35,9 +35,7 @@ def index():
                 flash('خطأ في صلاحيات المستخدم', 'danger')
                 return redirect(url_for('user_auth.login'))
 
-            return render_template('dashboard.html',
-                                user=current_user,
-                                stats=stats)
+            return render_template('dashboard.html', current_user=current_user)
 
         # لوحة الموظف
         else:

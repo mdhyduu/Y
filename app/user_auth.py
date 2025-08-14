@@ -33,7 +33,7 @@ def auth_required(admin_only=False):
             
             if admin_only and not session.get('is_admin'):
                 flash('صلاحيات غير كافية للوصول إلى هذه الصفحة', 'danger')
-                return redirect(url_for('dashboard.index'))
+                return render_template('dashboard.html', current_user=current_user)
                 
             return view_func(*args, **kwargs)
         return wrapper
