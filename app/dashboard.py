@@ -6,6 +6,7 @@ from functools import wraps
 import os
 from sqlalchemy import text
 from apscheduler.schedulers.background import BackgroundScheduler
+from .models import Product  # تأكد من وجود هذا النموذج
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 logger = logging.getLogger(__name__)
@@ -101,7 +102,6 @@ def before_request_handler():
         if not check_db_connection():
             flash('فقدان الاتصال بالنظام. يرجى المحاولة لاحقاً', 'danger')
             return redirect(url_for('user_auth.login', _scheme='https'))
-
 @dashboard_bp.route('/')
 @login_required
 def index():
@@ -120,10 +120,16 @@ def index():
                 resp.delete_cookie('is_admin')
                 return resp
                 
+            # إحصائيات للمشرف
+            employees_count = Employee.query.count()
+            products_count = db.session.query(Product).count()
+            
             logger.info(f"عرض لوحة تحكم المشرف: {user.email}")
-            return render_template('dashboard.html', 
+            return render_template('dashboard.html',
                                 current_user=user,
-                                is_admin=True)
+                                is_admin=True,
+                                employees_count=employees_count,
+                                products_count=products_count)
         
         else:
             employee = db.session.query(Employee).get(user_id)
@@ -184,7 +190,6 @@ def index():
         logger.error(f"خطأ في جلب لوحة التحكم: {str(e)}", exc_info=True)
         flash(f"حدث خطأ في جلب بيانات لوحة التحكم: {str(e)}", "error")
         return redirect(url_for('user_auth.login', _scheme='https'))
-
 @dashboard_bp.route('/profile')
 @login_required
 def profile():
