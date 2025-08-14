@@ -171,7 +171,7 @@ class ProductionConfig(Config):
         ))
         file_handler.setLevel(logging.INFO)
         app.logger.addHandler(file_handler)
-        
+        app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
         # إرسال الأخطاء بالبريد
         if app.config.get('MAIL_SERVER') and app.config.get('ADMINS'):
             credentials = None

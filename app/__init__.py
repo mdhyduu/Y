@@ -6,6 +6,7 @@ from flask_wtf.csrf import CSRFProtect
 from .config import Config
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
+from flask import session
 
 # إنشاء كائنات الإضافات
 db = SQLAlchemy()
@@ -15,8 +16,16 @@ csrf = CSRFProtect()
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    
 
-    # أضف هذا الجزء لمعالجة البروكسي
+    app.secret_key = os.environ.get('SECRET_KEY'),
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    
+    
+    
+    
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(
         app.wsgi_app, 
@@ -50,8 +59,10 @@ def create_app():
     from .permissions import permissions_bp
     from .products import products_bp
     from .delivery_orders import delivery_bp
-
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.register_blueprint(employees_bp)
+
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(user_auth_bp)
     app.register_blueprint(auth_bp)
