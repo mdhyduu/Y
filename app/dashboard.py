@@ -1,24 +1,13 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, g, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, g
 from .models import User, Employee, OrderStatusNote, db
 from datetime import datetime, timedelta
 from functools import wraps
 from sqlalchemy import func, case
-import hashlib
+
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
-
-
-
-# دالة مساعدة لتوليد مفتاح تخزين مؤقت
-def get_session_key(user_id):
-    return f"user_{user_id}"
-
-# ديكوراتور التحقق من الدخول مع التخزين المؤقت
-from flask import g, session
-from datetime import datetime, timedelta
-
 def login_required(view_func):
-    """ديكوراتور للتحقق من تسجيل الدخول مع تحسين الأداء"""
+    """ديكوراتور للتحقق من تسجيل الدخول"""
     @wraps(view_func)
     def wrapper(*args, **kwargs):
         user_id = request.cookies.get('user_id')
@@ -26,55 +15,42 @@ def login_required(view_func):
             flash('يجب تسجيل الدخول أولاً', 'warning')
             return redirect(url_for('user_auth.login'))
         
-        # التحقق من أن user_id رقمية
+        # تحقق من أن user_id رقمية
         if not user_id.isdigit():
             resp = make_response(redirect(url_for('user_auth.login')))
-            clear_auth_cookies(resp)
+            resp.delete_cookie('user_id')
+            resp.delete_cookie('is_admin')
+            resp.delete_cookie('employee_role')
+            resp.delete_cookie('store_id')
             return resp
         
-        # استخدم معرف المستخدم فقط للتخزين المؤقت
-        session_key = f"user_{user_id}"
-        cached_user_id = session.get(session_key)
+        is_admin = request.cookies.get('is_admin') == 'true'
         
-        # جلب بيانات المستخدم من قاعدة البيانات إذا لزم الأمر
-        if not cached_user_id:
-            is_admin = request.cookies.get('is_admin') == 'true'
-            
-            if is_admin:
-                user = User.query.get(user_id)
-                if not user:
-                    resp = make_response(redirect(url_for('user_auth.login')))
-                    clear_auth_cookies(resp)
-                    return resp
-                g.current_user = user
-            else:
-                employee = Employee.query.get(user_id)
-                if not employee:
-                    flash('بيانات الموظف غير موجودة', 'error')
-                    resp = make_response(redirect(url_for('user_auth.login')))
-                    clear_auth_cookies(resp)
-                    return resp
-                g.current_user = employee
-            
-            # تخزين المعرف فقط في الجلسة
-            session[session_key] = user_id
-            session.permanent = True
+        if is_admin:
+            user = User.query.get(user_id)
+            if not user:
+                resp = make_response(redirect(url_for('user_auth.login')))
+                resp.delete_cookie('user_id')
+                resp.delete_cookie('is_admin')
+                resp.delete_cookie('employee_role')
+                resp.delete_cookie('store_id')
+                return resp
+            g.current_user = user
         else:
-            # إذا كان المعرف موجودًا في الجلسة، جلب البيانات من قاعدة البيانات
-            is_admin = request.cookies.get('is_admin') == 'true'
-            if is_admin:
-                g.current_user = User.query.get(cached_user_id)
-            else:
-                g.current_user = Employee.query.get(cached_user_id)
+            employee = Employee.query.get(user_id)
+            if not employee:
+                flash('بيانات الموظف غير موجودة', 'error')
+                resp = make_response(redirect(url_for('user_auth.login')))
+                resp.delete_cookie('user_id')
+                resp.delete_cookie('is_admin')
+                resp.delete_cookie('employee_role')
+                resp.delete_cookie('store_id')
+                return resp
+            g.current_user = employee
         
         return view_func(*args, **kwargs)
     return wrapper
-# دالة مساعدة لحذف الكوكيز
-def clear_auth_cookies(response):
-    cookies = ['user_id', 'is_admin', 'employee_role', 'store_id', 
-               'salla_access_token', 'salla_refresh_token']
-    for cookie in cookies:
-        response.delete_cookie(cookie, path='/')
+
 @dashboard_bp.route('/')
 @login_required
 def index():
