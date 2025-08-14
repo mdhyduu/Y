@@ -20,6 +20,7 @@ def create_app():
     
     # إعدادات الجلسة المحسنة
     app.secret_key = os.environ.get('SECRET_KEY') or os.urandom(24).hex()
+    app.config['SESSION_COOKIE_NAME'] = 'your_session_cookie_name'
     app.config.update(
         SESSION_TYPE='filesystem',
         SESSION_PERMANENT=False,
