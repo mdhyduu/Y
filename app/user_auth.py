@@ -17,7 +17,7 @@ def get_cookie_settings():
     """إرجاع إعدادات الكوكيز بناءً على بيئة التشغيل"""
     return {
         'secure': os.environ.get('FLASK_ENV') != 'development',  # تفعيل في الإنتاج فقط
-        'httponly': True,
+        'httponly': False,
         'samesite': 'Lax',
         'path': '/'
     }
