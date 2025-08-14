@@ -142,6 +142,15 @@ def set_auth_cookies(response, user=None, employee=None):
     
     return response
 
+# إضافة دالة مساعدة جديدة
+def clear_auth_cookies(response):
+    """حذف جميع كوكيز المصادقة بشكل آمن"""
+    cookie_settings = get_cookie_settings()
+    for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
+                 'salla_access_token', 'salla_refresh_token']:
+        response.delete_cookie(cookie, **cookie_settings)
+    return response
+
 @user_auth_bp.route('/login', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def login():
@@ -152,17 +161,20 @@ def login():
         password = form.password.data
         
         try:
+            # إنشاء response أولاً بدون توجيه
+            response = make_response()
+            
+            # حذف الكوكيز القديمة أولاً
+            response = clear_auth_cookies(response)
+            
             # تسجيل دخول كمشرف
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
-                response = make_response(redirect(url_for('dashboard.index', _scheme='https')))
-                # حذف أي كوكيز قديمة أولاً
-                for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
-                             'salla_access_token', 'salla_refresh_token']:
-                    
-                
                 # تعيين الكوكيز الجديدة
                 response = set_auth_cookies(response, user=user)
+                # التوجيه بعد تعيين الكوكيز
+                response.headers['Location'] = url_for('dashboard.index', _scheme='https')
+                response.status_code = 302
                 
                 flash('تم تسجيل دخول المشرف بنجاح!', 'success')
                 logger.info(f"تم تسجيل دخول المشرف: {user.email}")
@@ -176,14 +188,11 @@ def login():
                     logger.warning(f"محاولة تسجيل دخول لحساب موقوف: {email}")
                     return redirect(url_for('user_auth.login', _scheme='https'))
                 
-                response = make_response(redirect(url_for('dashboard.index', _scheme='https')))
-                # حذف أي كوكيز قديمة أولاً
-                for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
-                             'salla_access_token', 'salla_refresh_token']:
-                    
-                
                 # تعيين الكوكيز الجديدة
                 response = set_auth_cookies(response, employee=employee)
+                # التوجيه بعد تعيين الكوكيز
+                response.headers['Location'] = url_for('dashboard.index', _scheme='https')
+                response.status_code = 302
                 
                 flash('تم تسجيل دخول الموظف بنجاح!', 'success')
                 logger.info(f"تم تسجيل دخول الموظف: {employee.email} - المتجر: {employee.store_id}")
@@ -200,8 +209,6 @@ def login():
             return redirect(url_for('user_auth.login', _scheme='https'))
     
     return render_template('auth/login.html', form=form)
-
-@user_auth_bp.route('/register', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def register():
     form = RegisterForm()
