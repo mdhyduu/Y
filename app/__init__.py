@@ -7,8 +7,7 @@ from .config import Config
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 from flask import session
-
-# إنشاء كائنات الإضافات
+from flask_session import Session
 db = SQLAlchemy()
 migrate = Migrate()
 csrf = CSRFProtect()
@@ -18,13 +17,16 @@ def create_app():
     app.config.from_object(Config)
     
 
-    app.secret_key = os.environ.get('SECRET_KEY'),
+    # إعدادات الجلسة
+    app.secret_key = os.environ.get('SECRET_KEY') or 'your-secret-key-here'
+    app.config['SESSION_TYPE'] = 'filesystem'  # أو '' إذا لم يكن Redis متاحاً
+    app.config['SESSION_PERMANENT'] = False
+    app.config['SESSION_USE_SIGNER'] = True
     app.config['SESSION_COOKIE_SECURE'] = True
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    
-    
-    
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # مدة الجلسة
+        
     
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(
@@ -38,7 +40,8 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
     csrf.init_app(app)
-
+    # تهيئة إضافة الجلسة
+    Session(app)
     # تسجيل النماذج مع سياق التطبيق
     with app.app_context():
         from . import models
@@ -59,8 +62,7 @@ def create_app():
     from .permissions import permissions_bp
     from .products import products_bp
     from .delivery_orders import delivery_bp
-    app.config['SESSION_COOKIE_SECURE'] = True
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    
     app.register_blueprint(employees_bp)
 
     app.register_blueprint(dashboard_bp)
