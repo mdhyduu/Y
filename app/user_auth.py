@@ -5,7 +5,7 @@ from wtforms.validators import DataRequired, Email
 from .models import db, User, Employee
 from datetime import datetime
 import logging
-
+from function import wraps
 user_auth_bp = Blueprint('user_auth', __name__, url_prefix='/auth')
 logger = logging.getLogger(__name__)
 

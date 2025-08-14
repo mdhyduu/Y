@@ -1,6 +1,6 @@
 from flask import session, current_app
 from .models import User, Employee
-
+from function import wraps
 def admin_required(view_func):
     """ديكوراتور للتحقق من صلاحيات المدير"""
     @wraps(view_func)
