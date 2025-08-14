@@ -1,6 +1,6 @@
 import logging
 from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, current_app
-from .models import User, Employee, OrderStatusNote, db
+from .models import User, Employee, OrderStatusNote, db, Product
 from datetime import datetime, timedelta
 from functools import wraps
 import os
@@ -101,6 +101,7 @@ def before_request_handler():
         if not check_db_connection():
             flash('فقدان الاتصال بالنظام. يرجى المحاولة لاحقاً', 'danger')
             return redirect(url_for('user_auth.login', _scheme='https'))
+
 @dashboard_bp.route('/')
 @login_required
 def index():
@@ -121,14 +122,18 @@ def index():
                 
             # إحصائيات للمشرف
             employees_count = Employee.query.count()
-            products_count = db.session.query(Product).count()
+            products_count = Product.query.count()
+            today_orders_count = db.session.query(OrderStatusNote).filter(
+                OrderStatusNote.created_at >= datetime.today().date()
+            ).count()
             
             logger.info(f"عرض لوحة تحكم المشرف: {user.email}")
             return render_template('dashboard.html',
                                 current_user=user,
                                 is_admin=True,
                                 employees_count=employees_count,
-                                products_count=products_count)
+                                products_count=products_count,
+                                today_orders_count=today_orders_count)
         
         else:
             employee = db.session.query(Employee).get(user_id)
@@ -189,6 +194,7 @@ def index():
         logger.error(f"خطأ في جلب لوحة التحكم: {str(e)}", exc_info=True)
         flash(f"حدث خطأ في جلب بيانات لوحة التحكم: {str(e)}", "error")
         return redirect(url_for('user_auth.login', _scheme='https'))
+
 @dashboard_bp.route('/profile')
 @login_required
 def profile():
