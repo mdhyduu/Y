@@ -156,12 +156,7 @@ def login():
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
                 response = make_response(redirect(url_for('dashboard.index', _scheme='https')))
-                # حذف أي كوكيز قديمة أولاً
-                for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
-                             'salla_access_token', 'salla_refresh_token']:
-                    
-                
-                # تعيين الكوكيز الجديدة
+                # تعيين الكوكيز الجديدة فقط بدون حذف القديمة
                 response = set_auth_cookies(response, user=user)
                 
                 flash('تم تسجيل دخول المشرف بنجاح!', 'success')
@@ -177,12 +172,7 @@ def login():
                     return redirect(url_for('user_auth.login', _scheme='https'))
                 
                 response = make_response(redirect(url_for('dashboard.index', _scheme='https')))
-                # حذف أي كوكيز قديمة أولاً
-                for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
-                             'salla_access_token', 'salla_refresh_token']:
-                    response.delete_cookie(cookie, path='/')
-                
-                # تعيين الكوكيز الجديدة
+                # تعيين الكوكيز الجديدة فقط بدون حذف القديمة
                 response = set_auth_cookies(response, employee=employee)
                 
                 flash('تم تسجيل دخول الموظف بنجاح!', 'success')
