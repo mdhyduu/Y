@@ -34,7 +34,7 @@ def create_app():
             'pool_recycle': 300
         }
     )
-    
+    Session(app)
     # إصلاح البروكسي
     app.wsgi_app = ProxyFix(
         app.wsgi_app, 
@@ -47,7 +47,7 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
     csrf.init_app(app)
-    Session(app)
+    
     
     # تسجيل النماذج مع سياق التطبيق
     with app.app_context():
