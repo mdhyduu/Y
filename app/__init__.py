@@ -23,7 +23,7 @@ def create_app():
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     
-    
+    app.config['WTF_CSRF_CHECK_DEFAULTS'] = False
     
     
     from werkzeug.middleware.proxy_fix import ProxyFix
