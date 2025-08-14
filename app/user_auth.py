@@ -1,119 +1,47 @@
-# Add this at the very top of user_auth.py
-# Add these imports at the top
-import logging
-from flask import Blueprint, render_template, redirect, url_for, flash, request, make_response, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, session
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField
 from wtforms.validators import DataRequired, Email
-from flask import session  # أضف هذا مع بقية الاستيرادات
-# Initialize logger
-
-# ... rest of your routes and logic ...
-# ... rest of your imports ...
-from wtforms import StringField, PasswordField
-from wtforms.validators import DataRequired, Email
 from .models import db, User, Employee
-from datetime import datetime, timedelta
-from functools import wraps
-from .forms import RegisterForm  # If defined in forms.py
-import os
-import re 
+from datetime import datetime
+import logging
+
 user_auth_bp = Blueprint('user_auth', __name__, url_prefix='/auth')
-
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
-# Define LoginForm within the file
 class LoginForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
 
-
-# ... (بقية الكود كما هو)
-def get_cookie_settings():
-    return {
-        'secure': os.environ.get('FLASK_ENV') == 'production',
-        'httponly': True,
-        'samesite': 'Strict',
-        'path': '/'
-    }
-
-# ديكور التحقق من المصادقة المحسّن
 def auth_required(admin_only=False):
     def decorator(view_func):
         @wraps(view_func)
         def wrapper(*args, **kwargs):
-            user_id = session.get('user_id') or request.cookies.get('user_id')
-            
-            if not user_id:
+            if not session.get('user_id'):
                 return redirect_to_login()
-
-            is_admin = session.get('is_admin') or request.cookies.get('is_admin') == 'true'
-            
-            if admin_only and not is_admin:
+                
+            if admin_only and not session.get('is_admin'):
                 flash('ليس لديك صلاحية الوصول', 'danger')
                 return redirect(url_for('dashboard.index'))
-
-            # التحقق من صحة المستخدم في قاعدة البيانات
-            user = None
-            try:
-                user_id = int(user_id)  # تحويل إلى عدد صحيح
-                if is_admin:
-                    user = User.query.get(user_id)
-                else:
-                    user = Employee.query.get(user_id)
-            except ValueError:
-                return redirect_to_login()
-
-            if not user:
-                return redirect_to_login()
-
-            request.current_user = user
+                
             return view_func(*args, **kwargs)
         return wrapper
     return decorator
+
 def redirect_if_authenticated(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
-        if 'user_id' in session:
+        if session.get('user_id'):
             return redirect(url_for('dashboard.index'))
-            
-        user_id = request.cookies.get('user_id')
-        if not user_id:
-            return view_func(*args, **kwargs)
-            
-        is_admin = request.cookies.get('is_admin') == 'true'
-        current_user = None
-        
-        try:
-            user_id = int(user_id)  # تحويل إلى عدد صحيح
-            if is_admin:
-                current_user = User.query.get(user_id)
-            else:
-                current_user = Employee.query.get(user_id)
-            
-            if current_user:
-                set_auth_session(
-                    user=current_user if is_admin else None,
-                    employee=None if is_admin else current_user
-                )
-                return redirect(url_for('dashboard.index'))
-        except (ValueError, Exception) as e:
-            logger.error(f"Error verifying user: {str(e)}")
-        
         return view_func(*args, **kwargs)
     return wrapper
-def redirect_to_login():
-    response = make_response(redirect(url_for('user_auth.login')))
-    clear_auth_cookies(response)
-    flash('يجب تسجيل الدخول أولاً', 'warning')
-    return response
 
-def clear_auth_cookies(response):
-    cookies = ['user_id', 'is_admin', 'employee_role', 'store_id', 
-              'salla_access_token', 'salla_refresh_token']
-    for cookie in cookies:
-        response.delete_cookie(cookie, **get_cookie_settings())
+def redirect_to_login():
+    clear_auth_session()
+    flash('يجب تسجيل الدخول أولاً', 'warning')
+    return redirect(url_for('user_auth.login'))
+
+def clear_auth_session():
     session.clear()
 
 def set_auth_session(user=None, employee=None):
@@ -128,23 +56,6 @@ def set_auth_session(user=None, employee=None):
         session['employee_role'] = employee.role
         session['store_id'] = employee.store_id
 
-def set_auth_cookies(response, user=None, employee=None): 
-    clear_auth_cookies(response)
-    cookie_settings = get_cookie_settings()
-    expires = int((datetime.now() + timedelta(days=1)).timestamp())
-
-    if user:
-        response.set_cookie('user_id', str(user.id), expires=expires, **cookie_settings)
-        response.set_cookie('is_admin', 'true', expires=expires, **cookie_settings)
-        response.set_cookie('store_id', str(user.store_id), expires=expires, **cookie_settings)
-    elif employee:
-        response.set_cookie('user_id', str(employee.id), expires=expires, **cookie_settings)
-        response.set_cookie('is_admin', 'false', expires=expires, **cookie_settings)
-        response.set_cookie('employee_role', employee.role, expires=expires, **cookie_settings)
-        response.set_cookie('store_id', str(employee.store_id), expires=expires, **cookie_settings)
-
-    return response
-
 @user_auth_bp.route('/login', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def login():
@@ -156,11 +67,9 @@ def login():
         try:
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
-                response = make_response(redirect(url_for('dashboard.index', _scheme='https')))
                 set_auth_session(user=user)
-                set_auth_cookies(response, user=user)
                 flash('تم تسجيل الدخول بنجاح', 'success')
-                return response
+                return redirect(url_for('dashboard.index'))
 
             employee = Employee.query.filter_by(email=email).first()
             if employee and employee.check_password(password):
@@ -168,11 +77,9 @@ def login():
                     flash('الحساب غير نشط', 'danger')
                     return redirect(url_for('user_auth.login'))
 
-                response = make_response(redirect(url_for('employee_dashboard.index')))
                 set_auth_session(employee=employee)
-                set_auth_cookies(response, employee=employee)
                 flash('تم تسجيل الدخول بنجاح', 'success')
-                return response
+                return redirect(url_for('employee_dashboard.index'))
 
             flash('بيانات الدخول غير صحيحة', 'danger')
             
@@ -209,9 +116,9 @@ def register():
         return redirect(url_for('user_auth.login'))
     
     return render_template('auth/register.html', form=form)
+
 @user_auth_bp.route('/logout')
 def logout():
-    response = make_response(redirect(url_for('user_auth.login')))
-    clear_auth_cookies(response)
+    clear_auth_session()
     flash('تم تسجيل الخروج بنجاح', 'success')
-    return response
+    return redirect(url_for('user_auth.login'))
