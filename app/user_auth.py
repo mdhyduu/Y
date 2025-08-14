@@ -5,23 +5,34 @@ from wtforms.validators import DataRequired, Email
 from .models import db, User, Employee
 from datetime import datetime
 import logging
-from function import wraps
+from functools import wraps
+
+# تهيئة البلوبنت والسجل
 user_auth_bp = Blueprint('user_auth', __name__, url_prefix='/auth')
 logger = logging.getLogger(__name__)
 
+# نموذج تسجيل الدخول
 class LoginForm(FlaskForm):
-    email = StringField('Email', validators=[DataRequired(), Email()])
-    password = PasswordField('Password', validators=[DataRequired()])
+    email = StringField('البريد الإلكتروني', validators=[DataRequired(), Email()])
+    password = PasswordField('كلمة المرور', validators=[DataRequired()])
+
+# نموذج التسجيل
+class RegisterForm(FlaskForm):
+    email = StringField('البريد الإلكتروني', validators=[DataRequired(), Email()])
+    password = PasswordField('كلمة المرور', validators=[DataRequired()])
+
+# ============= دوال المصادقة والتحكم =============
 
 def auth_required(admin_only=False):
+    """ديكوراتور للتحقق من تسجيل الدخول والصلاحيات"""
     def decorator(view_func):
         @wraps(view_func)
         def wrapper(*args, **kwargs):
             if not session.get('user_id'):
                 return redirect_to_login()
-                
+            
             if admin_only and not session.get('is_admin'):
-                flash('ليس لديك صلاحية الوصول', 'danger')
+                flash('صلاحيات غير كافية للوصول إلى هذه الصفحة', 'danger')
                 return redirect(url_for('dashboard.index'))
                 
             return view_func(*args, **kwargs)
@@ -29,6 +40,7 @@ def auth_required(admin_only=False):
     return decorator
 
 def redirect_if_authenticated(view_func):
+    """تحويل المستخدم إذا كان مسجل الدخول بالفعل"""
     @wraps(view_func)
     def wrapper(*args, **kwargs):
         if session.get('user_id'):
@@ -37,14 +49,17 @@ def redirect_if_authenticated(view_func):
     return wrapper
 
 def redirect_to_login():
+    """تحويل إلى صفحة تسجيل الدخول مع تنظيف الجلسة"""
     clear_auth_session()
-    flash('يجب تسجيل الدخول أولاً', 'warning')
+    flash('يجب تسجيل الدخول للوصول إلى هذه الصفحة', 'warning')
     return redirect(url_for('user_auth.login'))
 
 def clear_auth_session():
+    """مسح بيانات جلسة المستخدم"""
     session.clear()
 
 def set_auth_session(user=None, employee=None):
+    """تهيئة جلسة المستخدم بعد تسجيل الدخول"""
     session.clear()
     if user:
         session['user_id'] = user.id
@@ -56,69 +71,82 @@ def set_auth_session(user=None, employee=None):
         session['employee_role'] = employee.role
         session['store_id'] = employee.store_id
 
+# ============= مسارات المصادقة =============
+
 @user_auth_bp.route('/login', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def login():
+    """معالجة تسجيل الدخول"""
     form = LoginForm()
     if form.validate_on_submit():
         email = form.email.data.lower().strip()
         password = form.password.data
 
         try:
+            # محاولة تسجيل دخول مدير
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
                 set_auth_session(user=user)
-                flash('تم تسجيل الدخول بنجاح', 'success')
+                flash('تم تسجيل دخول المدير بنجاح', 'success')
                 return redirect(url_for('dashboard.index'))
 
+            # محاولة تسجيل دخول موظف
             employee = Employee.query.filter_by(email=email).first()
             if employee and employee.check_password(password):
                 if not employee.is_active:
-                    flash('الحساب غير نشط', 'danger')
+                    flash('حساب الموظف غير مفعل', 'danger')
                     return redirect(url_for('user_auth.login'))
 
                 set_auth_session(employee=employee)
-                flash('تم تسجيل الدخول بنجاح', 'success')
+                flash('تم تسجيل دخول الموظف بنجاح', 'success')
                 return redirect(url_for('employee_dashboard.index'))
 
-            flash('بيانات الدخول غير صحيحة', 'danger')
+            flash('البريد الإلكتروني أو كلمة المرور غير صحيحة', 'danger')
             
         except Exception as e:
             db.session.rollback()
-            logger.error(f"خطأ في تسجيل الدخول: {str(e)}")
-            flash('حدث خطأ أثناء تسجيل الدخول', 'danger')
+            logger.error(f"فشل تسجيل الدخول: {e}")
+            flash('حدث خطأ أثناء محاولة تسجيل الدخول', 'danger')
 
     return render_template('auth/login.html', form=form)
+
 @user_auth_bp.route('/register', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def register():
+    """معالجة إنشاء حساب جديد"""
     form = RegisterForm()
     if form.validate_on_submit():
-        email = form.email.data
+        email = form.email.data.lower().strip()
         password = form.password.data
-         
-        with current_app.app_context():
+
+        try:
             if User.query.filter_by(email=email).first():
-                flash('البريد الإلكتروني مسجل مسبقاً', 'danger')
+                flash('هذا البريد الإلكتروني مسجل بالفعل', 'danger')
                 return redirect(url_for('user_auth.register'))
-            
+
             new_user = User(email=email)
             new_user.set_password(password)
             
-            # إذا كان هذا هو المستخدم الأول، اجعله مسؤولاً
+            # إذا كان أول مستخدم، يصبح مديراً تلقائياً
             if User.query.count() == 0:
                 new_user.is_admin = True
             
             db.session.add(new_user)
             db.session.commit()
         
-        flash('تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول', 'success')
-        return redirect(url_for('user_auth.login'))
-    
+            flash('تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول', 'success')
+            return redirect(url_for('user_auth.login'))
+        
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"فشل إنشاء حساب: {e}")
+            flash('حدث خطأ أثناء إنشاء الحساب', 'danger')
+
     return render_template('auth/register.html', form=form)
 
 @user_auth_bp.route('/logout')
 def logout():
+    """معالجة تسجيل الخروج"""
     clear_auth_session()
     flash('تم تسجيل الخروج بنجاح', 'success')
     return redirect(url_for('user_auth.login'))
