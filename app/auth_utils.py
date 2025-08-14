@@ -13,20 +13,19 @@ def admin_required(view_func):
     return wrapper
 
 def get_current_user():
-    """
-    الحصول على المستخدم الحالي من الجلسة
-    يعيد كائن User إذا كان مدير، أو Employee إذا كان موظف
-    """
     user_id = session.get('user_id')
     if not user_id:
         return None
-
+    
     is_admin = session.get('is_admin', False)
     
     try:
         if is_admin:
-            return User.query.get(user_id)
+            user = User.query.get(user_id)
+            if user and user.is_admin:  # ← تحقق إضافي من is_admin في قاعدة البيانات
+                return user
+            return None
         return Employee.query.get(user_id)
     except Exception as e:
-        current_app.logger.error(f"خطأ في جلب بيانات المستخدم: {e}")
+        current_app.logger.error(f"Error getting current user: {e}")
         return None
