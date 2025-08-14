@@ -35,17 +35,16 @@ def login_required(view_func):
                 user = User.query.get(user_id)
                 if not user:
                     logger.warning(f"المشرف غير موجود في قاعدة البيانات: {user_id}")
-                    resp = make_response(redirect(url_for('user_auth.login', _scheme='https'))
+                    resp = make_response(redirect)
                     # حذف جميع الكوكيز
-                    for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
-                                 'salla_access_token', 'salla_refresh_token']:
+                    for cookie in ['user_id', 'is_admin','employee_role', 'store_id','salla_access_token', 'salla_refresh_token']:
                         resp.delete_cookie(cookie)
                     return resp
             else:
                 employee = Employee.query.get(user_id)
                 if not employee:
                     logger.warning(f"الموظف غير موجود في قاعدة البيانات: {user_id}")
-                    resp = make_response(redirect(url_for('user_auth.login', _scheme='https'))
+                    resp = make_response(redirect(url_for('user_auth.login', _scheme='https')))
                     # حذف جميع الكوكيز
                     for cookie in ['user_id', 'is_admin', 'employee_role', 'store_id', 
                                  'salla_access_token', 'salla_refresh_token']:

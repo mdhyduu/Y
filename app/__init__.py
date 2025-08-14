@@ -26,7 +26,13 @@ def create_app():
         PERMANENT_SESSION_LIFETIME=timedelta(days=1)  # زيادة مدة الجلسة
     )
     
-
+    # إزالة الإعدادات المتكررة
+    # app.secret_key = os.environ.get('SECRET_KEY')
+    # app.config['SESSION_COOKIE_SECURE'] = True
+    # app.config['SESSION_COOKIE_HTTPONLY'] = True
+    # app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    
+    # ... باقي الكود ...
     
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(
