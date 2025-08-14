@@ -62,7 +62,7 @@ class Config:
     
     # ------ إعدادات الكوكيز والأمان ------
     COOKIE_NAME = 'app_session'
-    COOKIE_SECURE = True  # ضروري للإنتاج
+    COOKIE_SECURE = False  # ضروري للإنتاج
     COOKIE_HTTPONLY = True
     COOKIE_SAMESITE = 'Strict'
     COOKIE_LIFETIME = timedelta(days=30)
@@ -84,7 +84,7 @@ class Config:
     
     # ------ إعدادات التطوير ------
     DEBUG = True
-    TESTING = True
+    TESTING = True 
     
     # ------ إعدادات البريد الإلكتروني ------
     MAIL_SERVER = os.environ.get('MAIL_SERVER')
