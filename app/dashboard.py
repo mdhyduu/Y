@@ -1,7 +1,7 @@
 import logging
 from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, current_app
-from .models import User, Employee, OrderStatusNote, db
-from datetime import datetime,Product, timedelta
+from .models import User, Employee, Product, OrderStatusNote, db
+from datetime import datetime, timedelta
 from functools import wraps
 import os
 from sqlalchemy import text
