@@ -1,12 +1,12 @@
 import logging
 from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, current_app
 from .models import User, Employee, OrderStatusNote, db
-from datetime import datetime, timedelta
+from datetime import datetime,Product, timedelta
 from functools import wraps
 import os
 from sqlalchemy import text
 from apscheduler.schedulers.background import BackgroundScheduler
-from .models import Product  # تأكد من وجود هذا النموذج
+
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 logger = logging.getLogger(__name__)
