@@ -18,7 +18,7 @@ def index():
         if not current_user:
             return redirect(url_for('user_auth.login'))
 
-        is_admin = session.get('is_admin', False)
+        is_admin = session.get('is_admin', True)
         store_id = session.get('store_id', 0)
         employee_role = session.get('employee_role', '')
 
