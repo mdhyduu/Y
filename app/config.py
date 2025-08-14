@@ -33,21 +33,7 @@ class Config:
         'pool_size': 20,
         'max_overflow': 40
     }
-
-    # ... (الإعدادات الحالية)
     
-    # ------ إعدادات الجلسة ------
-    SESSION_TYPE = 'filesystem'  # أو 'redis' للإنتاج
-    SESSION_PERMANENT = True
-    SESSION_USE_SIGNER = True
-    SESSION_KEY_PREFIX = 'session:'
-    SESSION_COOKIE_NAME = 'app_session'
-    SESSION_COOKIE_SECURE = True
-    SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = 'Lax'
-    PERMANENT_SESSION_LIFETIME = timedelta(days=1)
-    SESSION_FILE_DIR = './flask_session'  # فقط إذا كنت تستخدم filesystem
-    SESSION_FILE_THRESHOLD = 100  # عدد الجلسات قبل التنظيف التلقائي
     # ------ إعدادات الترحيل (Pagination) ------
     DEFAULT_PER_PAGE = 20
     MAX_PER_PAGE = 100
@@ -73,13 +59,12 @@ class Config:
     
     # ------ إعدادات الباركود ------
     BARCODE_FOLDER = basedir / 'static' / 'barcodes'
-        
-        # ------ إعدادات الكوكيز والأمان ------
-        # ------ إعدادات الكوكيز والأمان ------
-    COOKIE_NAME = 'app_cookie'  # تغيير الاسم لتمييزه عن جلسة Flask
-    COOKIE_SECURE = True
+    
+    # ------ إعدادات الكوكيز والأمان ------
+    COOKIE_NAME = 'app_session'
+    COOKIE_SECURE = True  # ضروري للإنتاج
     COOKIE_HTTPONLY = True
-    COOKIE_SAMESITE = 'Lax'  # تغيير من 'Strict' إلى 'Lax' لتحسين التوافق
+    COOKIE_SAMESITE = 'Lax'
     COOKIE_LIFETIME = timedelta(days=30)
     COOKIE_REFRESH_EACH_REQUEST = True
     SESSION_COOKIE_SECURE = True
