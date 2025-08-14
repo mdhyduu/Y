@@ -6,9 +6,6 @@ from flask_wtf.csrf import CSRFProtect
 from .config import Config
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
-from flask import session
-
-from .dashboard import init_db_checker
 
 # إنشاء كائنات الإضافات
 db = SQLAlchemy()
@@ -18,24 +15,8 @@ csrf = CSRFProtect()
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
-    
-    # تحديث إعدادات الجلسة
-    app.config.update(
-        SECRET_KEY=os.environ.get('SECRET_KEY'),
-        SESSION_COOKIE_SECURE=True,
-        SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE='Lax',
-        PERMANENT_SESSION_LIFETIME=timedelta(days=1)  # زيادة مدة الجلسة
-    )
-    
-    # إزالة الإعدادات المتكررة
-    # app.secret_key = os.environ.get('SECRET_KEY')
-    # app.config['SESSION_COOKIE_SECURE'] = True
-    # app.config['SESSION_COOKIE_HTTPONLY'] = True
-    # app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    
-    # ... باقي الكود ...
-    
+
+    # أضف هذا الجزء لمعالجة البروكسي
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(
         app.wsgi_app, 
@@ -48,7 +29,7 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
     csrf.init_app(app)
-    init_db_checker(app)
+
     # تسجيل النماذج مع سياق التطبيق
     with app.app_context():
         from . import models
@@ -69,10 +50,8 @@ def create_app():
     from .permissions import permissions_bp
     from .products import products_bp
     from .delivery_orders import delivery_bp
-    app.config['SESSION_COOKIE_SECURE'] = True
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    app.register_blueprint(employees_bp)
 
+    app.register_blueprint(employees_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(user_auth_bp)
     app.register_blueprint(auth_bp)

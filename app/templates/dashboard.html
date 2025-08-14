@@ -34,9 +34,7 @@
                     <div class="col-md-4">  <!-- إضافة بطاقة جديدة للمنتجات -->
                         <div class="card bg-light">
                             <div class="card-body">
-                                <h5 class="card-title">المنتجات</h5
-                                <p>عدد الموظفين: {{ employees_count | default('جاري التحميل...') }}</p>
-<p>عدد المنتجات: {{ products_count | default('جاري التحميل...') }}</p>
+                                <h5 class="card-title">المنتجات</h5>
                                 <p class="card-text">إدارة منتجات المتجر</p>
                                 <a href="{{ url_for('products.list_products') }}" class="btn btn-primary">عرض المنتجات</a>
                             </div>

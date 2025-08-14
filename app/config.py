@@ -62,7 +62,7 @@ class Config:
     
     # ------ إعدادات الكوكيز والأمان ------
     COOKIE_NAME = 'app_session'
-    COOKIE_SECURE = False  # ضروري للإنتاج
+    COOKIE_SECURE = True  # ضروري للإنتاج
     COOKIE_HTTPONLY = True
     COOKIE_SAMESITE = 'Strict'
     COOKIE_LIFETIME = timedelta(days=30)
@@ -70,7 +70,7 @@ class Config:
     SESSION_COOKIE_SECURE = True
     
     # ------ إعدادات CSRF ------
-    WTF_CSRF_ENABLED = False
+    WTF_CSRF_ENABLED = True
     WTF_CSRF_SECRET_KEY = os.environ.get('WTF_CSRF_SECRET_KEY')
     if not WTF_CSRF_SECRET_KEY:
         raise ValueError("يجب تعيين WTF_CSRF_SECRET_KEY في متغيرات البيئة للإنتاج")
@@ -83,8 +83,8 @@ class Config:
     }
     
     # ------ إعدادات التطوير ------
-    DEBUG = True
-    TESTING = True 
+    DEBUG = False
+    TESTING = False
     
     # ------ إعدادات البريد الإلكتروني ------
     MAIL_SERVER = os.environ.get('MAIL_SERVER')
@@ -171,7 +171,7 @@ class ProductionConfig(Config):
         ))
         file_handler.setLevel(logging.INFO)
         app.logger.addHandler(file_handler)
-        app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+        
         # إرسال الأخطاء بالبريد
         if app.config.get('MAIL_SERVER') and app.config.get('ADMINS'):
             credentials = None
