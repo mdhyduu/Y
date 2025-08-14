@@ -70,7 +70,7 @@ class Config:
     SESSION_COOKIE_SECURE = True
     
     # ------ إعدادات CSRF ------
-    WTF_CSRF_ENABLED = True
+    WTF_CSRF_ENABLED = False
     WTF_CSRF_SECRET_KEY = os.environ.get('WTF_CSRF_SECRET_KEY')
     if not WTF_CSRF_SECRET_KEY:
         raise ValueError("يجب تعيين WTF_CSRF_SECRET_KEY في متغيرات البيئة للإنتاج")
