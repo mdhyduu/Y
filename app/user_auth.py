@@ -18,7 +18,7 @@ def get_cookie_settings():
     return {
         'secure': os.environ.get('FLASK_ENV') != 'development',  # تفعيل في الإنتاج فقط
         'httponly': True,
-        'samesite': 'None',
+        'samesite': 'Lax',
         'path': '/'
     }
 
