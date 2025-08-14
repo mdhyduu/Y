@@ -3,37 +3,22 @@ from .models import User, Employee, OrderStatusNote, db
 import logging
 from datetime import datetime
 from functools import wraps
-from .user_auth import auth_required, redirect_to_login  # استيراد من user_auth بدلاً من التعريف المحلي
-from .auth_utils import admin_required, get_current_user
+from .user_auth import auth_required, redirect_to_login  # نستورد auth_required من هنا
+# نزيل استيراد admin_required و get_current_user من auth_utils
+
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# ==============================================
-# ديكوراتورات المصادقة المدمجة (بدون ملف منفصل)
-# ==============================================
+# ... (لا حاجة للديكوراتورات المحلية) ...
 
-
-
-
-
-
-
-
-# ==============================================
-# روابط لوحة التحكم
 @dashboard_bp.route('/')
 @auth_required()
 def index():
     """لوحة التحكم الرئيسية بدون إحصائيات الحالات"""
     try:
-        # الحصول على المستخدم الحالي
-        current_user = get_current_user()
-        
-        # التحقق من وجود المستخدم
-        if not current_user:
-            flash('جلسة العمل منتهية، يرجى تسجيل الدخول مرة أخرى', 'warning')
-            return redirect_to_login()
+        # الحصول على المستخدم الحالي من request (تم تعيينه في الديكوراتور)
+        current_user = request.current_user
         
         # استخدام بيانات الجلسة مباشرة
         is_admin = session.get('is_admin', False)
@@ -42,7 +27,7 @@ def index():
 
         # للمديرين
         if is_admin:
-            # التحقق من أن المستخدم فعلاً مدير
+            # التحقق من أن المستخدم فعلاً مدير (يجب أن يكون من نوع User)
             if not isinstance(current_user, User):
                 flash('خطأ في صلاحيات المستخدم', 'danger')
                 return redirect_to_login()
@@ -61,7 +46,7 @@ def index():
         
         # للموظفين
         else:
-            # التحقق من أن المستخدم فعلاً موظف
+            # التحقق من أن المستخدم فعلاً موظف (من نوع Employee)
             if not isinstance(current_user, Employee):
                 flash('خطأ في صلاحيات المستخدم', 'danger')
                 return redirect_to_login()
@@ -98,18 +83,19 @@ def index():
         logger.error(f"خطأ في لوحة التحكم: {str(e)}")
         flash('حدث خطأ في النظام، يرجى المحاولة لاحقاً', 'danger')
         return redirect_to_login()
+
 @dashboard_bp.route('/profile')
 @auth_required()
 def profile():
     """صفحة الملف الشخصي"""
-    current_user = get_current_user()
+    current_user = request.current_user
     if isinstance(current_user, User):
         return render_template('profile.html', user=current_user)
     return render_template('employee_profile.html', employee=current_user)
 
 @dashboard_bp.route('/settings')
-@admin_required
+@auth_required(admin_only=True)  # استخدام الديكوراتور المعدل
 def settings():
     """صفحة الإعدادات (للمدراء فقط)"""
-    current_user = get_current_user()
+    current_user = request.current_user
     return render_template('settings.html', user=current_user)
