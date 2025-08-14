@@ -59,8 +59,7 @@ def create_app():
     from .permissions import permissions_bp
     from .products import products_bp
     from .delivery_orders import delivery_bp
-    app.config['SESSION_COOKIE_SECURE'] = True
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
     app.register_blueprint(employees_bp)
 
     app.register_blueprint(dashboard_bp)
@@ -113,10 +112,6 @@ def create_app():
                 except Exception as e:
                     app.logger.error(f"فشل تجديد التوكن للمستخدم {user.id}: {str(e)}")
 
-    # تشغيل الـ scheduler
-    if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        scheduler = BackgroundScheduler()
-        scheduler.add_job(refresh_tokens_job, 'interval', hours=1)  # تحقق كل ساعة
-        scheduler.start()
+
 
     return app
