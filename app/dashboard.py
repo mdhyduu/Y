@@ -5,16 +5,27 @@ from functools import wraps  # <-- أضف هذا الاستيراد
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
+# أضف هذه الدالة في بداية الملف (بعد الاستيرادات)
+def get_cookie_settings():
+    """إرجاع إعدادات الكوكيز بناءً على بيئة التشغيل"""
+    import os
+    return {
+        'secure': os.environ.get('FLASK_ENV') != 'development',
+        'httponly': True,
+        'samesite': 'None',
+        'path': '/'
+    }
+
+# عدل الديكوراتور login_required كما يلي:
 def login_required(view_func):
-    """ديكوراتور للتحقق من تسجيل الدخول"""
-    @wraps(view_func)  # <-- الآن ستعمل بشكل صحيح
+    """ديكوراتور للتحقق من تسجيل الدخول وتحديث الكوكيز"""
+    @wraps(view_func)
     def wrapper(*args, **kwargs):
         user_id = request.cookies.get('user_id')
         if not user_id:
             flash('يجب تسجيل الدخول أولاً', 'warning')
             return redirect(url_for('user_auth.login'))
         
-        # تحقق من أن user_id رقمية
         if not user_id.isdigit():
             resp = make_response(redirect(url_for('user_auth.login')))
             resp.delete_cookie('user_id')
@@ -47,10 +58,28 @@ def login_required(view_func):
                 return resp
             request.current_user = employee
         
-        return view_func(*args, **kwargs)
+        # استدعاء الدالة الأصلية للحصول على الرد
+        response = view_func(*args, **kwargs)
+        
+        # تحديث مدة صلاحية الكوكيز
+        cookie_settings = get_cookie_settings()
+        cookies_to_update = [
+            'user_id', 'is_admin', 'employee_role', 'store_id',
+            'salla_access_token', 'salla_refresh_token'
+        ]
+        
+        for cookie_name in cookies_to_update:
+            cookie_value = request.cookies.get(cookie_name)
+            if cookie_value:
+                response.set_cookie(
+                    cookie_name,
+                    cookie_value,
+                    max_age=timedelta(days=30).total_seconds(),
+                    **cookie_settings
+                )
+        
+        return response
     return wrapper
-
-# ... بقية الكود كما هو
 
 @dashboard_bp.route('/')
 @login_required
