@@ -1,13 +1,81 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, g
+from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, g, session
 from .models import User, Employee, OrderStatusNote, db
 from datetime import datetime, timedelta
 from functools import wraps
 from sqlalchemy import func, case
-from .user_auth import login_required
+import hashlib
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
 
 
+
+# دالة مساعدة لتوليد مفتاح تخزين مؤقت
+def get_session_key(user_id):
+    return f"user_{user_id}"
+
+# ديكوراتور التحقق من الدخول مع التخزين المؤقت
+def login_required(view_func):
+    """ديكوراتور للتحقق من تسجيل الدخول مع تحسين الأداء"""
+    @wraps(view_func)
+    def wrapper(*args, **kwargs):
+        user_id = request.cookies.get('user_id')
+        if not user_id:
+            flash('يجب تسجيل الدخول أولاً', 'warning')
+            return redirect(url_for('user_auth.login'))
+        
+        # التحقق من أن user_id رقمية
+        if not user_id.isdigit():
+            resp = make_response(redirect(url_for('user_auth.login')))
+            clear_auth_cookies(resp)
+            return resp
+        
+        # التحقق من التخزين المؤقت أولاً
+        session_key = get_session_key(user_id)
+        cached_user = session.get(session_key)
+        
+        # إذا كانت الجلسة المؤقتة صالحة
+        if cached_user and cached_user.get('expires') > datetime.utcnow().timestamp():
+            g.current_user = cached_user['user']
+            return view_func(*args, **kwargs)
+        
+        # إذا لم توجد جلسة مؤقتة أو انتهت صلاحيتها
+        is_admin = request.cookies.get('is_admin') == 'true'
+        
+        if is_admin:
+            user = User.query.get(user_id)
+            if not user:
+                resp = make_response(redirect(url_for('user_auth.login')))
+                clear_auth_cookies(resp)
+                return resp
+            g.current_user = user
+            # تخزين مؤقت للجلسة (30 دقيقة)
+            session[session_key] = {
+                'user': user,
+                'expires': (datetime.utcnow() + timedelta(minutes=30)).timestamp()
+            }
+        else:
+            employee = Employee.query.get(user_id)
+            if not employee:
+                flash('بيانات الموظف غير موجودة', 'error')
+                resp = make_response(redirect(url_for('user_auth.login')))
+                clear_auth_cookies(resp)
+                return resp
+            g.current_user = employee
+            # تخزين مؤقت للجلسة (30 دقيقة)
+            session[session_key] = {
+                'user': employee,
+                'expires': (datetime.utcnow() + timedelta(minutes=30)).timestamp()
+            }
+        
+        return view_func(*args, **kwargs)
+    return wrapper
+
+# دالة مساعدة لحذف الكوكيز
+def clear_auth_cookies(response):
+    cookies = ['user_id', 'is_admin', 'employee_role', 'store_id', 
+               'salla_access_token', 'salla_refresh_token']
+    for cookie in cookies:
+        response.delete_cookie(cookie, path='/')
 @dashboard_bp.route('/')
 @login_required
 def index():

@@ -11,50 +11,7 @@ import os
 
 user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
-def login_required(view_func):
-    """ديكوراتور للتحقق من تسجيل الدخول"""
-    @wraps(view_func)
-    def wrapper(*args, **kwargs):
-        user_id = request.cookies.get('user_id')
-        if not user_id:
-            flash('يجب تسجيل الدخول أولاً', 'warning')
-            return redirect(url_for('user_auth.login'))
-        
-        # تحقق من أن user_id رقمية
-        if not user_id.isdigit():
-            resp = make_response(redirect(url_for('user_auth.login')))
-            resp.delete_cookie('user_id')
-            resp.delete_cookie('is_admin')
-            resp.delete_cookie('employee_role')
-            resp.delete_cookie('store_id')
-            return resp
-        
-        is_admin = request.cookies.get('is_admin') == 'true'
-        
-        if is_admin:
-            user = User.query.get(user_id)
-            if not user:
-                resp = make_response(redirect(url_for('user_auth.login')))
-                resp.delete_cookie('user_id')
-                resp.delete_cookie('is_admin')
-                resp.delete_cookie('employee_role')
-                resp.delete_cookie('store_id')
-                return resp
-            g.current_user = user
-        else:
-            employee = Employee.query.get(user_id)
-            if not employee:
-                flash('بيانات الموظف غير موجودة', 'error')
-                resp = make_response(redirect(url_for('user_auth.login')))
-                resp.delete_cookie('user_id')
-                resp.delete_cookie('is_admin')
-                resp.delete_cookie('employee_role')
-                resp.delete_cookie('store_id')
-                return resp
-            g.current_user = employee
-        
-        return view_func(*args, **kwargs)
-    return wrapper
+
 # إعدادات الأمان للكوكيز
 def get_cookie_settings():
     """إرجاع إعدادات الكوكيز بناءً على بيئة التشغيل"""
