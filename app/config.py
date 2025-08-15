@@ -22,10 +22,14 @@ class Config:
         raise ValueError("يجب تعيين ENCRYPTION_KEY في متغيرات البيئة للإنتاج")
 
     # ------ إعدادات قاعدة البيانات ------
-    SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI')
+        # في class Config:
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or os.environ.get('SQLALCHEMY_DATABASE_URI')
     if not SQLALCHEMY_DATABASE_URI:
-        raise ValueError("يجب تعيين SQLALCHEMY_DATABASE_URI في متغيرات البيئة للإنتاج")
+        raise ValueError("يجب تعيين DATABASE_URL أو SQLALCHEMY_DATABASE_URI في متغيرات البيئة")
     
+    # استبدال بداية الرابط إذا كان من Heroku (لتوافقية مع DigitalOcean)
+    if SQLALCHEMY_DATABASE_URI.startswith("postgres://"):
+        SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace("postgres://", "postgresql://", 1)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
