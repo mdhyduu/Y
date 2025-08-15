@@ -12,7 +12,7 @@
             </button>
 
             <div id="scanner-container" style="position: relative; max-width: 500px; margin: 0 auto; display: none;">
-                <video id="scanner-video" width="100%" playsinline style="border: 2px solid #007bff; border-radius: 8px;"></video>
+                <div id="interactive" class="viewport"></div>
                 <canvas id="scanner-canvas" style="position: absolute; top: 0; left: 0;"></canvas>
                 <div id="scan-result" class="mt-3 alert" style="display: none;"></div>
             </div>
@@ -25,12 +25,20 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<style>
+    #interactive {
+        width: 100%;
+        height: auto;
+        border: 2px solid #007bff;
+        border-radius: 8px;
+    }
+</style>
 
 <script>
 class BarcodeScanner {
     constructor() {
         this.scannerContainer = document.getElementById('scanner-container');
-        this.videoElement = document.getElementById('scanner-video');
+        this.interactiveElement = document.getElementById('interactive');
         this.canvasElement = document.getElementById('scanner-canvas');
         this.resultDiv = document.getElementById('scan-result');
         this.startButton = document.getElementById('startScanner');
@@ -52,10 +60,11 @@ class BarcodeScanner {
             await this.initQuagga();
             this.isScanning = true;
             this.startButton.style.display = 'none';
+            this.updateResult('جاهز للمسح. توجيه الكاميرا نحو الباركود...', 'info');
         } catch (error) {
+            console.error("Error initializing scanner:", error);
             this.handleCameraError(error);
-            this.startButton.disabled = false;
-            this.startButton.innerHTML = '<i class="fas fa-camera me-2"></i>بدء المسح';
+            this.resetScannerButton();
         }
     }
 
@@ -65,7 +74,7 @@ class BarcodeScanner {
                 inputStream: {
                     name: "Live",
                     type: "LiveStream",
-                    target: this.videoElement,
+                    target: this.interactiveElement,
                     constraints: {
                         facingMode: "environment",
                         width: { min: 640 },
@@ -86,7 +95,8 @@ class BarcodeScanner {
                         "qrcode_reader"
                     ]
                 },
-                locate: true
+                locate: true,
+                frequency: 10
             }, (err) => {
                 if (err) {
                     reject(err);
@@ -100,31 +110,8 @@ class BarcodeScanner {
                 if (!this.isScanning) return;
                 
                 const code = result.codeResult.code;
-                this.drawBoundingBox(result);
                 this.handleScanSuccess(code);
             });
-        });
-    }
-
-    drawBoundingBox(result) {
-        if (!result || !result.boxes) return;
-        
-        const canvasContext = this.canvasElement.getContext('2d');
-        this.canvasElement.width = this.videoElement.videoWidth;
-        this.canvasElement.height = this.videoElement.videoHeight;
-        canvasContext.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
-        
-        canvasContext.strokeStyle = '#28a745';
-        canvasContext.lineWidth = 4;
-        
-        result.boxes.forEach(box => {
-            canvasContext.beginPath();
-            canvasContext.moveTo(box[0][0], box[0][1]);
-            for (let i = 1; i < box.length; i++) {
-                canvasContext.lineTo(box[i][0], box[i][1]);
-            }
-            canvasContext.lineTo(box[0][0], box[0][1]);
-            canvasContext.stroke();
         });
     }
 
@@ -135,19 +122,19 @@ class BarcodeScanner {
     }
 
     handleCameraError(error) {
-        console.error("Camera Error:", error);
         let errorMessage = 'فشل في تشغيل الكاميرا.';
         if (error.name === 'NotAllowedError') {
             errorMessage = 'فشل في تشغيل الكاميرا. الرجاء منح الإذن لاستخدامها.';
         } else if (error.name === 'NotFoundError') {
             errorMessage = 'لم يتم العثور على كاميرا.';
+        } else if (error.message.includes('Permission denied')) {
+            errorMessage = 'تم رفض الإذن باستخدام الكاميرا.';
         }
         this.updateResult(`
             <i class="fas fa-times-circle text-danger me-2"></i>
             ${errorMessage}
             <br><small>تأكد من استخدام HTTPS أو localhost.</small>
         `, 'danger');
-        this.resetScannerButton();
     }
 
     stopScanning() {
@@ -157,9 +144,6 @@ class BarcodeScanner {
         }
         this.resetScannerButton();
         this.scannerContainer.style.display = 'none';
-        
-        const canvasContext = this.canvasElement.getContext('2d');
-        canvasContext.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
     }
 
     resetScannerButton() {
