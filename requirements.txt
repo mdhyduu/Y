@@ -42,3 +42,4 @@ wheel==0.41.2
 setuptools==80.0.0
 gunicorn==21.2.0
 APScheduler==3.10.1
+psycopg2-binary==2.9.9
