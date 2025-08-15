@@ -4,8 +4,7 @@
 <div class="container py-4">
     <div class="card shadow-lg">
         <div class="card-header bg-primary text-white">
-            <h3><i class="fas fa-camera me-2"></i>
-            <h3>ماسح الباركود </h3>
+            <h3><i class="fas fa-camera me-2"></i>مسح باركود/QR كود الطلب/المنتج</h3>
         </div>
         <div class="card-body text-center">
             <button id="startScanner" class="btn btn-lg btn-success mb-4">
@@ -19,7 +18,7 @@
             </div>
 
             <div id="guidance-message" class="mt-3 text-muted">
-                <small>توجيه الكاميرا نحو باركود QR كود الطلب أو المنتج</small>
+                <small>توجيه الكاميرا نحو باركود أو QR كود الطلب أو المنتج</small>
             </div>
         </div>
     </div>
@@ -36,21 +35,27 @@ class BarcodeScanner {
         this.resultDiv = document.getElementById('scan-result');
         this.startButton = document.getElementById('startScanner');
         this.guidanceMessage = document.getElementById('guidance-message');
+        this.isScanning = false;
 
         this.startButton.addEventListener('click', () => this.startScanning());
-        this.isScanning = false;
     }
 
     async startScanning() {
-        this.startButton.style.display = 'none';
+        if (this.isScanning) return;
+        
+        this.startButton.disabled = true;
+        this.startButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>جاري التهيئة...';
         this.scannerContainer.style.display = 'block';
         this.updateResult('جارِ بدء الكاميرا...', 'info');
 
         try {
             await this.initQuagga();
             this.isScanning = true;
+            this.startButton.style.display = 'none';
         } catch (error) {
             this.handleCameraError(error);
+            this.startButton.disabled = false;
+            this.startButton.innerHTML = '<i class="fas fa-camera me-2"></i>بدء المسح';
         }
     }
 
@@ -78,18 +83,11 @@ class BarcodeScanner {
                         "upc_reader",
                         "upc_e_reader",
                         "i2of5_reader",
-                        "qrcode_reader" // إضافة قارئ QR code
-                    ],
-                    debug: {
-                        drawBoundingBox: true,
-                        showFrequency: false,
-                        drawScanline: true,
-                        showPattern: false
-                    }
+                        "qrcode_reader"
+                    ]
                 },
-                locate: true,
-                frequency: 10
-            }, function(err) {
+                locate: true
+            }, (err) => {
                 if (err) {
                     reject(err);
                     return;
@@ -105,38 +103,17 @@ class BarcodeScanner {
                 this.drawBoundingBox(result);
                 this.handleScanSuccess(code);
             });
-
-            Quagga.onProcessed((result) => {
-                if (!result) return;
-                
-                const canvasContext = this.canvasElement.getContext('2d');
-                this.canvasElement.width = result.frame.width;
-                this.canvasElement.height = result.frame.height;
-                
-                if (result.boxes) {
-                    canvasContext.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
-                    canvasContext.strokeStyle = '#28a745';
-                    canvasContext.lineWidth = 4;
-                    
-                    result.boxes.filter(box => box !== result.box).forEach(box => {
-                        canvasContext.beginPath();
-                        canvasContext.moveTo(box[0][0], box[0][1]);
-                        for (let i = 1; i < box.length; i++) {
-                            canvasContext.lineTo(box[i][0], box[i][1]);
-                        }
-                        canvasContext.lineTo(box[0][0], box[0][1]);
-                        canvasContext.stroke();
-                    });
-                }
-            });
-        }.bind(this));
+        });
     }
 
     drawBoundingBox(result) {
         if (!result || !result.boxes) return;
         
         const canvasContext = this.canvasElement.getContext('2d');
+        this.canvasElement.width = this.videoElement.videoWidth;
+        this.canvasElement.height = this.videoElement.videoHeight;
         canvasContext.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
+        
         canvasContext.strokeStyle = '#28a745';
         canvasContext.lineWidth = 4;
         
@@ -157,14 +134,6 @@ class BarcodeScanner {
         this.processScannedCode(code);
     }
 
-    handleScanError(error) {
-        console.error('خطأ في المسح:', error);
-        this.updateResult(`
-            <i class="fas fa-times-circle text-danger me-2"></i>
-            خطأ في المسح: ${error.message}
-        `, 'danger');
-    }
-
     handleCameraError(error) {
         console.error("Camera Error:", error);
         let errorMessage = 'فشل في تشغيل الكاميرا.';
@@ -178,7 +147,7 @@ class BarcodeScanner {
             ${errorMessage}
             <br><small>تأكد من استخدام HTTPS أو localhost.</small>
         `, 'danger');
-        this.startButton.style.display = 'block';
+        this.resetScannerButton();
     }
 
     stopScanning() {
@@ -186,11 +155,17 @@ class BarcodeScanner {
             Quagga.stop();
             this.isScanning = false;
         }
-        this.startButton.style.display = 'block';
+        this.resetScannerButton();
         this.scannerContainer.style.display = 'none';
         
         const canvasContext = this.canvasElement.getContext('2d');
         canvasContext.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
+    }
+
+    resetScannerButton() {
+        this.startButton.style.display = 'block';
+        this.startButton.disabled = false;
+        this.startButton.innerHTML = '<i class="fas fa-camera me-2"></i>بدء المسح';
     }
 
     updateResult(message, type) {
@@ -222,7 +197,7 @@ class BarcodeScanner {
                 window.location.href = `/${url}`;
             } else {
                 this.updateResult('الكود الممسوح غير معروف أو بصيغة غير صحيحة.', 'warning');
-                this.startButton.style.display = 'block';
+                this.resetScannerButton();
             }
         }, 1000);
     }
