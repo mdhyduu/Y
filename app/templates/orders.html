@@ -24,7 +24,6 @@
     </div>
     
     <div class="card-body p-0">
-        <!-- فلترة متقدمة -->
         <div class="p-4 border-bottom">
             <form id="advanced-filters" class="row g-3 align-items-end">
                 <div class="col-md-3">
@@ -108,7 +107,6 @@
 
         {% if orders %}
         <div class="table-responsive position-relative">
-            <!-- مؤشر تحميل للجدول -->
             <div id="table-loading" class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center d-none" style="z-index: 10;">
                 <div class="spinner-border text-primary" role="status">
                     <span class="visually-hidden">جاري التحميل...</span>
@@ -116,7 +114,7 @@
             </div>
             
             <table class="table table-hover mb-0" id="orders-table">
-                <thead class="table-light">
+                <thead>
                     <tr>
                         {% if is_reviewer %}
                         <th width="5%" class="ps-4">
@@ -284,133 +282,91 @@
     </div>
 </div>
 
+
+
 {% block scripts %}
+<style>
+    /* =================================== */
+    /* General Styles             */
+    /* =================================== */
+    .status-badge { padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; }
+    .status-pending, .status-awaiting_payment { background-color: #fff3cd; color: #856404; }
+    .status-processing { background-color: #cce5ff; color: #004085; }
+    .status-under_review { background-color: #e2e3e5; color: #383d41; }
+    .status-shipped { background-color: #d1ecf1; color: #0c5460; }
+    .status-delivered { background-color: #d4edda; color: #155724; }
+    .status-canceled { background-color: #f8d7da; color: #721c24; }
+    
+    .avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 0.7rem; font-weight: 600; }
+    .avatar-text { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 50%; }
+    
+    .card { border-radius: 12px; overflow: hidden; }
+    .card-header { border-radius: 12px 12px 0 0 !important; }
+    .table th { font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; }
+    .table td { vertical-align: middle; }
+    .btn-icon { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+    .bg-gradient-primary { background: linear-gradient(135deg, #4e73df 0%, #224abe 100%); }
+    
+    tr:hover { background-color: rgba(0,0,0,0.02) !important; }
+
+    /* =================================== */
+    /* Dark Mode Styles          */
+    /* =================================== */
+    body.dark-mode .border-bottom { border-bottom-color: var(--border-color-dark) !important; }
+    body.dark-mode .border-top { border-top-color: var(--border-color-dark) !important; }
+    body.dark-mode .text-muted { color: #a0aec0 !important; }
+
+    /* Filters */
+    body.dark-mode .input-daterange .input-group-text.bg-light { background-color: #374151 !important; border-color: var(--border-color-dark); }
+
+    /* Table */
+    body.dark-mode #table-loading { background-color: rgba(42, 46, 66, 0.75); }
+    body.dark-mode .table th { color: #a0aec0; }
+    body.dark-mode tr:hover { background-color: rgba(255,255,255,0.04) !important; }
+
+    /* Status Badges */
+    body.dark-mode .status-pending,
+    body.dark-mode .status-awaiting_payment { background-color: rgba(252, 211, 77, 0.15); color: #facc15; }
+    body.dark-mode .status-processing { background-color: rgba(96, 165, 250, 0.15); color: #60a5fa; }
+    body.dark-mode .status-under_review { background-color: rgba(156, 163, 175, 0.15); color: #9ca3af; }
+    body.dark-mode .status-shipped { background-color: rgba(52, 211, 153, 0.15); color: #34d399; }
+    body.dark-mode .status-delivered { background-color: rgba(29, 78, 216, 0.2); color: #3b82f6; }
+    body.dark-mode .status-canceled { background-color: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+    /* Avatars & small badges */
+    body.dark-mode .badge.bg-secondary.bg-opacity-10 { background-color: rgba(107, 114, 128, 0.2) !important; color: #9ca3af !important; }
+    body.dark-mode .avatar-text.bg-light.text-dark { background-color: #4b5563 !important; color: var(--text-light) !important; }
+    body.dark-mode .badge.bg-light.text-muted { background-color: #374151 !important; color: #d1d5db !important; }
+
+    /* Pagination */
+    body.dark-mode .page-link { background-color: var(--content-dark); border-color: var(--border-color-dark); color: var(--primary-light); }
+    body.dark-mode .page-item.disabled .page-link { background-color: transparent; border-color: var(--border-color-dark); color: #6c757d; }
+    body.dark-mode .page-link:hover { background-color: #3a3f58; }
+    body.dark-mode .page-item.active .page-link { background-color: var(--primary); border-color: var(--primary); color: #fff; }
+
+    /* "No orders" state */
+    body.dark-mode .text-gray-300 { color: #4b5563 !important; }
+    body.dark-mode .text-gray-600 { color: #d1d5db !important; }
+
+    /* =================================== */
+    /* Responsive Styles            */
+    /* =================================== */
+    @media (max-width: 768px) {
+        .card-header h6 { font-size: 0.9rem; }
+        #sync-orders-btn .sync-text { display: none; }
+        #sync-orders-btn i { margin-right: 0 !important; }
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .table td, .table th { white-space: nowrap; }
+    }
+</style>
+
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/locale/ar.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
-<style>
-    .status-badge {
-        padding: 5px 10px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 500;
-        display: inline-flex;
-        align-items: center;
-    }
-    .status-pending { background-color: #fff3cd; color: #856404; }
-    .status-processing { background-color: #cce5ff; color: #004085; }
-    .status-under_review { background-color: #e2e3e5; color: #383d41; }
-    .status-shipped { background-color: #d4edda; color: #155724; }
-    .status-delivered { background-color: #d1ecf1; color: #0c5460; }
-    .status-canceled { background-color: #f8d7da; color: #721c24; }
-    .status-awaiting_payment { background-color: #fff3cd; color: #856404; }
-    
-    .avatar {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        font-size: 0.7rem;
-        font-weight: 600;
-    }
-    .avatar-text {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        height: 100%;
-        border-radius: 50%;
-    }
-    
-    .card {
-        border-radius: 12px;
-        overflow: hidden;
-    }
-    
-    .card-header {
-        border-radius: 12px 12px 0 0 !important;
-    }
-    
-    .table th {
-        font-weight: 600;
-        font-size: 0.8rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #6c757d;
-    }
-    
-    .table td {
-        vertical-align: middle;
-    }
-    
-    .btn-icon {
-        width: 32px;
-        height: 32px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-    }
-    
-    .bg-gradient-primary {
-        background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
-    }
-    
-    /* تحسينات للجوال */
-    @media (max-width: 768px) {
-        .card-header h6 {
-            font-size: 0.9rem;
-        }
-        
-        #sync-orders-btn .sync-text {
-            display: none;
-        }
-        
-        #sync-orders-btn i {
-            margin-right: 0 !important;
-        }
-        
-        .table-responsive {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        .table td, .table th {
-            white-space: nowrap;
-        }
-    }
-    
-    /* تأثيرات تفاعلية */
-    .nav-link, .btn, .form-select, .form-control {
-        transition: all 0.2s ease;
-    }
-    
-    .btn:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    
-    .btn:active {
-        transform: translateY(0);
-    }
-    
-    .order-checkbox:checked + label {
-        font-weight: bold;
-    }
-    
-    tr:hover {
-        background-color: rgba(0,0,0,0.02) !important;
-    }
-    
-    body.dark-mode tr:hover {
-        background-color: rgba(255,255,255,0.02) !important;
-    }
-</style>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     // --- تهيئة المكتبات ---
