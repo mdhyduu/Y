@@ -320,7 +320,7 @@
 <body>
   <div class="dashboard">
 
-    {% if request.cookies.get('username') and request.cookies.get('username') != 'زائر' %}
+    {% if request.cookies.get('is_admin') == 'true' or request.cookies.get('is_admin') == 'false' %}
     <aside class="sidebar">
       <h2>لوحة التحكم</h2>
       <a class="nav-link {% if request.path == url_for('orders.index') %}active{% endif %}" href="{{ url_for('orders.index') }}">
@@ -333,7 +333,7 @@
       
       <a class="nav-link {% if request.path == url_for('orders.manage_employee_status') %}active{% endif %}" href="{{ url_for('orders.manage_employee_status') }}">
         <i class="fas fa-tags"></i> حالاتي المخصصة
-      </a>
+      </a> 
       
       {% if not request.cookies.get('is_admin') == 'true' %}
         <a class="nav-link {% if request.path == url_for('orders.employee_dashboard') %}active{% endif %}" href="{{ url_for('orders.employee_dashboard') }}">
@@ -365,9 +365,9 @@
     <div class="sidebar__backdrop" onclick="toggleSidebar()"></div>
     {% endif %}
 
-    <div class="main {% if request.cookies.get('username') and request.cookies.get('username') != 'زائر' %}main-with-sidebar{% endif %}">
+    <div class="main {% if request.cookies.get('is_admin') == 'true' or request.cookies.get('is_admin') == 'false' %}main-with-sidebar{% endif %}">
       <div class="topbar">
-        {% if request.cookies.get('username') and request.cookies.get('username') != 'زائر' %}
+        {% if request.cookies.get('is_admin') == 'true' or request.cookies.get('is_admin') == 'false' %}
         <div class="sidebar-toggle d-lg-none" onclick="toggleSidebar()">
           <i class="fas fa-bars"></i>
         </div>
@@ -425,7 +425,6 @@
       const sidebarLinks = document.querySelectorAll('.sidebar .nav-link');
       if (sidebarLinks.length > 0) {
         sidebarLinks.forEach(link => {
-            // تحقق من أن الرابط ليس مجرد # لتجنب الأخطاء
             if (link.getAttribute('href') && link.getAttribute('href') !== '#') {
                 if (currentPath.startsWith(link.getAttribute('href'))) {
                     link.classList.add('active');
