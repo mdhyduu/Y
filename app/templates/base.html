@@ -20,7 +20,7 @@
       --sidebar-dark: #0f172a;
       --content-dark: #2a2e42;
       --text-light: #f8f9fa;
-      --text-dark: #111827;
+      --text-dark: #212529; /* لون أغمق قليلاً من السابق */
       --border-color-light: #e5e7eb;
       --border-color-dark: #444;
       --border-radius: 8px;
@@ -211,7 +211,6 @@
     
     .alert { direction: rtl; border-radius: var(--border-radius); }
     
-    /* Full Width Container */
     .container-fluid {
       width: 100%;
       padding-right: 0;
@@ -293,6 +292,25 @@
     body.dark-mode a {
       color: var(--primary-light);
     }
+
+    /* ======================================================= */
+    /* التعديل الأول: ضمان لون النص الفاتح لكل العناصر في الوضع الليلي */
+    /* ======================================================= */
+    body.dark-mode h1,
+    body.dark-mode h2,
+    body.dark-mode h3,
+    body.dark-mode h4,
+    body.dark-mode h5,
+    body.dark-mode h6,
+    body.dark-mode p,
+    body.dark-mode span,
+    body.dark-mode label,
+    body.dark-mode strong,
+    body.dark-mode .form-label,
+    body.dark-mode th,
+    body.dark-mode td {
+      color: var(--text-light) !important;
+    }
     
     /* Responsive Adjustments */
     @media (max-width: 991.98px) {
@@ -333,7 +351,7 @@
       
       <a class="nav-link {% if request.path == url_for('orders.manage_employee_status') %}active{% endif %}" href="{{ url_for('orders.manage_employee_status') }}">
         <i class="fas fa-tags"></i> حالاتي المخصصة
-      </a> 
+      </a>
       
       {% if not request.cookies.get('is_admin') == 'true' %}
         <a class="nav-link {% if request.path == url_for('orders.employee_dashboard') %}active{% endif %}" href="{{ url_for('orders.employee_dashboard') }}">
@@ -378,8 +396,7 @@
         
         <div class="actions">
           <a href="{{ url_for('orders.scan_barcode') }}" class="action-icon" title="مسح الباركود">
-            <i class="fas fa-barcode"></i>
-          </a>
+            <i class="fas fa-qrcode"></i> </a>
           <i class="fas fa-moon action-icon" id="themeToggle" onclick="toggleDarkMode()"></i>
         </div>
       </div>
