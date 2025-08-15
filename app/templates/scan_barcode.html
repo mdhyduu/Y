@@ -223,8 +223,7 @@ class ModernBarcodeScanner {
                 // مثال: /orders/12345
                 // window.location.href = `/orders/${url}`; 
                 // للتجربة، سنعرض الرابط الذي سيتم التوجيه إليه
-                this.updateStatus(`سيتم التوجيه إلى: /${url}`, 'success', false);
-                alert(`Redirecting to:/${url}`);
+                window.location.href = `/${url}`;
             } else {
                 this.updateStatus('الكود الممسوح غير معروف أو بصيغة غير صحيحة.', 'warning', false);
                 setTimeout(() => this.stop(), 3000); // العودة للواجهة الرئيسية بعد 3 ثوان
