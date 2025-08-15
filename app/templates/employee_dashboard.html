@@ -3,7 +3,6 @@
 {% block content %}
 <div class="container-fluid p-4">
     
-    <!-- قسم الإحصائيات العامة -->
     <div class="scrolling-stats-container mb-3">
         <h6 class="mb-2 fw-bold"><i class="fas fa-chart-bar me-2"></i>إحصائيات الطلبات</h6>
         <div class="d-flex flex-nowrap">
@@ -55,13 +54,12 @@
         </div>
     </div>
 
-    <!-- قسم الحالات المخصصة للموظف -->
     <div class="scrolling-stats-container mb-4">
         <h6 class="mb-2 fw-bold"><i class="fas fa-tags me-2"></i>حالاتي لمتابعة الطلبات</h6>
         <div class="d-flex flex-nowrap">
             {% for item in custom_status_stats %}
             <div class="stat-card-item">
-                <div class="stat-card h-100" style="background-color: {{ item.status.color }}; color: {% if item.status.color in ['#ffffff', '#f8f9fa'] %}black{% else %}white{% endif %}">
+                <div class="stat-card h-100" style="background-color: {{ item.status.color }}; color: {% if item.status.color in ['#ffffff', '#f8f9fa', '#ffc107', '#0dcaf0'] %}#212529{% else %}white{% endif %}">
                     <div class="stat-card-icon"><i class="fas fa-tag"></i></div>
                     <div class="stat-card-content">
                         <h5 class="mb-0 fw-bolder">{{ item.count }}</h5>
@@ -75,16 +73,15 @@
 
     <div class="row g-4">
         <div class="col-lg-8">
-            <!-- قسم الطلبات المسندة -->
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0 fs-5"><i class="fas fa-tasks me-2"></i>الطلبات المسندة إليك</h5>
                     <span class="badge bg-primary rounded-pill">{{ assigned_orders|length }}</span>
                 </div> 
-                <div class="card-body">
+                <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
-                            <thead class="table-light">
+                            <thead>
                                 <tr>
                                     <th>رقم الطلب</th>
                                     <th>العميل</th>
@@ -100,12 +97,12 @@
                                     <td class="fw-bold">#{{ order.id }}</td>
                                     <td>{{ order.customer_name }}</td>
                                     <td>
-  {% if order.created_at %}
-    {{ order.created_at.strftime('%Y-%m-%d %H:%M') }}
-  {% else %}
-    غير محدد
-  {% endif %}
-</td>
+                                        {% if order.created_at %}
+                                            {{ order.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                        {% else %}
+                                            غير محدد
+                                        {% endif %}
+                                    </td>
                                     <td>{{ order.total_amount }} {{ order.currency }}</td>
                                     <td>
                                         <span class="badge bg-{{ order.status_slug | replace('under_review', 'warning') | replace('processing', 'info') | replace('completed', 'success') | replace('awaiting_payment', 'warning') | replace('shipped', 'primary') | replace('delivered', 'success') | replace('canceled', 'danger') | replace('refunded', 'secondary') }}">
@@ -134,8 +131,8 @@
             </div>
         </div>
         <div class="col-lg-4">
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-white py-2">
+            <div class="card mb-4">
+                <div class="card-header">
                     <h6 class="mb-0"><i class="fas fa-chart-pie text-primary me-2"></i>توزيع الحالات الحرجة</h6>
                 </div>
                 <div class="card-body">
@@ -144,7 +141,7 @@
             </div>
             <div class="card">
                 <div class="card-header">
-                    <h6 class="mb-0"><i></i>آخر النشاطات</h6>
+                    <h6 class="mb-0"><i class="fas fa-history me-2"></i>آخر النشاطات</h6>
                 </div>
                 <div class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
                     {% for status in recent_statuses %}
@@ -176,75 +173,76 @@
 </div>
 
 <style>
-    body {
-        background-color: #f9fafb;
-    }
-    .card {
-        border-radius: 0.5rem;
-        border: 1px solid rgba(0,0,0,0.05);
-    }
-    .card-header {
-        padding: 0.75rem 1rem;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-    }
+    /* General styles for both modes */
     .scrolling-stats-container {
         overflow-x: auto;
         padding-bottom: 1rem;
         scrollbar-width: thin;
-        scrollbar-color: #d1d5db #f9fafb;
+        scrollbar-color: #d1d5db #f1f5f9;
     }
     .scrolling-stats-container::-webkit-scrollbar { height: 6px; }
-    .scrolling-stats-container::-webkit-scrollbar-track { background: #f9fafb; border-radius: 10px; }
+    .scrolling-stats-container::-webkit-scrollbar-track { background: transparent; border-radius: 10px; }
     .scrolling-stats-container::-webkit-scrollbar-thumb { background-color: #d1d5db; border-radius: 10px; }
     
     .stat-card-item {
         flex: 0 0 auto;
-        width: 100px; /* تصغير حجم البطاقات */
-        margin-left: 0.5rem;
+        width: 110px; /* تم تعديل الحجم قليلاً */
+        margin-left: 0.75rem;
     }
-    .stat-card-item:first-child { margin-left:2; }
+    .stat-card-item:first-child { margin-left: 0; }
     .stat-card {
         display: flex;
+        flex-direction: column; /* تعديل التخطيط */
         align-items: center;
+        justify-content: center;
+        text-align: center;
         padding: 0.75rem;
-        border-radius: 0.5rem;
+        border-radius: var(--border-radius);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
-        height: 100%;
+        height: 100px; /* تحديد ارتفاع ثابت */
     }
     .stat-card:hover {
         transform: translateY(-3px);
-        box-shadow: 0 0.25rem 0.75rem rgba(0,0,0,0.1);
+        box-shadow: 0 0.25rem 0.75rem rgba(0,0,0,0.07);
     }
     .stat-card-icon {
-        margin-left: 0.5rem;
-        font-size: 1rem;
+        font-size: 1.25rem;
+        margin-bottom: 0.5rem; /* مسافة بين الأيقونة والمحتوى */
     }
-    .stat-card-content {
-        line-height: 1.2;
+    .stat-card-content { line-height: 1.2; }
+    .stat-card-content h5 { font-size: 1.2rem; }
+    .table th, .table td { padding: 0.75rem; font-size: 0.9rem; vertical-align: middle; }
+    .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+
+    /* Dark Mode Overrides */
+    body.dark-mode .scrolling-stats-container { scrollbar-color: #4b5563 var(--bg-dark); }
+    body.dark-mode .scrolling-stats-container::-webkit-scrollbar-thumb { background-color: #4b5563; }
+    body.dark-mode .stat-card:hover { box-shadow: 0 0.25rem 1rem rgba(0,0,0,0.2); }
+    body.dark-mode .text-muted { color: #a0aec0 !important; }
+    
+    /* List Group dark styles */
+    body.dark-mode .list-group-item {
+        background-color: var(--content-dark);
+        border-color: var(--border-color-dark) !important;
     }
-    .stat-card-content h5 {
-        font-size: 1.1rem;
-    }
-    .badge {
-        font-weight: 500;
-        padding: 0.35em 0.65em;
-        font-size: 0.75rem;
-    }
-    .table th, .table td {
-        padding: 0.75rem;
-        font-size: 0.85rem;
-    }
-    .btn-sm {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
+    body.dark-mode .list-group-item-action:hover,
+    body.dark-mode .list-group-item-action:focus {
+        background-color: #3a3f58; /* لون أغمق قليلاً عند التمرير */
     }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        const isDarkMode = document.body.classList.contains('dark-mode');
+        const chartTextColor = isDarkMode ? 'rgba(255, 255, 255, 0.85)' : '#495057';
+        const chartBorderColor = isDarkMode ? 'var(--content-dark, #2a2e42)' : '#fff';
+
         const statusCtx = document.getElementById('statusChart').getContext('2d');
-        const statusChart = new Chart(statusCtx, {
+        if (window.myStatusChart) {
+            window.myStatusChart.destroy();
+        }
+        window.myStatusChart = new Chart(statusCtx, {
             type: 'doughnut',
             data: {
                 labels: ['متأخر', 'واصل ناقص', 'مسترجع', 'لم يتم الشحن'],
@@ -256,7 +254,7 @@
                         {{ stats.not_shipped_orders }}
                     ],
                     backgroundColor: ['#ffc107', '#dc3545', '#6c757d', '#0dcaf0'],
-                    borderColor: '#fff',
+                    borderColor: chartBorderColor,
                     borderWidth: 2
                 }]
             },
@@ -266,11 +264,18 @@
                 plugins: {
                     legend: {
                         display: true, position: 'bottom',
-                        labels: { font: { family: 'inherit', size: 11 }, padding: 12, usePointStyle: true }
+                        labels: { 
+                            font: { family: 'inherit', size: 12 }, 
+                            padding: 15, 
+                            usePointStyle: true,
+                            color: chartTextColor // لون نصوص التسميات
+                        }
                     },
                     tooltip: {
-                        rtl: true, backgroundColor: '#212529',
-                        titleFont: { size: 12, family: 'inherit' }, bodyFont: { size: 11, family: 'inherit' },
+                        rtl: true,
+                        backgroundColor: '#212529',
+                        titleFont: { size: 12, family: 'inherit' }, 
+                        bodyFont: { size: 11, family: 'inherit' },
                         padding: 8,
                     }
                 },
