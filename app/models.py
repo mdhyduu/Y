@@ -41,7 +41,9 @@ def repair_encrypted_token(token):
 
 class User(db.Model):
     __tablename__ = 'users'
-    
+    __table_args__ = (
+        db.UniqueConstraint('store_id', name='uq_user_store_id'),
+    )
     
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
@@ -49,7 +51,6 @@ class User(db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, server_default=func.now())
     updated_at = db.Column(db.DateTime, onupdate=func.now())
-    
     # حقول التوكنات
     _salla_access_token = db.Column('salla_access_token', LargeBinary)
     _salla_refresh_token = db.Column('salla_refresh_token', LargeBinary)
@@ -315,8 +316,8 @@ class Department(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     salla_id = db.Column(db.Integer, unique=True, nullable=False)
     name = db.Column(db.String(255), nullable=False)
-    store_id = db.Column(db.Integer, ForeignKey('users.store_id'), nullable=False)
-    parent_id = db.Column(db.Integer, ForeignKey('departments.id'), nullable=True)
+    store_id = db.Column(db.Integer, db.ForeignKey('users.store_id'), nullable=False)
+    parent_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=True)
     
     children = relationship('Department', backref=backref('parent', remote_side=[id]))
     permissions = relationship('EmployeePermission', back_populates='department')
