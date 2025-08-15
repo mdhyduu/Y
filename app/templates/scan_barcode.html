@@ -4,7 +4,8 @@
 <div class="container py-4">
     <div class="card shadow-lg">
         <div class="card-header bg-primary text-white">
-            <h3><i class="fas fa-camera me-2"></i>مسح باركود/QR كود الطلب/المنتج</h3>
+            <h3><i class="fas fa-camera me-2"></i>
+            <h3>ماسح الباركود </h3>
         </div>
         <div class="card-body text-center">
             <button id="startScanner" class="btn btn-lg btn-success mb-4">
@@ -18,18 +19,17 @@
             </div>
 
             <div id="guidance-message" class="mt-3 text-muted">
-                <small>توجيه الكاميرا نحو باركود أو QR كود الطلب أو المنتج</small>
+                <small>توجيه الكاميرا نحو باركود QR كود الطلب أو المنتج</small>
             </div>
         </div>
     </div>
 </div>
 
-<script src="https://unpkg.com/@zxing/library@latest"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 
 <script>
 class BarcodeScanner {
     constructor() {
-        this.codeReader = new ZXing.BrowserMultiFormatReader();
         this.scannerContainer = document.getElementById('scanner-container');
         this.videoElement = document.getElementById('scanner-video');
         this.canvasElement = document.getElementById('scanner-canvas');
@@ -38,6 +38,7 @@ class BarcodeScanner {
         this.guidanceMessage = document.getElementById('guidance-message');
 
         this.startButton.addEventListener('click', () => this.startScanning());
+        this.isScanning = false;
     }
 
     async startScanning() {
@@ -46,51 +47,108 @@ class BarcodeScanner {
         this.updateResult('جارِ بدء الكاميرا...', 'info');
 
         try {
-            await this.codeReader.decodeFromVideoDevice(
-                null,
-                this.videoElement,
-                (result, error) => {
-                    if (this.canvasElement) {
-                        this.drawBoundingBox(result);
-                    }
-
-                    if (result) {
-                        this.handleScanSuccess(result.text);
-                    }
-                    if (error && !(error instanceof ZXing.NotFoundException)) {
-                        this.handleScanError(error);
-                    }
-                }
-            );
+            await this.initQuagga();
+            this.isScanning = true;
         } catch (error) {
             this.handleCameraError(error);
         }
     }
 
-    drawBoundingBox(result) {
-        const canvasContext = this.canvasElement.getContext('2d');
-        this.canvasElement.width = this.videoElement.videoWidth;
-        this.canvasElement.height = this.videoElement.videoHeight;
-
-        canvasContext.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
-
-        if (result) {
-            const points = result.getResultPoints();
-            if (points.length > 0) {
-                canvasContext.strokeStyle = '#28a745'; // لون أخضر
-                canvasContext.lineWidth = 4;
-                canvasContext.beginPath();
-
-                // رسم خط بين كل نقطتين
-                canvasContext.moveTo(points[0].getX(), points[0].getY());
-                for (let i = 1; i < points.length; i++) {
-                    canvasContext.lineTo(points[i].getX(), points[i].getY());
+    initQuagga() {
+        return new Promise((resolve, reject) => {
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: this.videoElement,
+                    constraints: {
+                        facingMode: "environment",
+                        width: { min: 640 },
+                        height: { min: 480 }
+                    },
+                },
+                decoder: {
+                    readers: [
+                        "code_128_reader",
+                        "ean_reader",
+                        "ean_8_reader",
+                        "code_39_reader",
+                        "code_39_vin_reader",
+                        "codabar_reader",
+                        "upc_reader",
+                        "upc_e_reader",
+                        "i2of5_reader",
+                        "qrcode_reader" // إضافة قارئ QR code
+                    ],
+                    debug: {
+                        drawBoundingBox: true,
+                        showFrequency: false,
+                        drawScanline: true,
+                        showPattern: false
+                    }
+                },
+                locate: true,
+                frequency: 10
+            }, function(err) {
+                if (err) {
+                    reject(err);
+                    return;
                 }
-                // إغلاق الشكل للعودة للنقطة الأولى
-                canvasContext.lineTo(points[0].getX(), points[0].getY());
-                canvasContext.stroke();
+                Quagga.start();
+                resolve();
+            });
+
+            Quagga.onDetected((result) => {
+                if (!this.isScanning) return;
+                
+                const code = result.codeResult.code;
+                this.drawBoundingBox(result);
+                this.handleScanSuccess(code);
+            });
+
+            Quagga.onProcessed((result) => {
+                if (!result) return;
+                
+                const canvasContext = this.canvasElement.getContext('2d');
+                this.canvasElement.width = result.frame.width;
+                this.canvasElement.height = result.frame.height;
+                
+                if (result.boxes) {
+                    canvasContext.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
+                    canvasContext.strokeStyle = '#28a745';
+                    canvasContext.lineWidth = 4;
+                    
+                    result.boxes.filter(box => box !== result.box).forEach(box => {
+                        canvasContext.beginPath();
+                        canvasContext.moveTo(box[0][0], box[0][1]);
+                        for (let i = 1; i < box.length; i++) {
+                            canvasContext.lineTo(box[i][0], box[i][1]);
+                        }
+                        canvasContext.lineTo(box[0][0], box[0][1]);
+                        canvasContext.stroke();
+                    });
+                }
+            });
+        }.bind(this));
+    }
+
+    drawBoundingBox(result) {
+        if (!result || !result.boxes) return;
+        
+        const canvasContext = this.canvasElement.getContext('2d');
+        canvasContext.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
+        canvasContext.strokeStyle = '#28a745';
+        canvasContext.lineWidth = 4;
+        
+        result.boxes.forEach(box => {
+            canvasContext.beginPath();
+            canvasContext.moveTo(box[0][0], box[0][1]);
+            for (let i = 1; i < box.length; i++) {
+                canvasContext.lineTo(box[i][0], box[i][1]);
             }
-        }
+            canvasContext.lineTo(box[0][0], box[0][1]);
+            canvasContext.stroke();
+        });
     }
 
     handleScanSuccess(code) {
@@ -124,19 +182,19 @@ class BarcodeScanner {
     }
 
     stopScanning() {
-        if (this.codeReader) {
-            this.codeReader.reset();
+        if (this.isScanning) {
+            Quagga.stop();
+            this.isScanning = false;
         }
         this.startButton.style.display = 'block';
         this.scannerContainer.style.display = 'none';
         
-        // مسح محتويات الكانفاس عند الإيقاف
         const canvasContext = this.canvasElement.getContext('2d');
         canvasContext.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
     }
 
     updateResult(message, type) {
-        this.resultDiv.innerHTML = `<i class="fas fa-spinner fa-spin me-2"></i>${message}`;
+        this.resultDiv.innerHTML = message;
         this.resultDiv.className = `mt-3 alert alert-${type}`;
         this.resultDiv.style.display = 'block';
     }
