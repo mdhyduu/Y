@@ -63,8 +63,7 @@ class User(db.Model):
     remember_token = db.Column(db.String(100))
     
     # العلاقات
-    status_notes = relationship('OrderStatusNote', back_populates='user', 
-                              foreign_keys='OrderStatusNote.created_by')
+    status_notes = relationship('OrderStatusNote', back_populates='admin', foreign_keys='OrderStatusNote.admin_id') 
     # === دوال إدارة التوكنات ===
     
     @property
@@ -251,7 +250,7 @@ class Employee(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     remember_token = db.Column(db.String(100))  # New field for remember me functionality
-    
+    status_notes = relationship('OrderStatusNote', back_populates='employee', foreign_keys='OrderStatusNote.employee_id')
     permissions = relationship('EmployeePermission', back_populates='employee')
     custom_statuses = relationship('EmployeeCustomStatus', back_populates='employee')
     assignments = relationship('OrderAssignment', back_populates='employee')
@@ -358,12 +357,11 @@ class OrderStatusNote(db.Model):
     order_id = db.Column(db.String(50), ForeignKey('salla_orders.id'), nullable=False)
     status_flag = db.Column(db.String(20), nullable=False)
     note = db.Column(db.Text)
-    # تغيير العلاقة لتدعم كلا النوعين
-    admin_id = db.Column(db.Integer, ForeignKey('users.id'), nullable=True)  # للمديرين
-    employee_id = db.Column(db.Integer, ForeignKey('employees.id'), nullable=True)  # للموظفين
+    admin_id = db.Column(db.Integer, ForeignKey('users.id'), nullable=True)
+    employee_id = db.Column(db.Integer, ForeignKey('employees.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # تحديث العلاقات
+    # تحديث العلاقات مع الأعمدة الجديدة
     admin = relationship('User', foreign_keys=[admin_id])
     employee = relationship('Employee', foreign_keys=[employee_id])
     order = relationship('SallaOrder', back_populates='status_notes')
