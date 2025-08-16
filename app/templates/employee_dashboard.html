@@ -151,11 +151,15 @@
         <a href="{{ url_for('orders.order_details', order_id=status.order_id) }}" class="list-group-item list-group-item-action border-0 py-2">
             <div class="d-flex w-100 justify-content-between">
                 <h6 class="mb-1 fw-bold">
-                    طلب #{{ status.order_id }} -
-                    {% if status.status_flag == 'late' %} <span class="text-warning small">متأخر</span>
-                    {% elif status.status_flag == 'missing' %} <span class="text-danger small">ناقص</span>
-                    {% elif status.status_flag == 'refunded' %} <span class="text-secondary small">مسترجع</span>
-                    {% elif status.status_flag == 'not_shipped' %} <span class="text-info small">لم يتم الشحن</span>
+                    طلب #{{ status.order_id }} - 
+                    {% if status.status_flag == 'late' %}
+                        <span class="badge badge-late">متأخر</span>
+                    {% elif status.status_flag == 'missing' %}
+                        <span class="badge badge-missing">واصل ناقص</span>
+                    {% elif status.status_flag == 'refunded' %}
+                        <span class="badge badge-refunded">مسترجع</span>
+                    {% elif status.status_flag == 'not_shipped' %}
+                        <span class="badge badge-not_shipped">لم يتم الشحن</span>
                     {% endif %}
                 </h6>
                 <small class="text-muted flex-shrink-0 ms-2">{{ status.created_at|time_ago }}</small>
@@ -163,8 +167,7 @@
             <p class="mb-1 small text-muted">
                 {{ status.note|truncate(80) if status.note else 'تم تحديث الحالة بدون ملاحظات.' }}
             </p>
-            <!-- إضافة معلومات المنشئ -->
-    
+        
         </a>
         {% else %}
         <div class="list-group-item text-center p-4">
@@ -173,7 +176,6 @@
         {% endfor %}
     </div>
 </div>
-
 <!-- ... الأجزاء اللاحقة ... -->
 <!-- ... الأجزاء اللاحقة ... -->
         </div>
@@ -235,7 +237,69 @@
     }
     body.dark-mode .list-group-item-action:hover,
     body.dark-mode .list-group-item-action:focus {
-        background-color: #3a3f58; /* لون أغمق قليلاً عند التمرير */
+        background-color: #3a3f58; /* لون أغمق قليلاً عند التمرير
+    */
+    /* إضافة هذه الأنماط لقسم الـ CSS */
+.badge-late {
+    background-color: rgba(220, 38, 38, 0.1) !important;
+    color: #dc2626 !important;
+    border: 1px solid #dc2626;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.badge-missing {
+    background-color: rgba(234, 88, 12, 0.1) !important;
+    color: #ea580c !important;
+    border: 1px solid #ea580c;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.badge-refunded {
+    background-color: rgba(109, 40, 217, 0.1) !important;
+    color: #6d28d9 !important;
+    border: 1px solid #6d28d9;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.badge-not_shipped {
+    background-color: rgba(16, 185, 129, 0.1) !important;
+    color: #10b981 !important;
+    border: 1px solid #10b981;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* للوضع الليلي */
+body.dark-mode .badge-late {
+    background-color: rgba(220, 38, 38, 0.2) !important;
+    color: #fca5a5 !important;
+}
+
+body.dark-mode .badge-missing {
+    background-color: rgba(234, 88, 12, 0.2) !important;
+    color: #fdba74 !important;
+}
+
+body.dark-mode .badge-refunded {
+    background-color: rgba(109, 40, 217, 0.2) !important;
+    color: #c4b5fd !important;
+}
+
+body.dark-mode .badge-not_shipped {
+    background-color: rgba(16, 185, 129, 0.2) !important;
+    color: #6ee7b7 !important;
+}
     }
 </style>
 
