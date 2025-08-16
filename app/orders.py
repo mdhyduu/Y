@@ -747,7 +747,12 @@ def order_details(order_id):
         status_notes = []
         if is_reviewer:
             status_notes = OrderStatusNote.query.filter_by(order_id=str(order_id))\
+                .options(
+                    db.joinedload(OrderStatusNote.admin),
+                    db.joinedload(OrderStatusNote.employee)
+                )\
                 .order_by(OrderStatusNote.created_at.desc()).all()
+       
         
         # جلب الحالات المخصصة لهذا الطلب
         employee_statuses = db.session.query(
