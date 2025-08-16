@@ -164,15 +164,22 @@
                                 <span class="text-muted small">-</span>
                             {% endif %}
                         </td>
-                        <td>
-                            {% if order.status_notes %}
-                                {% for note in order.status_notes %}
-                                    <span class="badge bg-secondary bg-opacity-10 text-secondary fw-normal me-1">{{ note.status_flag }}</span>
-                                {% endfor %}
-                            {% else %}
-                                <span class="text-muted small">-</span>
-                            {% endif %}
-                        </td>
+                      <td>
+    {% if order.status_notes %}
+        {% for note in order.status_notes %}
+            {% set flag_class = "badge-" + note.status_flag %}
+            {% set flag_text = {
+                'late': 'متأخر',
+                'missing': 'واصل ناقص',
+                'refunded': 'مرتجع',
+                'not_shipped': 'لم يشحن'
+            }.get(note.status_flag, note.status_flag) %}
+            <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
+        {% endfor %}
+    {% else %}
+        <span class="text-muted small">-</span>
+    {% endif %}
+</td>
                         <td>
                             <span class="time-ago small" data-bs-toggle="tooltip" title="{{ order.raw_created_at|format_date }}">
                                 {{ order.created_at }}
@@ -313,6 +320,51 @@
     /* Dark Mode Styles          */
     /* =================================== */
     body.dark-mode .border-bottom { border-bottom-color: var(--border-color-dark) !important; }
+    /* إضافة هذه الأنماط لقسم الـ CSS */
+.badge-late {
+    background-color: rgba(220, 38, 38, 0.1) !important;
+    color: #dc2626 !important;
+    border: 1px solid #dc2626;
+}
+
+.badge-missing {
+    background-color: rgba(234, 88, 12, 0.1) !important;
+    color: #ea580c !important;
+    border: 1px solid #ea580c;
+}
+
+.badge-refunded {
+    background-color: rgba(109, 40, 217, 0.1) !important;
+    color: #6d28d9 !important;
+    border: 1px solid #6d28d9;
+}
+
+.badge-not_shipped {
+    background-color: rgba(16, 185, 129, 0.1) !important;
+    color: #10b981 !important;
+    border: 1px solid #10b981;
+}
+
+/* للوضع الليلي */
+body.dark-mode .badge-late {
+    background-color: rgba(220, 38, 38, 0.2) !important;
+    color: #fca5a5 !important;
+}
+
+body.dark-mode .badge-missing {
+    background-color: rgba(234, 88, 12, 0.2) !important;
+    color: #fdba74 !important;
+}
+
+body.dark-mode .badge-refunded {
+    background-color: rgba(109, 40, 217, 0.2) !important;
+    color: #c4b5fd !important;
+}
+
+body.dark-mode .badge-not_shipped {
+    background-color: rgba(16, 185, 129, 0.2) !important;
+    color: #6ee7b7 !important;
+}
     body.dark-mode .border-top { border-top-color: var(--border-color-dark) !important; }
     body.dark-mode .text-muted { color: #a0aec0 !important; }
 
