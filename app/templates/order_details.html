@@ -163,6 +163,7 @@
 <!-- قسم الحالات الخاصة -->
 <!-- بداية التعديل - قسم الحالات الخاصة -->
 <!-- بداية التعديل - قسم الحالات الخاصة -->
+<!-- بداية التعديل - قسم الحالات الخاصة -->
 {% if is_reviewer %}
 <div class="card shadow-sm mb-3 border-0">
     <div class="card-header bg-white py-2">
@@ -179,17 +180,17 @@
                     
                     <!-- الحالات التلقائية -->
                     <optgroup label="الحالات التلقائية">
-                        <option value="late" style="color: #ffc107;">متأخر</option>
-                        <option value="missing" style="color: #dc3545;">واصل ناقص</option>
-                        <option value="refunded" style="color: #6c757d;">مرتجع</option>
-                        <option value="not_shipped" style="color: #0dcaf0;">لم يتم الشحن</option>
+                        <option value="late">متأخر</option>
+                        <option value="missing">واصل ناقص</option>
+                        <option value="refunded">مرتجع</option>
+                        <option value="not_shipped">لم يتم الشحن</option>
                     </optgroup>
                     
                     <!-- الحالات المخصصة -->
                     {% if custom_note_statuses %}
                     <optgroup label="الحالات المخصصة">
                         {% for status in custom_note_statuses %}
-                        <option value="custom_{{ status.id }}" style="color: {{ status.color }};">
+                        <option value="custom_{{ status.id }}">
                             {{ status.name }}
                         </option>
                         {% endfor %}
@@ -274,6 +275,7 @@
     </div>
 </div>
 {% endif %}
+<!-- نهاية التعديل -->
 <!-- نهاية التعديل -->
 <!-- نهاية التعديل -->
       <!-- قسم تحديث حالة الطلب -->
