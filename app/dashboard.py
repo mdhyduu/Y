@@ -12,7 +12,7 @@ from .models import (
 from datetime import datetime, timedelta
 from functools import wraps
 
-dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')')
+dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
 def login_required(view_func):
     """ديكوراتور للتحقق من تسجيل الدخول"""
