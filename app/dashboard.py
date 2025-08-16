@@ -152,7 +152,8 @@ def index():
                     OrderStatusNote.order_id.in_(assigned_order_ids)
                 ).options(
                     db.joinedload(OrderStatusNote.admin),
-                    db.joinedload(OrderStatusNote.employee)
+                    db.joinedload(OrderStatusNote.employee),
+                    db.joinedload(OrderStatusNote.custom_status)  # تحميل الحالات المخصصة
                 ).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
                 
                 return render_template('employee_dashboard.html',
@@ -162,7 +163,7 @@ def index():
                                     custom_statuses=custom_statuses,
                                     custom_status_stats=custom_status_stats,
                                     recent_statuses=recent_statuses,
-                                    assigned_orders=assigned_orders)
+                                    assigned_orders=assigned_orders,recnt_statuses=recent_statuses)
         
     except Exception as e:
         flash(f"حدث خطأ في جلب بيانات لوحة التحكم: {str(e)}", "error")

@@ -142,6 +142,7 @@
           <!-- ... الأجزاء السابقة ... -->
 <!-- ... الأجزاء السابقة ... -->
 
+<!-- ... الأجزاء السابقة ... -->
 <div class="card">
     <div class="card-header">
         <h6 class="mb-0"><i class="fas fa-history me-2"></i>آخر النشاطات</h6>
@@ -152,14 +153,25 @@
             <div class="d-flex w-100 justify-content-between">
                 <h6 class="mb-1 fw-bold">
                     طلب #{{ status.order_id }} - 
-                    {% if status.status_flag == 'late' %}
-                        <span class="badge badge-late">متأخر</span>
-                    {% elif status.status_flag == 'missing' %}
-                        <span class="badge badge-missing">واصل ناقص</span>
-                    {% elif status.status_flag == 'refunded' %}
-                        <span class="badge badge-refunded">مسترجع</span>
-                    {% elif status.status_flag == 'not_shipped' %}
-                        <span class="badge badge-not_shipped">لم يتم الشحن</span>
+                    {% if status.custom_status %}
+                        <!-- حالة مخصصة -->
+                        <span class="badge" 
+                              style="background-color: {{ status.custom_status.color }};
+                                     color: {% if status.custom_status.color in ['#ffffff', '#f8f9fa'] %}#212529{% else %}white{% endif %};
+                                     border: 1px solid {{ status.custom_status.color }};">
+                            {{ status.custom_status.name }}
+                        </span>
+                    {% else %}
+                        <!-- الحالات الأساسية -->
+                        {% if status.status_flag == 'late' %}
+                            <span class="badge badge-late">متأخر</span>
+                        {% elif status.status_flag == 'missing' %}
+                            <span class="badge badge-missing">واصل ناقص</span>
+                        {% elif status.status_flag == 'refunded' %}
+                            <span class="badge badge-refunded">مسترجع</span>
+                        {% elif status.status_flag == 'not_shipped' %}
+                            <span class="badge badge-not_shipped">لم يتم الشحن</span>
+                        {% endif %}
                     {% endif %}
                 </h6>
                 <small class="text-muted flex-shrink-0 ms-2">{{ status.created_at|time_ago }}</small>
@@ -167,7 +179,6 @@
             <p class="mb-1 small text-muted">
                 {{ status.note|truncate(80) if status.note else 'تم تحديث الحالة بدون ملاحظات.' }}
             </p>
-        
         </a>
         {% else %}
         <div class="list-group-item text-center p-4">
@@ -176,6 +187,7 @@
         {% endfor %}
     </div>
 </div>
+<!-- ... الأجزاء اللاحقة ... -->
 <!-- ... الأجزاء اللاحقة ... -->
 <!-- ... الأجزاء اللاحقة ... -->
         </div>
@@ -248,6 +260,18 @@
     border-radius: 4px;
     font-size: 0.75rem;
     font-weight: 500;
+}
+/* إضافة هذا للأنماط العامة */
+.badge {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* للوضع الليلي - تخصيص الألوان */
+body.dark-mode .badge {
+    border: 1px solid rgba(255,255,255,0.1) !important;
 }
 
 .badge-missing {
