@@ -164,13 +164,13 @@
                     {% else %}
                         <!-- الحالات الأساسية -->
                         {% if status.status_flag == 'late' %}
-                            <span class="badge-badge-late">متأخر</span>
+                            <span class="badge-late">متأخر</span>
                         {% elif status.status_flag == 'missing' %}
-                            <span class="badge-badge-missing">واصل ناقص</span>
+                            <span class="badge-missing">واصل ناقص</span>
                         {% elif status.status_flag == 'refunded' %}
-                            <span class="badge-badge-refunded">مسترجع</span>
+                            <span class="badge-refunded">مسترجع</span>
                         {% elif status.status_flag == 'not_shipped' %}
-                            <span class="badge-badge-not_shipped">لم يتم الشحن</span>
+                            <span class="badge-not_shipped">لم يتم الشحن</span>
                         {% endif %}
                     {% endif %}
                 </h6>
