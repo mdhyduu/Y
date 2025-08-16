@@ -164,18 +164,7 @@
                 {{ status.note|truncate(80) if status.note else 'تم تحديث الحالة بدون ملاحظات.' }}
             </p>
             <!-- إضافة معلومات المنشئ -->
-            <div class="d-flex align-items-center mt-1">
-                <small class="text-muted">
-                    <i class="fas fa-user me-1"></i>
-                    {% if status.admin %}
-                        مدير: {{ status.admin.email }}
-                    {% elif status.employee %}
-                        موظف: {{ status.employee.email }}
-                    {% else %}
-                        نظام
-                    {% endif %}
-                </small>
-            </div>
+    
         </a>
         {% else %}
         <div class="list-group-item text-center p-4">
