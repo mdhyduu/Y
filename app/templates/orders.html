@@ -164,19 +164,28 @@
                                 <span class="text-muted small">-</span>
                             {% endif %}
                         </td>
-              <td>
+   <td>
     {% if order.status_notes %}
         <div class="d-flex flex-column gap-1">
             {% for note in order.status_notes %}
                 <div class="d-flex align-items-center">
-                    {% set flag_class = "badge-" + note.status_flag %}
-                    {% set flag_text = {
-                        'late': 'متأخر',
-                        'missing': 'واصل ناقص',
-                        'refunded': 'مرتجع',
-                        'not_shipped': 'لم يشحن'
-                    }.get(note.status_flag, note.status_flag) %}
-                    <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
+                    {% if note.custom_status %}
+                        <!-- حالة مخصصة مع لون مخصص -->
+                        <span class="badge rounded-pill me-1" 
+                              style="background-color: {{ note.custom_status.color }}; color: white">
+                            {{ note.custom_status.name }}
+                        </span>
+                    {% else %}
+                        <!-- حالة خاصة (status_flag) -->
+                        {% set flag_class = "badge-" + note.status_flag %}
+                        {% set flag_text = {
+                            'late': 'متأخر',
+                            'missing': 'واصل ناقص',
+                            'refunded': 'مرتجع',
+                            'not_shipped': 'لم يشحن'
+                        }.get(note.status_flag, note.status_flag) %}
+                        <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
+                    {% endif %}
                     
                     {% if note.admin %}
                         <span class="badge bg-light text-dark small" title="{{ note.admin.email }}">
@@ -193,8 +202,7 @@
     {% else %}
         <span class="text-muted small">-</span>
     {% endif %}
-</td>
-                        <td>
+</td>                        <td>
                             <span class="time-ago small" data-bs-toggle="tooltip" title="{{ order.raw_created_at|format_date }}">
                                 {{ order.created_at }}
                             </span>
@@ -409,7 +417,10 @@ body.dark-mode .badge-not_shipped {
     body.dark-mode .page-item.disabled .page-link { background-color: transparent; border-color: var(--border-color-dark); color: #6c757d; }
     body.dark-mode .page-link:hover { background-color: #3a3f58; }
     body.dark-mode .page-item.active .page-link { background-color: var(--primary); border-color: var(--primary); color: #fff; }
-
+/* إضافة هذا في قسم الـ CSS */
+body.dark-mode .badge[style*="background-color"] {
+    filter: brightness(0.9) contrast(1.2);
+}
     /* "No orders" state */
     body.dark-mode .text-gray-300 { color: #4b5563 !important; }
     body.dark-mode .text-gray-600 { color: #d1d5db !important; }
