@@ -356,11 +356,12 @@ class OrderStatusNote(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.String(50), ForeignKey('salla_orders.id'), nullable=False)
     status_flag = db.Column(db.String(20), nullable=False)
+    
     note = db.Column(db.Text)
     admin_id = db.Column(db.Integer, ForeignKey('users.id'), nullable=True)
     employee_id = db.Column(db.Integer, ForeignKey('employees.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+    custom_status_id = db.Column(db.Integer, ForeignKey('custom_note_statuses.id'),nullable=True)
     # تحديث العلاقات مع الأعمدة الجديدة
     admin = relationship('User', foreign_keys=[admin_id])
     employee = relationship('Employee', foreign_keys=[employee_id])
