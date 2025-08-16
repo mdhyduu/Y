@@ -153,48 +153,35 @@
                                 {{ order.status.name }}
                             </span>
                         </td>
-                        <td>
-                            {% if order.employee_statuses %}
-                                {% for status in order.employee_statuses %}
-                                    <span class="badge rounded-pill" style="background-color: {{ status.EmployeeCustomStatus.color }}; color: white">
-                                        {{ status.EmployeeCustomStatus.name }}
-                                    </span>
-                                {% endfor %}
-                            {% else %}
-                                <span class="text-muted small">-</span>
-                            {% endif %}
-                        </td>
-   <td>
-    {% if order.status_notes %}
-        <div class="d-flex flex-column gap-1">
-            {% for note in order.status_notes %}
-                <div class="d-flex align-items-center">
-                    {% if note.custom_status %}
-                        <!-- حالة مخصصة مع لون مخصص -->
-                        <span class="badge rounded-pill me-1" 
-                              style="background-color: {{ note.custom_status.color }}; color: white">
-                            {{ note.custom_status.name }}
-                        </span>
-                    {% else %}
-                        <!-- حالة خاصة (status_flag) -->
-                        {% set flag_class = "badge-" + note.status_flag %}
-                        {% set flag_text = {
-                            'late': 'متأخر',
-                            'missing': 'واصل ناقص',
-                            'refunded': 'مرتجع',
-                            'not_shipped': 'لم يشحن'
-                        }.get(note.status_flag, note.status_flag) %}
-                        <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
-                    {% endif %}
-                    
+                     <td>
+    {% if order.employee_statuses %}
+        {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
+        <span class="badge rounded-pill" style="background-color: {{ last_custom_status.EmployeeCustomStatus.color }}; color: white">
+            {{ last_custom_status.EmployeeCustomStatus.name }}
+        </span>
+    {% else %}
+        <span class="text-muted small">-</span>
+    {% endif %}
+</td>
 
-                </div>
-            {% endfor %}
+<td>
+    {% set last_flag_note = order.status_notes | selectattr('status_flag', '!=', none) | sort(attribute='created_at', reverse=true) | first %}
+    {% if last_flag_note %}
+        <div class="d-flex align-items-center">
+            {% set flag_class = "badge-" + last_flag_note.status_flag %}
+            {% set flag_text = {
+                'late': 'متأخر',
+                'missing': 'واصل ناقص',
+                'refunded': 'مرتجع',
+                'not_shipped': 'لم يشحن'
+            }.get(last_flag_note.status_flag, last_flag_note.status_flag) %}
+            <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
         </div>
     {% else %}
         <span class="text-muted small">-</span>
     {% endif %}
-</td>                        <td>
+</td>     
+<td>
                             <span class="time-ago small" data-bs-toggle="tooltip" title="{{ order.raw_created_at|format_date }}">
                                 {{ order.created_at }}
                             </span>
