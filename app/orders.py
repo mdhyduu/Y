@@ -408,6 +408,9 @@ def index():
         # جلب جميع ملاحظات الحالة
         status_notes = OrderStatusNote.query.filter(
             OrderStatusNote.order_id.in_(assigned_order_ids)
+        ).options(
+            db.joinedload(OrderStatusNote.admin),
+            db.joinedload(OrderStatusNote.employee)
         ).all()
         
         # تجميع ملاحظات الحالة حسب order_id
@@ -416,6 +419,7 @@ def index():
             if note.order_id not in notes_dict:
                 notes_dict[note.order_id] = []
             notes_dict[note.order_id].append(note)
+      
         
         # معالجة البيانات للعرض
         processed_orders = []
@@ -752,7 +756,7 @@ def order_details(order_id):
                     db.joinedload(OrderStatusNote.employee)
                 )\
                 .order_by(OrderStatusNote.created_at.desc()).all()
-       
+      
         
         # جلب الحالات المخصصة لهذا الطلب
         employee_statuses = db.session.query(
