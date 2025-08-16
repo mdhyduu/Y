@@ -354,9 +354,9 @@
       </a>
       
       {% if not request.cookies.get('is_admin') == 'true' %}
-        <a class="nav-link {% if request.path == url_for('dashboard.employee_dashboard') %}active{% endif %}" href="{{ url_for('dashboard.employee_dashboard') }}">
-          <i class="fas fa-tachometer-alt"></i> لوحتي
-        </a>
+     <a class="nav-link {% if request.path.startswith('/dashboard') %}active{% endif %}" href="{{ url_for('dashboard.index') }}">
+  <i class="fas fa-tachometer-alt"></i> لوحتي
+</a>
       {% endif %}
       
       {% if request.cookies.get('is_admin') == 'true' %}
