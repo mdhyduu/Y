@@ -70,7 +70,7 @@ def index():
         user_id = request.cookies.get('user_id')
         
         if is_admin:
-            # ... (الكود الأصلي للمدراء)
+            # للمستخدمين العامين (المدراء)
             user = User.query.get(user_id)
             if not user:
                 resp = make_response(redirect(url_for('user_auth.login')))
@@ -81,8 +81,9 @@ def index():
             return render_template('dashboard.html', 
                                 current_user=user,
                                 is_admin=True)
+        
         else:
-
+            # للموظفين
             employee = Employee.query.get(user_id)
             if not employee:
                 flash('بيانات الموظف غير موجودة', 'error')
@@ -90,21 +91,20 @@ def index():
                 resp.delete_cookie('user_id')
                 resp.delete_cookie('is_admin')
                 return resp
-                
+            
             user = User.query.filter_by(store_id=employee.store_id).first()
             
+            # تحديد نوع لوحة التحكم حسب الدور
             if employee.role in ('delivery', 'delivery_manager'):
                 is_delivery_manager = (employee.role == 'delivery_manager')
                 return render_template('dashboard.html',
                                     current_user=user,
                                     is_delivery_manager=is_delivery_manager,
                                     employee=employee)
-                # ... (الكود الأصلي لفريق التوصيل)
             else:
-                # ===== [جديد] كود لوحة الموظفين الموحد =====
                 # جلب الطلبات المسندة لهذا الموظف فقط
                 assignments = OrderAssignment.query.filter_by(employee_id=employee.id).all()
-                assigned_order_ids = [assignment.order_id for assignment in assignments]
+                assigned_order_ids = [a.order_id for a in assignments]
                 
                 # جلب الطلبات المسندة
                 assigned_orders = SallaOrder.query.filter(
@@ -125,8 +125,7 @@ def index():
                     )]),
                     'not_shipped_orders': len([o for o in assigned_orders if any(
                         note.status_flag == 'not_shipped' for note in o.status_notes
-                    )]),
-                    'completed_orders': len([o for o in assigned_orders if o.status_slug == 'completed'])
+                    )])
                 }
                 
                 # جلب الحالات المخصصة للموظف الحالي
@@ -152,14 +151,22 @@ def index():
                     OrderStatusNote.order_id.in_(assigned_order_ids)
                 ).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
                 
-                return render_template('employee_dashboard.html', 
+                # إضافة معلومات المستخدم الذي أضاف الحالة (للملاحظات)
+                for status_note in recent_statuses:
+                    status_note.user = User.query.get(status_note.created_by)
+                
+                return render_template('employee_dashboard.html',
+                                    current_user=user,
+                                    employee=employee,
                                     stats=stats,
+                                    custom_statuses=custom_statuses,
                                     custom_status_stats=custom_status_stats,
                                     recent_statuses=recent_statuses,
-                                    assigned_orders=assigned_orders,
-                                    current_user=user,
-                                    employee=employee)
-    # ... (بقية الكود)
+                                    assigned_orders=assigned_orders)
+    
+    except Exception as e:
+        flash(f"حدث خطأ في جلب بيانات لوحة التحكم: {str(e)}", "error")
+        return redirect(url_for('user_auth.login'))
 @dashboard_bp.route('/settings')
 @login_required
 def settings():
