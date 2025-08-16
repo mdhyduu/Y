@@ -159,56 +159,82 @@
         </div>
       </div>
 
-<!-- ... الكود السابق ... -->
-
-<!-- قسم الحالات الخاصة (للمراجعين فقط) -->
+      <!-- قسم الحالات الخاصة (للمراجعين فقط) -->
+<!-- قسم الحالات الخاصة -->
 {% if is_reviewer %}
 <div class="card shadow-sm mb-3 border-0">
-  <div class="card-header bg-white py-2">
-    <h5 class="mb-0 fs-5"><i class="fas fa-flag ms-2"></i>حالات خاصة</h5>
-  </div>
-  <div class="card-body p-2">
-    <!-- ... النموذج ... -->
-    <div class="mt-3">
-      <h6 class="border-bottom pb-1 small">الحالات المسجلة</h6>
-      <ul class="list-group list-group-flush small">
-        {% for note in status_notes %}
-        <li class="list-group-item d-flex justify-content-between py-1 px-0">
-          <div>
-            <span class="badge bg-{{ 'warning text-dark' if note.status_flag == 'late' else
-                                       'danger' if note.status_flag == 'missing' else
-                                       'secondary' if note.status_flag == 'refunded' else
-                                       'info' }}">
-              {{ note.status_flag | replace('late', 'متأخر') | replace('missing', 'واصل ناقص') | replace('refunded', 'مسترجع') | replace('not_shipped', 'لم يتم الشحن') }}
-            </span>
-            {% if note.note %}
-              <span class="ms-2">{{ note.note | safe }}</span>
-            {% endif %}
-            <!-- إضافة معلومات المستخدم هنا -->
-            <div class="text-muted small mt-1">
-              <i class="fas fa-user me-1"></i>
-              {% if note.admin %}
-                {{ note.admin.email }} (مدير)
-              {% elif note.employee %}
-                {{ note.employee.email }} (موظف)
-              {% else %}
-                مستخدم غير معروف
-              {% endif %}
-            </div>
-          </div>
-          <div class="text-muted">{{ note.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
-        </li>
-        {% else %}
-        <li class="list-group-item py-2 text-center text-muted">لا توجد حالات مسجلة</li>
-        {% endfor %}
-      </ul>
+    <div class="card-header bg-white py-2">
+        <h5 class="mb-0 fs-5"><i class="fas fa-flag ms-2"></i>حالات خاصة</h5>
     </div>
-  </div>
+    <div class="card-body p-2">
+        <form action="{{ url_for('orders.add_status_note', order_id=order.id) }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-3">
+                <label class="form-label small">نوع الحالة</label>
+                <select class="form-select form-select-sm" name="status_flag" required>
+                    <option value="">اختر نوع الحالة</option>
+                    <option value="late">متأخر</option>
+                    <option value="missing">واصل ناقص</option>
+                    <option value="refunded">مرتجع</option>
+                    <option value="not_shipped">لم يتم الشحن</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small">الملاحظات</label>
+                <textarea class="form-control form-control-sm" name="note" rows="3"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm w-100">
+                <i class="fas fa-save me-1"></i> حفظ
+            </button>
+        </form>
+
+        <!-- عرض الحالات المسجلة -->
+        <div class="mt-4">
+            <h6 class="border-bottom pb-2 mb-3 small">الحالات المسجلة</h6>
+            {% if status_notes %}
+                <div class="list-group list-group-flush">
+                    {% for note in status_notes %}
+                    <div class="list-group-item py-2 px-0">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <span class="badge bg-{{ 
+                                    'warning' if note.status_flag == 'late' 
+                                    else 'danger' if note.status_flag == 'missing' 
+                                    else 'info' if note.status_flag == 'not_shipped' 
+                                    else 'secondary' 
+                                }}">
+                                    {{ note.status_flag | replace('late', 'متأخر') | 
+                                       replace('missing', 'واصل ناقص') | 
+                                       replace('not_shipped', 'لم يشحن') | 
+                                       replace('refunded', 'مرتجع') }}
+                                </span>
+                                {% if note.note %}
+                                    <p class="mb-0 mt-1 small">{{ note.note }}</p>
+                                {% endif %}
+                            </div>
+                            <div class="text-muted small">
+                                {{ note.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                <div class="text-end mt-1">
+                                    <small>
+                                        {% if note.admin %}
+                                            <i class="fas fa-user-shield"></i> مدير
+                                        {% elif note.employee %}
+                                            <i class="fas fa-user-tie"></i> موظف
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted text-center py-3 small">لا توجد حالات مسجلة</p>
+            {% endif %}
+        </div>
+    </div>
 </div>
 {% endif %}
-
-<!-- ... بقية الكود ... -->
-
       <!-- قسم تحديث حالة الطلب -->
       <div class="card shadow-sm mb-3 border-0">
         <div class="card-header bg-white py-2">

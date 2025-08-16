@@ -748,17 +748,16 @@ def order_details(order_id):
 
         # ========== [5] جلب البيانات الإضافية من قاعدة البيانات ==========
         # جلب الملاحظات الخاصة بالطلب (للمراجعين فقط)
-        status_notes = []
-        if is_reviewer:
-            status_notes = OrderStatusNote.query.filter_by(order_id=str(order_id))\
-                .options(
-                    db.joinedload(OrderStatusNote.admin),
-                    db.joinedload(OrderStatusNote.employee)
-                )\
-                .order_by(OrderStatusNote.created_at.desc()).all()
-      
+        status_notes = OrderStatusNote.query.filter_by(
+            order_id=str(order_id)
+        ).options(
+            db.joinedload(OrderStatusNote.admin),
+            db.joinedload(OrderStatusNote.employee)
+        ).order_by(
+            OrderStatusNote.created_at.desc()
+        ).all()
         
-        # جلب الحالات المخصصة لهذا الطلب
+        # جلب الحالات المخصصة مع العلاقات
         employee_statuses = db.session.query(
             OrderEmployeeStatus,
             EmployeeCustomStatus,
@@ -774,14 +773,14 @@ def order_details(order_id):
         ).order_by(
             OrderEmployeeStatus.created_at.desc()
         ).all()
-
-        # ========== [6] عرض صفحة التفاصيل ==========
+        
         return render_template('order_details.html', 
-                            order=processed_order, 
-                            status_notes=status_notes,
-                            employee_statuses=employee_statuses,
-                            current_employee=current_employee,
-                            is_reviewer=is_reviewer)
+            order=processed_order,
+            status_notes=status_notes,  # تأكد من تمرير المتغير
+            employee_statuses=employee_statuses,  # تأكد من تمرير المتغير
+            current_employee=current_employee,
+            is_reviewer=is_reviewer
+        )
 
     except requests.exceptions.HTTPError as http_err:
         error_msg = f"خطأ في جلب تفاصيل الطلب: {http_err}"
