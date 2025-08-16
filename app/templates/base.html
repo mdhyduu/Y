@@ -358,7 +358,14 @@
   <i class="fas fa-tachometer-alt"></i> لوحتي
 </a>
       {% endif %}
-      
+      <!-- في القائمة الرئيسية -->
+{% if is_reviewer %}
+<li class="nav-item">
+    <a class="nav-link" href="{{ url_for('orders.manage_note_status') }}">
+        <i class="fas fa-tags"></i> إدارة حالات الملاحظات
+    </a>
+</li>
+{% endif %}
       {% if request.cookies.get('is_admin') == 'true' %}
         <a class="nav-link {% if request.path == url_for('employees.list_employees') %}active{% endif %}" href="{{ url_for('employees.list_employees') }}">
           <i class="fas fa-users"></i> الموظفين

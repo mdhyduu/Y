@@ -6,7 +6,7 @@ import requests
 from .models import (
     db, User, Employee, Department, EmployeePermission, 
     Product, OrderDelivery, SallaOrder, OrderAssignment,
-    OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus
+    OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, CustomNoteStatus
 )
 from .config import Config
 from .utils import process_order_data, format_date, generate_barcode, humanize_time
@@ -868,10 +868,8 @@ def update_order_status(order_id):
         flash(f"حدث خطأ غير متوقع: {str(e)}", "error")
         return redirect(url_for('orders.order_details', order_id=order_id))
 
-
 @orders_bp.route('/<int:order_id>/add_status_note', methods=['POST'])
 def add_status_note(order_id):
-    """إضافة ملاحظة خاصة بالطلب (متأخر، واصل ناقص، إلخ)"""
     user, employee = get_user_from_cookies()
     
     if not user:
@@ -894,9 +892,11 @@ def add_status_note(order_id):
         return redirect(url_for('orders.order_details', order_id=order_id))
     
     status_flag = request.form.get('status_flag')
+    custom_status_id = request.form.get('custom_status_id')  # الجديد
     note = request.form.get('note', '')
     
-    if not status_flag:
+    # يجب أن يكون هناك إما status_flag أو custom_status_id
+    if not status_flag and not custom_status_id:
         flash("يجب اختيار حالة", "error")
         return redirect(url_for('orders.order_details', order_id=order_id))
     
@@ -904,16 +904,15 @@ def add_status_note(order_id):
         # إنشاء كائن الملاحظة الجديدة
         new_note = OrderStatusNote(
             order_id=str(order_id),
-            status_flag=status_flag,
+            status_flag=custom_status_id if custom_status_id else status_flag,  # استخدام الحالة المخصصة إذا تم اختيارها
+            custom_status_id=custom_status_id if custom_status_id else None,  # حفظ معرف الحالة المخصصة
             note=note
         )
         
         # تحديد من أضاف الملاحظة (مدير أو موظف)
         if request.cookies.get('is_admin') == 'true':
-            # إذا كان مديرًا (من جدول users)
             new_note.admin_id = request.cookies.get('user_id')
         else:
-            # إذا كان موظفًا (من جدول employees)
             new_note.employee_id = employee.id
         
         db.session.add(new_note)
@@ -1060,3 +1059,72 @@ def add_employee_status(order_id):
         flash(f'حدث خطأ: {str(e)}', 'error')
     
     return redirect(url_for('orders.order_details', order_id=order_id))
+
+@orders_bp.route('/manage_note_status', methods=['GET', 'POST'])
+def manage_note_status():
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        flash('الرجاء تسجيل الدخول أولاً', 'error')
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
+    
+    # التحقق من الصلاحية (مدير أو مراجع فقط)
+    is_reviewer = False
+    if request.cookies.get('is_admin') == 'true':
+        is_reviewer = True
+    else:
+        if employee and employee.role in ['reviewer', 'manager']:
+            is_reviewer = True
+    
+    if not is_reviewer:
+        flash('غير مصرح لك بالوصول', 'error')
+        return redirect(url_for('orders.index'))
+    
+    store_id = user.store_id
+    
+    if request.method == 'POST':
+        name = request.form.get('name')
+        color = request.form.get('color', '#6c757d')
+        
+        if name:
+            new_status = CustomNoteStatus(
+                name=name,
+                color=color,
+                store_id=store_id
+            )
+            
+            if request.cookies.get('is_admin') == 'true':
+                new_status.created_by_admin = user.id
+            else:
+                new_status.created_by_employee = employee.id
+                
+            db.session.add(new_status)
+            db.session.commit()
+            flash('تمت إضافة الحالة بنجاح', 'success')
+        return redirect(url_for('orders.manage_note_status'))
+    
+    # جلب الحالات الخاصة بالمتجر
+    statuses = CustomNoteStatus.query.filter_by(store_id=store_id).all()
+    
+    return render_template('manage_note_status.html', statuses=statuses)
+
+@orders_bp.route('/note_status/<int:status_id>/delete', methods=['POST'])
+def delete_note_status(status_id):
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        flash('غير مصرح لك بالوصول', 'error')
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
+    
+    status = CustomNoteStatus.query.get(status_id)
+    if status and status.store_id == user.store_id:
+        db.session.delete(status)
+        db.session.commit()
+        flash('تم حذف الحالة بنجاح', 'success')
+    return redirect(url_for('orders.manage_note_status'))

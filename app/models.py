@@ -365,7 +365,7 @@ class OrderStatusNote(db.Model):
     admin = relationship('User', foreign_keys=[admin_id])
     employee = relationship('Employee', foreign_keys=[employee_id])
     order = relationship('SallaOrder', back_populates='status_notes')
-
+    custom_status = relationship('CustomNoteStatus', back_populates='notes', foreign_keys=[custom_status_id])  # 
 class EmployeeCustomStatus(db.Model):
     __tablename__ = 'employee_custom_statuses'
     
@@ -377,6 +377,23 @@ class EmployeeCustomStatus(db.Model):
     
     employee = relationship('Employee', back_populates='custom_statuses')
     order_statuses = relationship('OrderEmployeeStatus', back_populates='status')
+    
+class CustomNoteStatus(db.Model):
+    __tablename__ = 'custom_note_statuses'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    color = db.Column(db.String(20), default='#6c757d')
+    store_id = db.Column(db.Integer, nullable=False)
+    created_by_admin = db.Column(db.Integer, ForeignKey('users.id'), nullable=True)
+    created_by_employee = db.Column(db.Integer, ForeignKey('employees.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)
+    
+    # العلاقات
+    admin = relationship('User', foreign_keys=[created_by_admin])
+    employee = relationship('Employee', foreign_keys=[created_by_employee])
+    notes = relationship('OrderStatusNote', back_populates='custom_status')
 
 class Product(db.Model):
     __tablename__ = 'product'
