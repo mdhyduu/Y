@@ -163,37 +163,32 @@
         <span class="text-muted small">-</span>
     {% endif %}
 </td>
+
 <td>
-    {% set last_custom_note = order.status_notes | selectattr('custom_status', '!=', none) | sort(attribute='created_at', reverse=true) | first %}
-    {% set last_flag_note = order.status_notes | selectattr('status_flag', '!=', none) | sort(attribute='created_at', reverse=true) | first %}
-    
-    <div class="d-flex flex-column gap-1">
-        {% if last_custom_note %}
-            <div class="d-flex align-items-center">
+    {% set last_note = order.status_notes | sort(attribute='created_at', reverse=true) | first %}
+    {% if last_note %}
+        <div class="d-flex align-items-center">
+            {% if last_note.custom_status %}
+                <!-- حالة مخصصة مع لون مخصص -->
                 <span class="badge rounded-pill me-1" 
-                      style="background-color: {{ last_custom_note.custom_status.color }}; color: white">
-                    {{ last_custom_note.custom_status.name }}
+                      style="background-color: {{ last_note.custom_status.color }}; color: white">
+                    {{ last_note.custom_status.name }}
                 </span>
-            </div>
-        {% endif %}
-        
-        {% if last_flag_note %}
-            <div class="d-flex align-items-center">
-                {% set flag_class = "badge-" + last_flag_note.status_flag %}
+            {% elif last_note.status_flag %}
+                <!-- حالة خاصة (status_flag) -->
+                {% set flag_class = "badge-" + last_note.status_flag %}
                 {% set flag_text = {
                     'late': 'متأخر',
                     'missing': 'واصل ناقص',
                     'refunded': 'مرتجع',
                     'not_shipped': 'لم يشحن'
-                }.get(last_flag_note.status_flag, last_flag_note.status_flag) %}
+                }.get(last_note.status_flag, last_note.status_flag) %}
                 <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
-            </div>
-        {% endif %}
-        
-        {% if not last_custom_note and not last_flag_note %}
-            <span class="text-muted small">-</span>
-        {% endif %}
-    </div>
+            {% endif %} 
+        </div>
+    {% else %}
+        <span class="text-muted small">-</span>
+    {% endif %}
 </td>
 <td>
                             <span class="time-ago small" data-bs-toggle="tooltip" title="{{ order.raw_created_at|format_date }}">
