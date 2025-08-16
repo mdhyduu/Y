@@ -164,18 +164,32 @@
                                 <span class="text-muted small">-</span>
                             {% endif %}
                         </td>
-                      <td>
+              <td>
     {% if order.status_notes %}
-        {% for note in order.status_notes %}
-            {% set flag_class = "badge-" + note.status_flag %}
-            {% set flag_text = {
-                'late': 'متأخر',
-                'missing': 'واصل ناقص',
-                'refunded': 'مرتجع',
-                'not_shipped': 'لم يشحن'
-            }.get(note.status_flag, note.status_flag) %}
-            <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
-        {% endfor %}
+        <div class="d-flex flex-column gap-1">
+            {% for note in order.status_notes %}
+                <div class="d-flex align-items-center">
+                    {% set flag_class = "badge-" + note.status_flag %}
+                    {% set flag_text = {
+                        'late': 'متأخر',
+                        'missing': 'واصل ناقص',
+                        'refunded': 'مرتجع',
+                        'not_shipped': 'لم يشحن'
+                    }.get(note.status_flag, note.status_flag) %}
+                    <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
+                    
+                    {% if note.admin %}
+                        <span class="badge bg-light text-dark small" title="{{ note.admin.email }}">
+                            <i class="fas fa-user-shield me-1"></i>مدير
+                        </span>
+                    {% elif note.employee %}
+                        <span class="badge bg-light text-dark small" title="{{ note.employee.email }}">
+                            <i class="fas fa-user-tie me-1"></i>موظف
+                        </span>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
     {% else %}
         <span class="text-muted small">-</span>
     {% endif %}
