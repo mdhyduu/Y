@@ -71,14 +71,34 @@ def index():
         
         if is_admin:
             # ... (الكود الأصلي للمدراء)
+            user = User.query.get(user_id)
+            if not user:
+                resp = make_response(redirect(url_for('user_auth.login')))
+                resp.delete_cookie('user_id')
+                resp.delete_cookie('is_admin')
+                return resp
+                
+            return render_template('dashboard.html', 
+                                current_user=user,
+                                is_admin=True)
         else:
+
             employee = Employee.query.get(user_id)
             if not employee:
-                # ... (الكود الأصلي للتحقق)
-            
+                flash('بيانات الموظف غير موجودة', 'error')
+                resp = make_response(redirect(url_for('user_auth.login')))
+                resp.delete_cookie('user_id')
+                resp.delete_cookie('is_admin')
+                return resp
+                
             user = User.query.filter_by(store_id=employee.store_id).first()
             
             if employee.role in ('delivery', 'delivery_manager'):
+                is_delivery_manager = (employee.role == 'delivery_manager')
+                return render_template('dashboard.html',
+                                    current_user=user,
+                                    is_delivery_manager=is_delivery_manager,
+                                    employee=employee)
                 # ... (الكود الأصلي لفريق التوصيل)
             else:
                 # ===== [جديد] كود لوحة الموظفين الموحد =====
