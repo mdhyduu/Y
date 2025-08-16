@@ -187,15 +187,7 @@
                         <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
                     {% endif %}
                     
-                    {% if note.admin %}
-                        <span class="badge bg-light text-dark small" title="{{ note.admin.email }}">
-                            <i class="fas fa-user-shield me-1"></i>مدير
-                        </span>
-                    {% elif note.employee %}
-                        <span class="badge bg-light text-dark small" title="{{ note.employee.email }}">
-                            <i class="fas fa-user-tie me-1"></i>موظف
-                        </span>
-                    {% endif %}
+
                 </div>
             {% endfor %}
         </div>
