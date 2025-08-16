@@ -906,7 +906,8 @@ def add_status_note(order_id):
         if status_type.startswith('custom_'):
             # حالة مخصصة
             custom_status_id = status_type.split('_')[1]
-            status_flag = custom_status_id  # يمكنك استخدام قيمة أخرى إذا كنت تفضل
+            # للحالات المخصصة، نستخدم اسم الحالة كـ status_flag
+            status_flag = "custom"
         else:
             # حالة تلقائية
             status_flag = status_type
@@ -931,6 +932,7 @@ def add_status_note(order_id):
     except Exception as e:
         db.session.rollback()
         flash(f"حدث خطأ: {str(e)}", "error")
+        current_app.logger.error(f"Error adding status note: {str(e)}", exc_info=True)
     
     return redirect(url_for('orders.order_details', order_id=order_id))
 @orders_bp.route('/static/barcodes/<filename>')
