@@ -350,13 +350,13 @@
   </a>
   
   <a class="nav-link {% if request.path == url_for('orders.manage_employee_status') %}active{% endif %}" href="{{ url_for('orders.manage_employee_status') }}">
-    <i class="fas fa-tags"></i> حالاتي المخصصة
+    <i class="fas fa-tags"></i> حالات الطلبات
   </a>
   
   <!-- رابط إدارة حالات الملاحظات الجديد -->
   {% if is_reviewer %}
     <a class="nav-link {% if request.path == url_for('orders.manage_note_status') %}active{% endif %}" href="{{ url_for('orders.manage_note_status') }}">
-      <i class="fas fa-tags"></i> إدارة حالات الملاحظات
+      <i class="fas fa-tags"></i>التنبيهات 
     </a>
   {% endif %}
   

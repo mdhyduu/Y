@@ -891,21 +891,31 @@ def add_status_note(order_id):
         flash('غير مصرح لك بهذا الإجراء', 'error')
         return redirect(url_for('orders.order_details', order_id=order_id))
     
-    status_flag = request.form.get('status_flag')
-    custom_status_id = request.form.get('custom_status_id')  # الجديد
+    status_type = request.form.get('status_type')
     note = request.form.get('note', '')
     
-    # يجب أن يكون هناك إما status_flag أو custom_status_id
-    if not status_flag and not custom_status_id:
+    if not status_type:
         flash("يجب اختيار حالة", "error")
         return redirect(url_for('orders.order_details', order_id=order_id))
     
     try:
+        # معالجة نوع الحالة
+        custom_status_id = None
+        status_flag = None
+        
+        if status_type.startswith('custom_'):
+            # حالة مخصصة
+            custom_status_id = status_type.split('_')[1]
+            status_flag = custom_status_id  # يمكنك استخدام قيمة أخرى إذا كنت تفضل
+        else:
+            # حالة تلقائية
+            status_flag = status_type
+        
         # إنشاء كائن الملاحظة الجديدة
         new_note = OrderStatusNote(
             order_id=str(order_id),
-            status_flag=custom_status_id if custom_status_id else status_flag,  # استخدام الحالة المخصصة إذا تم اختيارها
-            custom_status_id=custom_status_id if custom_status_id else None,  # حفظ معرف الحالة المخصصة
+            status_flag=status_flag,
+            custom_status_id=custom_status_id,
             note=note
         )
         
@@ -923,7 +933,6 @@ def add_status_note(order_id):
         flash(f"حدث خطأ: {str(e)}", "error")
     
     return redirect(url_for('orders.order_details', order_id=order_id))
-
 @orders_bp.route('/static/barcodes/<filename>')
 def serve_barcode(filename):
     """تخدم ملفات الباركود"""
