@@ -7,7 +7,8 @@ from .models import (
     OrderAssignment,  # تمت الإضافة
     SallaOrder,       # تمت الإضافة
     EmployeeCustomStatus,  # تمت الإضافة
-    OrderEmployeeStatus    # تمت الإضافة
+    OrderEmployeeStatus, 
+    CustomNoteStatus  # تمت الإضافة
 )
 from datetime import datetime, timedelta
 from functools import wraps
@@ -149,11 +150,10 @@ def index():
                 # جلب آخر النشاطات للطلبات المسندة فقط
                 recent_statuses = OrderStatusNote.query.filter(
                     OrderStatusNote.order_id.in_(assigned_order_ids)
+                ).options(
+                    db.joinedload(OrderStatusNote.admin),
+                    db.joinedload(OrderStatusNote.employee)
                 ).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
-                
-                # إضافة معلومات المستخدم الذي أضاف الحالة (للملاحظات)
-                for status_note in recent_statuses:
-                    status_note.user = User.query.get(status_note.created_by)
                 
                 return render_template('employee_dashboard.html',
                                     current_user=user,
@@ -163,6 +163,10 @@ def index():
                                     custom_status_stats=custom_status_stats,
                                     recent_statuses=recent_statuses,
                                     assigned_orders=assigned_orders)
+        
+    except Exception as e:
+        flash(f"حدث خطأ في جلب بيانات لوحة التحكم: {str(e)}", "error")
+        return redirect(url_for('user_auth.login'))
     
     except Exception as e:
         flash(f"حدث خطأ في جلب بيانات لوحة التحكم: {str(e)}", "error")
