@@ -48,6 +48,7 @@ def login_required(view_func):
         
         return view_func(*args, **kwargs)
     return wrapper
+    
 @dashboard_bp.route('/')
 @login_required
 def index():
@@ -82,15 +83,16 @@ def index():
             if employee.role in ('delivery', 'delivery_manager'):
                 is_delivery_manager = (employee.role == 'delivery_manager')
                 
-                # جلب الطلبات المسندة لهذا الموظف فقط
-                assigned_orders = OrderAssignment.query.filter_by(
-                    employee_id=employee.id
-                ).all()
-                
-                order_ids = [ao.order_id for ao in assigned_orders]
+                # جلب الطلبات المسندة لهذا الموظف فقط مع تفاصيل كل طلب
+                assigned_orders = db.session.query(SallaOrder).join(
+                    OrderAssignment,
+                    OrderAssignment.order_id == SallaOrder.id
+                ).filter(
+                    OrderAssignment.employee_id == employee.id
+                ).order_by(SallaOrder.created_at.desc()).all()
                 
                 stats = {
-                    'assigned_orders': len(order_ids),
+                    'assigned_orders': len(assigned_orders),
                     'delivered_orders': OrderDelivery.query.filter_by(
                         employee_id=employee.id
                     ).count(),
@@ -100,70 +102,89 @@ def index():
                                     current_user=user,
                                     is_delivery_manager=is_delivery_manager,
                                     employee=employee,
-                                    stats=stats,
-                                    assigned_orders=order_ids)
+                                    stats=stats)
             else:
-                # فلترة البيانات حسب المتجر والموظف
+                # إحصائيات الطلبات حسب المتجر
                 stats = {
                     'new_orders': SallaOrder.query.filter_by(
                         store_id=employee.store_id
                     ).count(),
                     'late_orders': OrderStatusNote.query.join(
-                        SallaOrder
+                        SallaOrder,
+                        OrderStatusNote.order_id == SallaOrder.id
                     ).filter(
                         OrderStatusNote.status_flag == 'late',
                         SallaOrder.store_id == employee.store_id
                     ).count(),
                     'missing_orders': OrderStatusNote.query.join(
-                        SallaOrder
+                        SallaOrder,
+                        OrderStatusNote.order_id == SallaOrder.id
                     ).filter(
                         OrderStatusNote.status_flag == 'missing',
                         SallaOrder.store_id == employee.store_id
                     ).count(),
                     'refunded_orders': OrderStatusNote.query.join(
-                        SallaOrder
+                        SallaOrder,
+                        OrderStatusNote.order_id == SallaOrder.id
                     ).filter(
                         OrderStatusNote.status_flag == 'refunded',
                         SallaOrder.store_id == employee.store_id
                     ).count(),
                     'not_shipped_orders': OrderStatusNote.query.join(
-                        SallaOrder
+                        SallaOrder,
+                        OrderStatusNote.order_id == SallaOrder.id
                     ).filter(
                         OrderStatusNote.status_flag == 'not_shipped',
                         SallaOrder.store_id == employee.store_id
                     ).count(),
                 }
                 
-                # جلب الحالات الخاصة بالموظف فقط
+                # جلب الطلبات المسندة لهذا الموظف
+                assigned_orders = db.session.query(SallaOrder).join(
+                    OrderAssignment,
+                    OrderAssignment.order_id == SallaOrder.id
+                ).filter(
+                    OrderAssignment.employee_id == employee.id,
+                    SallaOrder.store_id == employee.store_id
+                ).order_by(SallaOrder.created_at.desc()).all()
+                
+                # جلب الحالات المخصصة التي أنشأها الموظف
                 custom_statuses = OrderStatusNote.query.join(
-                    SallaOrder
+                    SallaOrder,
+                    OrderStatusNote.order_id == SallaOrder.id
                 ).filter(
                     SallaOrder.store_id == employee.store_id,
                     OrderStatusNote.created_by == employee.id
                 ).order_by(OrderStatusNote.created_at.desc()).all()
                 
-                # جلب آخر 5 حالات للموظف فقط
+                # جلب آخر 5 حالات للموظف
                 recent_statuses = OrderStatusNote.query.join(
-                    SallaOrder
+                    SallaOrder,
+                    OrderStatusNote.order_id == SallaOrder.id
                 ).filter(
                     SallaOrder.store_id == employee.store_id,
                     OrderStatusNote.created_by == employee.id
                 ).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
                 
-                # جلب الطلبات المسندة لهذا الموظف
-                assigned_orders = OrderAssignment.query.filter_by(
-                    employee_id=employee.id
-                ).all()
-                
-                # إضافة معلومات المستخدم الذي أضاف الحالة
-                for status in custom_statuses + recent_statuses:
-                    status.user = User.query.get(status.created_by)
+                # إحصائيات الحالات المخصصة للموظف
+                custom_status_stats = []
+                if hasattr(employee, 'custom_statuses'):
+                    for status in employee.custom_statuses:
+                        count = db.session.query(OrderEmployeeStatus).filter(
+                            OrderEmployeeStatus.status_id == status.id,
+                            OrderEmployeeStatus.employee_id == employee.id
+                        ).count()
+                        if count > 0:
+                            custom_status_stats.append({
+                                'status': status,
+                                'count': count
+                            })
                 
                 return render_template('employee_dashboard.html',
                                     current_user=user,
                                     employee=employee,
                                     stats=stats,
-                                    custom_statuses=custom_statuses,
+                                    custom_status_stats=custom_status_stats,
                                     recent_statuses=recent_statuses,
                                     assigned_orders=assigned_orders)
     
