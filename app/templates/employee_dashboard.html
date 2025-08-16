@@ -139,35 +139,52 @@
                     <canvas id="statusChart" height="200"></canvas>
                 </div>
             </div>
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fas fa-history me-2"></i>آخر النشاطات</h6>
-                </div>
-                <div class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
-                    {% for status in recent_statuses %}
-                    <a href="{{ url_for('orders.order_details', order_id=status.order_id) }}" class="list-group-item list-group-item-action border-0 py-2">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1 fw-bold">
-                                طلب #{{ status.order_id }} -
-                                {% if status.status_flag == 'late' %} <span class="text-warning small">متأخر</span>
-                                {% elif status.status_flag == 'missing' %} <span class="text-danger small">ناقص</span>
-                                {% elif status.status_flag == 'refunded' %} <span class="text-secondary small">مسترجع</span>
-                                {% elif status.status_flag == 'not_shipped' %} <span class="text-info small">لم يتم الشحن</span>
-                                {% endif %}
-                            </h6>
-                            <small class="text-muted flex-shrink-0 ms-2">{{ status.created_at|time_ago }}</small>
-                        </div>
-                        <p class="mb-1 small text-muted">
-                            {{ status.note|truncate(80) if status.note else 'تم تحديث الحالة بدون ملاحظات.' }}
-                        </p>
-                    </a>
-                    {% else %}
-                    <div class="list-group-item text-center p-4">
-                        <p class="text-muted small mb-0">لا توجد نشاطات حديثة.</p>
-                    </div>
-                    {% endfor %}
-                </div>
+          <!-- ... الأجزاء السابقة ... -->
+
+<div class="card">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="fas fa-history me-2"></i>آخر النشاطات</h6>
+    </div>
+    <div class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
+        {% for status in recent_statuses %}
+        <a href="{{ url_for('orders.order_details', order_id=status.order_id) }}" class="list-group-item list-group-item-action border-0 py-2">
+            <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1 fw-bold">
+                    طلب #{{ status.order_id }} -
+                    {% if status.status_flag == 'late' %} <span class="text-warning small">متأخر</span>
+                    {% elif status.status_flag == 'missing' %} <span class="text-danger small">ناقص</span>
+                    {% elif status.status_flag == 'refunded' %} <span class="text-secondary small">مسترجع</span>
+                    {% elif status.status_flag == 'not_shipped' %} <span class="text-info small">لم يتم الشحن</span>
+                    {% endif %}
+                </h6>
+                <small class="text-muted flex-shrink-0 ms-2">{{ status.created_at|time_ago }}</small>
             </div>
+            <p class="mb-1 small text-muted">
+                {{ status.note|truncate(80) if status.note else 'تم تحديث الحالة بدون ملاحظات.' }}
+            </p>
+            <!-- إضافة معلومات المنشئ -->
+            <div class="d-flex align-items-center mt-1">
+                <small class="text-muted">
+                    <i class="fas fa-user me-1"></i>
+                    {% if status.admin %}
+                        مدير: {{ status.admin.email }}
+                    {% elif status.employee %}
+                        موظف: {{ status.employee.email }}
+                    {% else %}
+                        نظام
+                    {% endif %}
+                </small>
+            </div>
+        </a>
+        {% else %}
+        <div class="list-group-item text-center p-4">
+            <p class="text-muted small mb-0">لا توجد نشاطات حديثة.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- ... الأجزاء اللاحقة ... -->
         </div>
     </div>
 </div>
