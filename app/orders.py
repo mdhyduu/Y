@@ -748,16 +748,22 @@ def order_details(order_id):
 
         # ========== [5] جلب البيانات الإضافية من قاعدة البيانات ==========
         # جلب الملاحظات الخاصة بالطلب (للمراجعين فقط)
+        custom_note_statuses = CustomNoteStatus.query.filter_by(
+        store_id=user.store_id
+            ).all()
+    
+    # ========== [6] جلب ملاحظات الحالة مع العلاقات ==========
         status_notes = OrderStatusNote.query.filter_by(
             order_id=str(order_id)
         ).options(
             db.joinedload(OrderStatusNote.admin),
-            db.joinedload(OrderStatusNote.employee)
+            db.joinedload(OrderStatusNote.employee),
+            db.joinedload(OrderStatusNote.custom_status)  # إضافة تحميل الحالة المخصصة
         ).order_by(
             OrderStatusNote.created_at.desc()
         ).all()
         
-        # جلب الحالات المخصصة مع العلاقات
+        # ========== [7] جلب الحالات المخصصة للموظفين ==========
         employee_statuses = db.session.query(
             OrderEmployeeStatus,
             EmployeeCustomStatus,
@@ -776,8 +782,9 @@ def order_details(order_id):
         
         return render_template('order_details.html', 
             order=processed_order,
-            status_notes=status_notes,  # تأكد من تمرير المتغير
-            employee_statuses=employee_statuses,  # تأكد من تمرير المتغير
+            status_notes=status_notes,
+            employee_statuses=employee_statuses,
+            custom_note_statuses=custom_note_statuses,
             current_employee=current_employee,
             is_reviewer=is_reviewer
         )
