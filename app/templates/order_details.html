@@ -159,66 +159,55 @@
         </div>
       </div>
 
-      <!-- قسم الحالات الخاصة (للمراجعين فقط) -->
-      {% if is_reviewer %}
-      <div class="card shadow-sm mb-3 border-0">
-        <div class="card-header bg-white py-2">
-          <h5 class="mb-0 fs-5"><i class="fas fa-flag ms-2"></i>حالات خاصة</h5>
-        </div>
-        <div class="card-body p-2">
-          <form action="{{ url_for('orders.add_status_note', order_id=order.id) }}" method="POST" id="special-status-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="mb-2">
-              <label class="form-label small">اختر الحالة</label>
-              <div class="d-flex flex-wrap gap-2">
-                {% for slug, label in [
-                  ('late', 'متأخر'),
-                  ('missing', 'واصل ناقص'),
-                  ('refunded', 'مسترجع'),
-                  ('not_shipped', 'لم يتم الشحن')
-                ] %}
-                <div class="form-check">
-                  <input class="form-check-input" type="radio" name="status_flag" value="{{ slug }}" id="{{ slug }}-flag" required>
-                  <label class="form-check-label small" for="{{ slug }}-flag">{{ label }}</label>
-                </div>
-                {% endfor %}
-              </div>
-            </div>
-            <div class="mb-2">
-              <label for="special-note" class="form-label small">ملاحظة خاصة</label>
-              <textarea class="form-control form-control-sm" id="special-note" name="note" rows="2" 
-                        placeholder="أدخل ملاحظاتك هنا..." maxlength="500"></textarea>
-            </div>
-            <button type="submit" class="btn btn-primary btn-sm w-100">
-              <i class="fas fa-save me-1"></i> حفظ الحالة
-            </button>
-          </form>
-          <div class="mt-3">
-            <h6 class="border-bottom pb-1 small">الحالات المسجلة</h6>
-            <ul class="list-group list-group-flush small">
-              {% for note in status_notes %}
-              <li class="list-group-item d-flex justify-content-between py-1 px-0">
-                <div>
-                  <span class="badge bg-{{ 'warning text-dark' if note.status_flag == 'late' else
-                                             'danger' if note.status_flag == 'missing' else
-                                             'secondary' if note.status_flag == 'refunded' else
-                                             'info' }}">
-                    {{ note.status_flag | replace('late', 'متأخر') | replace('missing', 'واصل ناقص') | replace('refunded', 'مسترجع') | replace('not_shipped', 'لم يتم الشحن') }}
-                  </span>
-                  {% if note.note %}
-                    <span class="ms-2">{{ note.note | safe }}</span>
-                  {% endif %}
-                </div>
-                <div class="text-muted">{{ note.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
-              </li>
+<!-- ... الكود السابق ... -->
+
+<!-- قسم الحالات الخاصة (للمراجعين فقط) -->
+{% if is_reviewer %}
+<div class="card shadow-sm mb-3 border-0">
+  <div class="card-header bg-white py-2">
+    <h5 class="mb-0 fs-5"><i class="fas fa-flag ms-2"></i>حالات خاصة</h5>
+  </div>
+  <div class="card-body p-2">
+    <!-- ... النموذج ... -->
+    <div class="mt-3">
+      <h6 class="border-bottom pb-1 small">الحالات المسجلة</h6>
+      <ul class="list-group list-group-flush small">
+        {% for note in status_notes %}
+        <li class="list-group-item d-flex justify-content-between py-1 px-0">
+          <div>
+            <span class="badge bg-{{ 'warning text-dark' if note.status_flag == 'late' else
+                                       'danger' if note.status_flag == 'missing' else
+                                       'secondary' if note.status_flag == 'refunded' else
+                                       'info' }}">
+              {{ note.status_flag | replace('late', 'متأخر') | replace('missing', 'واصل ناقص') | replace('refunded', 'مسترجع') | replace('not_shipped', 'لم يتم الشحن') }}
+            </span>
+            {% if note.note %}
+              <span class="ms-2">{{ note.note | safe }}</span>
+            {% endif %}
+            <!-- إضافة معلومات المستخدم هنا -->
+            <div class="text-muted small mt-1">
+              <i class="fas fa-user me-1"></i>
+              {% if note.admin %}
+                {{ note.admin.email }} (مدير)
+              {% elif note.employee %}
+                {{ note.employee.email }} (موظف)
               {% else %}
-              <li class="list-group-item py-2 text-center text-muted">لا توجد حالات مسجلة</li>
-              {% endfor %}
-            </ul>
+                مستخدم غير معروف
+              {% endif %}
+            </div>
           </div>
-        </div>
-      </div>
-      {% endif %}
+          <div class="text-muted">{{ note.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+        </li>
+        {% else %}
+        <li class="list-group-item py-2 text-center text-muted">لا توجد حالات مسجلة</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ... بقية الكود ... -->
 
       <!-- قسم تحديث حالة الطلب -->
       <div class="card shadow-sm mb-3 border-0">

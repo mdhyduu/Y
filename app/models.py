@@ -358,10 +358,14 @@ class OrderStatusNote(db.Model):
     order_id = db.Column(db.String(50), ForeignKey('salla_orders.id'), nullable=False)
     status_flag = db.Column(db.String(20), nullable=False)
     note = db.Column(db.Text)
-    created_by = db.Column(db.Integer, ForeignKey('users.id'), nullable=False)
+    # تغيير العلاقة لتدعم كلا النوعين
+    admin_id = db.Column(db.Integer, ForeignKey('users.id'), nullable=True)  # للمديرين
+    employee_id = db.Column(db.Integer, ForeignKey('employees.id'), nullable=True)  # للموظفين
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    user = relationship('User', back_populates='status_notes')
+    # تحديث العلاقات
+    admin = relationship('User', foreign_keys=[admin_id])
+    employee = relationship('Employee', foreign_keys=[employee_id])
     order = relationship('SallaOrder', back_populates='status_notes')
 
 class EmployeeCustomStatus(db.Model):

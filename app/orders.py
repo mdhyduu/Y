@@ -893,12 +893,21 @@ def add_status_note(order_id):
         return redirect(url_for('orders.order_details', order_id=order_id))
     
     try:
+        # إنشاء كائن الملاحظة الجديدة
         new_note = OrderStatusNote(
             order_id=str(order_id),
             status_flag=status_flag,
-            note=note,
-            created_by=request.cookies.get('user_id')
+            note=note
         )
+        
+        # تحديد من أضاف الملاحظة (مدير أو موظف)
+        if request.cookies.get('is_admin') == 'true':
+            # إذا كان مديرًا (من جدول users)
+            new_note.admin_id = request.cookies.get('user_id')
+        else:
+            # إذا كان موظفًا (من جدول employees)
+            new_note.employee_id = employee.id
+        
         db.session.add(new_note)
         db.session.commit()
         flash("تم حفظ الملاحظة بنجاح", "success")
