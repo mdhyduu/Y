@@ -927,70 +927,7 @@ def scan_barcode():
         return response
     return render_template('scan_barcode.html')
 
-@orders_bp.route('/employee_dashboard')
-def employee_dashboard(): 
-    user, employee = get_user_from_cookies()
-    
-    if not user or request.cookies.get('is_admin') == 'true':
-        flash('غير مصرح لك بالوصول', 'error')
-        response = make_response(redirect(url_for('user_auth.login')))
-        response.set_cookie('user_id', '', expires=0)
-        response.set_cookie('is_admin', '', expires=0)
-        return response
-    
-    if not employee:
-        flash('غير مصرح لك بالوصول', 'error')
-        response = make_response(redirect(url_for('user_auth.login')))
-        response.set_cookie('user_id', '', expires=0)
-        response.set_cookie('is_admin', '', expires=0)
-        return response
-    
-    # جلب الطلبات المسندة لهذا الموظف فقط
-    assignments = OrderAssignment.query.filter_by(employee_id=employee.id).all()
-    assigned_order_ids = [assignment.order_id for assignment in assignments]
-    
-    # جلب الطلبات المسندة
-    assigned_orders = SallaOrder.query.filter(SallaOrder.id.in_(assigned_order_ids)).all() if assigned_order_ids else []
-    
-    # حساب الإحصائيات بناءً على الطلبات المسندة فقط
-    stats = {
-        'new_orders': len([o for o in assigned_orders if o.status_slug == 'new']),
-        'late_orders': len([o for o in assigned_orders if any(note.status_flag == 'late' for note in o.status_notes)]),
-        'missing_orders': len([o for o in assigned_orders if any(note.status_flag == 'missing' for note in o.status_notes)]),
-        'refunded_orders': len([o for o in assigned_orders if any(note.status_flag == 'refunded' for note in o.status_notes)]),
-        'not_shipped_orders': len([o for o in assigned_orders if any(note.status_flag == 'not_shipped' for note in o.status_notes)]),
-        'completed_orders': len([o for o in assigned_orders if o.status_slug == 'completed'])
-    }
-    
-    # جلب الحالات المخصصة للموظف الحالي
-    custom_statuses = EmployeeCustomStatus.query.filter_by(employee_id=employee.id).all()
-    
-    # حساب عدد الطلبات لكل حالة مخصصة - التعديل هنا
-    custom_status_stats = []
-    for status in custom_statuses:
-        if assigned_order_ids:  # فقط إذا كانت هناك طلبات مسندة
-            count = OrderEmployeeStatus.query.filter(
-                OrderEmployeeStatus.status_id == status.id,
-                OrderEmployeeStatus.order_id.in_(assigned_order_ids)
-            ).count()
-        else:
-            count = 0
-            
-        custom_status_stats.append({
-            'status': status,
-            'count': count
-        })
-    
-    # جلب آخر النشاطات للطلبات المسندة فقط
-    recent_statuses = OrderStatusNote.query.filter(
-        OrderStatusNote.order_id.in_(assigned_order_ids)
-    ).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
-    
-    return render_template('employee_dashboard.html', 
-                          stats=stats,
-                          custom_status_stats=custom_status_stats,
-                          recent_statuses=recent_statuses,
-                          assigned_orders=assigned_orders)
+
  
 @orders_bp.route('/employee_status', methods=['GET', 'POST'])
 def manage_employee_status():
