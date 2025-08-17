@@ -4,7 +4,7 @@ import barcode
 from barcode.writer import ImageWriter
 from flask import current_app
 import logging
-import json
+
 # إعداد المسجل
 logger = logging.getLogger(__name__)
 
@@ -95,8 +95,6 @@ def process_order_data(order_id, items_data):
         logger.info(f"Processed image URL: {main_image}")
         # معالجة الخيارات
         # معالجة الخيارات
-        # معالجة الخيارات
-        # معالجة الخيارات
         options = []
         item_options = item.get('options', [])
         if isinstance(item_options, list):
@@ -129,6 +127,15 @@ def process_order_data(order_id, items_data):
                     'name': option.get('name', ''),
                     'value': display_value,
                     'type': option.get('type', '')
+                })
+        
+        # معالجة الأكواد الرقمية
+        digital_codes = []
+        for code in item.get('codes', []):
+            if isinstance(code, dict):
+                digital_codes.append({
+                    'code': code.get('code', ''),
+                    'status': code.get('status', 'غير معروف')
                 })
         
         # معالجة الملفات الرقمية
