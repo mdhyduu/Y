@@ -96,38 +96,40 @@ def process_order_data(order_id, items_data):
         # معالجة الخيارات
         # معالجة الخيارات
         # معالجة الخيارات
+        # معالجة الخيارات
         options = []
         item_options = item.get('options', [])
         if isinstance(item_options, list):
             for option in item_options:
-                # استخراج القيمة كما هي بدون تحليل إضافي
+                # استخراج القيمة الأساسية
                 raw_value = option.get('value', '')
+                display_value = 'غير محدد'
                 
-                # تحويل القيمة إلى سلسلة نصية بغض النظر عن نوعها
-                if isinstance(raw_value, list):
-                    # إذا كانت القيمة قائمة، ندمج عناصرها بفواصل
-                    option_value = ', '.join([str(v) for v in raw_value])
-                elif isinstance(raw_value, dict):
-                    # إذا كانت القيمة قاموس، ندمج مفاتيحه وقيمه
-                    option_value = ', '.join([f"{k}: {v}" for k, v in raw_value.items()])
+                # محاولة استخراج القيمة الرئيسية من الهيكل المعقد
+                if isinstance(raw_value, dict):
+                    # إذا كانت القيمة قاموساً، نبحث عن الحقل 'name' أو 'value'
+                    display_value = raw_value.get('name') or raw_value.get('value') or str(raw_value)
+                elif isinstance(raw_value, list):
+                    # إذا كانت القيمة قائمة، نعالج كل عنصر فيها
+                    values_list = []
+                    for item in raw_value:
+                        if isinstance(item, dict):
+                            # للعناصر القاموسية في القائمة
+                            value_str = item.get('name') or item.get('value') or str(item)
+                            values_list.append(value_str)
+                        else:
+                            values_list.append(str(item))
+                    display_value = ', '.join(values_list)
                 else:
-                    # في جميع الحالات الأخرى، نستخدم القيمة كما هي
-                    option_value = str(raw_value) if raw_value else 'غير محدد'
+                    # في الحالات الأخرى نستخدم القيمة مباشرة
+                    display_value = str(raw_value) if raw_value else 'غير محدد'
                 
+                # إضافة الخيار إلى القائمة
                 options.append({
                     'name': option.get('name', ''),
-                    'value': option_value,
+                    'value': display_value,
                     'type': option.get('type', '')
                 })
-                        
-                # معالجة الأكواد الرقمية
-                digital_codes = []
-                for code in item.get('codes', []):
-                    if isinstance(code, dict):
-                        digital_codes.append({
-                            'code': code.get('code', ''),
-                            'status': code.get('status', 'غير معروف')
-                        })
         
         # معالجة الملفات الرقمية
         digital_files = []
