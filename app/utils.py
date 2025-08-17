@@ -95,41 +95,39 @@ def process_order_data(order_id, items_data):
         logger.info(f"Processed image URL: {main_image}")
         # معالجة الخيارات
         # معالجة الخيارات
+        # معالجة الخيارات
         options = []
         item_options = item.get('options', [])
         if isinstance(item_options, list):
             for option in item_options:
-                option_value = ''
-                option_type = option.get('type', '')
-                raw_value = option.get('value')
+                # استخراج القيمة كما هي بدون تحليل إضافي
+                raw_value = option.get('value', '')
                 
-                # معالجة القيمة بناءً على نوعها
-                if raw_value is None:
-                    option_value = 'غير محدد'
-                elif isinstance(raw_value, list):
-                    # إذا كانت القائمة تحتوي على عناصر من نوع قاموس وبداخلها مفتاح 'name'
-                    if all(isinstance(v, dict) and 'name' in v for v in raw_value):
-                        option_value = ', '.join([v.get('name', '') for v in raw_value])
-                    else:
-                        option_value = ', '.join([str(v) for v in raw_value])
+                # تحويل القيمة إلى سلسلة نصية بغض النظر عن نوعها
+                if isinstance(raw_value, list):
+                    # إذا كانت القيمة قائمة، ندمج عناصرها بفواصل
+                    option_value = ', '.join([str(v) for v in raw_value])
+                elif isinstance(raw_value, dict):
+                    # إذا كانت القيمة قاموس، ندمج مفاتيحه وقيمه
+                    option_value = ', '.join([f"{k}: {v}" for k, v in raw_value.items()])
                 else:
-                    # إذا كانت القيمة ليست قائمة (سواء سلسلة أو رقم أو غيرها)
-                    option_value = str(raw_value)
+                    # في جميع الحالات الأخرى، نستخدم القيمة كما هي
+                    option_value = str(raw_value) if raw_value else 'غير محدد'
                 
                 options.append({
                     'name': option.get('name', ''),
                     'value': option_value,
-                    'type': option_type
+                    'type': option.get('type', '')
                 })
-                
-        # معالجة الأكواد الرقمية
-        digital_codes = []
-        for code in item.get('codes', []):
-            if isinstance(code, dict):
-                digital_codes.append({
-                    'code': code.get('code', ''),
-                    'status': code.get('status', 'غير معروف')
-                })
+                        
+                # معالجة الأكواد الرقمية
+                digital_codes = []
+                for code in item.get('codes', []):
+                    if isinstance(code, dict):
+                        digital_codes.append({
+                            'code': code.get('code', ''),
+                            'status': code.get('status', 'غير معروف')
+                        })
         
         # معالجة الملفات الرقمية
         digital_files = []
