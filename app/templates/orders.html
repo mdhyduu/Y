@@ -35,7 +35,7 @@
                                data-debounce="500">
                     </div>
                 </div>
-                
+                {% if is_reviewer %}
                 <div class="col-md-2">
                     <label for="filter-order-status" class="form-label small text-muted mb-1">حالة الطلب</label>
                     <select id="filter-order-status" class="form-select">
@@ -49,7 +49,7 @@
                         <option value="awaiting_payment" {% if filters.status == 'awaiting_payment' %}selected{% endif %}>بانتظار الدفع</option>
                     </select>
                 </div>
-                
+                {% endif %}
                 {% if is_reviewer %}
                 <div class="col-md-2">
                     <label for="filter-employee" class="form-label small text-muted mb-1">الموظف المسؤول</label>
