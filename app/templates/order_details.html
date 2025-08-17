@@ -60,20 +60,24 @@
   
   <!-- خيارات المنتج -->
   <td style="min-width: 150px;">
-    
-    {% if item.options %}
-    <div class="text-start product-options">
-      <h6 class="mb-1 small text-muted"><i class="fas fa-cogs me-1"></i>خيارات</h6>
-      <ul class="list-group list-group-flush small" style="max-height: 120px; overflow-y: auto;">
-        {% for option in item.options %}
-        <li class="list-group-item d-flex justify-content-between py-1 px-0 option-item">
-          <span class="fw-bold">{{ option.name | safe }}</span>
-          <span>{{ option.value | safe }}</span>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endif %}
+    {% if item.options and item.options|length > 0 %}
+<div class="text-start product-options">
+  <h6 class="mb-1 small text-muted"><i class="fas fa-cogs me-1"></i>خيارات</h6>
+  <ul class="list-group list-group-flush small">
+    {% for option in item.options %}
+    <li class="list-group-item d-flex justify-content-between py-1 px-0 option-item">
+      <span class="fw-bold">{{ option.name | safe }}</span>
+      <span>{{ option.value | safe }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% else %}
+<div class="alert alert-info p-2 mt-2 small">
+  <i class="fas fa-info-circle me-1"></i>
+  لا توجد خيارات لهذا المنتج
+</div>
+{% endif %}
   </td>
   
   <!-- باركود المنتج -->

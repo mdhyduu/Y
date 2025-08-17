@@ -4,7 +4,7 @@ import barcode
 from barcode.writer import ImageWriter
 from flask import current_app
 import logging
-
+import json
 # إعداد المسجل
 logger = logging.getLogger(__name__)
 
@@ -96,10 +96,17 @@ def process_order_data(order_id, items_data):
         # معالجة الخيارات
         options = []
         item_options = item.get('options', [])
-        if isinstance(item_options, list):
-            for option in item_options:
-                option_value = ''
-                option_type = option.get('type', '')
+        if not isinstance(item_options, list):
+            try:
+                # إذا كانت نصاً (JSON) حاول تحليلها
+                if isinstance(item_options, str):
+                    item_options = json.loads(item_options)
+                # إذا كانت قامة (dict) حولها لقائمة
+                elif isinstance(item_options, dict):
+                    item_options = [item_options]
+            except:
+                item_options = []
+
                 
                 if option_type in ['radio', 'checkbox']:
                     values = option.get('value', [])
