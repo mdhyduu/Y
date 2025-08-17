@@ -209,7 +209,7 @@
                 <i class="fas fa-save me-1"></i> حفظ الحالة
             </button>
         </form>
-
+{% endif %}
         <!-- عرض الحالات المسجلة في قائمة واحدة -->
         <div class="mt-4">
             <h6 class="border-bottom pb-2 mb-3 small fw-bold">الحالات المسجلة</h6>
@@ -254,15 +254,7 @@
                             </div>
                             <div class="text-muted small text-end">
                                 <div>{{ note.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
-                                <div class="mt-1">
-                                    <small class="text-muted">
-                                        {% if note.admin %}
-                                            <i class="fas fa-user-shield"></i> مدير
-                                        {% elif note.employee %}
-                                            <i class="fas fa-user-tie"></i> موظف
-                                        {% endif %}
-                                    </small>
-                                </div>
+                               
                             </div>
                         </div>
                     </div>
@@ -274,7 +266,7 @@
         </div>
     </div>
 </div>
-{% endif %}
+
 <!-- نهاية التعديل -->
 <!-- نهاية التعديل -->
 <!-- نهاية التعديل -->
