@@ -24,7 +24,7 @@
         <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap py-2">
           <h5 class="mb-0 fs-5">معلومات الطلب</h5>
           <span class="badge rounded-pill bg-{{ order.status.slug | replace('under_review', 'warning') | replace('processing', 'info') | replace('completed', 'success') | replace('awaiting_payment', 'warning') | replace('shipped', 'primary') | replace('delivered', 'success') | replace('canceled', 'danger') | replace('refunded', 'secondary') }}">
-
+            {{ order.status.name | safe }}
           </span>
         </div>
         <div class="card-body p-2">
@@ -60,7 +60,7 @@
   
   <!-- خيارات المنتج -->
   <td style="min-width: 150px;">
-    <h6 class="mb-2">{{ item.name | safe }}</h6>
+    
     {% if item.options %}
     <div class="text-start product-options">
       <h6 class="mb-1 small text-muted"><i class="fas fa-cogs me-1"></i>خيارات</h6>
