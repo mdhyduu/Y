@@ -233,23 +233,26 @@ def assign_order(order_id):
         flash('غير مصرح لك', 'error')
         return redirect(url_for('dashboard.index'))
     
-    # جلب المندوبين الذين أضافهم مدير التوصيل الحالي فقط
+    # جلب المندوبين الذين أضافهم المدير الحالي فقط
     delivery_employees = Employee.query.filter(
         Employee.store_id == request.store_id,
         Employee.role == 'delivery',
-        Employee.added_by == employee.id  # افترضنا وجود حقل added_by في النموذج
+        Employee.added_by == employee.id
     ).all()
     
     if request.method == 'POST':
         selected_employee_id = request.form.get('employee_id')
         
-        # تحقق من أن المندوب المختار مضاف بواسطة المدير الحالي
+        # تحقق من أن الموظف المختار مضاف بواسطة المدير الحالي
         selected_employee = next((e for e in delivery_employees if e.id == int(selected_employee_id)), None)
         if not selected_employee:
             flash('المندوب المحدد غير مصرح به', 'error')
             return redirect(url_for('delivery.assign_order', order_id=order_id))
         
-        # ... باقي الكود كما هو
+        # تحقق من وجود إسناد سابق
+        existing_assignment = OrderAssignment.query.filter_by(order_id=order_id).first()
+        if existing_assignment:
+            existing_assignment.employee_id = selected_employee_id
         else:
             new_assignment = OrderAssignment(
                 order_id=order_id, 
@@ -311,3 +314,78 @@ def manage_delivery_employees():
     
     return render_template('delivery/manage_employees.html', 
                           employees=delivery_employees)
+@delivery_bp.route('/manage_delivery_employees', methods=['GET', 'POST'])
+@delivery_login_required
+def manage_delivery_employees():
+    employee = request.current_employee
+    
+    if employee.role != 'delivery_manager':
+        flash('غير مصرح لك', 'error')
+        return redirect(url_for('dashboard.index'))
+    
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        # التحقق من البريد الإلكتروني
+        if not email or '@' not in email:
+            flash('بريد إلكتروني غير صالح', 'error')
+            return redirect(url_for('delivery.manage_delivery_employees'))
+        
+        # التحقق من عدم وجود موظف بنفس البريد
+        existing_employee = Employee.query.filter_by(email=email).first()
+        if existing_employee:
+            flash('هذا البريد الإلكتروني مسجل مسبقًا', 'error')
+            return redirect(url_for('delivery.manage_delivery_employees'))
+        
+        # إنشاء الموظف الجديد
+        new_employee = Employee(
+            email=email,
+            password=generate_password_hash(password),
+            role='delivery',
+            store_id=request.store_id,
+            added_by=employee.id  # تحديد المدير الذي أضافه
+        )
+        
+        db.session.add(new_employee)
+        db.session.commit()
+        flash('تم إضافة المندوب بنجاح', 'success')
+        return redirect(url_for('delivery.manage_delivery_employees'))
+    
+    # جلب مناديب المدير الحالي فقط
+    delivery_employees = Employee.query.filter(
+        Employee.store_id == request.store_id,
+        Employee.role == 'delivery',
+        Employee.added_by == employee.id
+    ).all()
+    
+    return render_template('delivery/manage_employees.html', 
+                          employees=delivery_employees)
+@delivery_bp.route('/delete_delivery_employee/<int:employee_id>', methods=['POST'])
+@delivery_login_required
+def delete_delivery_employee(employee_id):
+    employee = request.current_employee
+    
+    if employee.role != 'delivery_manager':
+        flash('غير مصرح لك', 'error')
+        return redirect(url_for('dashboard.index'))
+    
+    # التحقق من أن الموظف مضاف بواسطة المدير الحالي
+    delivery_employee = Employee.query.filter(
+        Employee.id == employee_id,
+        Employee.added_by == employee.id
+    ).first()
+    
+    if not delivery_employee:
+        flash('الموظف غير موجود أو غير مصرح به', 'error')
+        return redirect(url_for('delivery.manage_delivery_employees'))
+    
+    try:
+        db.session.delete(delivery_employee)
+        db.session.commit()
+        flash('تم حذف المندوب بنجاح', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ أثناء الحذف: {str(e)}', 'error')
+    
+    return redirect(url_for('delivery.manage_delivery_employees'))

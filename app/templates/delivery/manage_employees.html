@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">إدارة مناديب التوصيل</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" class="mb-4">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="email" class="form-label">البريد الإلكتروني</label>
+                    <input type="email" class="form-control" id="email" name="email" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="password" class="form-label">كلمة المرور</label>
+                    <input type="password" class="form-control" id="password" name="password" required>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-success mt-3">
+                <i class="fas fa-plus"></i> إضافة مندوب جديد
+            </button>
+        </form>
+        
+        <h5 class="mt-4">قائمة مناديبك</h5>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>البريد الإلكتروني</th>
+                    <th>تاريخ الإضافة</th>
+                    <th>الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for emp in employees %}
+                <tr>
+                    <td>{{ emp.email }}</td>
+                    <td>{{ emp.created_at|format_date }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('delivery.delete_delivery_employee', employee_id=emp.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-sm btn-danger">
+                                <i class="fas fa-trash"></i> حذف
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="3">لم تقم بإضافة أي مناديب بعد</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

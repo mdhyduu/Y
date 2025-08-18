@@ -84,11 +84,12 @@
                         
                         {% if employee.role == 'delivery_manager' %}
                         <div class="col-md-6">
-                            <a href="{{ url_for('employees.add_employee') }}" 
-                               class="btn btn-success btn-lg w-100 py-3 d-flex align-items-center justify-content-center">
-                                <i class="fas fa-user-plus me-3 fa-lg"></i>
-                                <span>إدارة مناديب التوصيل</span>
-                            </a>
+                           {% if is_delivery_manager %}
+<a href="{{ url_for('delivery.manage_delivery_employees') }}" 
+   class="btn btn-sm btn-info">
+    <i class="fas fa-users"></i> إدارة المندوبين
+</a>
+{% endif %}
                         </div>
                         {% else %}
                         <div class="col-md-6">
