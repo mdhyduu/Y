@@ -264,3 +264,96 @@ def assign_order(order_id):
     return render_template('delivery/assign_order.html', 
                          order_id=order_id,
                          employees=delivery_employees)
+@delivery_bp.route('/manage_delivery_employees', methods=['GET', 'POST'])
+@delivery_login_required
+def manage_delivery_employees():
+    employee = request.current_employee
+    
+    if employee.role != 'delivery_manager':
+        flash('غير مصرح لك', 'error')
+        return redirect(url_for('dashboard.index'))
+    
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        # التحقق من البريد الإلكتروني
+        if not email or '@' not in email:
+            flash('بريد إلكتروني غير صالح', 'error')
+            return redirect(url_for('delivery.manage_delivery_employees'))
+        
+        # التحقق من عدم وجود موظف بنفس البريد
+        existing_employee = Employee.query.filter_by(email=email).first()
+        if existing_employee:
+            flash('هذا البريد الإلكتروني مسجل مسبقًا', 'error')
+            return redirect(url_for('delivery.manage_delivery_employees'))
+        
+        # إنشاء الموظف الجديد
+        new_employee = Employee(
+            email=email,
+            password=generate_password_hash(password),
+            role='delivery',
+            store_id=request.store_id,
+            added_by=employee.id  # تحديد المدير الذي أضافه
+        )
+        
+        db.session.add(new_employee)
+        db.session.commit()
+        flash('تم إضافة المندوب بنجاح', 'success')
+        return redirect(url_for('delivery.manage_delivery_employees'))
+    
+    # جلب مناديب المدير الحالي فقط
+    delivery_employees = Employee.query.filter(
+        Employee.store_id == request.store_id,
+        Employee.role == 'delivery',
+        Employee.added_by == employee.id
+    ).all()
+    
+    return render_template('delivery/manage_employees.html', 
+                          employees=delivery_employees)@delivery_bp.route('/manage_delivery_employees', methods=['GET', 'POST'])
+@delivery_login_required
+def manage_delivery_employees():
+    employee = request.current_employee
+    
+    if employee.role != 'delivery_manager':
+        flash('غير مصرح لك', 'error')
+        return redirect(url_for('dashboard.index'))
+    
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        # التحقق من البريد الإلكتروني
+        if not email or '@' not in email:
+            flash('بريد إلكتروني غير صالح', 'error')
+            return redirect(url_for('delivery.manage_delivery_employees'))
+        
+        # التحقق من عدم وجود موظف بنفس البريد
+        existing_employee = Employee.query.filter_by(email=email).first()
+        if existing_employee:
+            flash('هذا البريد الإلكتروني مسجل مسبقًا', 'error')
+            return redirect(url_for('delivery.manage_delivery_employees'))
+        
+        # إنشاء الموظف الجديد
+        new_employee = Employee(
+            email=email,
+            password=generate_password_hash(password),
+            role='delivery',
+            store_id=request.store_id,
+            added_by=employee.id  # تحديد المدير الذي أضافه
+        )
+        
+        db.session.add(new_employee)
+        db.session.commit()
+        flash('تم إضافة المندوب بنجاح', 'success')
+        return redirect(url_for('delivery.manage_delivery_employees'))
+    
+    # جلب مناديب المدير الحالي فقط
+    delivery_employees = Employee.query.filter(
+        Employee.store_id == request.store_id,
+        Employee.role == 'delivery',
+        Employee.added_by == employee.id
+    ).all()
+    
+    return render_template('delivery/manage_employees.html', 
+                          employees=delivery_employees)
