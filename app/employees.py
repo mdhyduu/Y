@@ -30,11 +30,18 @@ def add_employee():
     user_id = request.cookies.get('user_id')
     is_admin = request.cookies.get('is_admin') == 'true'
     is_delivery_manager = request.cookies.get('employee_role') == 'delivery_manager'
-    store_id = request.cookies.get('store_id')  # الحصول على store_id من الكوكيز
     
     if not user_id:
         flash('غير مصرح لك بالوصول', 'error')
         return redirect(url_for('user_auth.login'))
+    
+    # الحصول على المستخدم الحالي
+    user = User.query.get(user_id)
+    if not user:
+        flash('المستخدم غير موجود', 'error')
+        return redirect(url_for('user_auth.login'))
+    
+    store_id = user.store_id  # التصحيح هنا: الحصول من المستخدم بدل الكوكيز
     
     if not (is_admin or is_delivery_manager):
         flash('ليس لديك صلاحية إضافة موظفين', 'error')
@@ -54,12 +61,11 @@ def add_employee():
             flash('البريد الإلكتروني موجود مسبقاً', 'error')
             return redirect(url_for('employees.add_employee'))
         
-        # استخدم store_id من الكوكيز بدلاً من user.store_id
         region = 'الرياض' if role in ('delivery', 'delivery_manager') else None
         
         new_employee = Employee(
             email=email,
-            store_id=store_id,  # استخدام store_id من الكوكيز
+            store_id=store_id,  # استخدام store_id من المستخدم
             role=role,
             region=region
         )
