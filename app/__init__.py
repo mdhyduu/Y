@@ -24,7 +24,7 @@ def create_app():
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     
     app.config['WTF_CSRF_CHECK_DEFAULTS'] = False
-    
+    migrate.init_app(app, db)  # هذه السطر با
     
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(

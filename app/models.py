@@ -246,6 +246,7 @@ class Employee(db.Model):
     role = db.Column(db.String(50), default='general')
     is_delivery_manager = db.Column(db.Boolean, default=False)
     region = db.Column(db.String(100))
+    added_by = db.Column(db.Integer, db.ForeignKey('employees.id'))  # المدير الذي أضاف الموظف
     deactivated_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -255,6 +256,8 @@ class Employee(db.Model):
     custom_statuses = relationship('EmployeeCustomStatus', back_populates='employee')
     assignments = relationship('OrderAssignment', back_populates='employee')
     
+    added_employees = relationship('Employee', backref=db.backref('added_by_manager', remote_side=[id]))
+     
 
     def set_password(self, password: str):
         if len(password) < 8:
