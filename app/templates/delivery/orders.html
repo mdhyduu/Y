@@ -51,14 +51,14 @@
             </td>
             <td>
                 {% if is_delivery_manager %}  <!-- تم التصحيح هنا -->
-                    {% if not order.is_delivered %}
+
                     <a href="{{ url_for('delivery.assign_order', order_id=order.id) }}" 
                        class="btn btn-sm btn-warning">
                         <i class="fas fa-user-plus"></i> إسناد
                     </a>
-                    {% else %}
+
                     <span class="text-muted">تم التسليم</span>
-                    {% endif %}
+
                 {% else %}
                     {% if not order.is_delivered and order.assigned_to and order.assigned_to.id == employee.id %}
                     <a href="{{ url_for('delivery.scan_barcode') }}" 
