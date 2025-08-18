@@ -233,19 +233,23 @@ def assign_order(order_id):
         flash('غير مصرح لك', 'error')
         return redirect(url_for('dashboard.index'))
     
-    # جلب الموظفين (مندوبي التوصيل) في نفس المتجر
-    delivery_employees = Employee.query.filter_by(
-        store_id=request.store_id, 
-        role='delivery'
+    # جلب المندوبين الذين أضافهم مدير التوصيل الحالي فقط
+    delivery_employees = Employee.query.filter(
+        Employee.store_id == request.store_id,
+        Employee.role == 'delivery',
+        Employee.added_by == employee.id  # افترضنا وجود حقل added_by في النموذج
     ).all()
     
     if request.method == 'POST':
         selected_employee_id = request.form.get('employee_id')
         
-        # تحقق من وجود إسناد سابق
-        existing_assignment = OrderAssignment.query.filter_by(order_id=order_id).first()
-        if existing_assignment:
-            existing_assignment.employee_id = selected_employee_id
+        # تحقق من أن المندوب المختار مضاف بواسطة المدير الحالي
+        selected_employee = next((e for e in delivery_employees if e.id == int(selected_employee_id)), None)
+        if not selected_employee:
+            flash('المندوب المحدد غير مصرح به', 'error')
+            return redirect(url_for('delivery.assign_order', order_id=order_id))
+        
+        # ... باقي الكود كما هو
         else:
             new_assignment = OrderAssignment(
                 order_id=order_id, 

@@ -254,7 +254,9 @@ class Employee(db.Model):
     permissions = relationship('EmployeePermission', back_populates='employee')
     custom_statuses = relationship('EmployeeCustomStatus', back_populates='employee')
     assignments = relationship('OrderAssignment', back_populates='employee')
-    
+    added_employees = db.relationship('Employee', 
+                                      backref=db.backref('added_by_manager', remote_side=[id]),
+                                      foreign_keys='Employee.added_by')
     def set_password(self, password: str):
         if len(password) < 8:
             raise ValueError("كلمة المرور يجب أن تكون 8 أحرف على الأقل")
