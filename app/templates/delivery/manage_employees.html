@@ -6,9 +6,9 @@
         <h5 class="mb-0">إدارة مناديب التوصيل</h5>
     </div>
     <div class="card-body">
-        <!-- Fixed: Added CSRF token to the creation form -->
+        <!-- FIXED: Use manual CSRF token -->
         <form method="POST" class="mb-4">
-            {{ form.hidden_tag() }}  <!-- CSRF token inclusion -->
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="row g-3">
                 <div class="col-md-6">
                     <label for="email" class="form-label">البريد الإلكتروني</label>

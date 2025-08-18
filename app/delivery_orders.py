@@ -3,6 +3,8 @@ from .models import Employee, User, OrderDelivery, OrderAssignment, db
 import requests
 from .config import Config
 from functools import wraps
+# Add this import at the top
+from werkzeug.security import generate_password_hash
 
 delivery_bp = Blueprint('delivery', __name__, url_prefix='/delivery')
 
@@ -268,6 +270,8 @@ def assign_order(order_id):
                          order_id=order_id,
                          employees=delivery_employees)
 
+
+# Update the manage_delivery_employees route
 @delivery_bp.route('/manage_delivery_employees', methods=['GET', 'POST'])
 @delivery_login_required
 def manage_delivery_employees():
@@ -295,7 +299,7 @@ def manage_delivery_employees():
         # إنشاء الموظف الجديد
         new_employee = Employee(
             email=email,
-            password=generate_password_hash(password),
+            password=generate_password_hash(password),  # Fixed: use imported function
             role='delivery',
             store_id=request.store_id,
             added_by=employee.id  # تحديد المدير الذي أضافه
