@@ -384,21 +384,26 @@
                 <span>{{ order.receiver.email | safe }}</span>
             </li>
             
-            <!-- تفاصيل العنوان -->
-            <li class="list-group-item py-2 px-0">
-                <div class="fw-bold mb-1">عنوان الشحن الكامل:</div>
-                <div class="text-muted small">
-                    {% if order.shipping.address %}
-                        {{ order.shipping.address | safe }} 
-                    {% endif %}
-                    {% if order.customer.city %}
-                        {{ order.customer.city | safe }}،
-                    {% endif %}
-                    {% if order.customer.country %}
-                        {{ order.customer.country | safe }}
-                    {% endif %}
-                </div>
-            </li> 
+<li class="list-group-item py-2 px-0">
+    <div class="fw-bold mb-1">عنوان الشحن الكامل:</div>
+    <div class="text-muted small">
+        {% if order.shipping.address and order.shipping.address != 'لم يتم تحديد العنوان' %}
+            {{ order.shipping.address }}<br>
+        {% endif %}
+        
+        {% if order.shipping.city %}
+            {{ order.shipping.city }}{% if order.shipping.postal_code or order.shipping.country %},{% endif %}
+        {% endif %}
+        
+        {% if order.shipping.postal_code %}
+            {{ order.shipping.postal_code }}{% if order.shipping.country %},{% endif %}
+        {% endif %}
+        
+        {% if order.shipping.country %}
+            {{ order.shipping.country }}
+        {% endif %}
+    </div>
+</li>
             
             <!-- معلومات الشحن الإضافية -->
             <li class="list-group-item d-flex justify-content-between py-2 px-0">
