@@ -98,7 +98,7 @@ def index():
             # تحديد نوع لوحة التحكم حسب الدور
             if employee.role in ('delivery', 'delivery_manager'):
                 is_delivery_manager = (employee.role == 'delivery_manager')
-                return render_template('dashboard.html',
+                return render_template('delivery_dashboard.html',
                                     current_user=user,
                                     is_delivery_manager=is_delivery_manager,
                                     employee=employee)
