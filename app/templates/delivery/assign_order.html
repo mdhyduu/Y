@@ -7,6 +7,8 @@
     </div>
     <div class="card-body">
         <form method="POST">
+            <!-- إضافة حقل CSRF token -->
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="mb-3">
                 <label for="employee_id" class="form-label">اختر مندوب التوصيل</label>
                 <select class="form-select" id="employee_id" name="employee_id" required>
