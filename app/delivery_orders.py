@@ -1,22 +1,52 @@
-from flask import Blueprint, render_template, session, flash, redirect, url_for, request
+from flask import Blueprint, render_template, flash, redirect, url_for, request, make_response
 from .models import Employee, User, OrderDelivery, OrderAssignment, db
 import requests
 from .config import Config
+from functools import wraps
 
 delivery_bp = Blueprint('delivery', __name__, url_prefix='/delivery')
 
+def delivery_login_required(view_func):
+    """ديكوراتور للتحقق من تسجيل الدخول وتفويض التوصيل"""
+    @wraps(view_func)
+    def wrapper(*args, **kwargs):
+        user_id = request.cookies.get('user_id')
+        employee_role = request.cookies.get('employee_role')
+        store_id = request.cookies.get('store_id')
+        
+        # التحقق من وجود البيانات الأساسية
+        if not user_id or not employee_role or not store_id:
+            flash('غير مصرح لك بالوصول', 'error')
+            return redirect(url_for('user_auth.login'))
+        
+        # التحقق من أن الموظف مندوب توصيل
+        if employee_role not in ['delivery', 'delivery_manager']:
+            flash('غير مصرح لك بالوصول', 'error')
+            return redirect(url_for('dashboard.index'))
+        
+        # جلب بيانات الموظف
+        employee = Employee.query.get(user_id)
+        if not employee:
+            flash('بيانات الموظف غير موجودة', 'error')
+            response = make_response(redirect(url_for('user_auth.login')))
+            response.delete_cookie('user_id')
+            response.delete_cookie('employee_role')
+            response.delete_cookie('store_id')
+            return response
+        
+        # تخزين البيانات في الطلب للاستخدام لاحقاً
+        request.current_employee = employee
+        request.store_id = store_id
+        return view_func(*args, **kwargs)
+    return wrapper
+
 @delivery_bp.route('/orders')
+@delivery_login_required
 def delivery_orders():
-    if 'user_id' not in session:
-        flash('غير مصرح لك بالوصول', 'error')
-        return redirect(url_for('user_auth.login'))
+    employee = request.current_employee
+    store_id = request.store_id
     
-    employee = Employee.query.get(session['user_id'])
-    if not employee or employee.role not in ['delivery', 'delivery_manager']:
-        flash('غير مصرح لك بالوصول', 'error')
-        return redirect(url_for('dashboard.index'))
-    
-    user = User.query.filter_by(store_id=employee.store_id).first()
+    user = User.query.filter_by(store_id=store_id).first()
     if not user or not user.salla_access_token:
         flash('يجب ربط المتجر مع سلة أولاً', 'error')
         return redirect(url_for('auth.link_store'))
@@ -28,13 +58,13 @@ def delivery_orders():
         
         # جلب الطلبات المسلمة من قبل الموظفين في نفس المتجر
         delivered_orders = OrderDelivery.query.join(Employee).filter(
-            Employee.store_id == employee.store_id
+            Employee.store_id == store_id
         ).all()
         delivered_order_ids = {d.order_id for d in delivered_orders}
         
         # جلب جميع الإسنادات للمتجر
         assignments = OrderAssignment.query.join(Employee).filter(
-            Employee.store_id == employee.store_id
+            Employee.store_id == store_id
         ).all()
         assignment_dict = {a.order_id: a.employee for a in assignments}
         
@@ -97,20 +127,18 @@ def delivery_orders():
         return redirect(url_for('dashboard.index'))
 
 @delivery_bp.route('/scan_barcode', methods=['GET', 'POST'])
+@delivery_login_required
 def scan_barcode():
-    if 'user_id' not in session:
-        flash('غير مصرح لك', 'error')
-        return redirect(url_for('user_auth.login'))
+    employee = request.current_employee
     
-    employee = Employee.query.get(session['user_id'])
-    if not employee or employee.role != 'delivery':
+    if employee.role != 'delivery':
         flash('غير مصرح لك', 'error')
         return redirect(url_for('dashboard.index'))
     
     if request.method == 'POST':
         order_id = request.form.get('order_id')
         # التحقق من أن الطلب موجود في سلة
-        user = User.query.filter_by(store_id=employee.store_id).first()
+        user = User.query.filter_by(store_id=request.store_id).first()
         if not user or not user.salla_access_token:
             flash('يجب ربط المتجر مع سلة أولاً', 'error')
             return redirect(url_for('auth.link_store'))
@@ -131,13 +159,11 @@ def scan_barcode():
     return render_template('delivery/scan_barcode.html')
 
 @delivery_bp.route('/deliver_order/<order_id>', methods=['GET', 'POST'])
+@delivery_login_required
 def deliver_order(order_id):
-    if 'user_id' not in session:
-        flash('غير مصرح لك', 'error')
-        return redirect(url_for('user_auth.login'))
+    employee = request.current_employee
     
-    employee = Employee.query.get(session['user_id'])
-    if not employee or employee.role != 'delivery':
+    if employee.role != 'delivery':
         flash('غير مصرح لك', 'error')
         return redirect(url_for('dashboard.index'))
     
@@ -161,7 +187,7 @@ def deliver_order(order_id):
         return redirect(url_for('delivery.delivery_orders'))
     
     # عرض تفاصيل الطلب للتأكيد
-    user = User.query.filter_by(store_id=employee.store_id).first()
+    user = User.query.filter_by(store_id=request.store_id).first()
     if not user or not user.salla_access_token:
         flash('يجب ربط المتجر مع سلة أولاً', 'error')
         return redirect(url_for('auth.link_store'))
@@ -199,19 +225,17 @@ def deliver_order(order_id):
         return redirect(url_for('delivery.scan_barcode'))
 
 @delivery_bp.route('/assign_order/<order_id>', methods=['GET', 'POST'])
+@delivery_login_required
 def assign_order(order_id):
-    if 'user_id' not in session:
-        flash('غير مصرح لك', 'error')
-        return redirect(url_for('user_auth.login'))
+    employee = request.current_employee
     
-    employee = Employee.query.get(session['user_id'])
-    if not employee or employee.role != 'delivery_manager':
+    if employee.role != 'delivery_manager':
         flash('غير مصرح لك', 'error')
         return redirect(url_for('dashboard.index'))
     
     # جلب الموظفين (مندوبي التوصيل) في نفس المتجر
     delivery_employees = Employee.query.filter_by(
-        store_id=employee.store_id, 
+        store_id=request.store_id, 
         role='delivery'
     ).all()
     
