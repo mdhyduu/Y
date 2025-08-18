@@ -1,8 +1,65 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<style>
+  /* تنسيقات مخصصة للوضع الليلي */
+  body.dark-mode .card-header.bg-white {
+      background-color: var(--content-dark) !important;
+      color: var(--text-light);
+      border-bottom: 1px solid var(--border-color-dark);
+  }
+
+  body.dark-mode .card {
+      background-color: var(--content-dark);
+      border-color: var(--border-color-dark);
+  }
+
+  body.dark-mode .table {
+      color: var(--text-light);
+  }
+
+  body.dark-mode .table-hover tbody tr:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  body.dark-mode .form-control, 
+  body.dark-mode .form-control-color {
+      background-color: var(--bg-dark);
+      border-color: var(--border-color-dark);
+      color: var(--text-light);
+  }
+
+  body.dark-mode .form-label {
+      color: var(--text-light);
+  }
+
+  body.dark-mode .text-muted {
+      color: #aaa !important;
+  }
+
+  /* تحسينات عامة */
+  .card {
+      border-radius: var(--border-radius);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      margin-bottom: 1.5rem;
+  }
+
+  body.dark-mode .card {
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  }
+
+  .table-responsive {
+      border-radius: var(--border-radius);
+      overflow: hidden;
+  }
+</style>
+
 <div class="container">
-  <h2 class="mb-4">إدارة حالاتي المخصصة</h2>
+  <div class="card">
+    <div class="card-header bg-white">
+      <h3 class="mb-0"><i class="fas fa-tags me-2"></i>إدارة حالاتي المخصصة</h3>
+    </div>
+  </div>
   
   <div class="card">
     <div class="card-header bg-white">
@@ -47,7 +104,7 @@
             {% for status in statuses %}
             <tr>
               <td>
-                <span class="badge" style="background-color: {{ status.color }}; color: white;">
+                <span class="badge p-2" style="background-color: {{ status.color }}; color: white;">
                   {{ status.name }}
                 </span>
               </td>
@@ -56,13 +113,13 @@
               </td>
               <td>
                 {% if status.is_active %}
-                <span class="badge bg-success">نشطة</span>
+                <span class="badge bg-success p-2">نشطة</span>
                 {% else %}
-                <span class="badge bg-secondary">غير نشطة</span>
+                <span class="badge bg-secondary p-2">غير نشطة</span>
                 {% endif %}
               </td>
               <td>
-                <form method="POST" action="{{ url_for('orders.delete_employee_status', status_id=status.id) }}">
+                <form method="POST" action="{{ url_for('orders.delete_employee_status', status_id=status.id) }}" onsubmit="return confirm('هل أنت متأكد من حذف هذه الحالة؟');">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" class="btn btn-danger btn-sm">
                     <i class="fas fa-trash"></i> حذف
@@ -72,7 +129,7 @@
             </tr>
             {% else %}
             <tr>
-              <td colspan="4" class="text-center text-muted">لا توجد حالات مخصصة</td>
+              <td colspan="4" class="text-center text-muted py-4">لا توجد حالات مخصصة</td>
             </tr>
             {% endfor %}
           </tbody>
