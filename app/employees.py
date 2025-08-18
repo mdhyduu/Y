@@ -30,6 +30,7 @@ def add_employee():
     user_id = request.cookies.get('user_id')
     is_admin = request.cookies.get('is_admin') == 'true'
     is_delivery_manager = request.cookies.get('employee_role') == 'delivery_manager'
+    store_id = request.cookies.get('store_id')  # الحصول على store_id من الكوكيز
     
     if not user_id:
         flash('غير مصرح لك بالوصول', 'error')
@@ -53,12 +54,12 @@ def add_employee():
             flash('البريد الإلكتروني موجود مسبقاً', 'error')
             return redirect(url_for('employees.add_employee'))
         
-        user = User.query.get(user_id)
+        # استخدم store_id من الكوكيز بدلاً من user.store_id
         region = 'الرياض' if role in ('delivery', 'delivery_manager') else None
         
         new_employee = Employee(
             email=email,
-            store_id=user.store_id,
+            store_id=store_id,  # استخدام store_id من الكوكيز
             role=role,
             region=region
         )
@@ -82,7 +83,6 @@ def add_employee():
     return render_template('employees/add.html', 
                         roles=roles,
                         is_delivery_manager=is_delivery_manager)
-
 @employees_bp.route('/employees/<int:employee_id>/delete', methods=['POST'])
 def delete_employee(employee_id):
     user_id = request.cookies.get('user_id')
