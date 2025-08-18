@@ -55,7 +55,9 @@
     {% endif %}
 </td>
                         <td>
+                            <!-- إضافة CSRF token لنموذج التفعيل/الإيقاف -->
                             <form method="POST" action="{{ url_for('employees.toggle_employee_active', employee_id=employee.id) }}" style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 {% if employee.is_active %}
                                     <button type="submit" class="btn btn-warning btn-sm">
                                         <i class="fas fa-user-slash"></i> إيقاف
@@ -66,7 +68,10 @@
                                     </button>
                                 {% endif %}
                             </form>
+                            
+                            <!-- إضافة CSRF token لنموذج الحذف -->
                             <form method="POST" action="{{ url_for('employees.delete_employee', employee_id=employee.id) }}" style="display:inline;" onsubmit="return confirm('هل أنت متأكد من حذف الموظف؟');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                 <button type="submit" class="btn btn-danger btn-sm">
                                     <i class="fas fa-trash-alt"></i> حذف
                                 </button>
