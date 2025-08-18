@@ -237,7 +237,7 @@ class User(db.Model):
         }
 class Employee(db.Model):
     __tablename__ = 'employees'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(128), nullable=False)
@@ -249,14 +249,17 @@ class Employee(db.Model):
     deactivated_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    remember_token = db.Column(db.String(100))  # New field for remember me functionality
+    remember_token = db.Column(db.String(100))
+    added_by = db.Column(db.Integer, db.ForeignKey('employees.id'))  # المدير الذي أضاف الموظف
+    
+    # العلاقات
     status_notes = relationship('OrderStatusNote', back_populates='employee', foreign_keys='OrderStatusNote.employee_id')
     permissions = relationship('EmployeePermission', back_populates='employee')
     custom_statuses = relationship('EmployeeCustomStatus', back_populates='employee')
     assignments = relationship('OrderAssignment', back_populates='employee')
-    added_employees = db.relationship('Employee', 
-                                      backref=db.backref('added_by_manager', remote_side=[id]),
-                                      foreign_keys='Employee.added_by')
+    added_employees = relationship('Employee', backref=db.backref('added_by_manager', remote_side=[id]))
+    
+
     def set_password(self, password: str):
         if len(password) < 8:
             raise ValueError("كلمة المرور يجب أن تكون 8 أحرف على الأقل")
