@@ -60,7 +60,7 @@
                     <span class="text-muted">تم التسليم</span>
                     {% endif %}
                 {% else %}
-                    {% if not order.is_delivered and order.assigned_to and order.assigned_to.id == employee.id %}
+                    {% if order.assigned_to and order.assigned_to.id == employee.id %}
                     <a href="{{ url_for('delivery.scan_barcode') }}" 
                        class="btn btn-sm btn-success">
                         <i class="fas fa-barcode"></i> تسليم
