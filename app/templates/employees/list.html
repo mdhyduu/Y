@@ -1,87 +1,169 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<style>
+  /* تنسيقات مخصصة للوضع الليلي */
+  body.dark-mode .table-striped > tbody > tr:nth-of-type(odd) > * {
+    background-color: #2d3250;
+    color: #e9ecef;
+  }
+  
+  body.dark-mode .badge-success {
+    background-color: #198754;
+  }
+  
+  body.dark-mode .badge-danger {
+    background-color: #dc3545;
+  }
+  
+  /* تحسينات للشاشات الصغيرة */
+  @media (max-width: 768px) {
+    .table-responsive {
+      border: 0;
+    }
+    
+    .table thead {
+      display: none;
+    }
+    
+    .table, .table tbody, .table tr, .table td {
+      display: block;
+      width: 100%;
+    }
+    
+    .table tr {
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border-color-light);
+      border-radius: var(--border-radius);
+    }
+    
+    .table td {
+      padding: 0.75rem;
+      text-align: left;
+      position: relative;
+      padding-right: 35%;
+      border-bottom: 1px solid var(--border-color-light);
+    }
+    
+    body.dark-mode .table td {
+      border-bottom: 1px solid var(--border-color-dark);
+    }
+    
+    .table td:before {
+      content: attr(data-label);
+      position: absolute;
+      right: 0.5rem;
+      font-weight: bold;
+      color: var(--primary);
+    }
+    
+    body.dark-mode .table td:before {
+      color: var(--primary-light);
+    }
+    
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    
+    .actions form {
+      flex: 1;
+      min-width: 45%;
+    }
+    
+    .actions .btn {
+      width: 100%;
+    }
+  }
+</style>
+
 <div class="card">
-    <div class="card-header bg-primary text-white">
-        <h3 class="mb-0"><i class="fas fa-users"></i> إدارة الموظفين</h3>
+  <div class="card-header bg-primary text-white">
+    <div class="d-flex justify-content-between align-items-center">
+      <h3 class="mb-0"><i class="fas fa-users"></i> إدارة الموظفين</h3>
+      <a href="{{ url_for('employees.add_employee') }}" class="btn btn-light btn-sm">
+        <i class="fas fa-plus"></i> إضافة موظف جديد
+      </a>
     </div>
-    <div class="card-body">
-        <a href="{{ url_for('employees.add_employee') }}" class="btn btn-success mb-3">
-            <i class="fas fa-plus"></i> إضافة موظف جديد
-        </a>
-        
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="thead-dark">
-                    <tr>
-                        <th>#</th>
-                        <th>البريد الإلكتروني</th>
-                        <th>الدور</th>
-                        <th>الحالة</th>
-                        <th>تاريخ الإيقاف</th>
-                        <th>الإجراءات</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for employee in employees %}
-                    <tr class="{% if not employee.is_active %}table-secondary{% endif %}">
-                        <td>{{ loop.index }}</td>
-                        <td>{{ employee.email }}</td>
-                        <td>
-                            {% if employee.role == 'general' %}
-                                موظف عام
-                            {% elif employee.role == 'delivery' %}
-                                مندوب توصيل
-                            {% elif employee.role == 'delivery_manager' %}
-                                مدير التوصيل
-                            {% elif employee.role == 'reviewer' %}
-                                مراجع الطلبات
-                            {% else %}
-                                {{ employee.role }}
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if employee.is_active %}
-                                <span class="badge badge-success">نشط</span>
-                            {% else %}
-                                <span class="badge badge-danger">موقوف</span>
-                            {% endif %}
-                        </td>
-<td>
-    {% if employee.deactivated_at %}
-        {{ employee.deactivated_at|format_date }}
-    {% else %}
-        -
-    {% endif %}
-</td>
-                        <td>
-                            <!-- إضافة CSRF token لنموذج التفعيل/الإيقاف -->
-                            <form method="POST" action="{{ url_for('employees.toggle_employee_active', employee_id=employee.id) }}" style="display:inline;">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                {% if employee.is_active %}
-                                    <button type="submit" class="btn btn-warning btn-sm">
-                                        <i class="fas fa-user-slash"></i> إيقاف
-                                    </button>
-                                {% else %}
-                                    <button type="submit" class="btn btn-success btn-sm">
-                                        <i class="fas fa-user-check"></i> تفعيل
-                                    </button>
-                                {% endif %}
-                            </form>
-                            
-                            <!-- إضافة CSRF token لنموذج الحذف -->
-                            <form method="POST" action="{{ url_for('employees.delete_employee', employee_id=employee.id) }}" style="display:inline;" onsubmit="return confirm('هل أنت متأكد من حذف الموظف؟');">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                <button type="submit" class="btn btn-danger btn-sm">
-                                    <i class="fas fa-trash-alt"></i> حذف
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+  </div>
+  
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-striped table-hover">
+        <thead class="thead-dark">
+          <tr>
+            <th>#</th>
+            <th>البريد الإلكتروني</th>
+            <th>الدور</th>
+            <th>الحالة</th>
+            <th>تاريخ الإيقاف</th>
+            <th>الإجراءات</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for employee in employees %}
+          <tr class="{% if not employee.is_active %}table-secondary{% endif %}">
+            <td data-label="#"> {{ loop.index }} </td>
+            <td data-label="البريد الإلكتروني"> {{ employee.email }} </td>
+            <td data-label="الدور">
+              {% if employee.role == 'general' %}
+                موظف عام
+              {% elif employee.role == 'delivery' %}
+                مندوب توصيل
+              {% elif employee.role == 'delivery_manager' %}
+                مدير التوصيل
+              {% elif employee.role == 'reviewer' %}
+                مراجع الطلبات
+              {% else %}
+                {{ employee.role }}
+              {% endif %}
+            </td>
+            <td data-label="الحالة">
+              {% if employee.is_active %}
+                <span class="badge badge-success p-2">نشط</span>
+              {% else %}
+                <span class="badge badge-danger p-2">موقوف</span>
+              {% endif %}
+            </td>
+            <td data-label="تاريخ الإيقاف">
+              {% if employee.deactivated_at %}
+                {{ employee.deactivated_at|format_date }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td data-label="الإجراءات">
+              <div class="actions">
+                <!-- إضافة CSRF token لنموذج التفعيل/الإيقاف -->
+                <form method="POST" action="{{ url_for('employees.toggle_employee_active', employee_id=employee.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                  {% if employee.is_active %}
+                    <button type="submit" class="btn btn-warning btn-sm">
+                      <i class="fas fa-user-slash"></i> إيقاف
+                    </button>
+                  {% else %}
+                    <button type="submit" class="btn btn-success btn-sm">
+                      <i class="fas fa-user-check"></i> تفعيل
+                    </button>
+                  {% endif %}
+                </form>
+                
+                <!-- إضافة CSRF token لنموذج الحذف -->
+                <form method="POST" action="{{ url_for('employees.delete_employee', employee_id=employee.id) }}" onsubmit="return confirm('هل أنت متأكد من حذف الموظف؟');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                  <button type="submit" class="btn btn-danger btn-sm">
+                    <i class="fas fa-trash-alt"></i> حذف
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
+  </div>
 </div>
 {% endblock %}

@@ -18,9 +18,26 @@
                     {% endfor %}
                 </select>
             </div>
-            <button type="submit" class="btn btn-primary">إسناد</button>
-            <a href="{{ url_for('delivery.delivery_orders') }}" class="btn btn-secondary">إلغاء</a>
+            <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+                <button type="submit" class="btn btn-primary me-md-2">إسناد</button>
+                <a href="{{ url_for('delivery.delivery_orders') }}" class="btn btn-secondary">إلغاء</a>
+            </div>
         </form>
     </div>
 </div>
+
+<style>
+    /* تحسينات للوضع الليلي في النموذج */
+    body.dark-mode .form-select, 
+    body.dark-mode .form-label {
+        background-color: var(--content-dark);
+        color: var(--text-light);
+        border-color: var(--border-color-dark);
+    }
+    
+    body.dark-mode .form-select:focus {
+        border-color: var(--primary-light);
+        box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
+    }
+</style>
 {% endblock %}

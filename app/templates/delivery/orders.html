@@ -1,82 +1,174 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h2>طلبات منطقة الرياض</h2>
-{% if is_delivery_manager %}
-<div class="alert alert-info">
-    <strong>ملاحظة:</strong> أنت تشاهد جميع طلبات منطقة الرياض
-</div>
-{% else %}
-<div class="alert alert-info">
-    <strong>ملاحظة:</strong> أنت تشاهد فقط الطلبات المسندة لك أو التي قمت بتسليمها
-</div>
-{% endif %}
-
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>رقم الطلب</th>
-            <th>العميل</th>
-            <th>المدينة</th>
-            <th>التاريخ</th>
-            <th>المبلغ</th>
-            <th>الحالة</th>
-            <th>مسند إلى</th>
-            <th>تم التسليم</th>
-            <th>الإجراءات</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for order in orders %}
-        <tr>
-            <td>{{ order.id }}</td>
-            <td>{{ order.customer.first_name }} {{ order.customer.last_name }}</td>
-            <td>{{ order.city }}</td>
-            <td>{{ order.created_at|format_date }}</td>
-            <td>{{ order.amount }} {{ order.currency }}</td>
-            <td>{{ order.status }}</td>
-            <td>
-                {% if order.assigned_to %}
-                    {{ order.assigned_to.email }}
-                {% else %}
-                    غير مسند
-                {% endif %}
-            </td>
-            <td>
-                {% if order.is_delivered %}
-                    <span class="badge bg-success">تم التسليم</span>
-                {% else %}
-                    <span class="badge bg-warning">قيد التوصيل</span>
-                {% endif %}
-            </td>
-            <td>
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h3 class="mb-0">طلبات منطقة الرياض</h3>
+            <div>
                 {% if is_delivery_manager %}
-                    {% if not order.is_delivered %}
-                    <a href="{{ url_for('delivery.assign_order', order_id=order.id) }}" 
-                       class="btn btn-sm btn-warning">
-                        <i class="fas fa-user-plus"></i> 
-                        {% if order.assigned_to %}تعديل الإسناد{% else %}إسناد{% endif %}
-                    </a>
-                    {% else %}
-                    <span class="text-muted">تم التسليم</span>
-                    {% endif %}
-                {% else %}
-                    {% if not order.is_delivered and order.assigned_to and order.assigned_to.id == employee.id %}
-                    <a href="{{ url_for('delivery.scan_barcode') }}" 
-                       class="btn btn-sm btn-success">
-                        <i class="fas fa-barcode"></i> تسليم
-                    </a>
-                    {% elif order.is_delivered %}
-                    <span class="text-muted">تم التسليم</span>
-                    {% endif %}
+                    <span class="badge bg-info">مدير التوصيل</span>
                 {% endif %}
-            </td>
-        </tr>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if is_delivery_manager %}
+        <div class="alert alert-info">
+            <strong>ملاحظة:</strong> أنت تشاهد جميع طلبات منطقة الرياض
+        </div>
         {% else %}
-        <tr>
-            <td colspan="9">لا توجد طلبات في منطقة الرياض</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+        <div class="alert alert-info">
+            <strong>ملاحظة:</strong> أنت تشاهد فقط الطلبات المسندة لك أو التي قمت بتسليمها
+        </div>
+        {% endif %}
+        
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>رقم الطلب</th>
+                        <th>العميل</th>
+                        <th>المدينة</th>
+                        <th>التاريخ</th>
+                        <th>المبلغ</th>
+                        <th>الحالة</th>
+                        <th>مسند إلى</th>
+                        <th>تم التسليم</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td data-label="رقم الطلب">{{ order.id }}</td>
+                        <td data-label="العميل">{{ order.customer.first_name }} {{ order.customer.last_name }}</td>
+                        <td data-label="المدينة">{{ order.city }}</td>
+                        <td data-label="التاريخ">{{ order.created_at|format_date }}</td>
+                        <td data-label="المبلغ">{{ order.amount }} {{ order.currency }}</td>
+                        <td data-label="الحالة">{{ order.status }}</td>
+                        <td data-label="مسند إلى">
+                            {% if order.assigned_to %}
+                                {{ order.assigned_to.email }}
+                            {% else %}
+                                غير مسند
+                            {% endif %}
+                        </td>
+                        <td data-label="تم التسليم">
+                            {% if order.is_delivered %}
+                                <span class="badge bg-success p-2">تم التسليم</span>
+                            {% else %}
+                                <span class="badge bg-warning p-2">قيد التوصيل</span>
+                            {% endif %}
+                        </td>
+                        <td data-label="الإجراءات">
+                            {% if is_delivery_manager %}
+                                {% if not order.is_delivered %}
+                                <a href="{{ url_for('delivery.assign_order', order_id=order.id) }}" 
+                                   class="btn btn-sm btn-warning mb-1">
+                                    <i class="fas fa-user-plus"></i> 
+                                    {% if order.assigned_to %}تعديل{% else %}إسناد{% endif %}
+                                </a>
+                                {% else %}
+                                <span class="text-muted">تم التسليم</span>
+                                {% endif %}
+                            {% else %}
+                                {% if not order.is_delivered and order.assigned_to and order.assigned_to.id == employee.id %}
+                                <a href="{{ url_for('delivery.scan_barcode') }}" 
+                                   class="btn btn-sm btn-success">
+                                    <i class="fas fa-barcode"></i> تسليم
+                                </a>
+                                {% elif order.is_delivered %}
+                                <span class="text-muted">تم التسليم</span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center">لا توجد طلبات في منطقة الرياض</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* تحسينات للوضع الليلي */
+    body.dark-mode .table-striped > tbody > tr:nth-of-type(odd) > * {
+        background-color: #2d3250;
+        color: #e9ecef;
+    }
+    
+    body.dark-mode .badge-success {
+        background-color: #198754;
+    }
+    
+    body.dark-mode .badge-warning {
+        background-color: #ffc107;
+        color: #000;
+    }
+    
+    /* تحسينات للشاشات الصغيرة */
+    @media (max-width: 768px) {
+        .table-responsive {
+            border: 0;
+        }
+        
+        .table thead {
+            display: none;
+        }
+        
+        .table, .table tbody, .table tr, .table td {
+            display: block;
+            width: 100%;
+        }
+        
+        .table tr {
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color-light);
+            border-radius: var(--border-radius);
+        }
+        
+        body.dark-mode .table tr {
+            border-color: var(--border-color-dark);
+        }
+        
+        .table td {
+            padding: 0.75rem;
+            text-align: left;
+            position: relative;
+            padding-right: 35%;
+            border-bottom: 1px solid var(--border-color-light);
+        }
+        
+        body.dark-mode .table td {
+            border-bottom: 1px solid var(--border-color-dark);
+        }
+        
+        .table td:before {
+            content: attr(data-label);
+            position: absolute;
+            right: 0.5rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        body.dark-mode .table td:before {
+            color: var(--primary-light);
+        }
+        
+        .table td:last-child {
+            border-bottom: 0;
+        }
+        
+        .table td .btn {
+            margin-bottom: 0.5rem;
+            display: block;
+            width: 100%;
+        }
+    }
+</style>
 {% endblock %}
