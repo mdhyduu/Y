@@ -715,19 +715,31 @@ def order_details(order_id):
                 'phone': order_data.get('receiver', {}).get('phone', '') if order_data.get('receiver') else order_data.get('customer', {}).get('mobile_code', '') + str(order_data.get('customer', {}).get('mobile', '')),
                 'email': order_data.get('receiver', {}).get('email', '') if order_data.get('receiver') else order_data.get('customer', {}).get('email', '')
                     },
-                'shipping': {
-                    'method': order_data.get('delivery_method', ''),
-                    'branch_id': order_data.get('branch_id'),
-                    'courier_id': order_data.get('courier_id'),
-                    'address': shipping_data.get('address', ''),
-                    'address_line': shipping_data.get('address_line', ''),
-                    'block': shipping_data.get('block', ''),
-                    'street_number': shipping_data.get('street_number', ''),
-                    'postal_code': shipping_data.get('postal_code', ''),
-                    'geo_coordinates': shipping_data.get('geo_coordinates', {}),
-                    'city_id': shipping_data.get('city'),
-                    'country_id': shipping_data.get('country')
-                },
+            'shipping': {
+                'method': order_data.get('shipping', {}).get('company'),
+                'branch_id': order_data.get('branch_id'),
+                'address': (
+                    order_data.get('shipping_address', {}).get('address', '')
+                    if order_data.get('shipping_address')
+                    else (order_data.get('customer', {}).get('location', '') if order_data.get('customer') else '')
+                ) or 'لم يتم تحديد العنوان',  # Fallback if all empty
+                'postal_code': order_data.get('shipping_address', {}).get('postal_code', ''),
+                'city': (
+                    order_data.get('shipping_address', {}).get('city', '')
+                    if order_data.get('shipping_address')
+                    else (order_data.get('customer', {}).get('city', '') if order_data.get('customer') else '')
+                ),
+                'country': (
+                    order_data.get('shipping_address', {}).get('country_name', '')
+                    if order_data.get('shipping_address')
+                    else (order_data.get('customer', {}).get('country', '') if order_data.get('customer') else '')
+                ),
+            
+                'geo_coordinates': {
+                    'latitude': order_data.get('shipping_address', {}).get('latitude'),
+                    'longitude': order_data.get('shipping_address', {}).get('longitude')
+                }
+            },
                 'payment': {
                     'status': order_data.get('payment', {}).get('status', ''),
                     'method': order_data.get('payment', {}).get('method', '')
