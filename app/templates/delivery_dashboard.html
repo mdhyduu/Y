@@ -29,7 +29,7 @@
                                     <div class="d-flex justify-content-between">
                                         <div>
                                             <h6 class="text-muted mb-2">طلبات اليوم</h6>
-                                            <h3 class="mb-0">15</h3>
+                                            <h3 class="mb-0">{{ stats.today_orders }}</h3>
                                         </div>
                                         <div class="bg-primary bg-opacity-10 p-3 rounded">
                                             <i class="fas fa-calendar-day text-primary"></i>
@@ -45,7 +45,7 @@
                                     <div class="d-flex justify-content-between">
                                         <div>
                                             <h6 class="text-muted mb-2">طلبات مسلمة</h6>
-                                            <h3 class="mb-0">12</h3>
+                                            <h3 class="mb-0">{{ stats.delivered_orders }}</h3>
                                         </div>
                                         <div class="bg-success bg-opacity-10 p-3 rounded">
                                             <i class="fas fa-check-circle text-success"></i>
@@ -61,7 +61,7 @@
                                     <div class="d-flex justify-content-between">
                                         <div>
                                             <h6 class="text-muted mb-2">طلبات قيد التوصيل</h6>
-                                            <h3 class="mb-0">3</h3>
+                                            <h3 class="mb-0">{{ stats.in_delivery_orders }}</h3>
                                         </div>
                                         <div class="bg-warning bg-opacity-10 p-3 rounded">
                                             <i class="fas fa-truck text-warning"></i>
@@ -110,27 +110,21 @@
                         </div>
                         <div class="card-body">
                             <div class="list-group list-group-flush">
-                                <a href="#" class="list-group-item list-group-item-action">
+                                {% for order in recent_orders %}
+                                <a href="{{ url_for('delivery.delivery_orders') }}" class="list-group-item list-group-item-action">
                                     <div class="d-flex justify-content-between">
-                                        <span>#1254 - محمد أحمد</span>
-                                        <span class="badge bg-warning">قيد التوصيل</span>
+                                        <span>#{{ order.id }} - {{ order.customer.first_name }} {{ order.customer.last_name }}</span>
+                                        <span class="badge bg-{% if order.is_delivered %}success{% else %}warning{% endif %}">
+                                            {% if order.is_delivered %}تم التسليم{% else %}قيد التوصيل{% endif %}
+                                        </span>
                                     </div>
-                                    <small class="text-muted">منطقة: الرياض - منذ 30 دقيقة</small>
+                                    <small class="text-muted">منطقة: {{ order.city }} - منذ {{ order.created_at|timesince }}</small>
                                 </a>
-                                <a href="#" class="list-group-item list-group-item-action">
-                                    <div class="d-flex justify-content-between">
-                                        <span>#1253 - علي محمد</span>
-                                        <span class="badge bg-success">تم التسليم</span>
-                                    </div>
-                                    <small class="text-muted">منطقة: الرياض - منذ ساعتين</small>
-                                </a>
-                                <a href="#" class="list-group-item list-group-item-action">
-                                    <div class="d-flex justify-content-between">
-                                        <span>#1252 - سعيد خالد</span>
-                                        <span class="badge bg-success">تم التسليم</span>
-                                    </div>
-                                    <small class="text-muted">منطقة: الرياض - منذ 3 ساعات</small>
-                                </a>
+                                {% else %}
+                                <div class="list-group-item">
+                                    <p class="mb-0 text-center text-muted">لا توجد طلبات حديثة</p>
+                                </div>
+                                {% endfor %}
                             </div>
                         </div>
                     </div>
