@@ -56,7 +56,6 @@ def clear_cookies_and_redirect():
 
 # ... بقية الكود كما هو
 
-# ... (الكود السابق)
 @dashboard_bp.route('/')
 @login_required
 def index():
@@ -70,7 +69,7 @@ def index():
             # جلب جميع الطلبات للمتجر
             all_orders = SallaOrder.query.filter_by(store_id=user.store_id).all()
             
-            # حساب الإحصائيات الشاملة باستخدام علاقة الجداول
+            # حساب الإحصائيات الشاملة
             stats = {
                 'total_orders': len(all_orders),
                 'new_orders': len([o for o in all_orders if o.status_slug == 'new']),
@@ -95,7 +94,7 @@ def index():
             # جلب الحالات المخصصة للمتجر
             custom_statuses = CustomNoteStatus.query.filter_by(store_id=user.store_id).all()
             
-            # حساب عدد الطلبات لكل حالة باستخدام علاقة الجداول
+            # حساب عدد الطلبات لكل حالة
             custom_status_stats = []
             for status in custom_statuses:
                 count = db.session.query(OrderStatusNote).join(SallaOrder).filter(
@@ -112,7 +111,7 @@ def index():
                 store_id=user.store_id
             ).order_by(SallaOrder.created_at.desc()).limit(10).all()
             
-            # جلب آخر النشاطات باستخدام علاقة الجداول
+            # جلب آخر النشاطات
             recent_statuses = db.session.query(OrderStatusNote).join(SallaOrder).filter(
                 SallaOrder.store_id == user.store_id
             ).order_by(OrderStatusNote.created_at.desc()).limit(10).all()
@@ -121,7 +120,7 @@ def index():
             employees_count = Employee.query.filter_by(store_id=user.store_id).count()
             
             # جلب عدد المنتجات (افتراضي)
-            products_count = 0  # سيتم استبدالها بالاستعلام الفعلي
+            products_count = 0
             
             return render_template('dashboard.html', 
                                 current_user=user,
@@ -132,9 +131,6 @@ def index():
                                 employees_count=employees_count,
                                 products_count=products_count,
                                 is_admin=True)
-        
-
-    
     
         else:
             # للموظفين

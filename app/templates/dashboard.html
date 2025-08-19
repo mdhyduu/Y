@@ -96,10 +96,14 @@
                                 {% for order in recent_orders %}
                                 <tr>
                                     <td class="fw-bold">#{{ order.id }}</td>
-                                    <td>{{ order.customer_name }}</td>
-                                    <td>{{ order.created_at.strftime('%Y-%m-%d') }}</td>
-                                    <td>{{ order.total_amount }} {{ order.currency }}</td>
-                                    <td>
+                                    <!-- في قسم أحدث الطلبات -->
+<td>
+    {% if order.created_at %}
+        {{ order.created_at.strftime('%Y-%m-%d') }}
+    {% else %}
+        غير محدد
+    {% endif %}
+</td>
                                         <span class="badge bg-{{ order.status_slug | replace('under_review', 'warning') | replace('processing', 'info') | replace('completed', 'success') | replace('awaiting_payment', 'warning') | replace('shipped', 'primary') | replace('delivered', 'success') | replace('canceled', 'danger') | replace('refunded', 'secondary') }}">
                                             {{ order.status }}
                                         </span>
