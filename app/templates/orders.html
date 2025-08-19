@@ -703,11 +703,11 @@ $(document).on('click', '#print-orders-btn', function() {
     }
     
     Swal.fire({
-        title: 'تحميل الطلبات',
-        html: `سيتم تحميل <span class="fw-bold text-primary">${orderIds.length}</span> طلب كملف PDF`,
+        title: 'عرض الطلبات',
+        html: `سيتم فتح <span class="fw-bold text-primary">${orderIds.length}</span> طلب في نافذة جديدة`,
         icon: 'info',
         showCancelButton: true,
-        confirmButtonText: 'موافق، تحميل PDF',
+        confirmButtonText: 'موافق، عرض PDF',
         cancelButtonText: 'إلغاء',
         customClass: {
             confirmButton: 'btn btn-primary',
@@ -721,13 +721,8 @@ $(document).on('click', '#print-orders-btn', function() {
             const originalText = printBtn.html();
             printBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
             
-            // إنشاء رابط تحميل خفي
-            const downloadLink = document.createElement('a');
-            downloadLink.href = `{{ url_for('orders.print_orders') }}?order_ids=${orderIds.join(',')}`;
-            downloadLink.style.display = 'none';
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
+            // فتح PDF في نافذة جديدة
+            window.open(`{{ url_for('orders.print_orders') }}?order_ids=${orderIds.join(',')}`, '_blank');
             
             // استعادة حالة الزر بعد ثانية
             setTimeout(() => {

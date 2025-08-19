@@ -1256,7 +1256,6 @@ def bulk_update_status():
             'success': False,
             'error': f'حدث خطأ أثناء حفظ التغييرات: {str(e)}'
         }), 500
-
 @orders_bp.route('/print_orders')
 def print_orders():
     user, employee = get_user_from_cookies()
@@ -1334,13 +1333,10 @@ def print_orders():
         # إنشاء PDF من HTML
         pdf = HTML(string=html_content, base_url=request.base_url).write_pdf()
         
-        # إنشاء اسم ملف فريد
-        filename = f"orders_{'_'.join(order_ids)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        
-        # إعداد response مع PDF للتحميل
+        # إعداد response مع PDF للعرض في المتصفح
         response = make_response(pdf)
         response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        response.headers['Content-Disposition'] = 'inline; filename=orders.pdf'
         
         return response
         
