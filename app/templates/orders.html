@@ -104,42 +104,29 @@
                 </div>
             </form>
         </div>
-<!-- إضافة زر تغيير الحالة في شريط الأدوات -->
-<button type="button" class="btn btn-info rounded-pill px-4 ms-2" id="change-status-btn" disabled>
-    <i class="fas fa-tag me-1"></i> 
-    <span id="selected-orders-count-2">0</span> تغيير الحالة
-</button>
-<!-- إضافة نافذة اختيار الحالة -->
-<div class="modal fade" id="changeStatusModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">تغيير حالة الطلبات المحددة</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        
+        <!-- إضافة أزرار الإجراءات السريعة -->
+        <div class="d-flex p-3 border-bottom bg-light" id="quick-actions">
+            {% if is_reviewer and employees %}
+            <button type="button" class="btn btn-success rounded-pill px-3 me-2" id="assign-orders-btn" disabled>
+                <i class="fas fa-user-check me-1"></i> 
+                <span id="selected-orders-count">0</span> إسناد
+            </button>
+            {% endif %}
+            
+            <button type="button" class="btn btn-info rounded-pill px-3 me-2" id="change-status-btn" disabled>
+                <i class="fas fa-tag me-1"></i> 
+                <span id="selected-orders-count-2">0</span> تغيير الحالة
+            </button>
+            
+            {% if is_reviewer %}
+            <div class="form-check ms-auto d-flex align-items-center">
+                <input class="form-check-input me-2" type="checkbox" id="select-all">
+                <label class="form-check-label small text-muted" for="select-all">تحديد الكل</label>
             </div>
-            <div class="modal-body">
-                <p>سيتم تطبيق الحالة المحددة على <span id="selected-count-modal" class="fw-bold">0</span> طلب.</p>
-                <div class="mb-3">
-                    <label for="status-select" class="form-label">اختر الحالة:</label>
-                    <select class="form-select" id="status-select">
-                        <option value="">اختر حالة...</option>
-                        {% for status in custom_statuses %}
-                        <option value="{{ status.id }}" style="color: {{ status.color }}">{{ status.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label for="status-note" class="form-label">ملاحظة (اختياري):</label>
-                    <textarea class="form-control" id="status-note" rows="2"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                <button type="button" class="btn btn-primary" id="confirm-status-change">تأكيد</button>
-            </div>
+            {% endif %}
         </div>
-    </div>
-</div>
+
         {% if orders %}
         <div class="table-responsive position-relative">
             <div id="table-loading" class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center d-none" style="z-index: 10;">
@@ -149,12 +136,12 @@
             </div>
             
             <table class="table table-hover mb-0" id="orders-table">
-                <thead>
+                <thead class="table-light">
                     <tr>
                         {% if is_reviewer %}
                         <th width="5%" class="ps-4">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="select-all">
+                                <input class="form-check-input" type="checkbox" id="select-all-header">
                             </div>
                         </th>
                         {% endif %}
@@ -171,7 +158,7 @@
                 </thead>
                 <tbody>
                     {% for order in orders %}
-                    <tr data-order-id="{{ order.id }}" data-order-status="{{ order.status.slug }}" class="align-middle">
+                    <tr data-order-id="{{ order.id }}" data-order-status="{{ order.status.slug }}" class="align-middle clickable-row">
                         {% if is_reviewer %}
                         <td class="ps-4">
                             <div class="form-check">
@@ -256,7 +243,7 @@
                             {% endif %}
                         </td>
                         {% endif %}
-                        <td class="text-end pe-4">
+                        <td class="text-end pe-4 actions-cell">
                             <div class="d-flex justify-content-end gap-2">
                                 <a href="{{ url_for('orders.order_details', order_id=order.id) }}"
                                    class="btn btn-sm btn-icon btn-outline-primary rounded-circle"
@@ -278,13 +265,14 @@
         </div>
         
         <div class="d-flex justify-content-between align-items-center p-4 border-top">
-            <div>
-            {% if is_reviewer and employees %}
-                <button type="button" class="btn btn-success rounded-pill px-4" id="assign-orders-btn" disabled>
-                    <i class="fas fa-user-check me-1"></i> 
-                    <span id="selected-orders-count">0</span> إسناد
-                </button>
-            {% endif %}
+            <div class="d-flex align-items-center">
+                <span class="text-muted small me-3">العناصر لكل صفحة:</span>
+                <select class="form-select form-select-sm w-auto" id="per-page-select">
+                    <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10</option>
+                    <option value="25" {% if pagination.per_page == 25 %}selected{% endif %}>25</option>
+                    <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if pagination.per_page == 100 %}selected{% endif %}>100</option>
+                </select>
             </div>
             
             <div class="d-flex flex-column align-items-end">
@@ -326,7 +314,7 @@
             <p class="text-muted mb-4">
                 لم يتم العثور على طلبات تطابق معايير البحث الخاصة بك.
             </p>
-            <button type="button" class="btn btn-primary rounded-pill px-4" id="reset-filters">
+            <button type="button" class="btn btn-primary rounded-pill px-4" id="reset-filters-btn">
                 <i class="fas fa-undo me-2"></i>إعادة تعيين الفلاتر
             </button>
         </div>
@@ -334,7 +322,37 @@
     </div>
 </div>
 
-
+<!-- نافذة اختيار الحالة -->
+<div class="modal fade" id="changeStatusModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تغيير حالة الطلبات المحددة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>سيتم تطبيق الحالة المحددة على <span id="selected-count-modal" class="fw-bold">0</span> طلب.</p>
+                <div class="mb-3">
+                    <label for="status-select" class="form-label">اختر الحالة:</label>
+                    <select class="form-select" id="status-select">
+                        <option value="">اختر حالة...</option>
+                        {% for status in custom_statuses %}
+                        <option value="{{ status.id }}" style="color: {{ status.color }}">{{ status.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="status-note" class="form-label">ملاحظة (اختياري):</label>
+                    <textarea class="form-control" id="status-note" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="confirm-status-change">تأكيد</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% block scripts %}
 <style>
@@ -359,57 +377,125 @@
     .btn-icon { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
     .bg-gradient-primary { background: linear-gradient(135deg, #4e73df 0%, #224abe 100%); }
     
-    tr:hover { background-color: rgba(0,0,0,0.02) !important; }
-
+    /* تحسينات الجدول */
+    .clickable-row { cursor: pointer; transition: all 0.2s ease; }
+    .clickable-row:hover { background-color: rgba(78, 115, 223, 0.05) !important; transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .clickable-row.selected-row { background-color: rgba(78, 115, 223, 0.1) !important; }
+    
+    .actions-cell { 
+        position: relative; 
+        z-index: 5; /* تأكد من أن أزرار الإجراءات تظهر فوق الصف */
+    }
+    
+    /* تأثير النبض للأزرار عند التحديد */
+    .pulse-effect {
+        animation: pulse 1s;
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    
+    /* تحسينات للشاشات الصغيرة */
+    @media (max-width: 768px) {
+        .card-header h6 { font-size: 0.9rem; }
+        #sync-orders-btn .sync-text { display: none; }
+        #sync-orders-btn i { margin-right: 0 !important; }
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .table td, .table th { white-space: nowrap; }
+        
+        /* إخفاء بعض الأعمدة في الشاشات الصغيرة */
+        .table th:nth-child(4),
+        .table td:nth-child(4),
+        .table th:nth-child(5),
+        .table td:nth-child(5) {
+            display: none;
+        }
+        
+        /* تحسين شريط الإجراءات السريعة */
+        #quick-actions {
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        #quick-actions .btn {
+            flex: 1;
+            min-width: 120px;
+        }
+        
+        #quick-actions .form-check {
+            flex-basis: 100%;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        
+        /* تحسين التصفية */
+        #advanced-filters .col-md-3,
+        #advanced-filters .col-md-2 {
+            margin-bottom: 15px;
+        }
+    }
+    
+    /* تحسينات للشاشات المتوسطة */
+    @media (max-width: 992px) {
+        .table th:nth-child(6),
+        .table td:nth-child(6) {
+            display: none;
+        }
+    }
+    
     /* =================================== */
     /* Dark Mode Styles          */
     /* =================================== */
     body.dark-mode .border-bottom { border-bottom-color: var(--border-color-dark) !important; }
-    /* إضافة هذه الأنماط لقسم الـ CSS */
-.badge-late {
-    background-color: rgba(220, 38, 38, 0.1) !important;
-    color: #dc2626 !important;
-    border: 1px solid #dc2626;
-}
+    
+    .badge-late {
+        background-color: rgba(220, 38, 38, 0.1) !important;
+        color: #dc2626 !important;
+        border: 1px solid #dc2626;
+    }
 
-.badge-missing {
-    background-color: rgba(234, 88, 12, 0.1) !important;
-    color: #ea580c !important;
-    border: 1px solid #ea580c;
-}
+    .badge-missing {
+        background-color: rgba(234, 88, 12, 0.1) !important;
+        color: #ea580c !important;
+        border: 1px solid #ea580c;
+    }
 
-.badge-refunded {
-    background-color: rgba(109, 40, 217, 0.1) !important;
-    color: #6d28d9 !important;
-    border: 1px solid #6d28d9;
-}
+    .badge-refunded {
+        background-color: rgba(109, 40, 217, 0.1) !important;
+        color: #6d28d9 !important;
+        border: 1px solid #6d28d9;
+    }
 
-.badge-not_shipped {
-    background-color: rgba(16, 185, 129, 0.1) !important;
-    color: #10b981 !important;
-    border: 1px solid #10b981;
-}
+    .badge-not_shipped {
+        background-color: rgba(16, 185, 129, 0.1) !important;
+        color: #10b981 !important;
+        border: 1px solid #10b981;
+    }
 
-/* للوضع الليلي */
-body.dark-mode .badge-late {
-    background-color: rgba(220, 38, 38, 0.2) !important;
-    color: #fca5a5 !important;
-}
+    /* للوضع الليلي */
+    body.dark-mode .badge-late {
+        background-color: rgba(220, 38, 38, 0.2) !important;
+        color: #fca5a5 !important;
+    }
 
-body.dark-mode .badge-missing {
-    background-color: rgba(234, 88, 12, 0.2) !important;
-    color: #fdba74 !important;
-}
+    body.dark-mode .badge-missing {
+        background-color: rgba(234, 88, 12, 0.2) !important;
+        color: #fdba74 !important;
+    }
 
-body.dark-mode .badge-refunded {
-    background-color: rgba(109, 40, 217, 0.2) !important;
-    color: #c4b5fd !important;
-}
+    body.dark-mode .badge-refunded {
+        background-color: rgba(109, 40, 217, 0.2) !important;
+        color: #c4b5fd !important;
+    }
 
-body.dark-mode .badge-not_shipped {
-    background-color: rgba(16, 185, 129, 0.2) !important;
-    color: #6ee7b7 !important;
-}
+    body.dark-mode .badge-not_shipped {
+        background-color: rgba(16, 185, 129, 0.2) !important;
+        color: #6ee7b7 !important;
+    }
+    
     body.dark-mode .border-top { border-top-color: var(--border-color-dark) !important; }
     body.dark-mode .text-muted { color: #a0aec0 !important; }
 
@@ -419,7 +505,8 @@ body.dark-mode .badge-not_shipped {
     /* Table */
     body.dark-mode #table-loading { background-color: rgba(42, 46, 66, 0.75); }
     body.dark-mode .table th { color: #a0aec0; }
-    body.dark-mode tr:hover { background-color: rgba(255,255,255,0.04) !important; }
+    body.dark-mode .clickable-row:hover { background-color: rgba(78, 115, 223, 0.1) !important; }
+    body.dark-mode .clickable-row.selected-row { background-color: rgba(78, 115, 223, 0.15) !important; }
 
     /* Status Badges */
     body.dark-mode .status-pending,
@@ -440,24 +527,14 @@ body.dark-mode .badge-not_shipped {
     body.dark-mode .page-item.disabled .page-link { background-color: transparent; border-color: var(--border-color-dark); color: #6c757d; }
     body.dark-mode .page-link:hover { background-color: #3a3f58; }
     body.dark-mode .page-item.active .page-link { background-color: var(--primary); border-color: var(--primary); color: #fff; }
-/* إضافة هذا في قسم الـ CSS */
-body.dark-mode .badge[style*="background-color"] {
-    filter: brightness(0.9) contrast(1.2);
-}
+
+    body.dark-mode .badge[style*="background-color"] {
+        filter: brightness(0.9) contrast(1.2);
+    }
+    
     /* "No orders" state */
     body.dark-mode .text-gray-300 { color: #4b5563 !important; }
     body.dark-mode .text-gray-600 { color: #d1d5db !important; }
-
-    /* =================================== */
-    /* Responsive Styles            */
-    /* =================================== */
-    @media (max-width: 768px) {
-        .card-header h6 { font-size: 0.9rem; }
-        #sync-orders-btn .sync-text { display: none; }
-        #sync-orders-btn i { margin-right: 0 !important; }
-        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        .table td, .table th { white-space: nowrap; }
-    }
 </style>
 
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -474,7 +551,7 @@ document.addEventListener('DOMContentLoaded', function () {
     dayjs.locale('ar');
     
     // --- تهيئة الأدوات ---
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip']'));
     tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
@@ -530,13 +607,14 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateAssignButtonState() {
         const checkedCount = $('.order-checkbox:checked').length;
         $('#selected-orders-count').text(checkedCount);
+        $('#selected-orders-count-2').text(checkedCount);
         $('#assign-orders-btn').prop('disabled', checkedCount === 0);
+        $('#change-status-btn').prop('disabled', checkedCount === 0);
         
-        // إضافة تأثير عند تحديد الطلبات
         if (checkedCount > 0) {
-            $('#assign-orders-btn').addClass('pulse-effect');
+            $('#assign-orders-btn, #change-status-btn').addClass('pulse-effect');
             setTimeout(() => {
-                $('#assign-orders-btn').removeClass('pulse-effect');
+                $('#assign-orders-btn, #change-status-btn').removeClass('pulse-effect');
             }, 1000);
         }
     }
@@ -548,11 +626,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const search = $('#search-order-id').val();
         const dateFrom = $('#date-from').val();
         const dateTo = $('#date-to').val();
+        const perPage = $('#per-page-select').val();
         
         if (status) params.set('status', status);
         if (search) params.set('search', search);
         if (dateFrom) params.set('date_from', dateFrom);
         if (dateTo) params.set('date_to', dateTo);
+        if (perPage) params.set('per_page', perPage);
         
         {% if is_reviewer %}
         const employee = $('#filter-employee').val();
@@ -631,82 +711,9 @@ document.addEventListener('DOMContentLoaded', function () {
             progressContainer.addClass('d-none');
         });
     });
-// إضافة دالة لتحديث زر تغيير الحالة
-function updateChangeStatusButton() {
-    const checkedCount = $('.order-checkbox:checked').length;
-    $('#selected-orders-count-2').text(checkedCount);
-    $('#change-status-btn').prop('disabled', checkedCount === 0);
-    
-    if (checkedCount > 0) {
-        $('#change-status-btn').addClass('pulse-effect');
-        setTimeout(() => {
-            $('#change-status-btn').removeClass('pulse-effect');
-        }, 1000);
-    }
-}
 
-// إضافة معالج حدث لزر تغيير الحالة
-$('#change-status-btn').on('click', function() {
-    const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
-    $('#selected-count-modal').text(orderIds.length);
-    $('#changeStatusModal').modal('show');
-});
-
-// إضافة معالج حدث لتأكيد تغيير الحالة
-$('#confirm-status-change').on('click', function() {
-    const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
-    const statusId = $('#status-select').val();
-    const note = $('#status-note').val();
-    
-    if (!statusId) {
-        showSweetAlert('warning', 'تحذير', 'يجب اختيار حالة');
-        return;
-    }
-    
-    $('#changeStatusModal').modal('hide');
-    
-    $.ajax({
-        url: "{{ url_for('orders.bulk_update_status') }}",
-        type: "POST",
-        contentType: "application/json",
-        headers: { 'X-CSRFToken': csrfToken },
-        data: JSON.stringify({
-            order_ids: orderIds,
-            status_id: statusId,
-            note: note
-        }),
-    })
-    .done(function(response) {
-        if (response.success) {
-            showSweetAlert('success', 'نجح التحديث!', response.message);
-            setTimeout(() => location.reload(), 1500);
-        } else {
-            showSweetAlert('error', 'فشل التحديث', response.error);
-        }
-    })
-    .fail(function(xhr) {
-        const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم';
-        showSweetAlert('error', 'حدث خطأ', errorMsg);
-    });
-});
-
-// تحديث دالة updateAssignButtonState لتشمل زر تغيير الحالة
-function updateAssignButtonState() {
-    const checkedCount = $('.order-checkbox:checked').length;
-    $('#selected-orders-count').text(checkedCount);
-    $('#selected-orders-count-2').text(checkedCount);
-    $('#assign-orders-btn').prop('disabled', checkedCount === 0);
-    $('#change-status-btn').prop('disabled', checkedCount === 0);
-    
-    if (checkedCount > 0) {
-        $('#assign-orders-btn, #change-status-btn').addClass('pulse-effect');
-        setTimeout(() => {
-            $('#assign-orders-btn, #change-status-btn').removeClass('pulse-effect');
-        }, 1000);
-    }
-}
     // 2. تحديد الطلبات (الكل أو فردي)
-    $('#select-all').on('change', function() {
+    $('#select-all, #select-all-header').on('change', function() {
         $('.order-checkbox').prop('checked', this.checked);
         updateAssignButtonState();
         
@@ -719,7 +726,7 @@ function updateAssignButtonState() {
     });
 
     $('.order-checkbox').on('change', function() {
-        $('#select-all').prop('checked', $('.order-checkbox:checked').length === $('.order-checkbox').length);
+        $('#select-all, #select-all-header').prop('checked', $('.order-checkbox:checked').length === $('.order-checkbox').length);
         updateAssignButtonState();
         
         // إضافة تأثير عند التحديد
@@ -791,7 +798,8 @@ function updateAssignButtonState() {
     });
     
     // 4. إسناد سريع لطلب واحد
-    $('.assign-single-btn').on('click', function() {
+    $('.assign-single-btn').on('click', function(e) {
+        e.stopPropagation(); // منع انتشار الحدث إلى الصف
         const orderId = $(this).data('order-id');
         
         const employeeOptions = {
@@ -849,7 +857,51 @@ function updateAssignButtonState() {
         });
     });
     
-    // 5. تطبيق الفلاتر مع تأخير للبحث
+    // 5. تغيير حالة الطلبات
+    $('#change-status-btn').on('click', function() {
+        const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
+        $('#selected-count-modal').text(orderIds.length);
+        $('#changeStatusModal').modal('show');
+    });
+
+    $('#confirm-status-change').on('click', function() {
+        const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
+        const statusId = $('#status-select').val();
+        const note = $('#status-note').val();
+        
+        if (!statusId) {
+            showSweetAlert('warning', 'تحذير', 'يجب اختيار حالة');
+            return;
+        }
+        
+        $('#changeStatusModal').modal('hide');
+        
+        $.ajax({
+            url: "{{ url_for('orders.bulk_update_status') }}",
+            type: "POST",
+            contentType: "application/json",
+            headers: { 'X-CSRFToken': csrfToken },
+            data: JSON.stringify({
+                order_ids: orderIds,
+                status_id: statusId,
+                note: note
+            }),
+        })
+        .done(function(response) {
+            if (response.success) {
+                showSweetAlert('success', 'نجح التحديث!', response.message);
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showSweetAlert('error', 'فشل التحديث', response.error);
+            }
+        })
+        .fail(function(xhr) {
+            const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم';
+            showSweetAlert('error', 'حدث خطأ', errorMsg);
+        });
+    });
+    
+    // 6. تطبيق الفلاتر مع تأخير للبحث
     $('#advanced-filters').on('submit', function(e) {
         e.preventDefault();
         reloadOrders();
@@ -861,21 +913,30 @@ function updateAssignButtonState() {
     }, 500));
     
     // تغيير الفلاتر مع تأخير
-    $('#filter-order-status, #filter-employee, #filter-custom-status, #filter-special-status').on('change', _.debounce(function() {
+    $('#filter-order-status, #filter-employee, #filter-custom-status, #filter-special-status, #per-page-select').on('change', _.debounce(function() {
         reloadOrders();
     }, 300));
     
-    // 6. إعادة تعيين الفلاتر
-    $('#reset-filters').on('click', function() {
+    // 7. إعادة تعيين الفلاتر
+    $('#reset-filters, #reset-filters-btn').on('click', function() {
         window.location.href = "{{ url_for('orders.index') }}";
+    });
+
+    // 8. النقر على صف الجدول للانتقال إلى التفاصيل
+    $('.clickable-row').on('click', function(e) {
+        // تجاهل النقر على عناصر الإدخال أو الأزرار
+        if ($(e.target).is('input, button, a, i') || $(e.target).closest('button, a, .actions-cell').length) {
+            return;
+        }
+        
+        const orderId = $(this).data('order-id');
+        window.location.href = "{{ url_for('orders.order_details', order_id=0) }}".replace('0', orderId);
     });
 
     // --- التشغيل عند تحميل الصفحة ---
     updateTimestamps();
     updateAssignButtonState();
-    // في نهاية document ready
-updateAssignButtonState();
-updateChangeStatusButton(); // إضافة هذا السطر
+    
     // تحديث التواريخ كل دقيقة
     setInterval(updateTimestamps, 60000);
     
