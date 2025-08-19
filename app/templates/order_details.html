@@ -3,7 +3,8 @@
 {% block content_class %}p-0{% endblock %}
 
 {% block content %}
-
+<!-- في رأس القالب -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 <div class="container-fluid g-0 m-0 w-100 full-width-container">
   <!-- رأس الصفحة -->
 <div class="bg-light p-3 d-flex justify-content-between align-items-center flex-wrap gap-2"> <h2 class="mb-0 fs-4"> <i class="fas fa-file-invoice ms-2"></i> تفاصيل الطلب #{{  order.reference_id | safe }}
@@ -205,6 +206,7 @@
                 </select>
             </div>
             
+            
             <div class="mb-3">
                 <label class="form-label small fw-bold">ملاحظات إضافية</label>
                 <textarea class="form-control form-control-sm" name="note" rows="3" 
@@ -216,6 +218,43 @@
             </button>
         </form>
 {% endif %}
+{% for item in order.order_items %}
+<tr class="border-bottom">
+  <!-- صورة المنتج -->
+  <td style="width: 120px; min-width: 120px;">
+    <div class="d-flex justify-content-center">
+      {% if item.main_image %}
+      <img src="{{ item.main_image | safe }}" alt="{{ item.name | safe }}"
+           class="img-fluid rounded product-image"
+           style="width: 160px; height: 160px; object-fit: cover;"
+           loading="lazy" id="product-image-{{ loop.index }}">
+      {% else %}
+      <div class="bg-light d-flex align-items-center justify-content-center rounded product-image-placeholder" 
+           style="width: 80px; height: 80px;">
+        <i class="fas fa-image fa-lg text-muted"></i>
+      </div>
+      {% endif %}
+    </div>
+    <div class="text-center mt-1 small text-muted">
+      الكمية: {{ item.quantity }}
+    </div>
+    
+    <!-- زر المشاركة -->
+    <div class="text-center mt-2">
+      <button class="btn btn-sm btn-success share-btn" 
+              data-product-name="{{ item.name | safe }}"
+              data-product-image="{{ item.main_image | safe if item.main_image else '' }}"
+              data-product-options="{{ item.options | tojson | safe }}"
+              title="مشاركة عبر واتساب">
+        <i class="fab fa-whatsapp"></i> مشاركة
+      </button>
+    </div>
+  </td>
+  
+  <!-- بقية محتوى الخلية -->
+  ...
+</tr>
+{% endfor %}
         <!-- عرض الحالات المسجلة في قائمة واحدة -->
         <div class="mt-4">
             <h6 class="border-bottom pb-2 mb-3 small fw-bold">تنبيهات  </h6>
@@ -611,6 +650,42 @@
 </style>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+    // مشاركة المنتج عبر واتساب
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.share-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const productName = this.dataset.productName;
+            const productImage = this.dataset.productImage;
+            const productOptions = JSON.parse(this.dataset.productOptions || '[]');
+            
+            // بناء نص المشاركة
+            let shareText = `*${productName}*%0A%0A`;
+            
+            // إضافة الخيارات إذا وجدت
+            if (productOptions.length > 0) {
+                shareText += `*الخيارات:*%0A`;
+                productOptions.forEach(option => {
+                    shareText += `${option.name}: ${option.value}%0A`;
+                });
+                shareText += '%0A';
+            }
+            
+            shareText += '---%0A';
+            shareText += 'تم المشاركة من تطبيق إدارة الطلبات';
+            
+            // بناء رابط واتساب
+            let whatsappUrl = `https://wa.me/?text=${shareText}`;
+            
+            // إذا كانت هناك صورة، نضيفها كرابط
+            if (productImage) {
+                whatsappUrl += `&media=${encodeURIComponent(productImage)}`;
+            }
+            
+            // فتح واتساب في نافذة جديدة
+            window.open(whatsappUrl, '_blank', 'width=600,height=400');
+        });
+    });
+});
   // التحقق قبل إرسال النماذج
   document.getElementById('status-form').addEventListener('submit', function(e) {
     const status = document.getElementById('status').value;
