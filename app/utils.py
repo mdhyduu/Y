@@ -153,7 +153,7 @@ def process_order_data(order_id, items_data):
         for reservation in item.get('reservations', []):
             if isinstance(reservation, dict):
                 reservations.append({
-                    'id': reservation.get('id'),
+                    'reference_id': reservation.get('id'),
                     'from': reservation.get('from', ''),
                     'to': reservation.get('to', ''),
                     'date': reservation.get('date', '')
@@ -198,7 +198,7 @@ def process_order_data(order_id, items_data):
         logger.info(f"Processed item: {item_data['name']} with barcode: {item_barcode or 'None'}")
 
     processed_order = {
-        'id': order_id,
+        'reference_id': order_id,
         'order_items': items,
         'barcode': generate_order_barcode(order_id)  # الباركود الرئيسي للطلب
     }
