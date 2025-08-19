@@ -18,6 +18,9 @@ import logging
 import time
 from math import ceil
 import json
+from weasyprint import HTML
+
+import tempfile
 
 # إعداد تسجيل الأخطاء
 logging.basicConfig(level=logging.INFO)
@@ -1253,3 +1256,75 @@ def bulk_update_status():
             'success': False,
             'error': f'حدث خطأ أثناء حفظ التغييرات: {str(e)}'
         }), 500
+
+@orders_bp.route('/print_orders')
+def print_orders():
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        flash('الرجاء تسجيل الدخول أولاً', 'error')
+        return redirect(url_for('user_auth.login'))
+    
+    order_ids = request.args.get('order_ids', '').split(',')
+    if not order_ids or order_ids == ['']:
+        flash('لم يتم تحديد أي طلبات للطباعة', 'error')
+        return redirect(url_for('orders.index'))
+    
+    # جلب بيانات الطلبات المحددة
+    orders = []
+    for order_id in order_ids:
+        try:
+            # جلب بيانات الطلب من API سلة
+            access_token = user.salla_access_token
+            headers = {'Authorization': f'Bearer {access_token}'}
+            
+            # جلب بيانات الطلب الأساسية
+            order_response = requests.get(
+                f"{Config.SALLA_ORDERS_API}/{order_id}",
+                headers=headers
+            )
+            
+            if order_response.status_code != 200:
+                continue
+                
+            order_data = order_response.json().get('data', {})
+            
+            # جلب عناصر الطلب
+            items_response = requests.get(
+                f"{Config.SALLA_BASE_URL}/orders/items",
+                params={'order_id': order_id, 'include': 'images'},
+                headers=headers
+            )
+            
+            items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
+            
+            # معالجة بيانات الطلب
+            processed_order = process_order_data(order_id, items_data)
+            
+            # إضافة معلومات إضافية
+            processed_order['reference_id'] = order_data.get('reference_id', order_id)
+            processed_order['customer'] = order_data.get('customer', {})
+            processed_order['created_at'] = format_date(order_data.get('created_at', ''))
+            
+            orders.append(processed_order)
+            
+        except Exception as e:
+            current_app.logger.error(f"Error fetching order {order_id}: {str(e)}")
+            continue
+    
+    if not orders:
+        flash('لم يتم العثور على أي طلبات للطباعة', 'error')
+        return redirect(url_for('orders.index'))
+    
+    # إنشاء HTML من template مخصص للطباعة
+    html_content = render_template('print_orders.html', orders=orders)
+    
+    # إنشاء PDF من HTML
+    pdf = HTML(string=html_content, base_url=request.base_url).write_pdf()
+    
+    # إعداد response مع PDF
+    response = make_response(pdf)
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'inline; filename=orders_{"_".join(order_ids)}.pdf'
+    
+    return response

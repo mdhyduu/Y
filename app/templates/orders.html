@@ -113,7 +113,11 @@
                 <span id="selected-orders-count">0</span> إسناد
             </button>
             {% endif %}
-            
+            <!-- في قسم quick-actions -->
+<button type="button" class="btn btn-warning rounded-pill px-3 me-2" id="print-orders-btn" disabled>
+    <i class="fas fa-print me-1"></i> 
+    <span id="selected-orders-count-print">0</span> طباعة
+</button>
             <button type="button" class="btn btn-info rounded-pill px-3 me-2" id="change-status-btn" disabled>
                 <i class="fas fa-tag me-1"></i> 
                 <span id="selected-orders-count-2">0</span> تغيير الحالة
@@ -601,20 +605,31 @@ $(document).ready(function () {
         });
     }
     
-    function updateAssignButtonState() {
-        const checkedCount = $('.order-checkbox:checked').length;
-        $('#selected-orders-count').text(checkedCount);
-        $('#selected-orders-count-2').text(checkedCount);
-        $('#assign-orders-btn').prop('disabled', checkedCount === 0);
-        $('#change-status-btn').prop('disabled', checkedCount === 0);
-        
-        if (checkedCount > 0) {
-            $('#assign-orders-btn, #change-status-btn').addClass('pulse-effect');
-            setTimeout(() => {
-                $('#assign-orders-btn, #change-status-btn').removeClass('pulse-effect');
-            }, 1000);
-        }
+    // تحديث دالة updateAssignButtonState
+function updateAssignButtonState() {
+    const checkedCount = $('.order-checkbox:checked').length;
+    $('#selected-orders-count').text(checkedCount);
+    $('#selected-orders-count-2').text(checkedCount);
+    $('#selected-orders-count-print').text(checkedCount); // إضافة هذا السطر
+    $('#assign-orders-btn').prop('disabled', checkedCount === 0);
+    $('#change-status-btn').prop('disabled', checkedCount === 0);
+    $('#print-orders-btn').prop('disabled', checkedCount === 0); // وإضافة هذا السطر
+
+    if (checkedCount > 0) {
+        $('#assign-orders-btn, #change-status-btn, #print-orders-btn').addClass('pulse-effect');
+        setTimeout(() => {
+            $('#assign-orders-btn, #change-status-btn, #print-orders-btn').removeClass('pulse-effect');
+        }, 1000);
     }
+}
+
+// إضافة معالج الحدث للزر الجديد
+$(document).on('click', '#print-orders-btn', function() {
+    const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
+    
+    // فتح نافذة جديدة لطباعة الطلبات المحددة
+    window.open(`{{ url_for('orders.print_orders') }}?order_ids=${orderIds.join(',')}`, '_blank');
+});
 
     function buildQueryParams() {
         const params = new URLSearchParams();
