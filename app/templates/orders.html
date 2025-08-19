@@ -545,13 +545,14 @@
 <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+// استخدم $(document).ready() بدلاً من DOMContentLoaded
+$(document).ready(function () {
     // --- تهيئة المكتبات ---
     dayjs.extend(dayjs_plugin_relativeTime);
     dayjs.locale('ar');
     
     // --- تهيئة الأدوات ---
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip']'));
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
@@ -662,8 +663,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- معالجات الأحداث ---
     const csrfToken = "{{ csrf_token() }}";
     
-    // 1. مزامنة الطلبات
-    $('#sync-orders-btn').on('click', function() {
+    // استخدم event delegation لجميع الأحداث
+    $(document).on('click', '#sync-orders-btn', function() {
         const btn = $(this);
         const icon = btn.find('i');
         const progressContainer = $('#sync-progress');
@@ -713,7 +714,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // 2. تحديد الطلبات (الكل أو فردي)
-    $('#select-all, #select-all-header').on('change', function() {
+    $(document).on('change', '#select-all, #select-all-header', function() {
         $('.order-checkbox').prop('checked', this.checked);
         updateAssignButtonState();
         
@@ -725,7 +726,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    $('.order-checkbox').on('change', function() {
+    $(document).on('change', '.order-checkbox', function() {
         $('#select-all, #select-all-header').prop('checked', $('.order-checkbox:checked').length === $('.order-checkbox').length);
         updateAssignButtonState();
         
@@ -738,7 +739,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // 3. إسناد الطلبات المحددة
-    $('#assign-orders-btn').on('click', function() {
+    $(document).on('click', '#assign-orders-btn', function() {
         const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
         
         const employeeOptions = {
@@ -798,7 +799,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     
     // 4. إسناد سريع لطلب واحد
-    $('.assign-single-btn').on('click', function(e) {
+    $(document).on('click', '.assign-single-btn', function(e) {
         e.stopPropagation(); // منع انتشار الحدث إلى الصف
         const orderId = $(this).data('order-id');
         
@@ -858,13 +859,13 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     
     // 5. تغيير حالة الطلبات
-    $('#change-status-btn').on('click', function() {
+    $(document).on('click', '#change-status-btn', function() {
         const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
         $('#selected-count-modal').text(orderIds.length);
         $('#changeStatusModal').modal('show');
     });
 
-    $('#confirm-status-change').on('click', function() {
+    $(document).on('click', '#confirm-status-change', function() {
         const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
         const statusId = $('#status-select').val();
         const note = $('#status-note').val();
@@ -902,28 +903,28 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     
     // 6. تطبيق الفلاتر مع تأخير للبحث
-    $('#advanced-filters').on('submit', function(e) {
+    $(document).on('submit', '#advanced-filters', function(e) {
         e.preventDefault();
         reloadOrders();
     });
     
     // البحث مع تأخير لمنع طلبات متعددة
-    $('#search-order-id').on('input', _.debounce(function() {
+    $(document).on('input', '#search-order-id', _.debounce(function() {
         reloadOrders();
     }, 500));
     
     // تغيير الفلاتر مع تأخير
-    $('#filter-order-status, #filter-employee, #filter-custom-status, #filter-special-status, #per-page-select').on('change', _.debounce(function() {
+    $(document).on('change', '#filter-order-status, #filter-employee, #filter-custom-status, #filter-special-status, #per-page-select', _.debounce(function() {
         reloadOrders();
     }, 300));
     
     // 7. إعادة تعيين الفلاتر
-    $('#reset-filters, #reset-filters-btn').on('click', function() {
+    $(document).on('click', '#reset-filters, #reset-filters-btn', function() {
         window.location.href = "{{ url_for('orders.index') }}";
     });
 
     // 8. النقر على صف الجدول للانتقال إلى التفاصيل
-    $('.clickable-row').on('click', function(e) {
+    $(document).on('click', '.clickable-row', function(e) {
         // تجاهل النقر على عناصر الإدخال أو الأزرار
         if ($(e.target).is('input, button, a, i') || $(e.target).closest('button, a, .actions-cell').length) {
             return;
