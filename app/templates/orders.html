@@ -106,7 +106,7 @@
         </div>
         
         <!-- إضافة أزرار الإجراءات السريعة -->
-        <div class="d-flex p-3 border-bottom bg-light" id="quick-actions">
+        <div class="d-flex p-3" class="card-body"  id="quick-actions">
             {% if is_reviewer and employees %}
             <button type="button" class="btn btn-success rounded-pill px-3 me-2" id="assign-orders-btn" disabled>
                 <i class="fas fa-user-check me-1"></i> 
@@ -119,12 +119,8 @@
                 <span id="selected-orders-count-2">0</span> تغيير الحالة
             </button>
             
-            {% if is_reviewer %}
-            <div class="form-check ms-auto d-flex align-items-center">
-                <input class="form-check-input me-2" type="checkbox" id="select-all">
-                <label class="form-check-label small text-muted" for="select-all">تحديد الكل</label>
-            </div>
-            {% endif %}
+
+
         </div>
 
         {% if orders %}
