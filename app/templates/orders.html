@@ -104,54 +104,42 @@
                 </div>
             </form>
         </div>
-        
-        <!-- إضافة أزرار الإجراءات الجماعية -->
-        <div class="d-flex p-3 border-bottom bg-light">
-            {% if is_reviewer and employees %}
-            <button type="button" class="btn btn-success rounded-pill px-4 me-2" id="assign-orders-btn" disabled>
-                <i class="fas fa-user-check me-1"></i> 
-                <span id="selected-orders-count">0</span> إسناد
-            </button>
-            {% endif %}
-            
-            <button type="button" class="btn btn-info rounded-pill px-4 me-2" id="change-status-btn" disabled>
-                <i class="fas fa-tag me-1"></i> 
-                <span id="selected-orders-count-2">0</span> تغيير الحالة
-            </button>
-        </div>
-
-        <!-- إضافة نافذة اختيار الحالة -->
-        <div class="modal fade" id="changeStatusModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">تغيير حالة الطلبات المحددة</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p>سيتم تطبيق الحالة المحددة على <span id="selected-count-modal" class="fw-bold">0</span> طلب.</p>
-                        <div class="mb-3">
-                            <label for="status-select" class="form-label">اختر الحالة:</label>
-                            <select class="form-select" id="status-select">
-                                <option value="">اختر حالة...</option>
-                                {% for status in custom_statuses %}
-                                <option value="{{ status.id }}" style="color: {{ status.color }}">{{ status.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="status-note" class="form-label">ملاحظة (اختياري):</label>
-                            <textarea class="form-control" id="status-note" rows="2"></textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                        <button type="button" class="btn btn-primary" id="confirm-status-change">تأكيد</button>
-                    </div>
+<!-- إضافة زر تغيير الحالة في شريط الأدوات -->
+<button type="button" class="btn btn-info rounded-pill px-4 ms-2" id="change-status-btn" disabled>
+    <i class="fas fa-tag me-1"></i> 
+    <span id="selected-orders-count-2">0</span> تغيير الحالة
+</button>
+<!-- إضافة نافذة اختيار الحالة -->
+<div class="modal fade" id="changeStatusModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تغيير حالة الطلبات المحددة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>سيتم تطبيق الحالة المحددة على <span id="selected-count-modal" class="fw-bold">0</span> طلب.</p>
+                <div class="mb-3">
+                    <label for="status-select" class="form-label">اختر الحالة:</label>
+                    <select class="form-select" id="status-select">
+                        <option value="">اختر حالة...</option>
+                        {% for status in custom_statuses %}
+                        <option value="{{ status.id }}" style="color: {{ status.color }}">{{ status.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="status-note" class="form-label">ملاحظة (اختياري):</label>
+                    <textarea class="form-control" id="status-note" rows="2"></textarea>
                 </div>
             </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="confirm-status-change">تأكيد</button>
+            </div>
         </div>
-
+    </div>
+</div>
         {% if orders %}
         <div class="table-responsive position-relative">
             <div id="table-loading" class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center d-none" style="z-index: 10;">
@@ -161,7 +149,7 @@
             </div>
             
             <table class="table table-hover mb-0" id="orders-table">
-                <thead class="d-none d-md-table-header-group">
+                <thead>
                     <tr>
                         {% if is_reviewer %}
                         <th width="5%" class="ps-4">
@@ -183,66 +171,67 @@
                 </thead>
                 <tbody>
                     {% for order in orders %}
-                    <tr data-order-id="{{ order.id }}" data-order-status="{{ order.status.slug }}" class="align-middle order-row" data-href="{{ url_for('orders.order_details', order_id=order.id) }}">
+                    <tr data-order-id="{{ order.id }}" data-order-status="{{ order.status.slug }}" class="align-middle">
                         {% if is_reviewer %}
-                        <td class="ps-4 d-none d-md-table-cell">
+                        <td class="ps-4">
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}">
                             </div>
                         </td>
                         {% endif %}
-                        <td data-label="رقم الطلب">
+                        <td>
                             <span class="fw-bold">#{{ order.reference_id }}</span>
                         </td>
-                        <td data-label="الحالة">
+                        <td>
                             <span class="status-badge status-{{ order.status.slug }}">
                                 <i class="fas fa-circle me-1 small"></i>
                                 {{ order.status.name }}
                             </span>
                         </td>
-                        <td data-label="الحالة المخصصة">
-                            {% if order.employee_statuses %}
-                                {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
-                                <span class="badge rounded-pill" style="background-color: {{ last_custom_status.EmployeeCustomStatus.color }}; color: white">
-                                    {{ last_custom_status.EmployeeCustomStatus.name }}
-                                </span>
-                            {% else %}
-                                <span class="text-muted small">-</span>
-                            {% endif %}
-                        </td>
-                        <td data-label="العلامات">
-                            {% set last_note = order.status_notes | sort(attribute='created_at', reverse=true) | first %}
-                            {% if last_note %}
-                                <div class="d-flex align-items-center">
-                                    {% if last_note.custom_status %}
-                                        <!-- حالة مخصصة مع لون مخصص -->
-                                        <span class="badge rounded-pill me-1" 
-                                              style="background-color: {{ last_note.custom_status.color }}; color: white">
-                                            {{ last_note.custom_status.name }}
-                                        </span>
-                                    {% elif last_note.status_flag %}
-                                        <!-- حالة خاصة (status_flag) -->
-                                        {% set flag_class = "badge-" + last_note.status_flag %}
-                                        {% set flag_text = {
-                                            'late': 'متأخر',
-                                            'missing': 'واصل ناقص',
-                                            'refunded': 'مرتجع',
-                                            'not_shipped': 'لم يشحن'
-                                        }.get(last_note.status_flag, last_note.status_flag) %}
-                                        <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
-                                    {% endif %} 
-                                </div>
-                            {% else %}
-                                <span class="text-muted small">-</span>
-                            {% endif %}
-                        </td>
-                        <td data-label="التاريخ">
+                     <td>
+    {% if order.employee_statuses %}
+        {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
+        <span class="badge rounded-pill" style="background-color: {{ last_custom_status.EmployeeCustomStatus.color }}; color: white">
+            {{ last_custom_status.EmployeeCustomStatus.name }}
+        </span>
+    {% else %}
+        <span class="text-muted small">-</span>
+    {% endif %}
+</td>
+
+<td>
+    {% set last_note = order.status_notes | sort(attribute='created_at', reverse=true) | first %}
+    {% if last_note %}
+        <div class="d-flex align-items-center">
+            {% if last_note.custom_status %}
+                <!-- حالة مخصصة مع لون مخصص -->
+                <span class="badge rounded-pill me-1" 
+                      style="background-color: {{ last_note.custom_status.color }}; color: white">
+                    {{ last_note.custom_status.name }}
+                </span>
+            {% elif last_note.status_flag %}
+                <!-- حالة خاصة (status_flag) -->
+                {% set flag_class = "badge-" + last_note.status_flag %}
+                {% set flag_text = {
+                    'late': 'متأخر',
+                    'missing': 'واصل ناقص',
+                    'refunded': 'مرتجع',
+                    'not_shipped': 'لم يشحن'
+                }.get(last_note.status_flag, last_note.status_flag) %}
+                <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
+            {% endif %} 
+        </div>
+    {% else %}
+        <span class="text-muted small">-</span>
+    {% endif %}
+</td>
+<td>
                             <span class="time-ago small" data-bs-toggle="tooltip" title="{{ order.raw_created_at|format_date }}">
                                 {{ order.created_at }}
                             </span>
                         </td>
                         {% if is_reviewer %}
-                        <td data-label="المسند إليه" class="d-none d-md-table-cell">
+                        <td>
                             {% if order.assignments %} 
                                 <div class="avatar-group">
                                     {% for assignment in order.assignments[:3] %}
@@ -267,7 +256,7 @@
                             {% endif %}
                         </td>
                         {% endif %}
-                        <td class="text-end pe-4" data-label="الإجراءات">
+                        <td class="text-end pe-4">
                             <div class="d-flex justify-content-end gap-2">
                                 <a href="{{ url_for('orders.order_details', order_id=order.id) }}"
                                    class="btn btn-sm btn-icon btn-outline-primary rounded-circle"
@@ -289,13 +278,13 @@
         </div>
         
         <div class="d-flex justify-content-between align-items-center p-4 border-top">
-            <div class="d-none d-md-block">
-                {% if is_reviewer and employees %}
-                <button type="button" class="btn btn-success rounded-pill px-4" id="assign-orders-btn-mobile" disabled>
+            <div>
+            {% if is_reviewer and employees %}
+                <button type="button" class="btn btn-success rounded-pill px-4" id="assign-orders-btn" disabled>
                     <i class="fas fa-user-check me-1"></i> 
-                    <span id="selected-orders-count-mobile">0</span> إسناد
+                    <span id="selected-orders-count">0</span> إسناد
                 </button>
-                {% endif %}
+            {% endif %}
             </div>
             
             <div class="d-flex flex-column align-items-end">
@@ -345,6 +334,8 @@
     </div>
 </div>
 
+
+
 {% block scripts %}
 <style>
     /* =================================== */
@@ -369,142 +360,56 @@
     .bg-gradient-primary { background: linear-gradient(135deg, #4e73df 0%, #224abe 100%); }
     
     tr:hover { background-color: rgba(0,0,0,0.02) !important; }
-    
-    /* تحسينات للجوال */
-    @media (max-width: 767.98px) {
-        #orders-table tbody tr {
-            display: block;
-            margin-bottom: 1rem;
-            border: 1px solid #dee2e6;
-            border-radius: 0.375rem;
-            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-            padding: 0.75rem;
-            position: relative;
-        }
-        
-        #orders-table tbody td {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.5rem;
-            border: none;
-            border-bottom: 1px solid #f1f1f1;
-        }
-        
-        #orders-table tbody td:last-child {
-            border-bottom: none;
-        }
-        
-        #orders-table tbody td::before {
-            content: attr(data-label);
-            font-weight: 600;
-            color: #6c757d;
-            text-align: right;
-            padding-left: 1rem;
-            flex: 0 0 40%;
-        }
-        
-        #orders-table tbody td .btn-group {
-            justify-content: flex-end;
-        }
-        
-        .order-row {
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .order-row:active {
-            background-color: #f8f9fa;
-            transform: scale(0.98);
-        }
-        
-        .card-header h6 {
-            font-size: 1rem;
-        }
-        
-        .card-body .p-4 {
-            padding: 1rem !important;
-        }
-        
-        .table-responsive {
-            border: none;
-        }
-    }
-    
-    /* تأثيرات تفاعلية */
-    .pulse-effect {
-        animation: pulse 0.6s ease-in-out;
-    }
-    
-    @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.05); }
-        100% { transform: scale(1); }
-    }
-    
-    .selected-row {
-        background-color: rgba(13, 110, 253, 0.1) !important;
-        box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.2);
-    }
-    
-    .order-row {
-        cursor: pointer;
-        transition: background-color 0.15s ease;
-    }
-    
-    .order-row:hover {
-        background-color: rgba(0, 0, 0, 0.03);
-    }
 
     /* =================================== */
     /* Dark Mode Styles          */
     /* =================================== */
     body.dark-mode .border-bottom { border-bottom-color: var(--border-color-dark) !important; }
     /* إضافة هذه الأنماط لقسم الـ CSS */
-    .badge-late {
-        background-color: rgba(220, 38, 38, 0.1) !important;
-        color: #dc2626 !important;
-        border: 1px solid #dc2626;
-    }
+.badge-late {
+    background-color: rgba(220, 38, 38, 0.1) !important;
+    color: #dc2626 !important;
+    border: 1px solid #dc2626;
+}
 
-    .badge-missing {
-        background-color: rgba(234, 88, 12, 0.1) !important;
-        color: #ea580c !important;
-        border: 1px solid #ea580c;
-    }
+.badge-missing {
+    background-color: rgba(234, 88, 12, 0.1) !important;
+    color: #ea580c !important;
+    border: 1px solid #ea580c;
+}
 
-    .badge-refunded {
-        background-color: rgba(109, 40, 217, 0.1) !important;
-        color: #6d28d9 !important;
-        border: 1px solid #6d28d9;
-    }
+.badge-refunded {
+    background-color: rgba(109, 40, 217, 0.1) !important;
+    color: #6d28d9 !important;
+    border: 1px solid #6d28d9;
+}
 
-    .badge-not_shipped {
-        background-color: rgba(16, 185, 129, 0.1) !important;
-        color: #10b981 !important;
-        border: 1px solid #10b981;
-    }
+.badge-not_shipped {
+    background-color: rgba(16, 185, 129, 0.1) !important;
+    color: #10b981 !important;
+    border: 1px solid #10b981;
+}
 
-    /* للوضع الليلي */
-    body.dark-mode .badge-late {
-        background-color: rgba(220, 38, 38, 0.2) !important;
-        color: #fca5a5 !important;
-    }
+/* للوضع الليلي */
+body.dark-mode .badge-late {
+    background-color: rgba(220, 38, 38, 0.2) !important;
+    color: #fca5a5 !important;
+}
 
-    body.dark-mode .badge-missing {
-        background-color: rgba(234, 88, 12, 0.2) !important;
-        color: #fdba74 !important;
-    }
+body.dark-mode .badge-missing {
+    background-color: rgba(234, 88, 12, 0.2) !important;
+    color: #fdba74 !important;
+}
 
-    body.dark-mode .badge-refunded {
-        background-color: rgba(109, 40, 217, 0.2) !important;
-        color: #c4b5fd !important;
-    }
+body.dark-mode .badge-refunded {
+    background-color: rgba(109, 40, 217, 0.2) !important;
+    color: #c4b5fd !important;
+}
 
-    body.dark-mode .badge-not_shipped {
-        background-color: rgba(16, 185, 129, 0.2) !important;
-        color: #6ee7b7 !important;
-    }
+body.dark-mode .badge-not_shipped {
+    background-color: rgba(16, 185, 129, 0.2) !important;
+    color: #6ee7b7 !important;
+}
     body.dark-mode .border-top { border-top-color: var(--border-color-dark) !important; }
     body.dark-mode .text-muted { color: #a0aec0 !important; }
 
@@ -535,12 +440,10 @@
     body.dark-mode .page-item.disabled .page-link { background-color: transparent; border-color: var(--border-color-dark); color: #6c757d; }
     body.dark-mode .page-link:hover { background-color: #3a3f58; }
     body.dark-mode .page-item.active .page-link { background-color: var(--primary); border-color: var(--primary); color: #fff; }
-    
-    /* إضافة هذا في قسم الـ CSS */
-    body.dark-mode .badge[style*="background-color"] {
-        filter: brightness(0.9) contrast(1.2);
-    }
-    
+/* إضافة هذا في قسم الـ CSS */
+body.dark-mode .badge[style*="background-color"] {
+    filter: brightness(0.9) contrast(1.2);
+}
     /* "No orders" state */
     body.dark-mode .text-gray-300 { color: #4b5563 !important; }
     body.dark-mode .text-gray-600 { color: #d1d5db !important; }
@@ -554,16 +457,6 @@
         #sync-orders-btn i { margin-right: 0 !important; }
         .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .table td, .table th { white-space: nowrap; }
-        
-        /* تحسينات الفلاتر للجوال */
-        #advanced-filters .col-md-3,
-        #advanced-filters .col-md-2 {
-            margin-bottom: 0.5rem;
-        }
-        
-        #advanced-filters .col-md-2.d-flex {
-            margin-top: 0.5rem;
-        }
     }
 </style>
 
@@ -581,7 +474,7 @@ document.addEventListener('DOMContentLoaded', function () {
     dayjs.locale('ar');
     
     // --- تهيئة الأدوات ---
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip']'));
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
@@ -637,17 +530,13 @@ document.addEventListener('DOMContentLoaded', function () {
     function updateAssignButtonState() {
         const checkedCount = $('.order-checkbox:checked').length;
         $('#selected-orders-count').text(checkedCount);
-        $('#selected-orders-count-2').text(checkedCount);
-        $('#selected-orders-count-mobile').text(checkedCount);
         $('#assign-orders-btn').prop('disabled', checkedCount === 0);
-        $('#assign-orders-btn-mobile').prop('disabled', checkedCount === 0);
-        $('#change-status-btn').prop('disabled', checkedCount === 0);
         
         // إضافة تأثير عند تحديد الطلبات
         if (checkedCount > 0) {
-            $('#assign-orders-btn, #assign-orders-btn-mobile, #change-status-btn').addClass('pulse-effect');
+            $('#assign-orders-btn').addClass('pulse-effect');
             setTimeout(() => {
-                $('#assign-orders-btn, #assign-orders-btn-mobile, #change-status-btn').removeClass('pulse-effect');
+                $('#assign-orders-btn').removeClass('pulse-effect');
             }, 1000);
         }
     }
@@ -742,7 +631,80 @@ document.addEventListener('DOMContentLoaded', function () {
             progressContainer.addClass('d-none');
         });
     });
+// إضافة دالة لتحديث زر تغيير الحالة
+function updateChangeStatusButton() {
+    const checkedCount = $('.order-checkbox:checked').length;
+    $('#selected-orders-count-2').text(checkedCount);
+    $('#change-status-btn').prop('disabled', checkedCount === 0);
+    
+    if (checkedCount > 0) {
+        $('#change-status-btn').addClass('pulse-effect');
+        setTimeout(() => {
+            $('#change-status-btn').removeClass('pulse-effect');
+        }, 1000);
+    }
+}
 
+// إضافة معالج حدث لزر تغيير الحالة
+$('#change-status-btn').on('click', function() {
+    const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
+    $('#selected-count-modal').text(orderIds.length);
+    $('#changeStatusModal').modal('show');
+});
+
+// إضافة معالج حدث لتأكيد تغيير الحالة
+$('#confirm-status-change').on('click', function() {
+    const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
+    const statusId = $('#status-select').val();
+    const note = $('#status-note').val();
+    
+    if (!statusId) {
+        showSweetAlert('warning', 'تحذير', 'يجب اختيار حالة');
+        return;
+    }
+    
+    $('#changeStatusModal').modal('hide');
+    
+    $.ajax({
+        url: "{{ url_for('orders.bulk_update_status') }}",
+        type: "POST",
+        contentType: "application/json",
+        headers: { 'X-CSRFToken': csrfToken },
+        data: JSON.stringify({
+            order_ids: orderIds,
+            status_id: statusId,
+            note: note
+        }),
+    })
+    .done(function(response) {
+        if (response.success) {
+            showSweetAlert('success', 'نجح التحديث!', response.message);
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showSweetAlert('error', 'فشل التحديث', response.error);
+        }
+    })
+    .fail(function(xhr) {
+        const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم';
+        showSweetAlert('error', 'حدث خطأ', errorMsg);
+    });
+});
+
+// تحديث دالة updateAssignButtonState لتشمل زر تغيير الحالة
+function updateAssignButtonState() {
+    const checkedCount = $('.order-checkbox:checked').length;
+    $('#selected-orders-count').text(checkedCount);
+    $('#selected-orders-count-2').text(checkedCount);
+    $('#assign-orders-btn').prop('disabled', checkedCount === 0);
+    $('#change-status-btn').prop('disabled', checkedCount === 0);
+    
+    if (checkedCount > 0) {
+        $('#assign-orders-btn, #change-status-btn').addClass('pulse-effect');
+        setTimeout(() => {
+            $('#assign-orders-btn, #change-status-btn').removeClass('pulse-effect');
+        }, 1000);
+    }
+}
     // 2. تحديد الطلبات (الكل أو فردي)
     $('#select-all').on('change', function() {
         $('.order-checkbox').prop('checked', this.checked);
@@ -769,7 +731,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // 3. إسناد الطلبات المحددة
-    $('#assign-orders-btn, #assign-orders-btn-mobile').on('click', function() {
+    $('#assign-orders-btn').on('click', function() {
         const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
         
         const employeeOptions = {
@@ -829,8 +791,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     
     // 4. إسناد سريع لطلب واحد
-    $('.assign-single-btn').on('click', function(e) {
-        e.stopPropagation(); // منع الانتشار إلى الصف
+    $('.assign-single-btn').on('click', function() {
         const orderId = $(this).data('order-id');
         
         const employeeOptions = {
@@ -888,51 +849,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
     
-    // 5. تغيير حالة الطلبات المحددة
-    $('#change-status-btn').on('click', function() {
-        const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
-        $('#selected-count-modal').text(orderIds.length);
-        $('#changeStatusModal').modal('show');
-    });
-
-    $('#confirm-status-change').on('click', function() {
-        const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
-        const statusId = $('#status-select').val();
-        const note = $('#status-note').val();
-        
-        if (!statusId) {
-            showSweetAlert('warning', 'تحذير', 'يجب اختيار حالة');
-            return;
-        }
-        
-        $('#changeStatusModal').modal('hide');
-        
-        $.ajax({
-            url: "{{ url_for('orders.bulk_update_status') }}",
-            type: "POST",
-            contentType: "application/json",
-            headers: { 'X-CSRFToken': csrfToken },
-            data: JSON.stringify({
-                order_ids: orderIds,
-                status_id: statusId,
-                note: note
-            }),
-        })
-        .done(function(response) {
-            if (response.success) {
-                showSweetAlert('success', 'نجح التحديث!', response.message);
-                setTimeout(() => location.reload(), 1500);
-            } else {
-                showSweetAlert('error', 'فشل التحديث', response.error);
-            }
-        })
-        .fail(function(xhr) {
-            const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم';
-            showSweetAlert('error', 'حدث خطأ', errorMsg);
-        });
-    });
-    
-    // 6. تطبيق الفلاتر مع تأخير للبحث
+    // 5. تطبيق الفلاتر مع تأخير للبحث
     $('#advanced-filters').on('submit', function(e) {
         e.preventDefault();
         reloadOrders();
@@ -948,29 +865,17 @@ document.addEventListener('DOMContentLoaded', function () {
         reloadOrders();
     }, 300));
     
-    // 7. إعادة تعيين الفلاتر
+    // 6. إعادة تعيين الفلاتر
     $('#reset-filters').on('click', function() {
         window.location.href = "{{ url_for('orders.index') }}";
-    });
-
-    // 8. النقر على صف الطلب للانتقال إلى التفاصيل
-    $('.order-row').on('click', function(e) {
-        // منع الانتقال إذا تم النقر على زر أو عنصر تفاعلي
-        if ($(e.target).is('input, button, a, .btn, .form-check, .form-check-input') || 
-            $(e.target).closest('input, button, a, .btn, .form-check').length) {
-            return;
-        }
-        
-        const href = $(this).data('href');
-        if (href) {
-            window.location.href = href;
-        }
     });
 
     // --- التشغيل عند تحميل الصفحة ---
     updateTimestamps();
     updateAssignButtonState();
-    
+    // في نهاية document ready
+updateAssignButtonState();
+updateChangeStatusButton(); // إضافة هذا السطر
     // تحديث التواريخ كل دقيقة
     setInterval(updateTimestamps, 60000);
     
