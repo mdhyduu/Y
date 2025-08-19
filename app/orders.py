@@ -425,7 +425,7 @@ def index():
         processed_orders = []
         for order in pagination_obj.items:
             processed_orders.append({
-                'reference_id': order.id,  # تغيير id إلى reference_id
+                'id': order.id,
                 'customer_name': order.customer_name,
                 'created_at': humanize_time(order.created_at) if order.created_at else '',
                 'status': {
@@ -697,7 +697,8 @@ def order_details(order_id):
 
         # تحديث بيانات الطلب المعالجة
         processed_order.update({
-            'reference_id': order_data.get('reference_id') or 'غير متوفر',  # استخدام reference_id بدلاً من id
+            'id': order_id,
+            'reference_id': order_data.get('reference_id') or 'غير متوفر',
             'customer': {
                 'first_name': order_data.get('customer', {}).get('first_name', ''),
                 'last_name': order_data.get('customer', {}).get('last_name', ''),
