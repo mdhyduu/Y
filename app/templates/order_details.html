@@ -274,7 +274,12 @@
         </div>
     </div>
 </div>
-
+{% if order.checkout_id %}
+<div class="order-field">
+    <span class="field-label">رقم Checkout:</span>
+    <span class="field-value">{{ order.checkout_id }}</span>
+</div>
+{% endif %}
 <!-- نهاية التعديل -->
 <!-- نهاية التعديل -->
 <!-- نهاية التعديل -->
