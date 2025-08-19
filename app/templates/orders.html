@@ -136,28 +136,28 @@
                 </thead>
                 <tbody>
                     {% for order in orders %}
-                    <tr data-order-id="{{ order['reference_id'] }}" data-order-status="{{ order['status']['slug'] }}" class="align-middle">
+                    <tr data-order-id="{{ order.id }}" data-order-status="{{ order.status.slug }}" class="align-middle">
                         {% if is_reviewer %}
                         <td class="ps-4">
                             <div class="form-check">
-                                <input type="checkbox" class="form-check-input order-checkbox" value="{{ order['reference_id'] }}">
+                                <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}">
                             </div>
                         </td>
                         {% endif %}
                         <td>
-                            <span class="fw-bold">#{{ order['reference_id'] }}</span>
+                            <span class="fw-bold">#{{ order.id }}</span>
                         </td>
                         <td>
-                            <span class="status-badge status-{{ order['status']['slug'] }}">
+                            <span class="status-badge status-{{ order.status.slug }}">
                                 <i class="fas fa-circle me-1 small"></i>
-                                {{ order['status']['name'] }}
+                                {{ order.status.name }}
                             </span>
                         </td>
                      <td>
-    {% if order['employee_statuses'] %}
-        {% set last_custom_status = order['employee_statuses'] | sort(attribute='created_at', reverse=true) | first %}
-        <span class="badge rounded-pill" style="background-color: {{ last_custom_status['EmployeeCustomStatus']['color'] }}; color: white">
-            {{ last_custom_status['EmployeeCustomStatus']['name'] }}
+    {% if order.employee_statuses %}
+        {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
+        <span class="badge rounded-pill" style="background-color: {{ last_custom_status.EmployeeCustomStatus.color }}; color: white">
+            {{ last_custom_status.EmployeeCustomStatus.name }}
         </span>
     {% else %}
         <span class="text-muted small">-</span>
@@ -165,24 +165,24 @@
 </td>
 
 <td>
-    {% set last_note = order['status_notes'] | sort(attribute='created_at', reverse=true) | first %}
+    {% set last_note = order.status_notes | sort(attribute='created_at', reverse=true) | first %}
     {% if last_note %}
         <div class="d-flex align-items-center">
-            {% if last_note['custom_status'] %}
+            {% if last_note.custom_status %}
                 <!-- حالة مخصصة مع لون مخصص -->
                 <span class="badge rounded-pill me-1" 
-                      style="background-color: {{ last_note['custom_status']['color'] }}; color: white">
-                    {{ last_note['custom_status']['name'] }}
+                      style="background-color: {{ last_note.custom_status.color }}; color: white">
+                    {{ last_note.custom_status.name }}
                 </span>
-            {% elif last_note['status_flag'] %}
+            {% elif last_note.status_flag %}
                 <!-- حالة خاصة (status_flag) -->
-                {% set flag_class = "badge-" + last_note['status_flag'] %}
+                {% set flag_class = "badge-" + last_note.status_flag %}
                 {% set flag_text = {
                     'late': 'متأخر',
                     'missing': 'واصل ناقص',
                     'refunded': 'مرتجع',
                     'not_shipped': 'لم يشحن'
-                }.get(last_note['status_flag'], last_note['status_flag']) %}
+                }.get(last_note.status_flag, last_note.status_flag) %}
                 <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
             {% endif %} 
         </div>
@@ -191,27 +191,27 @@
     {% endif %}
 </td>
 <td>
-                            <span class="time-ago small" data-bs-toggle="tooltip" title="{{ order['raw_created_at']|format_date }}">
-                                {{ order['created_at'] }}
+                            <span class="time-ago small" data-bs-toggle="tooltip" title="{{ order.raw_created_at|format_date }}">
+                                {{ order.created_at }}
                             </span>
                         </td>
                         {% if is_reviewer %}
                         <td>
-                            {% if order['assignments'] %} 
+                            {% if order.assignments %} 
                                 <div class="avatar-group">
-                                    {% for assignment in order['assignments'][:3] %}
+                                    {% for assignment in order.assignments[:3] %}
                                     <div class="avatar avatar-xs" data-bs-toggle="tooltip" 
-                                         title="{{ assignment['employee']['email'] }}">
+                                         title="{{ assignment.employee.email }}">
                                         <span class="avatar-text bg-primary text-white">
-                                            {{ assignment['employee']['email']|first|upper }}
+                                            {{ assignment.employee.email|first|upper }}
                                         </span>
                                     </div>
                                     {% endfor %}
-                                    {% if order['assignments']|length > 3 %}
+                                    {% if order.assignments|length > 3 %}
                                     <div class="avatar avatar-xs" data-bs-toggle="tooltip" 
-                                         title="و {{ order['assignments']|length - 3 }} أكثر">
+                                         title="و {{ order.assignments|length - 3 }} أكثر">
                                         <span class="avatar-text bg-light text-dark">
-                                            +{{ order['assignments']|length - 3 }}
+                                            +{{ order.assignments|length - 3 }}
                                         </span>
                                     </div>
                                     {% endif %}
@@ -223,14 +223,14 @@
                         {% endif %}
                         <td class="text-end pe-4">
                             <div class="d-flex justify-content-end gap-2">
-                                <a href="{{ url_for('orders.order_details', order_id=order['reference_id']) }}"
+                                <a href="{{ url_for('orders.order_details', order_id=order.id) }}"
                                    class="btn btn-sm btn-icon btn-outline-primary rounded-circle"
                                    title="عرض التفاصيل">
                                     <i class="fas fa-eye"></i>
                                 </a>
                                 {% if is_reviewer %}
                                 <button class="btn btn-sm btn-icon btn-outline-success rounded-circle assign-single-btn" 
-                                        data-order-id="{{ order['reference_id'] }}" title="إسناد سريع">
+                                        data-order-id="{{ order.id }}" title="إسناد سريع">
                                     <i class="fas fa-user-plus"></i>
                                 </button>
                                 {% endif %}
@@ -298,6 +298,7 @@
         {% endif %}
     </div>
 </div>
+
 
 
 {% block scripts %}
