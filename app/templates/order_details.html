@@ -9,7 +9,13 @@
   <div class="bg-light p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
     <h2 class="mb-0 fs-4">
       <i class="fas fa-file-invoice ms-2"></i>تفاصيل الطلب #{{ order.id | safe }}
-    </h2>
+  {% if order.checkout_id %}
+<div class="order-field">
+    <span class="field-label">رقم Checkout:</span>
+    <span class="field-value">{{ order.checkout_id }}</span>
+</div>
+{% endif %}
+   </h2>
     <div>
       <a href="{{ url_for('orders.index') }}" class="btn btn-outline-secondary btn-sm">
         <i class="fas fa-arrow-left ms-1"></i> العودة للطلبات
@@ -274,12 +280,7 @@
         </div>
     </div>
 </div>
-{% if order.checkout_id %}
-<div class="order-field">
-    <span class="field-label">رقم Checkout:</span>
-    <span class="field-value">{{ order.checkout_id }}</span>
-</div>
-{% endif %}
+
 <!-- نهاية التعديل -->
 <!-- نهاية التعديل -->
 <!-- نهاية التعديل -->
