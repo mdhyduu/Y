@@ -105,13 +105,10 @@
             </form>
         </div>
 <!-- إضافة زر تغيير الحالة في شريط الأدوات -->
-{% if not is_reviewer and custom_statuses %}
 <button type="button" class="btn btn-info rounded-pill px-4 ms-2" id="change-status-btn" disabled>
     <i class="fas fa-tag me-1"></i> 
     <span id="selected-orders-count-2">0</span> تغيير الحالة
 </button>
-{% endif %}
-
 <!-- إضافة نافذة اختيار الحالة -->
 <div class="modal fade" id="changeStatusModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
