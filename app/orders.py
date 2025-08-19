@@ -1,7 +1,7 @@
 # orders.py
 from flask_wtf.csrf import CSRFProtect
 csrf = CSRFProtect() 
-from flask import Blueprint, render_template, flash, redirect, url_for, request, send_from_directory, current_app, jsonify, make_response
+from flask import Blueprint, render_template, flash, redirect, url_for, request, send_from_directory, current_app, jsonify, make_response, send_file
 import requests
 from sqlalchemy import nullslast
 from .models import (
@@ -1270,61 +1270,89 @@ def print_orders():
         flash('لم يتم تحديد أي طلبات للطباعة', 'error')
         return redirect(url_for('orders.index'))
     
-    # جلب بيانات الطلبات المحددة
-    orders = []
-    for order_id in order_ids:
-        try:
-            # جلب بيانات الطلب من API سلة
-            access_token = user.salla_access_token
-            headers = {'Authorization': f'Bearer {access_token}'}
+    try:
+        # جلب بيانات الطلبات المحددة
+        orders = []
+        access_token = user.salla_access_token
+        
+        if not access_token:
+            flash('يجب ربط المتجر مع سلة أولاً', 'error')
+            return redirect(url_for('auth.link_store'))
             
-            # جلب بيانات الطلب الأساسية
-            order_response = requests.get(
-                f"{Config.SALLA_ORDERS_API}/{order_id}",
-                headers=headers
-            )
-            
-            if order_response.status_code != 200:
-                continue
+        headers = {'Authorization': f'Bearer {access_token}'}
+        
+        for order_id in order_ids:
+            try:
+                # جلب بيانات الطلب الأساسية
+                order_response = requests.get(
+                    f"{Config.SALLA_ORDERS_API}/{order_id}",
+                    headers=headers,
+                    timeout=10
+                )
                 
-            order_data = order_response.json().get('data', {})
-            
-            # جلب عناصر الطلب
-            items_response = requests.get(
-                f"{Config.SALLA_BASE_URL}/orders/items",
-                params={'order_id': order_id, 'include': 'images'},
-                headers=headers
-            )
-            
-            items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
-            
-            # معالجة بيانات الطلب
-            processed_order = process_order_data(order_id, items_data)
-            
-            # إضافة معلومات إضافية
-            processed_order['reference_id'] = order_data.get('reference_id', order_id)
-            processed_order['customer'] = order_data.get('customer', {})
-            processed_order['created_at'] = format_date(order_data.get('created_at', ''))
-            
-            orders.append(processed_order)
-            
-        except Exception as e:
-            current_app.logger.error(f"Error fetching order {order_id}: {str(e)}")
-            continue
-    
-    if not orders:
-        flash('لم يتم العثور على أي طلبات للطباعة', 'error')
+                if order_response.status_code != 200:
+                    continue
+                    
+                order_data = order_response.json().get('data', {})
+                
+                # جلب عناصر الطلب
+                items_response = requests.get(
+                    f"{Config.SALLA_BASE_URL}/orders/items",
+                    params={'order_id': order_id},
+                    headers=headers,
+                    timeout=10
+                )
+                
+                items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
+                
+                # معالجة بيانات الطلب
+                processed_order = process_order_data(order_id, items_data)
+                
+                # إضافة معلومات إضافية
+                processed_order['reference_id'] = order_data.get('reference_id', order_id)
+                processed_order['customer'] = order_data.get('customer', {})
+                processed_order['created_at'] = format_date(order_data.get('created_at', ''))
+                
+                orders.append(processed_order)
+                
+            except Exception as e:
+                current_app.logger.error(f"Error fetching order {order_id}: {str(e)}")
+                continue
+        
+        if not orders:
+            flash('لم يتم العثور على أي طلبات للطباعة', 'error')
+            return redirect(url_for('orders.index'))
+        
+        # إضافة الوقت الحالي للقالب
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # إنشاء HTML من template مخصص للطباعة
+        html_content = render_template('print_orders.html', 
+                                     orders=orders, 
+                                     current_time=current_time)
+        
+        # إنشاء PDF من HTML
+        pdf = HTML(string=html_content, base_url=request.base_url).write_pdf()
+        
+        # إنشاء اسم ملف فريد
+        filename = f"orders_{'_'.join(order_ids)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        
+        # حفظ الملف مؤقتاً
+        temp_dir = tempfile.gettempdir()
+        temp_file = os.path.join(temp_dir, filename)
+        
+        with open(temp_file, 'wb') as f:
+            f.write(pdf)
+        
+        # إرسال الملف للتحميل
+        return send_file(
+            temp_file,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f"Error generating PDF: {str(e)}")
+        flash(f'حدث خطأ أثناء إنشاء PDF: {str(e)}', 'error')
         return redirect(url_for('orders.index'))
-    
-    # إنشاء HTML من template مخصص للطباعة
-    html_content = render_template('print_orders.html', orders=orders)
-    
-    # إنشاء PDF من HTML
-    pdf = HTML(string=html_content, base_url=request.base_url).write_pdf()
-    
-    # إعداد response مع PDF
-    response = make_response(pdf)
-    response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'inline; filename=orders_{"_".join(order_ids)}.pdf'
-    
-    return response

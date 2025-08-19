@@ -673,7 +673,64 @@ $(document).on('click', '#print-orders-btn', function() {
 
     // --- معالجات الأحداث ---
     const csrfToken = "{{ csrf_token() }}";
+    $(document).on('click', '#print-orders-btn', function() {
+    const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
     
+    if (orderIds.length === 0) {
+        showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للطباعة');
+        return;
+    }
+    
+    // إظهار مؤشر التحميل
+    const printBtn = $(this);
+    const originalText = printBtn.html();
+    printBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
+    
+    // تحميل PDF
+    window.location.href = `{{ url_for('orders.print_orders') }}?order_ids=${orderIds.join(',')}`;
+    
+    // استعادة حالة الزر بعد ثانية
+    setTimeout(() => {
+        printBtn.prop('disabled', false).html(originalText);
+    }, 3000);
+});
+$(document).on('click', '#print-orders-btn', function() {
+    const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
+    
+    if (orderIds.length === 0) {
+        showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للطباعة');
+        return;
+    }
+    
+    Swal.fire({
+        title: 'تأكيد الطباعة',
+        html: `سيتم إنشاء ملف PDF يحتوي على <span class="fw-bold text-primary">${orderIds.length}</span> طلب`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'موافق، إنشاء PDF',
+        cancelButtonText: 'إلغاء',
+        customClass: {
+            confirmButton: 'btn btn-primary',
+            cancelButton: 'btn btn-outline-secondary ms-2'
+        },
+        buttonsStyling: false
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // إظهار مؤشر التحميل
+            const printBtn = $('#print-orders-btn');
+            const originalText = printBtn.html();
+            printBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
+            
+            // تحميل PDF
+            window.location.href = `{{ url_for('orders.print_orders') }}?order_ids=${orderIds.join(',')}`;
+            
+            // استعادة حالة الزر بعد ثانية
+            setTimeout(() => {
+                printBtn.prop('disabled', false).html(originalText);
+            }, 3000);
+        }
+    });
+});
     // استخدم event delegation لجميع الأحداث
     $(document).on('click', '#sync-orders-btn', function() {
         const btn = $(this);
