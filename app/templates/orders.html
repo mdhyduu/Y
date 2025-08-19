@@ -159,14 +159,13 @@
                 <tbody>
                     {% for order in orders %}
                     <tr data-order-id="{{ order.id }}" data-order-status="{{ order.status.slug }}" class="align-middle clickable-row">
-                        {% if is_reviewer %}
+
                         <td class="ps-4">
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}">
                             </div>
                         </td>
-                        {% endif %}
-                        <td>
+                                          <td>
                             <span class="fw-bold">#{{ order.reference_id }}</span>
                         </td>
                         <td>
