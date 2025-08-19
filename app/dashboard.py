@@ -14,51 +14,45 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
-
 def login_required(view_func):
     """ديكوراتور للتحقق من تسجيل الدخول"""
-    @wraps(view_func)  # <-- الآن ستعمل بشكل صحيح
+    @wraps(view_func)
     def wrapper(*args, **kwargs):
         user_id = request.cookies.get('user_id')
+        is_admin = request.cookies.get('is_admin') == 'true'
+        
+        # إذا لم يكن هناك user_id، نعيد التوجيه إلى تسجيل الدخول
         if not user_id:
             flash('يجب تسجيل الدخول أولاً', 'warning')
             return redirect(url_for('user_auth.login'))
         
-        # تحقق من أن user_id رقمية
+        # إذا كان user_id غير رقمية، نحذف الكوكيز ونعيد التوجيه
         if not user_id.isdigit():
-            resp = make_response(redirect(url_for('user_auth.login')))
-            resp.delete_cookie('user_id')
-            resp.delete_cookie('is_admin')
-            resp.delete_cookie('employee_role')
-            resp.delete_cookie('store_id')
-            return resp
-        
-        is_admin = request.cookies.get('is_admin') == 'true'
+            return clear_cookies_and_redirect()
         
         if is_admin:
             user = User.query.get(user_id)
             if not user:
-                resp = make_response(redirect(url_for('user_auth.login')))
-                resp.delete_cookie('user_id')
-                resp.delete_cookie('is_admin')
-                resp.delete_cookie('employee_role')
-                resp.delete_cookie('store_id')
-                return resp
+                return clear_cookies_and_redirect()
             request.current_user = user
         else:
             employee = Employee.query.get(user_id)
             if not employee:
                 flash('بيانات الموظف غير موجودة', 'error')
-                resp = make_response(redirect(url_for('user_auth.login')))
-                resp.delete_cookie('user_id')
-                resp.delete_cookie('is_admin')
-                resp.delete_cookie('employee_role')
-                resp.delete_cookie('store_id')
-                return resp
+                return clear_cookies_and_redirect()
             request.current_user = employee
         
         return view_func(*args, **kwargs)
     return wrapper
+
+def clear_cookies_and_redirect():
+    """حذف الكوكيز وإعادة التوجيه إلى تسجيل الدخول"""
+    resp = make_response(redirect(url_for('user_auth.login')))
+    resp.delete_cookie('user_id')
+    resp.delete_cookie('is_admin')
+    resp.delete_cookie('employee_role')
+    resp.delete_cookie('store_id')
+    return resp
 
 # ... بقية الكود كما هو
 
@@ -70,16 +64,9 @@ def index():
     """لوحة التحكم الرئيسية"""
     try:
         is_admin = request.cookies.get('is_admin') == 'true'
-        user_id = request.cookies.get('user_id')
         
         if is_admin:
-            # للمستخدمين العامين (المدراء)
-            user = User.query.get(user_id)
-            if not user:
-                resp = make_response(redirect(url_for('user_auth.login')))
-                resp.delete_cookie('user_id')
-                resp.delete_cookie('is_admin')
-                return resp
+            user = request.current_user  # تم تعيينه في الديكور
             
             # جلب جميع الطلبات للمتجر
             all_orders = SallaOrder.query.filter_by(store_id=user.store_id).all()
@@ -88,19 +75,19 @@ def index():
             stats = {
                 'total_orders': len(all_orders),
                 'new_orders': len([o for o in all_orders if o.status_slug == 'new']),
-                'late_orders': db.session.query(OrderStatusNote).filter(
+                'late_orders': OrderStatusNote.query.filter(
                     OrderStatusNote.status_flag == 'late',
                     OrderStatusNote.store_id == user.store_id
                 ).count(),
-                'missing_orders': db.session.query(OrderStatusNote).filter(
+                'missing_orders': OrderStatusNote.query.filter(
                     OrderStatusNote.status_flag == 'missing',
                     OrderStatusNote.store_id == user.store_id
                 ).count(),
-                'refunded_orders': db.session.query(OrderStatusNote).filter(
+                'refunded_orders': OrderStatusNote.query.filter(
                     OrderStatusNote.status_flag == 'refunded',
                     OrderStatusNote.store_id == user.store_id
                 ).count(),
-                'not_shipped_orders': db.session.query(OrderStatusNote).filter(
+                'not_shipped_orders': OrderStatusNote.query.filter(
                     OrderStatusNote.status_flag == 'not_shipped',
                     OrderStatusNote.store_id == user.store_id
                 ).count()
@@ -112,7 +99,7 @@ def index():
             # حساب عدد الطلبات لكل حالة
             custom_status_stats = []
             for status in custom_statuses:
-                count = db.session.query(OrderStatusNote).filter(
+                count = OrderStatusNote.query.filter(
                     OrderStatusNote.custom_status_id == status.id
                 ).count()
                 custom_status_stats.append({
@@ -145,9 +132,12 @@ def index():
                                 employees_count=employees_count,
                                 products_count=products_count,
                                 is_admin=True)
-    
-
         
+    
+            
+
+    
+    
         else:
             # للموظفين
             employee = Employee.query.get(user_id)
