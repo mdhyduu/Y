@@ -57,7 +57,6 @@ def clear_cookies_and_redirect():
 # ... بقية الكود كما هو
 
 # ... (الكود السابق)
-
 @dashboard_bp.route('/')
 @login_required
 def index():
@@ -66,41 +65,42 @@ def index():
         is_admin = request.cookies.get('is_admin') == 'true'
         
         if is_admin:
-            user = request.current_user  # تم تعيينه في الديكور
+            user = request.current_user
             
             # جلب جميع الطلبات للمتجر
             all_orders = SallaOrder.query.filter_by(store_id=user.store_id).all()
             
-            # حساب الإحصائيات الشاملة
+            # حساب الإحصائيات الشاملة باستخدام علاقة الجداول
             stats = {
                 'total_orders': len(all_orders),
                 'new_orders': len([o for o in all_orders if o.status_slug == 'new']),
-                'late_orders': OrderStatusNote.query.filter(
+                'late_orders': db.session.query(OrderStatusNote).join(SallaOrder).filter(
                     OrderStatusNote.status_flag == 'late',
-                    OrderStatusNote.store_id == user.store_id
+                    SallaOrder.store_id == user.store_id
                 ).count(),
-                'missing_orders': OrderStatusNote.query.filter(
+                'missing_orders': db.session.query(OrderStatusNote).join(SallaOrder).filter(
                     OrderStatusNote.status_flag == 'missing',
-                    OrderStatusNote.store_id == user.store_id
+                    SallaOrder.store_id == user.store_id
                 ).count(),
-                'refunded_orders': OrderStatusNote.query.filter(
+                'refunded_orders': db.session.query(OrderStatusNote).join(SallaOrder).filter(
                     OrderStatusNote.status_flag == 'refunded',
-                    OrderStatusNote.store_id == user.store_id
+                    SallaOrder.store_id == user.store_id
                 ).count(),
-                'not_shipped_orders': OrderStatusNote.query.filter(
+                'not_shipped_orders': db.session.query(OrderStatusNote).join(SallaOrder).filter(
                     OrderStatusNote.status_flag == 'not_shipped',
-                    OrderStatusNote.store_id == user.store_id
+                    SallaOrder.store_id == user.store_id
                 ).count()
             }
             
             # جلب الحالات المخصصة للمتجر
             custom_statuses = CustomNoteStatus.query.filter_by(store_id=user.store_id).all()
             
-            # حساب عدد الطلبات لكل حالة
+            # حساب عدد الطلبات لكل حالة باستخدام علاقة الجداول
             custom_status_stats = []
             for status in custom_statuses:
-                count = OrderStatusNote.query.filter(
-                    OrderStatusNote.custom_status_id == status.id
+                count = db.session.query(OrderStatusNote).join(SallaOrder).filter(
+                    OrderStatusNote.custom_status_id == status.id,
+                    SallaOrder.store_id == user.store_id
                 ).count()
                 custom_status_stats.append({
                     'status': status,
@@ -112,9 +112,9 @@ def index():
                 store_id=user.store_id
             ).order_by(SallaOrder.created_at.desc()).limit(10).all()
             
-            # جلب آخر النشاطات
-            recent_statuses = OrderStatusNote.query.filter_by(
-                store_id=user.store_id
+            # جلب آخر النشاطات باستخدام علاقة الجداول
+            recent_statuses = db.session.query(OrderStatusNote).join(SallaOrder).filter(
+                SallaOrder.store_id == user.store_id
             ).order_by(OrderStatusNote.created_at.desc()).limit(10).all()
             
             # جلب عدد الموظفين
@@ -133,8 +133,6 @@ def index():
                                 products_count=products_count,
                                 is_admin=True)
         
-    
-            
 
     
     
