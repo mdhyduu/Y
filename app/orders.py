@@ -425,7 +425,7 @@ def index():
         processed_orders = []
         for order in pagination_obj.items:
             processed_orders.append({
-                'id': order.id,
+                'reference_id': order.id,
                 'customer_name': order.customer_name,
                 'created_at': humanize_time(order.created_at) if order.created_at else '',
                 'status': {
@@ -669,24 +669,32 @@ def order_details(order_id):
                     else:  # إذا كان redirect (فشل التجديد)
                         return new_token  # هذا سيكون redirect response
                 
+                # التحقق من وجود الطلب (404)
+                if response.status_code == 404:
+                    return None, f"الطلب رقم {order_id} غير موجود في نظام سلة"
+                
                 response.raise_for_status()
-                return response
+                return response, None
             except requests.exceptions.RequestException as e:
-                raise e
+                return None, f"خطأ في الاتصال: {str(e)}"
 
         # جلب بيانات الطلب الأساسية
-        order_response = make_salla_api_request(f"{Config.SALLA_ORDERS_API}/{order_id}")
-        if not isinstance(order_response, requests.Response):  # إذا كان redirect
-            return order_response
+        order_response, error = make_salla_api_request(f"{Config.SALLA_ORDERS_API}/{order_id}")
+        if error:
+            flash(error, "error")
+            return redirect(url_for('orders.index'))
+        
         order_data = order_response.json().get('data', {})
 
         # جلب عناصر الطلب
-        items_response = make_salla_api_request(
+        items_response, error = make_salla_api_request(
             f"{Config.SALLA_BASE_URL}/orders/items",
             params={'order_id': order_id, 'include': 'images'}
         )
-        if not isinstance(items_response, requests.Response):
-            return items_response
+        if error:
+            flash(error, "error")
+            return redirect(url_for('orders.index'))
+            
         items_data = items_response.json().get('data', [])
 
         # ========== [4] معالجة بيانات الطلب ==========
@@ -698,6 +706,7 @@ def order_details(order_id):
         # تحديث بيانات الطلب المعالجة
         processed_order.update({
             'reference_id': order_id,
+
             'customer': {
                 'first_name': order_data.get('customer', {}).get('first_name', ''),
                 'last_name': order_data.get('customer', {}).get('last_name', ''),
@@ -802,11 +811,15 @@ def order_details(order_id):
         )
 
     except requests.exceptions.HTTPError as http_err:
-        error_msg = f"خطأ في جلب تفاصيل الطلب: {http_err}"
-        if http_err.response.status_code == 401:
+        status_code = http_err.response.status_code
+        if status_code == 401:
             error_msg = "انتهت صلاحية الجلسة، الرجاء إعادة الربط مع سلة"
+        elif status_code == 404:
+            error_msg = f"الطلب رقم {order_id} غير موجود في نظام سلة"
+        else:
+            error_msg = f"خطأ في جلب تفاصيل الطلب: {http_err}"
         flash(error_msg, "error")
-        logger.error(f"HTTP Error: {http_err} - Status Code: {http_err.response.status_code}")
+        logger.error(f"HTTP Error: {http_err} - Status Code: {status_code}")
         return redirect(url_for('orders.index'))
 
     except requests.exceptions.RequestException as e:
@@ -820,7 +833,6 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
-
 @orders_bp.route('/<int:order_id>/update_status', methods=['POST'])
 def update_order_status(order_id):
     """تحديث حالة الطلب في سلة"""
