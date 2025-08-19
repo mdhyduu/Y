@@ -104,45 +104,7 @@
                 </div>
             </form>
         </div>
-<!-- إضافة زر تغيير الحالة في شريط الأدوات -->
-{% if not is_reviewer and custom_statuses %}
-<button type="button" class="btn btn-info rounded-pill px-4 ms-2" id="change-status-btn" disabled>
-    <i class="fas fa-tag me-1"></i> 
-    <span id="selected-orders-count-2">0</span> تغيير الحالة
-</button>
-{% endif %}
 
-<!-- إضافة نافذة اختيار الحالة -->
-<div class="modal fade" id="changeStatusModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">تغيير حالة الطلبات المحددة</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>سيتم تطبيق الحالة المحددة على <span id="selected-count-modal" class="fw-bold">0</span> طلب.</p>
-                <div class="mb-3">
-                    <label for="status-select" class="form-label">اختر الحالة:</label>
-                    <select class="form-select" id="status-select">
-                        <option value="">اختر حالة...</option>
-                        {% for status in custom_statuses %}
-                        <option value="{{ status.id }}" style="color: {{ status.color }}">{{ status.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label for="status-note" class="form-label">ملاحظة (اختياري):</label>
-                    <textarea class="form-control" id="status-note" rows="2"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                <button type="button" class="btn btn-primary" id="confirm-status-change">تأكيد</button>
-            </div>
-        </div>
-    </div>
-</div>
         {% if orders %}
         <div class="table-responsive position-relative">
             <div id="table-loading" class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center d-none" style="z-index: 10;">
@@ -634,80 +596,7 @@ document.addEventListener('DOMContentLoaded', function () {
             progressContainer.addClass('d-none');
         });
     });
-// إضافة دالة لتحديث زر تغيير الحالة
-function updateChangeStatusButton() {
-    const checkedCount = $('.order-checkbox:checked').length;
-    $('#selected-orders-count-2').text(checkedCount);
-    $('#change-status-btn').prop('disabled', checkedCount === 0);
-    
-    if (checkedCount > 0) {
-        $('#change-status-btn').addClass('pulse-effect');
-        setTimeout(() => {
-            $('#change-status-btn').removeClass('pulse-effect');
-        }, 1000);
-    }
-}
 
-// إضافة معالج حدث لزر تغيير الحالة
-$('#change-status-btn').on('click', function() {
-    const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
-    $('#selected-count-modal').text(orderIds.length);
-    $('#changeStatusModal').modal('show');
-});
-
-// إضافة معالج حدث لتأكيد تغيير الحالة
-$('#confirm-status-change').on('click', function() {
-    const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
-    const statusId = $('#status-select').val();
-    const note = $('#status-note').val();
-    
-    if (!statusId) {
-        showSweetAlert('warning', 'تحذير', 'يجب اختيار حالة');
-        return;
-    }
-    
-    $('#changeStatusModal').modal('hide');
-    
-    $.ajax({
-        url: "{{ url_for('orders.bulk_update_status') }}",
-        type: "POST",
-        contentType: "application/json",
-        headers: { 'X-CSRFToken': csrfToken },
-        data: JSON.stringify({
-            order_ids: orderIds,
-            status_id: statusId,
-            note: note
-        }),
-    })
-    .done(function(response) {
-        if (response.success) {
-            showSweetAlert('success', 'نجح التحديث!', response.message);
-            setTimeout(() => location.reload(), 1500);
-        } else {
-            showSweetAlert('error', 'فشل التحديث', response.error);
-        }
-    })
-    .fail(function(xhr) {
-        const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم';
-        showSweetAlert('error', 'حدث خطأ', errorMsg);
-    });
-});
-
-// تحديث دالة updateAssignButtonState لتشمل زر تغيير الحالة
-function updateAssignButtonState() {
-    const checkedCount = $('.order-checkbox:checked').length;
-    $('#selected-orders-count').text(checkedCount);
-    $('#selected-orders-count-2').text(checkedCount);
-    $('#assign-orders-btn').prop('disabled', checkedCount === 0);
-    $('#change-status-btn').prop('disabled', checkedCount === 0);
-    
-    if (checkedCount > 0) {
-        $('#assign-orders-btn, #change-status-btn').addClass('pulse-effect');
-        setTimeout(() => {
-            $('#assign-orders-btn, #change-status-btn').removeClass('pulse-effect');
-        }, 1000);
-    }
-}
     // 2. تحديد الطلبات (الكل أو فردي)
     $('#select-all').on('change', function() {
         $('.order-checkbox').prop('checked', this.checked);
@@ -876,9 +765,7 @@ function updateAssignButtonState() {
     // --- التشغيل عند تحميل الصفحة ---
     updateTimestamps();
     updateAssignButtonState();
-    // في نهاية document ready
-updateAssignButtonState();
-updateChangeStatusButton(); // إضافة هذا السطر
+    
     // تحديث التواريخ كل دقيقة
     setInterval(updateTimestamps, 60000);
     
