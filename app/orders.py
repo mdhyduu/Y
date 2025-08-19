@@ -424,12 +424,8 @@ def index():
         # معالجة البيانات للعرض
         processed_orders = []
         for order in pagination_obj.items:
-        raw_data = json.loads(order.raw_data) if order.raw_data else {}
-        reference_id = raw_data.get('reference_id', order.id)  # استخدام id كاحتياطي
-
             processed_orders.append({
                 'id': order.id,
-                'reference_id': reference_id,  # إضافة reference_id 
                 'customer_name': order.customer_name,
                 'created_at': humanize_time(order.created_at) if order.created_at else '',
                 'status': {
