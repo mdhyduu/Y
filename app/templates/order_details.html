@@ -3,8 +3,11 @@
 {% block content_class %}p-0{% endblock %}
 
 {% block content %}
-<!-- في رأس القالب -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<!-- في قسم head من القالب -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.7.12/sweetalert2.all.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/sweetalert2/11.7.12/sweetalert2.min.css">
 <div class="container-fluid g-0 m-0 w-100 full-width-container">
   <!-- رأس الصفحة -->
 <div class="bg-light p-3 d-flex justify-content-between align-items-center flex-wrap gap-2"> <h2 class="mb-0 fs-4"> <i class="fas fa-file-invoice ms-2"></i> تفاصيل الطلب #{{  order.reference_id | safe }}
@@ -206,7 +209,6 @@
                 </select>
             </div>
             
-            
             <div class="mb-3">
                 <label class="form-label small fw-bold">ملاحظات إضافية</label>
                 <textarea class="form-control form-control-sm" name="note" rows="3" 
@@ -218,41 +220,6 @@
             </button>
         </form>
 {% endif %}
-{% for item in order.order_items %}
-<tr class="border-bottom">
-  <!-- صورة المنتج -->
-  <td style="width: 120px; min-width: 120px;">
-    <div class="d-flex justify-content-center">
-      {% if item.main_image %}
-      <img src="{{ item.main_image | safe }}" alt="{{ item.name | safe }}"
-           class="img-fluid rounded product-image"
-           style="width: 160px; height: 160px; object-fit: cover;"
-           loading="lazy" id="product-image-{{ loop.index }}">
-      {% else %}
-      <div class="bg-light d-flex align-items-center justify-content-center rounded product-image-placeholder" 
-           style="width: 80px; height: 80px;">
-        <i class="fas fa-image fa-lg text-muted"></i>
-      </div>
-      {% endif %}
-    </div>
-    <div class="text-center mt-1 small text-muted">
-      الكمية: {{ item.quantity }}
-    </div>
-    
-    <!-- زر المشاركة -->
-    <div class="text-center mt-2">
-      <button class="btn btn-sm btn-success share-btn" 
-              data-product-name="{{ item.name | safe }}"
-              data-product-image="{{ item.main_image | safe if item.main_image else '' }}"
-              data-product-options="{{ item.options | tojson | safe }}"
-              title="مشاركة عبر واتساب">
-        <i class="fab fa-whatsapp"></i> مشاركة
-      </button>
-    </div>
-  </td>
-  <!-- ... -->
-</tr>
-{% endfor %}
         <!-- عرض الحالات المسجلة في قائمة واحدة -->
         <div class="mt-4">
             <h6 class="border-bottom pb-2 mb-3 small fw-bold">تنبيهات  </h6>
@@ -476,7 +443,81 @@
     </div>
   </div>
 </div>
-
+{% for item in order.order_items %}
+<tr class="border-bottom">
+  <!-- صورة المنتج -->
+  <td style="width: 120px; min-width: 120px;">
+    <div class="d-flex justify-content-center">
+      {% if item.main_image %}
+      <img src="{{ item.main_image | safe }}" alt="{{ item.name | safe }}"
+           class="img-fluid rounded product-image"
+           style="width: 160px; height: 160px; object-fit: cover;"
+           loading="lazy" id="product-image-{{ loop.index }}">
+      {% else %}
+      <div class="bg-light d-flex align-items-center justify-content-center rounded product-image-placeholder" 
+           style="width: 80px; height: 80px;">
+        <i class="fas fa-image fa-lg text-muted"></i>
+      </div>
+      {% endif %}
+    </div>
+    <div class="text-center mt-1 small text-muted">
+      الكمية: {{ item.quantity }}
+    </div>
+    
+    <!-- زر المشاركة -->
+    <div class="text-center mt-2">
+      <button class="btn btn-sm btn-success share-btn" 
+              data-item-index="{{ loop.index }}"
+              data-product-name="{{ item.name | safe }}"
+              data-product-options="{{ item.options | tojson | safe }}"
+              title="مشاركة عبر واتساب">
+        <i class="fab fa-whatsapp"></i> مشاركة
+      </button>
+    </div>
+  </td>
+  
+  <!-- خيارات المنتج -->
+  <td style="min-width: 150px;">
+    {% if item.options %}
+    <div class="text-start product-options" id="product-options-{{ loop.index }}">
+      <h6 class="mb-1 small text-muted">
+        <i class="fas fa-cogs me-1"></i>خيارات
+      </h6>
+      <ul class="list-group list-group-flush small">
+        {% for option in item.options %}
+        <li class="list-group-item d-flex justify-content-between py-1 px-0 option-item">
+          <span class="fw-bold">{{ option.name | safe }}</span>
+          <span class="text-wrap text-end" style="max-width: 60%;">
+            {{ option.value | safe }}
+          </span>
+        </li>
+        {% endfor %}
+      </ul> 
+    </div>
+    {% else %}
+    <div class="alert alert-info p-1 mt-2 small">
+      <i class="fas fa-info-circle me-1"></i>
+      لا توجد خيارات لهذا المنتج
+    </div>
+    {% endif %}
+  </td>
+  
+  <!-- الباركود -->
+  <td style="width: 150px; min-width: 150px;">
+    {% if item.barcode %}
+    <div class="d-flex flex-column align-items-center">
+      <div class="barcode-container p-1 border rounded">
+        <img src="{{ url_for('orders.serve_barcode', filename=item.barcode) | safe }}"
+             alt="باركود المنتج {{ item.name | safe }}"
+             class="img-fluid"
+             style="max-height: 40px;">
+        <div class="mt-1 small text-center">#{{ item.id | safe }}</div>
+      </div>
+    </div>
+    {% endif %}
+  </td>
+</tr>
+{% endfor %}
 <style>
   /* أنماط عامة للجدول */
   .table {
@@ -648,19 +689,19 @@
 </style>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    // مشاركة المنتج عبر واتساب
-// مشاركة المنتج عبر واتساب مع معالجة صورة Amazon S3
+  // التحقق قبل إرسال النماذج
+ // مشاركة المنتج عبر واتساب باستخدام html2canvas
 document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.share-btn').forEach((button, index) => {
+    document.querySelectorAll('.share-btn').forEach(button => {
         button.addEventListener('click', async function() {
+            const itemIndex = this.dataset.itemIndex;
             const productName = this.dataset.productName;
-            const productImage = this.dataset.productImage;
             const productOptions = JSON.parse(this.dataset.productOptions || '[]');
             
             // عرض تحميل أثناء المعالجة
-            const swalInstance = Swal.fire({
-                title: 'جاري التجهيز للمشاركة',
-                text: 'يرجى الانتظار...',
+            Swal.fire({
+                title: 'جاري إعداد المشاركة',
+                text: 'يرجى الانتظار mientras capturemos la imagen del producto...',
                 icon: 'info',
                 showConfirmButton: false,
                 allowOutsideClick: false,
@@ -670,14 +711,113 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             try {
+                // إنشاء عنصر مؤقت للالتقاط
+                const captureElement = document.createElement('div');
+                captureElement.style.width = '400px';
+                captureElement.style.padding = '15px';
+                captureElement.style.backgroundColor = 'white';
+                captureElement.style.borderRadius = '8px';
+                captureElement.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+                
+                // إضافة صورة المنتج
+                const productImage = document.getElementById(`product-image-${itemIndex}`);
+                if (productImage) {
+                    const imgClone = productImage.cloneNode(true);
+                    imgClone.style.width = '100%';
+                    imgClone.style.height = '200px';
+                    imgClone.style.objectFit = 'contain';
+                    imgClone.style.marginBottom = '15px';
+                    captureElement.appendChild(imgClone);
+                }
+                
+                // إضافة اسم المنتج
+                const nameElement = document.createElement('h3');
+                nameElement.textContent = productName;
+                nameElement.style.margin = '0 0 15px 0';
+                nameElement.style.textAlign = 'center';
+                nameElement.style.fontSize = '18px';
+                nameElement.style.color = '#2c3e50';
+                captureElement.appendChild(nameElement);
+                
+                // إضافة الخيارات إذا وجدت
+                if (productOptions.length > 0) {
+                    const optionsTitle = document.createElement('h4');
+                    optionsTitle.textContent = 'خيارات المنتج';
+                    optionsTitle.style.margin = '0 0 10px 0';
+                    optionsTitle.style.fontSize = '16px';
+                    optionsTitle.style.color = '#7f8c8d';
+                    captureElement.appendChild(optionsTitle);
+                    
+                    const optionsList = document.createElement('ul');
+                    optionsList.style.padding = '0';
+                    optionsList.style.margin = '0';
+                    optionsList.style.listStyle = 'none';
+                    
+                    productOptions.forEach(option => {
+                        const optionItem = document.createElement('li');
+                        optionItem.style.padding = '5px 0';
+                        optionItem.style.borderBottom = '1px dashed #eee';
+                        optionItem.style.display = 'flex';
+                        optionItem.style.justifyContent = 'space-between';
+                        
+                        const optionName = document.createElement('span');
+                        optionName.textContent = option.name;
+                        optionName.style.fontWeight = 'bold';
+                        
+                        const optionValue = document.createElement('span');
+                        optionValue.textContent = option.value;
+                        optionValue.style.maxWidth = '60%';
+                        optionValue.style.textAlign = 'left';
+                        
+                        optionItem.appendChild(optionName);
+                        optionItem.appendChild(optionValue);
+                        optionsList.appendChild(optionItem);
+                    });
+                    
+                    captureElement.appendChild(optionsList);
+                }
+                
+                // إضافة التذييل
+                const footer = document.createElement('div');
+                footer.style.marginTop = '15px';
+                footer.style.paddingTop = '15px';
+                footer.style.borderTop = '1px solid #eee';
+                footer.style.textAlign = 'center';
+                footer.style.fontSize = '12px';
+                footer.style.color = '#95a5a6';
+                footer.textContent = 'مشاركة من تطبيق إدارة الطلبات';
+                captureElement.appendChild(footer);
+                
+                // إضافة العنصر إلى الجسم مؤقتاً
+                captureElement.style.position = 'fixed';
+                captureElement.style.left = '-9999px';
+                document.body.appendChild(captureElement);
+                
+                // الانتظار لتحميل الصورة
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // التقاط صورة للعنصر
+                const canvas = await html2canvas(captureElement, {
+                    backgroundColor: '#ffffff',
+                    scale: 2, // زيادة الدقة
+                    logging: false,
+                    useCORS: true // مهم للصور الخارجية
+                });
+                
+                // تحويل Canvas إلى صورة
+                const imageData = canvas.toDataURL('image/jpeg', 0.9);
+                
+                // إزالة العنصر المؤقت
+                document.body.removeChild(captureElement);
+                
                 // بناء نص المشاركة
                 let shareText = `*${productName}*%0A%0A`;
                 
                 // إضافة الخيارات إذا وجدت
                 if (productOptions.length > 0) {
-                    shareText += `*الخيارات:*%0A`;
+                    shareText += `*خيارات المنتج:*%0A`;
                     productOptions.forEach(option => {
-                        shareText += `🔹 ${option.name}: ${option.value}%0A`;
+                        shareText += `${option.name}: ${option.value}%0A`;
                     });
                     shareText += '%0A';
                 }
@@ -685,105 +825,50 @@ document.addEventListener('DOMContentLoaded', function() {
                 shareText += '---%0A';
                 shareText += 'تم المشاركة من تطبيق إدارة الطلبات';
                 
-                // معالجة صورة Amazon S3
-                let finalImageUrl = productImage;
+                // إنشاء نموذج لتحميل الصورة إلى خدمة imgbb
+                const formData = new FormData();
+                const blob = await (await fetch(imageData)).blob();
+                formData.append('image', blob, 'product.jpg');
                 
-                // إذا كانت الصورة من Amazon S3، نحتاج إلى معالجتها
-                if (productImage && productImage.includes('amazonaws.com')) {
-                    // محاولة جلب الصورة وتحويلها إلى base64
-                    try {
-                        const base64Image = await convertImageToBase64(productImage);
-                        finalImageUrl = base64Image;
-                    } catch (error) {
-                        console.error('Failed to convert Amazon S3 image:', error);
-                        // إذا فشل التحويل، نستخدم الرابط الأصلي
-                    }
+                // استخدام خدمة imgbb لرفع الصورة (مفتاح مجاني)
+                const apiKey = '9b5abf24f82498e8cf3d15d226bb3692';
+                Swal.fire({
+                    title: 'جاري رفع الصورة',
+                    text: 'جاري تحميل الصورة للخادم...',
+                    icon: 'info',
+                    showConfirmButton: false,
+                    allowOutsideClick: false
+                });
+                
+                const uploadResponse = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const uploadData = await uploadResponse.json();
+                
+                if (!uploadData.success) {
+                    throw new Error('فشل في رفع الصورة');
                 }
                 
-                // بناء رابط واتساب
-                let whatsappUrl;
-                if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
-                    // إذا كانت الصورة base64، نستخدمها مباشرة (قد لا تعمل مع واتساب)
-                    whatsappUrl = `https://wa.me/?text=${shareText}`;
-                    // نضيف الصورة كرابط منفصل في النص
-                    shareText += '%0A%0Aرابط الصورة: ' + encodeURIComponent(productImage);
-                } else if (finalImageUrl) {
-                    // إذا كان لدينا رابط صورة عادي
-                    whatsappUrl = `https://wa.me/?text=${shareText}&media=${encodeURIComponent(finalImageUrl)}`;
-                } else {
-                    // إذا لم توجد صورة
-                    whatsappUrl = `https://wa.me/?text=${shareText}`;
-                }
+                const imageUrl = uploadData.data.url;
                 
                 // إغلاق نافذة التحميل
-                swalInstance.close();
+                Swal.close();
+                
+                // بناء رابط واتساب
+                const whatsappUrl = `https://wa.me/?text=${shareText}&media=${encodeURIComponent(imageUrl)}`;
                 
                 // فتح واتساب في نافذة جديدة
                 window.open(whatsappUrl, '_blank');
                 
             } catch (error) {
-                swalInstance.close();
+                console.error('Error sharing product:', error);
                 Swal.fire('خطأ', 'حدث خطأ أثناء محاولة المشاركة: ' + error.message, 'error');
             }
         });
     });
 });
-
-// دالة لتحويل صورة Amazon S3 إلى base64
-async function convertImageToBase64(url) {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = 'Anonymous'; // هذا مهم لصور Amazon S3
-        
-        img.onload = function() {
-            try {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                
-                // تحويل إلى base64
-                const dataURL = canvas.toDataURL('image/jpeg');
-                resolve(dataURL);
-            } catch (error) {
-                reject(error);
-            }
-        };
-        
-        img.onerror = function() {
-            reject(new Error('Failed to load image'));
-        };
-        
-        // إضافة timestamp لمنع التخزين المؤقت
-        const timestamp = new Date().getTime();
-        const cacheBusterUrl = url + (url.includes('?') ? '&' : '?') + 't=' + timestamp;
-        
-        img.src = cacheBusterUrl;
-    });
-}
-
-// دالة للتحقق من إمكانية الوصول إلى الصورة
-async function isImageAccessible(url) {
-    if (!url) return false;
-    
-    try {
-        // إضافة timestamp لمنع التخزين المؤقت
-        const timestamp = new Date().getTime();
-        const cacheBusterUrl = url + (url.includes('?') ? '&' : '?') + 't=' + timestamp;
-        
-        const response = await fetch(cacheBusterUrl, { 
-            method: 'HEAD',
-            mode: 'cors'
-        });
-        return response.ok && response.headers.get('content-type')?.startsWith('image/');
-    } catch (error) {
-        console.error('Image accessibility check failed:', error);
-        return false;
-    }
-}
-  // التحقق قبل إرسال النماذج
   document.getElementById('status-form').addEventListener('submit', function(e) {
     const status = document.getElementById('status').value;
     if (status === 'canceled') {
