@@ -703,11 +703,11 @@ $(document).on('click', '#print-orders-btn', function() {
     }
     
     Swal.fire({
-        title: 'تأكيد الطباعة',
-        html: `سيتم إنشاء ملف PDF يحتوي على <span class="fw-bold text-primary">${orderIds.length}</span> طلب`,
-        icon: 'question',
+        title: 'تحميل الطلبات',
+        html: `سيتم تحميل <span class="fw-bold text-primary">${orderIds.length}</span> طلب كملف PDF`,
+        icon: 'info',
         showCancelButton: true,
-        confirmButtonText: 'موافق، إنشاء PDF',
+        confirmButtonText: 'موافق، تحميل PDF',
         cancelButtonText: 'إلغاء',
         customClass: {
             confirmButton: 'btn btn-primary',
@@ -721,13 +721,18 @@ $(document).on('click', '#print-orders-btn', function() {
             const originalText = printBtn.html();
             printBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
             
-            // تحميل PDF
-            window.location.href = `{{ url_for('orders.print_orders') }}?order_ids=${orderIds.join(',')}`;
+            // إنشاء رابط تحميل خفي
+            const downloadLink = document.createElement('a');
+            downloadLink.href = `{{ url_for('orders.print_orders') }}?order_ids=${orderIds.join(',')}`;
+            downloadLink.style.display = 'none';
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
             
             // استعادة حالة الزر بعد ثانية
             setTimeout(() => {
                 printBtn.prop('disabled', false).html(originalText);
-            }, 3000);
+            }, 2000);
         }
     });
 });

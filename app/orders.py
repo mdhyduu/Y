@@ -1337,20 +1337,12 @@ def print_orders():
         # إنشاء اسم ملف فريد
         filename = f"orders_{'_'.join(order_ids)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         
-        # حفظ الملف مؤقتاً
-        temp_dir = tempfile.gettempdir()
-        temp_file = os.path.join(temp_dir, filename)
+        # إعداد response مع PDF للتحميل
+        response = make_response(pdf)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
         
-        with open(temp_file, 'wb') as f:
-            f.write(pdf)
-        
-        # إرسال الملف للتحميل
-        return send_file(
-            temp_file,
-            as_attachment=True,
-            download_name=filename,
-            mimetype='application/pdf'
-        )
+        return response
         
     except Exception as e:
         current_app.logger.error(f"Error generating PDF: {str(e)}")
