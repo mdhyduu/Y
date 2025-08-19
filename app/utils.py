@@ -198,7 +198,7 @@ def process_order_data(order_id, items_data):
         logger.info(f"Processed item: {item_data['name']} with barcode: {item_barcode or 'None'}")
 
     processed_order = {
-        'id': order_id,
+        'reference_id': order_id,  # تغيير id إلى reference_id
         'order_items': items,
         'barcode': generate_order_barcode(order_id)  # الباركود الرئيسي للطلب
     }
@@ -243,4 +243,4 @@ def humanize_time(dt):
     elif minutes > 0:
         return f"منذ {int(minutes)} دقيقة" if minutes > 1 else "منذ دقيقة"
     else:
-        return "الآن"        
+        return "الآن"
