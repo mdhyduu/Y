@@ -698,7 +698,7 @@ def order_details(order_id):
         # تحديث بيانات الطلب المعالجة
         processed_order.update({
             'id': order_id,
-            'checkout_id': order_data.get('checkout_id') or 'غير متوفر',
+            'reference_id': order_data.get('reference_id') or 'غير متوفر',
             'customer': {
                 'first_name': order_data.get('customer', {}).get('first_name', ''),
                 'last_name': order_data.get('customer', {}).get('last_name', ''),
