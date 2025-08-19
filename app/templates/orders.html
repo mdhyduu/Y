@@ -136,16 +136,16 @@
                 </thead>
                 <tbody>
                     {% for order in orders %}
-                    <tr data-order-id="{{ order.id }}" data-order-status="{{ order.status.slug }}" class="align-middle">
+                    <tr data-order-id="{{ order.reference_id }}" data-order-status="{{ order.status.slug }}" class="align-middle">
                         {% if is_reviewer %}
                         <td class="ps-4">
                             <div class="form-check">
-                                <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}">
+                                <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.reference_id }}">
                             </div>
                         </td>
                         {% endif %}
                         <td>
-                            <span class="fw-bold">#{{ order.id }}</span>
+                            <span class="fw-bold">#{{ order.reference_id }}</span>
                         </td>
                         <td>
                             <span class="status-badge status-{{ order.status.slug }}">
@@ -223,14 +223,14 @@
                         {% endif %}
                         <td class="text-end pe-4">
                             <div class="d-flex justify-content-end gap-2">
-                                <a href="{{ url_for('orders.order_details', order_id=order.id) }}"
+                                <a href="{{ url_for('orders.order_details', order_id=order.reference_id) }}"
                                    class="btn btn-sm btn-icon btn-outline-primary rounded-circle"
                                    title="عرض التفاصيل">
                                     <i class="fas fa-eye"></i>
                                 </a>
                                 {% if is_reviewer %}
                                 <button class="btn btn-sm btn-icon btn-outline-success rounded-circle assign-single-btn" 
-                                        data-order-id="{{ order.id }}" title="إسناد سريع">
+                                        data-order-id="{{ order.reference_id }}" title="إسناد سريع">
                                     <i class="fas fa-user-plus"></i>
                                 </button>
                                 {% endif %}
@@ -298,7 +298,6 @@
         {% endif %}
     </div>
 </div>
-
 
 
 {% block scripts %}
