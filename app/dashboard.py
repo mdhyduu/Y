@@ -134,7 +134,7 @@ def index():
     
         else:
             # للموظفين
-            employee = Employee.query.get(user_id)
+            employee = request.current_user  
             if not employee:
                 flash('بيانات الموظف غير موجودة', 'error')
                 resp = make_response(redirect(url_for('user_auth.login')))
