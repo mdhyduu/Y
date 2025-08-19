@@ -117,7 +117,7 @@
         </div>
         <div class="card-body p-2">
           {% if current_employee %}
-          <form action="{{ url_for('orders.add_employee_status', order_id=order.id) }}" method="POST" id="employee-status-form">
+          <form action="{{ url_for('orders.add_employee_status', order_id=order['id']) }}" method="POST" id="employee-status-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-2">
               <label class="form-label small">اختر حالة</label>
@@ -178,7 +178,7 @@
         <h5 class="mb-0 fs-5"><i class="fas fa-flag ms-2"></i>حالات خاصة</h5>
     </div>
     <div class="card-body p-2">
-        <form action="{{ url_for('orders.add_status_note', order_id=order.id) }}" method="POST">
+        <form action="{{ url_for('orders.add_status_note', order_id=order['id']) }}" method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             
             <div class="mb-3">
@@ -286,7 +286,7 @@
         </div>
         
         <div class="card-body p-2">
-          <form id="status-form" action="{{ url_for('orders.update_order_status', order_id=order.id) }}" method="POST">
+          <form id="status-form" action="{{ url_for('orders.update_order_status', order_id=order['id']) }}" method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-2">
               <label for="status" class="form-label small">الحالة الجديدة</label>
