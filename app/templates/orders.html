@@ -353,8 +353,8 @@
         </div>
     </div>
 </div>
-{% endblock %}
-{% block scripts %}
+
+
 <style>
     /* =================================== */
     /* General Styles             */
@@ -536,7 +536,7 @@
     body.dark-mode .text-gray-300 { color: #4b5563 !important; }
     body.dark-mode .text-gray-600 { color: #d1d5db !important; }
 </style>
-
+{% block scripts %}
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js"></script>
@@ -947,4 +947,5 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
+{% endblock %}
 {% endblock %}
