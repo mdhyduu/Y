@@ -1166,3 +1166,90 @@ def delete_note_status(status_id):
         db.session.commit()
         flash('تم حذف الحالة بنجاح', 'success')
     return redirect(url_for('orders.manage_note_status'))
+@orders_bp.route('/bulk_update_status', methods=['POST'])
+def bulk_update_status():
+    """تحديث حالة عدة طلبات دفعة واحدة"""
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
+    
+    # التحقق من أن المستخدم موظف وليس مديراً
+    if request.cookies.get('is_admin') == 'true':
+        return jsonify({
+            'success': False,
+            'error': 'هذه الخدمة للموظفين فقط'
+        }), 403
+    
+    if not employee:
+        return jsonify({
+            'success': False,
+            'error': 'غير مصرح لك بهذا الإجراء'
+        }), 403
+    
+    data = request.get_json()
+    order_ids = data.get('order_ids', [])
+    status_id = data.get('status_id')
+    note = data.get('note', '')
+    
+    if not order_ids or not status_id:
+        return jsonify({
+            'success': False,
+            'error': 'بيانات ناقصة'
+        }), 400
+    
+    # التحقق أن الحالة تخص الموظف الحالي
+    custom_status = EmployeeCustomStatus.query.filter_by(
+        id=status_id,
+        employee_id=employee.id
+    ).first()
+    
+    if not custom_status:
+        return jsonify({
+            'success': False,
+            'error': 'الحالة المحددة غير صالحة'
+        }), 400
+    
+    # التحقق من أن الطلبات مسندة للموظف الحالي
+    for order_id in order_ids:
+        assignment = OrderAssignment.query.filter_by(
+            order_id=str(order_id),
+            employee_id=employee.id
+        ).first()
+        
+        if not assignment:
+            return jsonify({
+                'success': False,
+                'error': f'الطلب {order_id} غير مسند لك'
+            }), 403
+    
+    # تحديث حالة كل طلب
+    updated_count = 0
+    for order_id in order_ids:
+        try:
+            new_status = OrderEmployeeStatus(
+                order_id=str(order_id),
+                status_id=status_id,
+                note=note
+            )
+            db.session.add(new_status)
+            updated_count += 1
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'error': f'حدث خطأ أثناء تحديث الطلب {order_id}: {str(e)}'
+            }), 500
+    
+    try:
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': f'تم تحديث {updated_count} طلب بنجاح'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': f'حدث خطأ أثناء حفظ التغييرات: {str(e)}'
+        }), 500
