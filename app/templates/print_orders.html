@@ -68,8 +68,8 @@
         }
         
         .product-image {
-            max-width: 250px;
-            max-height: 250px;
+            max-width: 500px;
+            max-height: 500px;
             width: auto;
             height: auto;
             object-fit: contain;
@@ -153,14 +153,27 @@
             flex: 1;
         }
         
-        .order-number {
+        .barcode-section {
             text-align: center;
-            margin-top: 20px;
-            padding-top: 15px;
+            margin-top: 25px;
+            padding-top: 20px;
             border-top: 2px dashed #ddd;
+        }
+        
+        .barcode-image {
+            max-width: 300px;
+            height: 80px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            padding: 5px;
+            background-color: #fff;
+        }
+        
+        .barcode-number {
             font-size: 18px;
             font-weight: bold;
             color: #2c3e50;
+            margin-top: 5px;
         }
         
         .page-break {
@@ -205,7 +218,12 @@
                 font-size: 14px;
             }
             
-            .order-number {
+            .barcode-image {
+                max-width: 250px;
+                height: 70px;
+            }
+            
+            .barcode-number {
                 font-size: 16px;
             }
         }
@@ -240,9 +258,7 @@
                 <div class="product-info">
                     <strong>الكمية:</strong> {{ item.quantity }}
                 </div>
-                <div class="product-info">
-                    <strong>السعر:</strong> {{ item.price.amount }} {{ item.price.currency }}
-                </div>
+
             </div>
             
             {% if item.options %}
@@ -259,8 +275,14 @@
         </div>
         {% endfor %}
         
-        <div class="order-number">
-            رقم الطلب: #{{ order.id }}
+        <div class="barcode-section">
+            {% if order.barcode %}
+            <img src="{{ url_for('orders.serve_barcode', filename=order.barcode, _external=True) }}" 
+                 alt="باركود الطلب" class="barcode-image">
+            <div class="barcode-number">#{{ order.id }}</div>
+            {% else %}
+            <div class="barcode-number">لا يوجد باركود للطلب #{{ order.id }}</div>
+            {% endif %}
         </div>
     </div>
     
