@@ -364,7 +364,9 @@ def index():
                 )
         
         # الترحيل
-        pagination_obj = query.order_by(SallaOrder.created_at.desc()).paginate(page=page, per_page=per_page)
+        pagination_obj = query.order_by(
+            nullslast(SallaOrder.created_at.desc())
+        ).paginate(page=page, per_page=per_page)
         
         # جلب البيانات الإضافية
         assigned_order_ids = [order.id for order in pagination_obj.items]
