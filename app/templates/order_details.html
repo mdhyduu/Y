@@ -250,9 +250,7 @@
       </button>
     </div>
   </td>
-  
-  <!-- بقية محتوى الخلية -->
-  ...
+  <!-- ... -->
 </tr>
 {% endfor %}
         <!-- عرض الحالات المسجلة في قائمة واحدة -->
@@ -651,41 +649,140 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     // مشاركة المنتج عبر واتساب
+// مشاركة المنتج عبر واتساب مع معالجة صورة Amazon S3
 document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.share-btn').forEach(button => {
-        button.addEventListener('click', function() {
+    document.querySelectorAll('.share-btn').forEach((button, index) => {
+        button.addEventListener('click', async function() {
             const productName = this.dataset.productName;
             const productImage = this.dataset.productImage;
             const productOptions = JSON.parse(this.dataset.productOptions || '[]');
             
-            // بناء نص المشاركة
-            let shareText = `*${productName}*%0A%0A`;
+            // عرض تحميل أثناء المعالجة
+            const swalInstance = Swal.fire({
+                title: 'جاري التجهيز للمشاركة',
+                text: 'يرجى الانتظار...',
+                icon: 'info',
+                showConfirmButton: false,
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
             
-            // إضافة الخيارات إذا وجدت
-            if (productOptions.length > 0) {
-                shareText += `*الخيارات:*%0A`;
-                productOptions.forEach(option => {
-                    shareText += `${option.name}: ${option.value}%0A`;
-                });
-                shareText += '%0A';
+            try {
+                // بناء نص المشاركة
+                let shareText = `*${productName}*%0A%0A`;
+                
+                // إضافة الخيارات إذا وجدت
+                if (productOptions.length > 0) {
+                    shareText += `*الخيارات:*%0A`;
+                    productOptions.forEach(option => {
+                        shareText += `🔹 ${option.name}: ${option.value}%0A`;
+                    });
+                    shareText += '%0A';
+                }
+                
+                shareText += '---%0A';
+                shareText += 'تم المشاركة من تطبيق إدارة الطلبات';
+                
+                // معالجة صورة Amazon S3
+                let finalImageUrl = productImage;
+                
+                // إذا كانت الصورة من Amazon S3، نحتاج إلى معالجتها
+                if (productImage && productImage.includes('amazonaws.com')) {
+                    // محاولة جلب الصورة وتحويلها إلى base64
+                    try {
+                        const base64Image = await convertImageToBase64(productImage);
+                        finalImageUrl = base64Image;
+                    } catch (error) {
+                        console.error('Failed to convert Amazon S3 image:', error);
+                        // إذا فشل التحويل، نستخدم الرابط الأصلي
+                    }
+                }
+                
+                // بناء رابط واتساب
+                let whatsappUrl;
+                if (finalImageUrl && finalImageUrl.startsWith('data:image')) {
+                    // إذا كانت الصورة base64، نستخدمها مباشرة (قد لا تعمل مع واتساب)
+                    whatsappUrl = `https://wa.me/?text=${shareText}`;
+                    // نضيف الصورة كرابط منفصل في النص
+                    shareText += '%0A%0Aرابط الصورة: ' + encodeURIComponent(productImage);
+                } else if (finalImageUrl) {
+                    // إذا كان لدينا رابط صورة عادي
+                    whatsappUrl = `https://wa.me/?text=${shareText}&media=${encodeURIComponent(finalImageUrl)}`;
+                } else {
+                    // إذا لم توجد صورة
+                    whatsappUrl = `https://wa.me/?text=${shareText}`;
+                }
+                
+                // إغلاق نافذة التحميل
+                swalInstance.close();
+                
+                // فتح واتساب في نافذة جديدة
+                window.open(whatsappUrl, '_blank');
+                
+            } catch (error) {
+                swalInstance.close();
+                Swal.fire('خطأ', 'حدث خطأ أثناء محاولة المشاركة: ' + error.message, 'error');
             }
-            
-            shareText += '---%0A';
-            shareText += 'تم المشاركة من تطبيق إدارة الطلبات';
-            
-            // بناء رابط واتساب
-            let whatsappUrl = `https://wa.me/?text=${shareText}`;
-            
-            // إذا كانت هناك صورة، نضيفها كرابط
-            if (productImage) {
-                whatsappUrl += `&media=${encodeURIComponent(productImage)}`;
-            }
-            
-            // فتح واتساب في نافذة جديدة
-            window.open(whatsappUrl, '_blank', 'width=600,height=400');
         });
     });
 });
+
+// دالة لتحويل صورة Amazon S3 إلى base64
+async function convertImageToBase64(url) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous'; // هذا مهم لصور Amazon S3
+        
+        img.onload = function() {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                // تحويل إلى base64
+                const dataURL = canvas.toDataURL('image/jpeg');
+                resolve(dataURL);
+            } catch (error) {
+                reject(error);
+            }
+        };
+        
+        img.onerror = function() {
+            reject(new Error('Failed to load image'));
+        };
+        
+        // إضافة timestamp لمنع التخزين المؤقت
+        const timestamp = new Date().getTime();
+        const cacheBusterUrl = url + (url.includes('?') ? '&' : '?') + 't=' + timestamp;
+        
+        img.src = cacheBusterUrl;
+    });
+}
+
+// دالة للتحقق من إمكانية الوصول إلى الصورة
+async function isImageAccessible(url) {
+    if (!url) return false;
+    
+    try {
+        // إضافة timestamp لمنع التخزين المؤقت
+        const timestamp = new Date().getTime();
+        const cacheBusterUrl = url + (url.includes('?') ? '&' : '?') + 't=' + timestamp;
+        
+        const response = await fetch(cacheBusterUrl, { 
+            method: 'HEAD',
+            mode: 'cors'
+        });
+        return response.ok && response.headers.get('content-type')?.startsWith('image/');
+    } catch (error) {
+        console.error('Image accessibility check failed:', error);
+        return false;
+    }
+}
   // التحقق قبل إرسال النماذج
   document.getElementById('status-form').addEventListener('submit', function(e) {
     const status = document.getElementById('status').value;
