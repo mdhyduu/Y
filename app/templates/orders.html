@@ -1,5 +1,3 @@
-[file name]: orders.html
-[file content begin]
 {% extends 'base.html' %}
 
 {% block content %} 
@@ -108,7 +106,7 @@
         </div>
         
         <!-- إضافة أزرار الإجراءات السريعة -->
-        <div class="d-flex p-3 border-bottom bg-light" id="quick-actions">
+        <div class="d-flex p-3" class="card-body"  id="quick-actions">
             {% if is_reviewer and employees %}
             <button type="button" class="btn btn-success rounded-pill px-3 me-2" id="assign-orders-btn" disabled>
                 <i class="fas fa-user-check me-1"></i> 
@@ -121,11 +119,8 @@
                 <span id="selected-orders-count-2">0</span> تغيير الحالة
             </button>
             
-            <!-- إزالة الشرط is_reviewer لجعل تحديد الكل متاح للجميع -->
-            <div class="form-check ms-auto d-flex align-items-center">
-                <input class="form-check-input me-2" type="checkbox" id="select-all">
-                <label class="form-check-label small text-muted" for="select-all">تحديد الكل</label>
-            </div>
+
+
         </div>
 
         {% if orders %}
@@ -139,12 +134,13 @@
             <table class="table table-hover mb-0" id="orders-table">
                 <thead class="table-light">
                     <tr>
-                        <!-- إزالة الشرط is_reviewer لجعل عمود التحديد متاح للجميع -->
+
                         <th width="5%" class="ps-4">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="select-all-header">
                             </div>
                         </th>
+
                         <th>رقم الطلب</th>
                         <th>الحالة</th>
                         <th>الحالة المخصصة</th>
@@ -159,13 +155,13 @@
                 <tbody>
                     {% for order in orders %}
                     <tr data-order-id="{{ order.id }}" data-order-status="{{ order.status.slug }}" class="align-middle clickable-row">
-                        <!-- إزالة الشرط is_reviewer لجعل خلية التحديد متاحة للجميع -->
+
                         <td class="ps-4">
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}">
                             </div>
                         </td>
-                        <td>
+                                          <td>
                             <span class="fw-bold">#{{ order.reference_id }}</span>
                         </td>
                         <td>
@@ -608,26 +604,13 @@ $(document).ready(function () {
         const checkedCount = $('.order-checkbox:checked').length;
         $('#selected-orders-count').text(checkedCount);
         $('#selected-orders-count-2').text(checkedCount);
-        
-        // تحديث زر الإسناد (يظهر فقط للمراجعين)
-        {% if is_reviewer %}
         $('#assign-orders-btn').prop('disabled', checkedCount === 0);
-        {% endif %}
-        
-        // تحديث زر تغيير الحالة (يظهر للجميع)
         $('#change-status-btn').prop('disabled', checkedCount === 0);
         
         if (checkedCount > 0) {
-            {% if is_reviewer %}
-            $('#assign-orders-btn').addClass('pulse-effect');
-            {% endif %}
-            $('#change-status-btn').addClass('pulse-effect');
-            
+            $('#assign-orders-btn, #change-status-btn').addClass('pulse-effect');
             setTimeout(() => {
-                {% if is_reviewer %}
-                $('#assign-orders-btn').removeClass('pulse-effect');
-                {% endif %}
-                $('#change-status-btn').removeClass('pulse-effect');
+                $('#assign-orders-btn, #change-status-btn').removeClass('pulse-effect');
             }, 1000);
         }
     }
@@ -750,8 +733,7 @@ $(document).ready(function () {
         }
     });
 
-    // 3. إسناد الطلبات المحددة (للمراجعين فقط)
-    {% if is_reviewer %}
+    // 3. إسناد الطلبات المحددة
     $(document).on('click', '#assign-orders-btn', function() {
         const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
         
@@ -810,10 +792,8 @@ $(document).ready(function () {
             }
         });
     });
-    {% endif %}
     
-    // 4. إسناد سريع لطلب واحد (للمراجعين فقط)
-    {% if is_reviewer %}
+    // 4. إسناد سريع لطلب واحد
     $(document).on('click', '.assign-single-btn', function(e) {
         e.stopPropagation(); // منع انتشار الحدث إلى الصف
         const orderId = $(this).data('order-id');
@@ -872,9 +852,8 @@ $(document).ready(function () {
             }
         });
     });
-    {% endif %}
     
-    // 5. تغيير حالة الطلبات (متاح للجميع)
+    // 5. تغيير حالة الطلبات
     $(document).on('click', '#change-status-btn', function() {
         const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
         $('#selected-count-modal').text(orderIds.length);
@@ -966,4 +945,3 @@ $(document).ready(function () {
 </script>
 {% endblock %}
 {% endblock %}
-[file content end]
