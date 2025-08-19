@@ -174,7 +174,7 @@ def sync_orders():
         updated_count = 0
         
         for order in all_orders:
-            order_id = str(order.get('id'))
+            order_id = str(order.get('reference_id'))
             existing_order = SallaOrder.query.get(order_id)
             
             # تحويل تاريخ الإنشاء
