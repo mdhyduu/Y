@@ -1,63 +1,391 @@
 {% extends 'base.html' %}
+
 {% block content %}
-<style>html, body {
-  height: auto !important;
-  overflow: auto !important;
-}</style>
-<div class="row">
-    <div class="col-md-8">
-        <h1 class="mb-4">لوحة تحكم المتجر</h1>
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">مرحباً بك، {{ current_user.email }}</h5>
-                <p class="card-text">يمكنك إدارة متجرك والطلبات والموظفين والمنتجات من هنا.</p>  <!-- تم تحديث النص -->
-                
-                <div class="row mt-4">
-                    <div class="col-md-4">  <!-- تغيير من col-md-6 إلى col-md-4 -->
-                        <div class="card">
-                            <div class="card-body">
-                                <h5 class="card-title">الطلبات</h5>
-                                <p class="card-text">عرض وإدارة طلبات المتجر</p>
-                                <a href="{{ url_for('orders.index') }}" class="btn btn-primary">عرض الطلبات</a>
-                            </div>
-                        </div>
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0"><i class="fas fa-tachometer-alt me-2"></i>لوحة تحكم المدير</h1>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('orders.index') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-tasks me-1"></i> إدارة الطلبات
+            </a>
+            <a href="{{ url_for('employees.list_employees') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-users me-1"></i> إدارة الموظفين
+            </a>
+            <a href="{{ url_for('products.list_products') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-box me-1"></i> إدارة المنتجات
+            </a>
+        </div>
+    </div>
+
+    <!-- إحصائيات رئيسية -->
+    <div class="row mb-4">
+        <div class="col-md-2 col-6">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center py-3">
+                    <h3 class="mb-1 fw-bold">{{ stats.total_orders }}</h3>
+                    <p class="mb-0 small">إجمالي الطلبات</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center py-3">
+                    <h3 class="mb-1 fw-bold">{{ stats.new_orders }}</h3>
+                    <p class="mb-0 small">طلبات جديدة</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center py-3">
+                    <h3 class="mb-1 fw-bold">{{ stats.late_orders }}</h3>
+                    <p class="mb-0 small">طلبات متأخرة</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center py-3">
+                    <h3 class="mb-1 fw-bold">{{ stats.missing_orders }}</h3>
+                    <p class="mb-0 small">واصل ناقص</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="card bg-secondary text-white">
+                <div class="card-body text-center py-3">
+                    <h3 class="mb-1 fw-bold">{{ employees_count }}</h3>
+                    <p class="mb-0 small">الموظفين</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 col-6">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center py-3">
+                    <h3 class="mb-1 fw-bold">{{ products_count }}</h3>
+                    <p class="mb-0 small">المنتجات</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- الطلبات الحديثة -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fs-5"><i class="fas fa-clock me-2"></i>أحدث الطلبات</h5>
+                    <a href="{{ url_for('orders.index') }}" class="btn btn-sm btn-outline-primary">
+                        عرض الكل <i class="fas fa-arrow-left me-1"></i>
+                    </a>
+                </div> 
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>رقم الطلب</th>
+                                    <th>العميل</th>
+                                    <th>التاريخ</th>
+                                    <th>المجموع</th>
+                                    <th>الحالة</th>
+                                    <th>الموظف المسؤول</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in recent_orders %}
+                                <tr>
+                                    <td class="fw-bold">#{{ order.id }}</td>
+                                    <td>{{ order.customer_name }}</td>
+                                    <td>{{ order.created_at.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ order.total_amount }} {{ order.currency }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ order.status_slug | replace('under_review', 'warning') | replace('processing', 'info') | replace('completed', 'success') | replace('awaiting_payment', 'warning') | replace('shipped', 'primary') | replace('delivered', 'success') | replace('canceled', 'danger') | replace('refunded', 'secondary') }}">
+                                            {{ order.status }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if order.assigned_employee %}
+                                            {{ order.assigned_employee.name }}
+                                        {% else %}
+                                            <span class="text-muted">غير مسند</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">
+                                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                                        <p>لا توجد طلبات</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="col-md-4">  <!-- تغيير من col-md-6 إلى col-md-4 -->
-                        <div class="card">
-                            <div class="card-body">
-                                <h5 class="card-title">الموظفين</h5>
-                                <p class="card-text">إدارة موظفي المتجر</p>
-                                <a href="{{ url_for('employees.list_employees') }}" class="btn btn-primary">عرض الموظفين</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- آخر النشاطات -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="fas fa-history me-2"></i>آخر النشاطات</h6>
+                    <span class="badge bg-primary rounded-pill">{{ recent_statuses|length }}</span>
+                </div>
+                <div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
+                    {% for status in recent_statuses %}
+                    <a href="{{ url_for('orders.order_details', order_id=status.order_id) }}" 
+                       class="list-group-item list-group-item-action border-0 py-2">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 fw-bold">#{{ status.order_id }}</h6>
+                            <small class="text-muted">{{ status.created_at|time_ago }}</small>
+                        </div>
+                        <div class="d-flex align-items-center mt-2">
+                            <div class="flex-shrink-0">
+                                {% if status.employee %}
+                                <img src="{{ status.employee.avatar or url_for('static', filename='images/default-avatar.png') }}" 
+                                     alt="{{ status.employee.name }}" 
+                                     class="rounded-circle" width="30" height="30">
+                                {% else %}
+                                <div class="bg-light rounded-circle d-flex align-items-center justify-content-center" 
+                                     style="width: 30px; height: 30px;">
+                                    <i class="fas fa-user text-muted"></i>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="flex-grow-1 ms-2">
+                                <p class="mb-0 small">
+                                    <span class="fw-bold">
+                                        {{ status.employee.name if status.employee else 'النظام' }}
+                                    </span>
+                                    <span class="text-muted">قام بتحديث الحالة إلى</span>
+                                    {% if status.custom_status %}
+                                    <span class="badge" 
+                                          style="background-color: {{ status.custom_status.color }};
+                                                 color: {% if status.custom_status.color in ['#ffffff', '#f8f9fa'] %}#212529{% else %}white{% endif %};
+                                                 border: 1px solid {{ status.custom_status.color }};">
+                                        {{ status.custom_status.name }}
+                                    </span>
+                                    {% else %}
+                                    {% if status.status_flag == 'late' %}
+                                        <span class="badge-late">متأخر</span>
+                                    {% elif status.status_flag == 'missing' %}
+                                        <span class="badge-missing">واصل ناقص</span>
+                                    {% elif status.status_flag == 'refunded' %}
+                                        <span class="badge-refunded">مسترجع</span>
+                                    {% elif status.status_flag == 'not_shipped' %}
+                                        <span class="badge-not_shipped">لم يتم الشحن</span>
+                                    {% endif %}
+                                    {% endif %}
+                                </p>
                             </div>
                         </div>
+                    </a>
+                    {% else %}
+                    <div class="list-group-item text-center p-4">
+                        <p class="text-muted small mb-0">لا توجد نشاطات حديثة</p>
                     </div>
-                    <div class="col-md-4">  <!-- إضافة بطاقة جديدة للمنتجات -->
-                        <div class="card">
-                            <div class="card-body">
-                                <h5 class="card-title">المنتجات</h5>
-                                <p class="card-text">إدارة منتجات المتجر</p>
-                                <a href="{{ url_for('products.list_products') }}" class="btn btn-primary">عرض المنتجات</a>
-                            </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- توزيع الحالات -->
+    <div class="row mt-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-chart-pie text-primary me-2"></i>توزيع حالات الطلبات</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="statusDistributionChart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-tags text-info me-2"></i>الحالات المخصصة</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for item in custom_status_stats %}
+                        <div class="position-relative">
+                            <span class="badge position-absolute top-0 start-100 translate-middle rounded-pill bg-danger">
+                                {{ item.count }}
+                            </span>
+                            <span class="badge p-2" 
+                                  style="background-color: {{ item.status.color }};
+                                         color: {% if item.status.color in ['#ffffff', '#f8f9fa', '#ffc107', '#0dcaf0'] %}#212529{% else %}white{% endif %};
+                                         border: 1px solid {{ item.status.color }};">
+                                {{ item.status.name }}
+                            </span>
                         </div>
-                        <!-- في قسم بطاقات لوحة التحكم -->
+                        {% else %}
+                        <p class="text-muted small mb-0">لا توجد حالات مخصصة</p>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                إحصائيات سريعة
-            </div>
-            <div class="card-body">
-                <p>عدد الطلبات اليوم: 15</p>
-                <p>عدد الموظفين: {{ employees_count }}</p>
-                <p>عدد المنتجات: {{ products_count }}</p>  <!-- إضافة إحصائية للمنتجات -->
-                <p>حالة الربط مع سلة: {% if current_user.salla_access_token %}مرتبط{% else %}غير مرتبط{% endif %}</p>
-                <a href="{{ url_for('auth.link_store') }}" class="btn btn-sm btn-outline-secondary">ربط المتجر</a>
-            </div>
-        </div>
-    </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // رسم مخطط توزيع الحالات
+        const ctx = document.getElementById('statusDistributionChart').getContext('2d');
+        const statusChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['طلبات جديدة', 'متأخرة', 'واصل ناقص', 'مسترجع', 'لم يتم الشحن'],
+                datasets: [{
+                    label: 'عدد الطلبات',
+                    data: [
+                        {{ stats.new_orders }},
+                        {{ stats.late_orders }},
+                        {{ stats.missing_orders }},
+                        {{ stats.refunded_orders }},
+                        {{ stats.not_shipped_orders }}
+                    ],
+                    backgroundColor: [
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(153, 102, 255, 0.7)',
+                        'rgba(75, 192, 192, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(75, 192, 192, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    });
+</script>
+
+<style>
+    .card {
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        margin-bottom: 1.5rem;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+    
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #eaeaea;
+        padding: 1rem 1.25rem;
+    }
+    
+    .table th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+    }
+    
+    .list-group-item {
+        border-left: 0;
+        border-right: 0;
+        border-radius: 0 !important;
+    }
+    
+    .list-group-item:first-child {
+        border-top: 0;
+    }
+    
+    .list-group-item:last-child {
+        border-bottom: 0;
+    }
+    
+    .badge-late {
+        background-color: rgba(220, 38, 38, 0.1) !important;
+        color: #dc2626 !important;
+        border: 1px solid #dc2626;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .badge-missing {
+        background-color: rgba(234, 88, 12, 0.1) !important;
+        color: #ea580c !important;
+        border: 1px solid #ea580c;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .badge-refunded {
+        background-color: rgba(109, 40, 217, 0.1) !important;
+        color: #6d28d9 !important;
+        border: 1px solid #6d28d9;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .badge-not_shipped {
+        background-color: rgba(16, 185, 129, 0.1) !important;
+        color: #10b981 !important;
+        border: 1px solid #10b981;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    /* للوضع الليلي */
+    body.dark-mode .badge-late {
+        background-color: rgba(220, 38, 38, 0.2) !important;
+        color: #fca5a5 !important;
+    }
+    
+    body.dark-mode .badge-missing {
+        background-color: rgba(234, 88, 12, 0.2) !important;
+        color: #fdba74 !important;
+    }
+    
+    body.dark-mode .badge-refunded {
+        background-color: rgba(109, 40, 217, 0.2) !important;
+        color: #c4b5fd !important;
+    }
+    
+    body.dark-mode .badge-not_shipped {
+        background-color: rgba(16, 185, 129, 0.2) !important;
+        color: #6ee7b7 !important;
+    }
+</style>
 {% endblock %}
