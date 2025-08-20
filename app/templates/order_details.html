@@ -359,39 +359,53 @@
 
             
 <!-- في القسم الخاص بعرض العنوان، استبدل هذا الكود: -->
-
+{# قسم التصحيح - يمكن إزالته لاحقًا #}
+{% if config.DEBUG %}
+<li class="list-group-item py-2 px-0 bg-light">
+    <div class="fw-bold text-danger">تصحيح:</div>
+    <small>
+        shipping: {{ order.shipping|tojson }}<br>
+        receiver: {{ order.receiver|tojson }}<br>
+        customer: {{ order.customer|tojson }}
+    </small>
+</li>
+{% endif %}
 
 <li class="list-group-item py-2 px-0">
     <div class="fw-bold mb-1">عنوان الشحن الكامل:</div>
     <div class="text-muted small">
+        {# أولاً: محاولة استخدام العنوان المجمع #}
         {% if order.shipping.address and order.shipping.address != 'لم يتم تحديد العنوان' %}
             {{ order.shipping.address }}<br>
+        {# ثانياً: إذا لم يكن موجوداً، نعرض المكونات بشكل منفصل #}
         {% else %}
-            {# بناء العنوان من مكوناته إذا لم يكن جاهزاً #}
             {% if order.shipping.street_number %}
-                {{ order.shipping.street_number }}،
+                رقم المبنى: {{ order.shipping.street_number }}<br>
             {% endif %}
             {% if order.shipping.address_line %}
-                {{ order.shipping.address_line }}،
+                الشارع: {{ order.shipping.address_line }}<br>
             {% endif %}
             {% if order.shipping.block %}
-                {{ order.shipping.block }}<br>
+                الحي/القطعة: {{ order.shipping.block }}<br>
             {% endif %}
         {% endif %}
         
+        {# معلومات الموقع #}
         {% if order.shipping.city %}
-            {{ order.shipping.city }}{% if order.shipping.postal_code or order.shipping.country %},{% endif %}
+            المدينة: {{ order.shipping.city }}<br>
         {% endif %}
-        
         {% if order.shipping.postal_code %}
-            {{ order.shipping.postal_code }}{% if order.shipping.country %},{% endif %}
+            الرمز البريدي: {{ order.shipping.postal_code }}<br>
         {% endif %}
-        
         {% if order.shipping.country %}
-            {{ order.shipping.country }}
+            الدولة: {{ order.shipping.country }}<br>
         {% endif %}
         
-        {% if not order.shipping.address and not order.shipping.street_number and not order.shipping.address_line and not order.shipping.block and not order.shipping.city and not order.shipping.postal_code and not order.shipping.country %}
+        {# إذا لم يكن هناك أي بيانات عنوان #}
+        {% if not order.shipping.address and not order.shipping.street_number 
+              and not order.shipping.address_line and not order.shipping.block 
+              and not order.shipping.city and not order.shipping.postal_code 
+              and not order.shipping.country %}
             لم يتم تحديد العنوان
         {% endif %}
     </div>
@@ -400,8 +414,11 @@
 <li class="list-group-item d-flex justify-content-between py-2 px-0">
     <span class="fw-bold">اسم المستلم:</span>
     <span>
+        {# البحث عن اسم المستلم في عدة أماكن محتملة #}
         {% if order.receiver.name %}
             {{ order.receiver.name | safe }}
+        {% elif order.shipping.customer_name %}
+            {{ order.shipping.customer_name | safe }}
         {% else %}
             {{ order.customer.first_name | safe }} {{ order.customer.last_name | safe }}
         {% endif %}
@@ -411,8 +428,11 @@
 <li class="list-group-item d-flex justify-content-between py-2 px-0">
     <span class="fw-bold">هاتف المستلم:</span>
     <span>
+        {# البحث عن هاتف المستلم في عدة أماكن محتملة #}
         {% if order.receiver.phone %}
             {{ order.receiver.phone | safe }}
+        {% elif order.shipping.phone %}
+            {{ order.shipping.phone | safe }}
         {% else %}
             {{ order.customer.phone | safe }}
         {% endif %}
@@ -422,6 +442,7 @@
 <li class="list-group-item d-flex justify-content-between py-2 px-0">
     <span class="fw-bold">البريد الإلكتروني:</span>
     <span>
+        {# البحث عن البريد الإلكتروني في عدة أماكن محتملة #}
         {% if order.receiver.email %}
             {{ order.receiver.email | safe }}
         {% else %}
@@ -429,29 +450,6 @@
         {% endif %}
     </span>
 </li>
-
-{# إضافة معلومات إضافية إذا كانت متوفرة #}
-{% if order.shipping.tracking_number %}
-<li class="list-group-item d-flex justify-content-between py-2 px-0">
-    <span class="fw-bold">رقم التتبع:</span>
-    <span>
-        {% if order.shipping.tracking_link %}
-            <a href="{{ order.shipping.tracking_link }}" target="_blank" class="text-decoration-none">
-                {{ order.shipping.tracking_number }}
-            </a>
-        {% else %}
-            {{ order.shipping.tracking_number }}
-        {% endif %}
-    </span>
-</li>
-{% endif %}
-
-{% if order.shipping.method and order.shipping.method != 'غير محدد' %}
-<li class="list-group-item d-flex justify-content-between py-2 px-0">
-    <span class="fw-bold">شركة الشحن:</span>
-    <span>{{ order.shipping.method }}</span>
-</li>
-{% endif %}
           </ul>
         </div>
       </div>
