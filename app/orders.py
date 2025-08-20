@@ -703,8 +703,23 @@ def order_details(order_id):
         processed_order = process_order_data(order_id, items_data)
 
         # استخراج بيانات الشحن بشكل آمن
-        shipping_data = order_data.get('shipping', {}) or {}
+        ship_to = order_data.get('ship_to', {}) or {}
+        if not ship_to:
+            # محاولة الحصول على العنوان من مكان آخر إذا لم يكن في ship_to
+            ship_to = order_data.get('shipping', {}).get('address', {}) or {}
+        
+        # بناء العنوان بشكل صحيح
+        address_parts = []
+        if ship_to.get('street_number'):
+            address_parts.append(ship_to.get('street_number'))
+        if ship_to.get('block'):
+            address_parts.append(ship_to.get('block'))
+        if ship_to.get('address_line'):
+            address_parts.append(ship_to.get('address_line'))
+            
+        full_address = ' '.join(address_parts) if address_parts else 'لم يتم تحديد العنوان'
 
+# تحديث بيانات الطلب المعالجة
         # تحديث بيانات الطلب المعالجة
         processed_order.update({
             'id': order_id,
@@ -726,18 +741,15 @@ def order_details(order_id):
                 'phone': order_data.get('receiver', {}).get('phone', '') if order_data.get('receiver') else order_data.get('customer', {}).get('mobile_code', '') + str(order_data.get('customer', {}).get('mobile', '')),
                 'email': order_data.get('receiver', {}).get('email', '') if order_data.get('receiver') else order_data.get('customer', {}).get('email', '')
                     },
-            'shipping': {
-                'method': order_data.get('shipping', {}).get('company'),
+           'shipping': {
+                'method': order_data.get('shipping', {}).get('company', 'غير محدد'),
                 'branch_id': order_data.get('branch_id'),
-                'address': (
-                    f"{shipping_data.get('street_number', '')} "
-                    f"{shipping_data.get('block', '')} "
-                    f"{shipping_data.get('address_line', '')}"
-                ).strip() or 'لم يتم تحديد العنوان',
-                'postal_code': shipping_data.get('postal_code', ''),
-                'city': shipping_data.get('city', ''),
-                'country': shipping_data.get('country', ''),
-                     },
+                'address': full_address,
+                'postal_code': ship_to.get('postal_code', ''),
+                'city': ship_to.get('city', ''),
+                'country': ship_to.get('country', ''),
+                'raw_data': ship_to
+                },
             'payment': {
                 'status': order_data.get('payment', {}).get('status', ''),
                 'method': order_data.get('payment', {}).get('method', '')
