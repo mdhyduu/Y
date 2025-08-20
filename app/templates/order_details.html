@@ -364,11 +364,11 @@
 <li class="list-group-item py-2 px-0">
     <div class="fw-bold mb-1">عنوان الشحن الكامل:</div>
     <div class="text-muted small">
-        {# استخدام العنوان الكامل إذا كان متوفراً #}
+        {# إذا عندنا العنوان الكامل نعرضه #}
         {% if order.shipping.address and order.shipping.address != 'لم يتم تحديد العنوان' %}
-            {{ order.shipping.address }}<br>
+            {{ order.shipping.address }}
         {% else %}
-            {# عرض المكونات بشكل منفصل #}
+            {# نعرض المكونات بشكل منفصل #}
             {% if order.shipping.country %}
                 <span class="d-block">الدولة: {{ order.shipping.country }}</span>
             {% endif %}
@@ -388,8 +388,8 @@
                 <span class="d-block">الرمز البريدي: {{ order.shipping.postal_code }}</span>
             {% endif %}
         {% endif %}
-        
-        {# إذا لم يكن هناك أي بيانات عنوان #}
+
+        {# إذا ما فيه أي بيانات #}
         {% if not order.shipping.address and not order.shipping.country 
               and not order.shipping.city and not order.shipping.district
               and not order.shipping.street and not order.shipping.description 
@@ -397,7 +397,7 @@
             <span class="text-danger">لم يتم تحديد العنوان</span>
         {% endif %}
 
-        {# عرض إحداثيات الموقع إذا كانت متوفرة #}
+        {# عرض إحداثيات الموقع لو موجودة #}
         {% if order.shipping.raw_data and order.shipping.raw_data.latitude and order.shipping.raw_data.longitude %}
             <span class="d-block mt-1">
                 <small>الإحداثيات: {{ order.shipping.raw_data.latitude }}, {{ order.shipping.raw_data.longitude }}</small>
@@ -405,7 +405,6 @@
         {% endif %}
     </div>
 </li>
-
 <li class="list-group-item d-flex justify-content-between py-2 px-0">
     <span class="fw-bold">اسم المستلم:</span>
     <span>
