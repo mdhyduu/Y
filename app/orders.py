@@ -730,21 +730,15 @@ def order_details(order_id):
                 'method': order_data.get('shipping', {}).get('company'),
                 'branch_id': order_data.get('branch_id'),
                 'address': (
-                    order_data.get('shipping_address', {}).get('address', '')
-                    if order_data.get('shipping_address')
-                    else (order_data.get('customer', {}).get('location', '') if order_data.get('customer') else '')
-                ) or 'لم يتم تحديد العنوان',  # Fallback if all empty
-                'postal_code': order_data.get('shipping_address', {}).get('postal_code', ''),
-                'city': (
-                    order_data.get('shipping_address', {}).get('city', '')
-                    if order_data.get('shipping_address')
-                    else (order_data.get('customer', {}).get('city', '') if order_data.get('customer') else '')
-                ),
-                'country': (
-                    order_data.get('shipping_address', {}).get('country_name', '')
-                    if order_data.get('shipping_address')
-                    else (order_data.get('customer', {}).get('country', '') if order_data.get('customer') else '')
-                ),
+                    # بناء العنوان من مكوناته المفصلة
+                    f"{order_data.get('ship_to', {}).get('street_number', '')} "
+                    f"{order_data.get('ship_to', {}).get('block', '')} "
+                    f"{order_data.get('ship_to', {}).get('address_line', '')}"
+                ).strip() or 'لم يتم تحديد العنوان',
+                'postal_code': order_data.get('ship_to', {}).get('postal_code', ''),
+                'city': order_data.get('ship_to', {}).get('city', ''),
+                'country': order_data.get('ship_to', {}).get('country', ''),
+            
             
                 'geo_coordinates': {
                     'latitude': order_data.get('shipping_address', {}).get('latitude'),
