@@ -702,8 +702,7 @@ def order_details(order_id):
         # ========== [4] معالجة بيانات الطلب ==========
         processed_order = process_order_data(order_id, items_data)
 
-        # ========== [5] استخراج بيانات العنوان بشكل صحيح ==========
-        # البحث عن العنوان في الأماكن المحتملة حسب وثائق API
+# ========== [5] استخراج بيانات العنوان بشكل صحيح ==========
         address_data = {}
         full_address = 'لم يتم تحديد العنوان'
         
@@ -720,28 +719,25 @@ def order_details(order_id):
         # المحاولة 3: من ship_to مباشرة (كبديل)
         if not address_data and 'ship_to' in order_data:
             address_data = order_data.get('ship_to', {})
-        
-        # بناء العنوان الكامل
-        if address_data:
-            address_parts = []
-            
-            # استخدام shipping_address إذا موجود (الحقل الرئيسي)
-            if address_data.get('shipping_address'):
-                full_address = address_data.get('shipping_address')
-            else:
-                # بناء العنوان من القطع
-                if address_data.get('street_number'):
-                    address_parts.append(str(address_data.get('street_number')))
-                if address_data.get('address_line'):
-                    address_parts.append(address_data.get('address_line'))
-                elif address_data.get('shipping_address'):  # اسم مختلف لنفس الحقل
-                    address_parts.append(address_data.get('shipping_address'))
-                if address_data.get('block'):
-                    address_parts.append(address_data.get('block'))
-                
-                if address_parts:
-                    full_address = "، ".join(address_parts)
 
+        # بناء العنوان الكامل بشكل موحّد
+        if address_data:
+            parts = []
+            if address_data.get('country'):
+                parts.append(address_data['country'])
+            if address_data.get('city'):
+                parts.append(address_data['city'])
+            if address_data.get('district'):
+                parts.append(address_data['district'])
+            if address_data.get('street'):
+                parts.append(address_data['street'])
+            if address_data.get('description'):
+                parts.append(address_data['description'])
+            if address_data.get('postal_code'):
+                parts.append(f"الرمز البريدي: {address_data['postal_code']}")
+
+            if parts:
+                full_address = "، ".join(parts)
         # استخراج بيانات المستلم
         receiver_info = order_data.get('receiver', {})
         if not receiver_info:
@@ -774,7 +770,7 @@ def order_details(order_id):
                 'phone': receiver_info.get('phone', ''),
                 'email': receiver_info.get('email', '')
             },
-            'shipping': {
+           'shipping': {
                 'customer_name': receiver_info.get('name', ''),
                 'phone': receiver_info.get('phone', ''),
                 'method': shipping_data.get('courier_name', 'غير محدد'),
@@ -783,16 +779,17 @@ def order_details(order_id):
                 
                 # بيانات العنوان
                 'address': full_address,
-                'city': address_data.get('city', ''),
                 'country': address_data.get('country', ''),
+                'city': address_data.get('city', ''),
+                'district': address_data.get('district', ''),
+                'street': address_data.get('street', ''),
+                'description': address_data.get('description', ''),
                 'postal_code': address_data.get('postal_code', ''),
-                'street_number': address_data.get('street_number', ''),
-                'block': address_data.get('block', ''),
-                'address_line': address_data.get('address_line', ''),
-                
+
                 # البيانات الأصلية كمرجع
                 'raw_data': address_data
             },
+            
             'payment': {
                 'status': order_data.get('payment', {}).get('status', ''),
                 'method': order_data.get('payment', {}).get('method', '')
