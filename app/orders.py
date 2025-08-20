@@ -684,7 +684,7 @@ def order_details(order_id):
             except requests.exceptions.RequestException as e:
                 raise e
 
-        # جلب بيانات الطلب الأساسية
+        # جلب بيانات الطلب الأساسية - بدون format=light للحصول على العنوان
         order_response = make_salla_api_request(f"{Config.SALLA_ORDERS_API}/{order_id}")
         if not isinstance(order_response, requests.Response):  # إذا كان redirect
             return order_response
@@ -702,25 +702,45 @@ def order_details(order_id):
         # ========== [4] معالجة بيانات الطلب ==========
         processed_order = process_order_data(order_id, items_data)
 
-        # استخراج بيانات العنوان من استجابة الطلب
-        # البيانات موجودة في order_data['shipping']['address'] أو order_data['ship_to']
-        shipping_data = order_data.get('shipping', {})
-        address_data = shipping_data.get('address', {})
+        # ========== [5] استخراج بيانات العنوان بشكل صحيح ==========
+        # البحث عن العنوان في الأماكن المحتملة حسب وثائق API
+        address_data = {}
+        full_address = 'لم يتم تحديد العنوان'
         
-        # إذا لم يكن العنوان في shipping، نبحث في ship_to
-        if not address_data:
+        # المحاولة 1: من shipping.address (الهيكل الأساسي)
+        shipping_data = order_data.get('shipping', {})
+        if shipping_data and 'address' in shipping_data:
+            address_data = shipping_data.get('address', {})
+        
+        # المحاولة 2: من shipments[0].ship_to (إذا كان هناك شحنات)
+        if not address_data and 'shipments' in order_data and order_data['shipments']:
+            first_shipment = order_data['shipments'][0]
+            address_data = first_shipment.get('ship_to', {})
+        
+        # المحاولة 3: من ship_to مباشرة (كبديل)
+        if not address_data and 'ship_to' in order_data:
             address_data = order_data.get('ship_to', {})
         
-        # بناء العنوان الكامل من المكونات
-        address_parts = []
-        if address_data.get('street_number'):
-            address_parts.append(str(address_data.get('street_number')))
-        if address_data.get('address_line'):
-            address_parts.append(address_data.get('address_line'))
-        if address_data.get('block'):
-            address_parts.append(address_data.get('block'))
-        
-        full_address = "، ".join(address_parts) if address_parts else 'لم يتم تحديد العنوان'
+        # بناء العنوان الكامل
+        if address_data:
+            address_parts = []
+            
+            # استخدام shipping_address إذا موجود (الحقل الرئيسي)
+            if address_data.get('shipping_address'):
+                full_address = address_data.get('shipping_address')
+            else:
+                # بناء العنوان من القطع
+                if address_data.get('street_number'):
+                    address_parts.append(str(address_data.get('street_number')))
+                if address_data.get('address_line'):
+                    address_parts.append(address_data.get('address_line'))
+                elif address_data.get('shipping_address'):  # اسم مختلف لنفس الحقل
+                    address_parts.append(address_data.get('shipping_address'))
+                if address_data.get('block'):
+                    address_parts.append(address_data.get('block'))
+                
+                if address_parts:
+                    full_address = "، ".join(address_parts)
 
         # استخراج بيانات المستلم
         receiver_info = order_data.get('receiver', {})
@@ -791,13 +811,13 @@ def order_details(order_id):
             if barcode_filename:
                 processed_order['barcode'] = barcode_filename
 
-        # ========== [5] جلب البيانات الإضافية من قاعدة البيانات ==========
+        # ========== [6] جلب البيانات الإضافية من قاعدة البيانات ==========
         # جلب الملاحظات الخاصة بالطلب (للمراجعين فقط)
         custom_note_statuses = CustomNoteStatus.query.filter_by(
             store_id=user.store_id
         ).all()
     
-        # ========== [6] جلب ملاحظات الحالة مع العلاقات ==========
+        # ========== [7] جلب ملاحظات الحالة مع العلاقات ==========
         status_notes = OrderStatusNote.query.filter_by(
             order_id=str(order_id)
         ).options(
@@ -808,7 +828,7 @@ def order_details(order_id):
             OrderStatusNote.created_at.desc()
         ).all()
         
-        # ========== [7] جلب الحالات المخصصة للموظفين ==========
+        # ========== [8] جلب الحالات المخصصة للموظفين ==========
         employee_statuses = db.session.query(
             OrderEmployeeStatus,
             EmployeeCustomStatus,
@@ -853,7 +873,6 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
-
 @orders_bp.route('/<int:order_id>/update_status', methods=['POST'])
 def update_order_status(order_id):
     """تحديث حالة الطلب في سلة"""
