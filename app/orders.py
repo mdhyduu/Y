@@ -703,6 +703,8 @@ def order_details(order_id):
         processed_order = process_order_data(order_id, items_data)
 
 # ========== [5] استخراج بيانات العنوان بشكل صحيح ==========
+        # تهيئة بيانات المستلم مسبقًا لتجنب الخطأ
+        receiver_info = {}
         address_data = {}
         full_address = 'لم يتم تحديد العنوان'
         
@@ -749,7 +751,7 @@ def order_details(order_id):
                 full_address = "، ".join(parts)
 
         # تحديث بيانات الطلب المعالجة
-
+        
         if not receiver_info:
             # إذا لم تكن هناك بيانات مستقلة للمستلم، نستخدم بيانات العميل
             customer_info = order_data.get('customer', {})
