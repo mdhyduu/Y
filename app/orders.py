@@ -703,7 +703,7 @@ def order_details(order_id):
         processed_order = process_order_data(order_id, items_data)
 
 # ========== [5] استخراج بيانات العنوان بشكل صحيح ==========
-              address_data = {}
+        address_data = {}
         full_address = 'لم يتم تحديد العنوان'
         
         # المحاولة 1: من shipping.address
