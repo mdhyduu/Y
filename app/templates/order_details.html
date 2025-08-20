@@ -361,53 +361,47 @@
 <!-- في القسم الخاص بعرض العنوان، استبدل هذا الكود: -->
  
 
-<!-- بـ هذا الكود المحسن: -->
 <li class="list-group-item py-2 px-0">
     <div class="fw-bold mb-1">عنوان الشحن الكامل:</div>
     <div class="text-muted small">
         {# استخدام العنوان الكامل إذا كان متوفراً #}
         {% if order.shipping.address and order.shipping.address != 'لم يتم تحديد العنوان' %}
             {{ order.shipping.address }}<br>
-        {# إذا لم يكن العنوان الكامل متوفراً، نعرض المكونات بشكل منفصل #}
         {% else %}
-            {% if order.shipping.street_number %}
-                <span class="d-block">رقم المبنى: {{ order.shipping.street_number }}</span>
+            {# عرض المكونات بشكل منفصل #}
+            {% if order.shipping.country %}
+                <span class="d-block">الدولة: {{ order.shipping.country }}</span>
             {% endif %}
-            {% if order.shipping.address_line %}
-                <span class="d-block">الشارع: {{ order.shipping.address_line }}</span>
+            {% if order.shipping.city %}
+                <span class="d-block">المدينة: {{ order.shipping.city }}</span>
             {% endif %}
-            {% if order.shipping.block %}
-                <span class="d-block">الحي/القطعة: {{ order.shipping.block }}</span>
+            {% if order.shipping.district %}
+                <span class="d-block">الحي: {{ order.shipping.district }}</span>
             {% endif %}
-        {% endif %}
-        
-        {# معلومات الموقع الإضافية #}
-        {% if order.shipping.city %}
-            <span class="d-block">المدينة: {{ order.shipping.city }}</span>
-        {% endif %}
-        {% if order.shipping.postal_code %}
-            <span class="d-block">الرمز البريدي: {{ order.shipping.postal_code }}</span>
-        {% endif %}
-        {% if order.shipping.country %}
-            <span class="d-block">الدولة: {{ order.shipping.country }}</span>
+            {% if order.shipping.street %}
+                <span class="d-block">الشارع: {{ order.shipping.street }}</span>
+            {% endif %}
+            {% if order.shipping.description %}
+                <span class="d-block">الوصف: {{ order.shipping.description }}</span>
+            {% endif %}
+            {% if order.shipping.postal_code %}
+                <span class="d-block">الرمز البريدي: {{ order.shipping.postal_code }}</span>
+            {% endif %}
         {% endif %}
         
         {# إذا لم يكن هناك أي بيانات عنوان #}
-        {% if not order.shipping.address and not order.shipping.street_number 
-              and not order.shipping.address_line and not order.shipping.block 
-              and not order.shipping.city and not order.shipping.postal_code 
-              and not order.shipping.country %}
+        {% if not order.shipping.address and not order.shipping.country 
+              and not order.shipping.city and not order.shipping.district
+              and not order.shipping.street and not order.shipping.description 
+              and not order.shipping.postal_code %}
             <span class="text-danger">لم يتم تحديد العنوان</span>
         {% endif %}
 
         {# عرض إحداثيات الموقع إذا كانت متوفرة #}
-        {% if order.shipping.raw_data and order.shipping.raw_data.geo_coordinates %}
-            {% set coords = order.shipping.raw_data.geo_coordinates %}
-            {% if coords.lat and coords.lng %}
-                <span class="d-block mt-1">
-                    <small>الإحداثيات: {{ "%.6f"|format(coords.lat) }}, {{ "%.6f"|format(coords.lng) }}</small>
-                </span>
-            {% endif %}
+        {% if order.shipping.raw_data and order.shipping.raw_data.latitude and order.shipping.raw_data.longitude %}
+            <span class="d-block mt-1">
+                <small>الإحداثيات: {{ order.shipping.raw_data.latitude }}, {{ order.shipping.raw_data.longitude }}</small>
+            </span>
         {% endif %}
     </div>
 </li>
