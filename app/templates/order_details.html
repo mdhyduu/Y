@@ -359,18 +359,9 @@
 
             
 <!-- في القسم الخاص بعرض العنوان، استبدل هذا الكود: -->
-{# قسم التصحيح - يمكن إزالته لاحقًا #}
-{% if config.DEBUG %}
-<li class="list-group-item py-2 px-0 bg-light">
-    <div class="fw-bold text-danger">تصحيح:</div>
-    <small>
-        shipping: {{ order.shipping|tojson }}<br>
-        receiver: {{ order.receiver|tojson }}<br>
-        customer: {{ order.customer|tojson }}
-    </small>
-</li>
-{% endif %}
 
+
+<!-- بـ هذا الكود المحسن: -->
 <li class="list-group-item py-2 px-0">
     <div class="fw-bold mb-1">عنوان الشحن الكامل:</div>
     <div class="text-muted small">
@@ -379,34 +370,43 @@
             {{ order.shipping.address }}<br>
         {# ثانياً: إذا لم يكن موجوداً، نعرض المكونات بشكل منفصل #}
         {% else %}
-            {% if order.shipping.street_number %}
+            {% if order.shipping.street_number and order.shipping.street_number != 'لم يتم تحديد العنوان' %}
                 رقم المبنى: {{ order.shipping.street_number }}<br>
             {% endif %}
-            {% if order.shipping.address_line %}
+            {% if order.shipping.address_line and order.shipping.address_line != 'لم يتم تحديد العنوان' %}
                 الشارع: {{ order.shipping.address_line }}<br>
             {% endif %}
-            {% if order.shipping.block %}
+            {% if order.shipping.block and order.shipping.block != 'لم يتم تحديد العنوان' %}
                 الحي/القطعة: {{ order.shipping.block }}<br>
             {% endif %}
         {% endif %}
         
         {# معلومات الموقع #}
-        {% if order.shipping.city %}
+        {% if order.shipping.city and order.shipping.city != 'لم يتم تحديد العنوان' %}
             المدينة: {{ order.shipping.city }}<br>
         {% endif %}
-        {% if order.shipping.postal_code %}
+        {% if order.shipping.postal_code and order.shipping.postal_code != 'لم يتم تحديد العنوان' %}
             الرمز البريدي: {{ order.shipping.postal_code }}<br>
         {% endif %}
-        {% if order.shipping.country %}
+        {% if order.shipping.country and order.shipping.country != 'لم يتم تحديد العنوان' %}
             الدولة: {{ order.shipping.country }}<br>
         {% endif %}
         
         {# إذا لم يكن هناك أي بيانات عنوان #}
-        {% if not order.shipping.address and not order.shipping.street_number 
-              and not order.shipping.address_line and not order.shipping.block 
-              and not order.shipping.city and not order.shipping.postal_code 
-              and not order.shipping.country %}
-            لم يتم تحديد العنوان
+        {% if not order.shipping.address or order.shipping.address == 'لم يتم تحديد العنوان' %}
+            {% if not order.shipping.street_number or order.shipping.street_number == 'لم يتم تحديد العنوان' %}
+                {% if not order.shipping.address_line or order.shipping.address_line == 'لم يتم تحديد العنوان' %}
+                    {% if not order.shipping.block or order.shipping.block == 'لم يتم تحديد العنوان' %}
+                        {% if not order.shipping.city or order.shipping.city == 'لم يتم تحديد العنوان' %}
+                            {% if not order.shipping.postal_code or order.shipping.postal_code == 'لم يتم تحديد العنوان' %}
+                                {% if not order.shipping.country or order.shipping.country == 'لم يتم تحديد العنوان' %}
+                                    لم يتم تحديد العنوان
+                                {% endif %}
+                            {% endif %}
+                        {% endif %}
+                    {% endif %}
+                {% endif %}
+            {% endif %}
         {% endif %}
     </div>
 </li>
@@ -415,12 +415,14 @@
     <span class="fw-bold">اسم المستلم:</span>
     <span>
         {# البحث عن اسم المستلم في عدة أماكن محتملة #}
-        {% if order.receiver.name %}
+        {% if order.receiver.name and order.receiver.name != 'لم يتم تحديد العنوان' %}
             {{ order.receiver.name | safe }}
-        {% elif order.shipping.customer_name %}
+        {% elif order.shipping.customer_name and order.shipping.customer_name != 'لم يتم تحديد العنوان' %}
             {{ order.shipping.customer_name | safe }}
-        {% else %}
+        {% elif order.customer.first_name or order.customer.last_name %}
             {{ order.customer.first_name | safe }} {{ order.customer.last_name | safe }}
+        {% else %}
+            لم يتم تحديد الاسم
         {% endif %}
     </span>
 </li>
@@ -429,12 +431,14 @@
     <span class="fw-bold">هاتف المستلم:</span>
     <span>
         {# البحث عن هاتف المستلم في عدة أماكن محتملة #}
-        {% if order.receiver.phone %}
+        {% if order.receiver.phone and order.receiver.phone != 'لم يتم تحديد العنوان' %}
             {{ order.receiver.phone | safe }}
-        {% elif order.shipping.phone %}
+        {% elif order.shipping.phone and order.shipping.phone != 'لم يتم تحديد العنوان' %}
             {{ order.shipping.phone | safe }}
-        {% else %}
+        {% elif order.customer.phone and order.customer.phone != 'لم يتم تحديد العنوان' %}
             {{ order.customer.phone | safe }}
+        {% else %}
+            لم يتم تحديد الهاتف
         {% endif %}
     </span>
 </li>
@@ -443,10 +447,12 @@
     <span class="fw-bold">البريد الإلكتروني:</span>
     <span>
         {# البحث عن البريد الإلكتروني في عدة أماكن محتملة #}
-        {% if order.receiver.email %}
+        {% if order.receiver.email and order.receiver.email != 'لم يتم تحديد العنوان' %}
             {{ order.receiver.email | safe }}
-        {% else %}
+        {% elif order.customer.email and order.customer.email != 'لم يتم تحديد العنوان' %}
             {{ order.customer.email | safe }}
+        {% else %}
+            لم يتم تحديد البريد الإلكتروني
         {% endif %}
     </span>
 </li>
