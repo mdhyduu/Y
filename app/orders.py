@@ -738,16 +738,10 @@ def order_details(order_id):
                 'postal_code': order_data.get('ship_to', {}).get('postal_code', ''),
                 'city': order_data.get('ship_to', {}).get('city', ''),
                 'country': order_data.get('ship_to', {}).get('country', ''),
-            
-            
-                'geo_coordinates': {
-                    'latitude': order_data.get('shipping_address', {}).get('latitude'),
-                    'longitude': order_data.get('shipping_address', {}).get('longitude')
-                }
-            },
-                'payment': {
-                    'status': order_data.get('payment', {}).get('status', ''),
-                    'method': order_data.get('payment', {}).get('method', '')
+                  },
+            'payment': {
+                'status': order_data.get('payment', {}).get('status', ''),
+                'method': order_data.get('payment', {}).get('method', '')
                 },
             'amount': {
                 'sub_total': order_data.get('amounts', {}).get('sub_total', {'amount': 0, 'currency': 'SAR'}),
