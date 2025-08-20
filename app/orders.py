@@ -730,15 +730,14 @@ def order_details(order_id):
                 'method': order_data.get('shipping', {}).get('company'),
                 'branch_id': order_data.get('branch_id'),
                 'address': (
-                    # بناء العنوان من مكوناته المفصلة
-                    f"{order_data.get('ship_to', {}).get('street_number', '')} "
-                    f"{order_data.get('ship_to', {}).get('block', '')} "
-                    f"{order_data.get('ship_to', {}).get('address_line', '')}"
+                    f"{shipping_data.get('street_number', '')} "
+                    f"{shipping_data.get('block', '')} "
+                    f"{shipping_data.get('address_line', '')}"
                 ).strip() or 'لم يتم تحديد العنوان',
-                'postal_code': order_data.get('ship_to', {}).get('postal_code', ''),
-                'city': order_data.get('ship_to', {}).get('city', ''),
-                'country': order_data.get('ship_to', {}).get('country', ''),
-                  },
+                'postal_code': shipping_data.get('postal_code', ''),
+                'city': shipping_data.get('city', ''),
+                'country': shipping_data.get('country', ''),
+                     },
             'payment': {
                 'status': order_data.get('payment', {}).get('status', ''),
                 'method': order_data.get('payment', {}).get('method', '')
