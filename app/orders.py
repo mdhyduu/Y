@@ -703,24 +703,33 @@ def order_details(order_id):
         processed_order = process_order_data(order_id, items_data)
 
 # ========== [5] استخراج بيانات العنوان بشكل صحيح ==========
-        address_data = {}
+              address_data = {}
         full_address = 'لم يتم تحديد العنوان'
         
-        # المحاولة 1: من shipping.address (الهيكل الأساسي)
+        # المحاولة 1: من shipping.address
         shipping_data = order_data.get('shipping', {})
         if shipping_data and 'address' in shipping_data:
             address_data = shipping_data.get('address', {})
         
-        # المحاولة 2: من shipments[0].ship_to (إذا كان هناك شحنات)
+        # المحاولة 2: من shipments[0].ship_to
         if not address_data and 'shipments' in order_data and order_data['shipments']:
             first_shipment = order_data['shipments'][0]
             address_data = first_shipment.get('ship_to', {})
         
-        # المحاولة 3: من ship_to مباشرة (كبديل)
+        # المحاولة 3: من ship_to مباشرة
         if not address_data and 'ship_to' in order_data:
             address_data = order_data.get('ship_to', {})
+        
+        # المحاولة 4: من customer (fallback أخير)
+        if not address_data and 'customer' in order_data:
+            customer = order_data.get('customer', {})
+            address_data = {
+                'country': customer.get('country', ''),
+                'city': customer.get('city', ''),
+                'description': customer.get('location', '')
+            }
 
-        # بناء العنوان الكامل بشكل موحّد
+        # بناء العنوان الكامل
         if address_data:
             parts = []
             if address_data.get('country'):
@@ -738,8 +747,9 @@ def order_details(order_id):
 
             if parts:
                 full_address = "، ".join(parts)
-        # استخراج بيانات المستلم
-        receiver_info = order_data.get('receiver', {})
+
+        # تحديث بيانات الطلب المعالجة
+
         if not receiver_info:
             # إذا لم تكن هناك بيانات مستقلة للمستلم، نستخدم بيانات العميل
             customer_info = order_data.get('customer', {})
@@ -770,27 +780,28 @@ def order_details(order_id):
                 'phone': receiver_info.get('phone', ''),
                 'email': receiver_info.get('email', '')
             },
-           'shipping': {
-                'customer_name': receiver_info.get('name', ''),
-                'phone': receiver_info.get('phone', ''),
-                'method': shipping_data.get('courier_name', 'غير محدد'),
-                'tracking_number': shipping_data.get('tracking_number', ''),
-                'tracking_link': shipping_data.get('tracking_link', ''),
-                
-                # بيانات العنوان
-                'address': full_address,
-                'country': address_data.get('country', ''),
-                'city': address_data.get('city', ''),
-                'district': address_data.get('district', ''),
-                'street': address_data.get('street', ''),
-                'description': address_data.get('description', ''),
-                'postal_code': address_data.get('postal_code', ''),
-
-                # البيانات الأصلية كمرجع
-                'raw_data': address_data
-            },
+            'shipping': {
+                    'customer_name': receiver_info.get('name', ''),
+                    'phone': receiver_info.get('phone', ''),
+                    'method': shipping_data.get('courier_name', 'غير محدد'),
+                    'tracking_number': shipping_data.get('tracking_number', ''),
+                    'tracking_link': shipping_data.get('tracking_link', ''),
+                    
+                    # بيانات العنوان
+                    'address': full_address,
+                    'country': address_data.get('country', ''),
+                    'city': address_data.get('city', ''),
+                    'district': address_data.get('district', ''),
+                    'street': address_data.get('street', ''),
+                    'description': address_data.get('description', ''),
+                    'postal_code': address_data.get('postal_code', ''),
+    
+                    # البيانات الأصلية كمرجع
+                    'raw_data': address_data
+                },
+      
             
-            'payment': {
+             'payment': {
                 'status': order_data.get('payment', {}).get('status', ''),
                 'method': order_data.get('payment', {}).get('method', '')
             },
