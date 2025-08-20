@@ -702,10 +702,37 @@ def order_details(order_id):
         # ========== [4] معالجة بيانات الطلب ==========
         processed_order = process_order_data(order_id, items_data)
 
-        # استخراج بيانات الشحن بشكل آمن
-        ship_to_info = shipment_data.get('ship_to', {})
-        full_address = ship_to_info.get('address_line', 'لم يتم تحديد العنوان')
-# تحديث بيانات الطلب المعالجة
+        # استخراج بيانات العنوان من استجابة الطلب
+        # البيانات موجودة في order_data['shipping']['address'] أو order_data['ship_to']
+        shipping_data = order_data.get('shipping', {})
+        address_data = shipping_data.get('address', {})
+        
+        # إذا لم يكن العنوان في shipping، نبحث في ship_to
+        if not address_data:
+            address_data = order_data.get('ship_to', {})
+        
+        # بناء العنوان الكامل من المكونات
+        address_parts = []
+        if address_data.get('street_number'):
+            address_parts.append(str(address_data.get('street_number')))
+        if address_data.get('address_line'):
+            address_parts.append(address_data.get('address_line'))
+        if address_data.get('block'):
+            address_parts.append(address_data.get('block'))
+        
+        full_address = "، ".join(address_parts) if address_parts else 'لم يتم تحديد العنوان'
+
+        # استخراج بيانات المستلم
+        receiver_info = order_data.get('receiver', {})
+        if not receiver_info:
+            # إذا لم تكن هناك بيانات مستقلة للمستلم، نستخدم بيانات العميل
+            customer_info = order_data.get('customer', {})
+            receiver_info = {
+                'name': f"{customer_info.get('first_name', '')} {customer_info.get('last_name', '')}".strip(),
+                'phone': f"{customer_info.get('mobile_code', '')}{customer_info.get('mobile', '')}",
+                'email': customer_info.get('email', '')
+            }
+
         # تحديث بيانات الطلب المعالجة
         processed_order.update({
             'id': order_id,
@@ -723,30 +750,33 @@ def order_details(order_id):
             'created_at': format_date(order_data.get('created_at', '')),
             'payment_method': order_data.get('payment_method', 'غير محدد'),
             'receiver': {
-                'name': order_data.get('receiver', {}).get('name') if order_data.get('receiver') else order_data.get('customer', {}).get('first_name', '') + ' ' + order_data.get('customer', {}).get('last_name', ''),
-                'phone': order_data.get('receiver', {}).get('phone', '') if order_data.get('receiver') else order_data.get('customer', {}).get('mobile_code', '') + str(order_data.get('customer', {}).get('mobile', '')),
-                'email': order_data.get('receiver', {}).get('email', '') if order_data.get('receiver') else order_data.get('customer', {}).get('email', '')
-                    },
+                'name': receiver_info.get('name', ''),
+                'phone': receiver_info.get('phone', ''),
+                'email': receiver_info.get('email', '')
+            },
             'shipping': {
-                'customer_name': ship_to_info.get('name', ''),
-                'phone': ship_to_info.get('phone', ''),
-                'method': shipment_data.get('courier_name', 'غير محدد'),
-                'tracking_number': shipment_data.get('tracking_number', ''),
-                'tracking_link': shipment_data.get('tracking_link', ''),
+                'customer_name': receiver_info.get('name', ''),
+                'phone': receiver_info.get('phone', ''),
+                'method': shipping_data.get('courier_name', 'غير محدد'),
+                'tracking_number': shipping_data.get('tracking_number', ''),
+                'tracking_link': shipping_data.get('tracking_link', ''),
                 
                 # بيانات العنوان
-                'address': full_address,  # استخدام address_line هو الأنسب
-                'city': ship_to_info.get('city', ''),
-                'country': ship_to_info.get('country', ''),
-                'postal_code': ship_to_info.get('postal_code', ''),
+                'address': full_address,
+                'city': address_data.get('city', ''),
+                'country': address_data.get('country', ''),
+                'postal_code': address_data.get('postal_code', ''),
+                'street_number': address_data.get('street_number', ''),
+                'block': address_data.get('block', ''),
+                'address_line': address_data.get('address_line', ''),
                 
                 # البيانات الأصلية كمرجع
-                'raw_data': ship_to_info
-                    },
+                'raw_data': address_data
+            },
             'payment': {
                 'status': order_data.get('payment', {}).get('status', ''),
                 'method': order_data.get('payment', {}).get('method', '')
-                },
+            },
             'amount': {
                 'sub_total': order_data.get('amounts', {}).get('sub_total', {'amount': 0, 'currency': 'SAR'}),
                 'shipping_cost': order_data.get('amounts', {}).get('shipping_cost', {'amount': 0, 'currency': 'SAR'}),
@@ -764,10 +794,10 @@ def order_details(order_id):
         # ========== [5] جلب البيانات الإضافية من قاعدة البيانات ==========
         # جلب الملاحظات الخاصة بالطلب (للمراجعين فقط)
         custom_note_statuses = CustomNoteStatus.query.filter_by(
-        store_id=user.store_id
-            ).all()
+            store_id=user.store_id
+        ).all()
     
-    # ========== [6] جلب ملاحظات الحالة مع العلاقات ==========
+        # ========== [6] جلب ملاحظات الحالة مع العلاقات ==========
         status_notes = OrderStatusNote.query.filter_by(
             order_id=str(order_id)
         ).options(
