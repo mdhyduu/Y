@@ -707,7 +707,7 @@ def order_details(order_id):
         if not ship_to:
             # محاولة الحصول على العنوان من مكان آخر إذا لم يكن في ship_to
             ship_to = order_data.get('shipping', {}).get('address', {}) or {}
-        
+         
         # بناء العنوان بشكل صحيح
         address_parts = []
         if ship_to.get('street_number'):
@@ -718,7 +718,10 @@ def order_details(order_id):
             address_parts.append(ship_to.get('address_line'))
             
         full_address = ' '.join(address_parts) if address_parts else 'لم يتم تحديد العنوان'
-
+        # أضف هذا قبل معالجة بيانات الشحن للتصحيح
+        current_app.logger.info(f"Order data: {json.dumps(order_data, indent=2, ensure_ascii=False)}")
+        current_app.logger.info(f"Ship to data: {json.dumps(order_data.get('ship_to', {}), indent=2, ensure_ascii=False)}")
+        current_app.logger.info(f"Shipping data: {json.dumps(order_data.get('shipping', {}), indent=2, ensure_ascii=False)}")
 # تحديث بيانات الطلب المعالجة
         # تحديث بيانات الطلب المعالجة
         processed_order.update({
