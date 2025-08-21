@@ -754,28 +754,42 @@ def order_details(order_id):
             return items_response
         items_data = items_response.json().get('data', [])
 
+        # جلب بيانات الشحنات الخاصة بالطلب
+        shipments_response = make_salla_api_request(
+            f"{Config.SALLA_API_BASE_URL}/shipments",
+            params={'order_id': order_id}
+        )
+        if not isinstance(shipments_response, requests.Response):
+            return shipments_response
+        shipments_data = shipments_response.json().get('data', [])
+
         # ========== [4] معالجة بيانات الطلب ==========
         processed_order = process_order_data(order_id, items_data)
 
-# ========== [5] استخراج بيانات العنوان بشكل صحيح ==========
+        # ========== [5] استخراج بيانات العنوان بشكل صحيح ==========
         # تهيئة بيانات المستلم مسبقًا لتجنب الخطأ
-        receiver_info =order_data.get('receiver',{})
+        receiver_info = {}
         address_data = {}
         full_address = 'لم يتم تحديد العنوان'
         
-        # المحاولة 1: من shipping.address
-        shipping_data = order_data.get('shipping', {})
-        if shipping_data and 'address' in shipping_data:
-            address_data = shipping_data.get('address', {})
-        
-        # المحاولة 2: من shipments[0].ship_to
-        if not address_data and 'shipments' in order_data and order_data['shipments']:
-            first_shipment = order_data['shipments'][0]
+        # المحاولة 1: من بيانات الشحنات (shipments)
+        if shipments_data and len(shipments_data) > 0:
+            # نأخذ أول شحنة (يمكن تعديل هذا إذا كان هناك multiple shipments)
+            first_shipment = shipments_data[0]
             address_data = first_shipment.get('ship_to', {})
+            current_app.logger.info(f"تم العثور على عنوان من shipments: {address_data}")
         
-        # المحاولة 3: من ship_to مباشرة
+        # المحاولة 2: من shipping.address في بيانات الطلب
+        if not address_data:
+            shipping_data = order_data.get('shipping', {})
+            if shipping_data and 'address' in shipping_data:
+                address_data = shipping_data.get('address', {})
+                current_app.logger.info(f"تم العثور على عنوان من shipping.address: {address_data}")
+        
+        # المحاولة 3: من ship_to مباشرة في بيانات الطلب
         if not address_data and 'ship_to' in order_data:
             address_data = order_data.get('ship_to', {})
+            current_app.logger.info(f"تم العثور على عنوان من order_data.ship_to: {address_data}")
         
         # المحاولة 4: من customer (fallback أخير)
         if not address_data and 'customer' in order_data:
@@ -785,30 +799,42 @@ def order_details(order_id):
                 'city': customer.get('city', ''),
                 'description': customer.get('location', '')
             }
+            current_app.logger.info(f"تم استخدام بيانات العميل كعنوان: {address_data}")
 
-        # بناء العنوان الكامل
+        # بناء العنوان الكامل للمستلم
         if address_data:
             parts = []
+            if address_data.get('name'):
+                parts.append(f"الاسم: {address_data['name']}")
             if address_data.get('country'):
-                parts.append(address_data['country'])
+                parts.append(f"الدولة: {address_data['country']}")
             if address_data.get('city'):
-                parts.append(address_data['city'])
+                parts.append(f"المدينة: {address_data['city']}")
             if address_data.get('district'):
-                parts.append(address_data['district'])
+                parts.append(f"الحي: {address_data['district']}")
             if address_data.get('street'):
-                parts.append(address_data['street'])
+                parts.append(f"الشارع: {address_data['street']}")
+            if address_data.get('street_number'):
+                parts.append(f"رقم الشارع: {address_data['street_number']}")
+            if address_data.get('block'):
+                parts.append(f"القطعة: {address_data['block']}")
             if address_data.get('description'):
-                parts.append(address_data['description'])
+                parts.append(f"وصف إضافي: {address_data['description']}")
             if address_data.get('postal_code'):
                 parts.append(f"الرمز البريدي: {address_data['postal_code']}")
-
+            
             if parts:
                 full_address = "، ".join(parts)
 
-        # تحديث بيانات الطلب المعالجة
-        
-        if not receiver_info:
-            # إذا لم تكن هناك بيانات مستقلة للمستلم، نستخدم بيانات العميل
+        # استخراج معلومات المستلم من بيانات العنوان
+        receiver_info = {
+            'name': address_data.get('name', ''),
+            'phone': address_data.get('phone', ''),
+            'email': address_data.get('email', '')
+        }
+
+        # إذا لم تكن هناك بيانات مستقلة للمستلم، نستخدم بيانات العميل
+        if not receiver_info['name']:
             customer_info = order_data.get('customer', {})
             receiver_info = {
                 'name': f"{customer_info.get('first_name', '')} {customer_info.get('last_name', '')}".strip(),
@@ -832,33 +858,27 @@ def order_details(order_id):
             },
             'created_at': format_date(order_data.get('created_at', '')),
             'payment_method': order_data.get('payment_method', 'غير محدد'),
-            'receiver': {
-                'name': receiver_info.get('name', ''),
-                'phone': receiver_info.get('phone', ''),
-                'email': receiver_info.get('email', '')
-            },
+            'receiver': receiver_info,
             'shipping': {
-                    'customer_name': receiver_info.get('name', ''),
-                    'phone': receiver_info.get('phone', ''),
-                    'method': shipping_data.get('courier_name', 'غير محدد'),
-                    'tracking_number': shipping_data.get('tracking_number', ''),
-                    'tracking_link': shipping_data.get('tracking_link', ''),
-                    
-                    # بيانات العنوان
-                    'address': full_address,
-                    'country': address_data.get('country', ''),
-                    'city': address_data.get('city', ''),
-                    'district': address_data.get('district', ''),
-                    'street': address_data.get('street', ''),
-                    'description': address_data.get('description', ''),
-                    'postal_code': address_data.get('postal_code', ''),
-    
-                    # البيانات الأصلية كمرجع
-                    'raw_data': address_data
-                },
-      
-            
-             'payment': {
+                'customer_name': receiver_info.get('name', ''),
+                'phone': receiver_info.get('phone', ''),
+                'method': order_data.get('shipping', {}).get('courier_name', 'غير محدد'),
+                'tracking_number': order_data.get('shipping', {}).get('tracking_number', ''),
+                'tracking_link': order_data.get('shipping', {}).get('tracking_link', ''),
+                
+                # بيانات العنوان
+                'address': full_address,
+                'country': address_data.get('country', ''),
+                'city': address_data.get('city', ''),
+                'district': address_data.get('district', ''),
+                'street': address_data.get('street', ''),
+                'description': address_data.get('description', ''),
+                'postal_code': address_data.get('postal_code', ''),
+
+                # البيانات الأصلية كمرجع
+                'raw_data': address_data
+            },
+            'payment': {
                 'status': order_data.get('payment', {}).get('status', ''),
                 'method': order_data.get('payment', {}).get('method', '')
             },
