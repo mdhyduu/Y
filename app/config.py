@@ -53,7 +53,7 @@ class Config:
     SALLA_API_BASE_URL = os.environ.get('SALLA_API_BASE_URL', 'https://api.salla.dev/admin/v2')
     SALLA_BASE_URL = SALLA_API_BASE_URL
     SALLA_ORDERS_API = os.environ.get('SALLA_ORDERS_API', f"{SALLA_API_BASE_URL}/orders")
-    SALLA_SHIPMENTS_ENDPOINT = f"{SALLA_API_BASE_URL}/shipments"
+    SALLA_SHIPMENTS_API = f"{SALLA_API_BASE_URL}/shipments"
     SALLA_ORDERS_ENDPOINT = f"{SALLA_API_BASE_URL}/orders"
     SALLA_PRODUCTS_ENDPOINT = f"{SALLA_API_BASE_URL}/products"
     SALLA_STORE_INFO_ENDPOINT = f"{SALLA_API_BASE_URL}/store/info"
