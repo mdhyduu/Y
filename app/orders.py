@@ -1474,9 +1474,9 @@ def print_orders():
         current_app.logger.error(f"Error generating PDF: {str(e)}")
         flash(f'حدث خطأ أثناء إنشاء PDF: {str(e)}', 'error')
         return redirect(url_for('orders.index'))
-@orders_bp.route('/quick_list') 
+@orders_bp.route('/quick_list')
 def quick_list():
-    """صفحة القائمة السريعة لعرض الطلبات والمنتجات بشكل مصغر"""
+    """صفحة القائمة السريعة - تجلب البيانات مباشرة من سلة"""
     user, employee = get_user_from_cookies()
     
     if not user:
@@ -1486,7 +1486,12 @@ def quick_list():
         response.set_cookie('is_admin', '', expires=0)
         return response
     
-    # جلب معلمات التصفية والترحيل
+    # التحقق من وجود توكن الوصول
+    if not user.salla_access_token:
+        flash('يجب ربط المتجر مع سلة أولاً', 'error')
+        return redirect(url_for('auth.link_store' if request.cookies.get('is_admin') == 'true' else 'user_auth.logout'))
+    
+    # جلب معلمات التصفية
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     status_filter = request.args.get('status', '')
@@ -1499,45 +1504,77 @@ def quick_list():
         per_page = 10
     
     try:
-        # جلب الطلبات من قاعدة البيانات المحلية
-        query = SallaOrder.query.filter_by(store_id=user.store_id)
+        # جلب الطلبات مباشرة من سلة API
+        headers = {
+            'Authorization': f'Bearer {user.salla_access_token}',
+            'Accept': 'application/json'
+        }
         
-        # تطبيق الفلاتر
+        # إعداد معلمات الطلب
+        params = {
+            'page': page,
+            'perPage': per_page,
+            'sort_by': 'created_at-desc'
+        }
+        
+        # إضافة الفلاتر إذا كانت موجودة
         if status_filter:
-            query = query.filter_by(status_slug=status_filter)
+            params['status'] = status_filter
         
         if search_query:
-            query = query.filter(
-                SallaOrder.customer_name.ilike(f'%{search_query}%') | 
-                SallaOrder.id.ilike(f'%{search_query}%')
-            )
+            params['search'] = search_query
         
-        # الترحيل والترتيب حسب أحدث الطلبات
-        pagination_obj = query.order_by(
-            nullslast(SallaOrder.created_at.desc())
-        ).paginate(page=page, per_page=per_page)
+        # جلب الطلبات من سلة
+        response = requests.get(
+            f"{Config.SALLA_API_BASE_URL}/orders",
+            headers=headers,
+            params=params,
+            timeout=30
+        )
+        
+        # التحقق من استجابة API
+        if response.status_code != 200:
+            error_msg = f"خطأ في استجابة سلة: {response.status_code}"
+            flash(error_msg, 'error')
+            return redirect(url_for('orders.index'))
+        
+        data = response.json()
+        orders_data = data.get('data', [])
+        pagination_data = data.get('pagination', {})
         
         # معالجة بيانات كل طلب
         processed_orders = []
-        for order in pagination_obj.items:
-            # تحليل البيانات الخام للطلب
-            raw_data = {}
-            if order.raw_data:
-                try:
-                    raw_data = json.loads(order.raw_data)
-                except json.JSONDecodeError:
-                    raw_data = {}
-                    current_app.logger.error(f"Failed to parse raw_data for order {order.id}")
+        for order in orders_data:
+            order_id = order.get('id')
             
-            # استخراج معلومات المنتجات من البيانات الخام
-            items = raw_data.get('items', [])
-            processed_items = []
+            # جلب تفاصيل الطلب (بما في ذلك العناصر) من سلة
+            order_detail_response = requests.get(
+                f"{Config.SALLA_ORDERS_API}/{order_id}",
+                headers=headers,
+                timeout=15
+            )
             
-            for item in items:
-                if not isinstance(item, dict):
-                    continue  # تخطي العناصر غير الصالحة
+            order_details = {}
+            items_data = []
+            
+            if order_detail_response.status_code == 200:
+                order_details = order_detail_response.json().get('data', {})
                 
-                # استخراج صورة المنتج بشكل آمن
+                # جلب عناصر الطلب
+                items_response = requests.get(
+                    f"{Config.SALLA_BASE_URL}/orders/items",
+                    params={'order_id': order_id, 'include': 'images'},
+                    headers=headers,
+                    timeout=15
+                )
+                
+                if items_response.status_code == 200:
+                    items_data = items_response.json().get('data', [])
+            
+            # معالجة العناصر
+            processed_items = []
+            for item in items_data:
+                # استخراج صورة المنتج
                 image_url = ''
                 
                 # المحاولة 1: استخدام product_thumbnail
@@ -1545,9 +1582,9 @@ def quick_list():
                 if product_thumbnail and isinstance(product_thumbnail, str):
                     image_url = product_thumbnail
                 
-                # المحاولة 2: استخدام images إذا كانت موجودة
+                # المحاولة 2: استخدام images
                 if not image_url:
-                    images = item.get('images')
+                    images = item.get('images', [])
                     if images and isinstance(images, list) and len(images) > 0:
                         first_image = images[0]
                         if isinstance(first_image, dict):
@@ -1565,15 +1602,33 @@ def quick_list():
                 if image_url and not image_url.startswith(('http://', 'https://')):
                     image_url = f"https://cdn.salla.sa{image_url}"
                 
-                # استخراج الخيارات بشكل آمن
+                # استخراج الخيارات
                 options = []
                 item_options = item.get('options', [])
                 if isinstance(item_options, list):
                     for option in item_options:
                         if isinstance(option, dict):
+                            # معالجة قيمة الخيار
+                            raw_value = option.get('value', '')
+                            display_value = 'غير محدد'
+                            
+                            if isinstance(raw_value, dict):
+                                display_value = raw_value.get('name') or raw_value.get('value') or str(raw_value)
+                            elif isinstance(raw_value, list):
+                                values_list = []
+                                for val in raw_value:
+                                    if isinstance(val, dict):
+                                        value_str = val.get('name') or val.get('value') or str(val)
+                                        values_list.append(value_str)
+                                    else:
+                                        values_list.append(str(val))
+                                display_value = ', '.join(values_list)
+                            else:
+                                display_value = str(raw_value) if raw_value else 'غير محدد'
+                            
                             options.append({
                                 'name': option.get('name', ''),
-                                'value': option.get('value', '')
+                                'value': display_value
                             })
                 
                 processed_items.append({
@@ -1584,29 +1639,58 @@ def quick_list():
                     'sku': item.get('sku', '')
                 })
             
+            # معلومات العميل
+            customer = order.get('customer', {})
+            customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip()
+            if not customer_name:
+                customer_name = customer.get('name', 'غير معروف')
+            
+            # معلومات الحالة
+            status_info = order.get('status', {})
+            
+            # معلومات المبلغ
+            total_info = order.get('total', {})
+            total_amount = float(total_info.get('amount', 0)) if total_info else 0
+            currency = total_info.get('currency', 'SAR') if total_info else 'SAR'
+            
+            # معلومات التاريخ
+            created_at = order.get('created_at', '')
+            if created_at:
+                try:
+                    # تحويل تنسيق التاريخ
+                    if '.' in created_at:
+                        dt = datetime.strptime(created_at.split('.')[0], '%Y-%m-%d %H:%M:%S')
+                    else:
+                        dt = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S')
+                    created_at_display = humanize_time(dt)
+                except (ValueError, TypeError):
+                    created_at_display = created_at
+            else:
+                created_at_display = 'غير معروف'
+            
             processed_orders.append({
-                'id': order.id,
-                'customer_name': order.customer_name,
-                'created_at': humanize_time(order.created_at) if order.created_at else '',
+                'id': order_id,
+                'customer_name': customer_name,
+                'created_at': created_at_display,
                 'status': {
-                    'slug': order.status_slug,
-                    'name': order.status
+                    'slug': status_info.get('slug', ''),
+                    'name': status_info.get('name', '')
                 },
                 'items': processed_items,
-                'total_amount': order.total_amount,
-                'currency': order.currency
+                'total_amount': total_amount,
+                'currency': currency
             })
         
         # إعداد بيانات الترحيل للقالب
         pagination = {
-            'page': pagination_obj.page,
-            'per_page': pagination_obj.per_page,
-            'total_items': pagination_obj.total,
-            'total_pages': pagination_obj.pages,
-            'has_prev': pagination_obj.has_prev,
-            'has_next': pagination_obj.has_next,
-            'prev_page': pagination_obj.prev_num,
-            'next_page': pagination_obj.next_num
+            'page': pagination_data.get('currentPage', page),
+            'per_page': pagination_data.get('perPage', per_page),
+            'total_items': pagination_data.get('total', 0),
+            'total_pages': pagination_data.get('totalPages', 1),
+            'has_prev': page > 1,
+            'has_next': page < pagination_data.get('totalPages', 1),
+            'prev_page': page - 1 if page > 1 else None,
+            'next_page': page + 1 if page < pagination_data.get('totalPages', 1) else None
         }
         
         return render_template('quick_list.html', 
@@ -1614,6 +1698,12 @@ def quick_list():
                             pagination=pagination,
                             status_filter=status_filter,
                             search_query=search_query)
+    
+    except requests.exceptions.RequestException as e:
+        error_msg = f"خطأ في الاتصال بسلة: {str(e)}"
+        flash(error_msg, 'error')
+        logger.error(error_msg, exc_info=True)
+        return redirect(url_for('orders.index'))
     
     except Exception as e:
         error_msg = f'حدث خطأ غير متوقع: {str(e)}'
