@@ -1556,168 +1556,91 @@ def quick_list():
             if not order_id:
                 continue
             
-            # جلب تفاصيل الطلب (بما في ذلك العناصر) من سلة
-            order_detail_response = requests.get(
-                f"{Config.SALLA_ORDERS_API}/{order_id}",
-                headers=headers,
-                timeout=15
-            )
-            
-            order_details = {}
-            items_data = []
-            
-            if order_detail_response.status_code == 200:
-                try:
-                    order_details = order_detail_response.json().get('data', {})
-                    if not isinstance(order_details, dict):
-                        order_details = {}
-                except Exception as e:
-                    current_app.logger.error(f"Error parsing order details: {str(e)}")
-                    order_details = {}
-                
-                # جلب عناصر الطلب
-                # جلب عناصر الطلب
-            items_response = requests.get(
-                f"{Config.SALLA_BASE_URL}/orders/items",
-                params={'order_id': order_id, 'include': 'images'},
-                headers=headers,
-                timeout=15
-            )
-            
-            items_data = []  # افتراضيًا قائمة فارغة
-            
-            if items_response.status_code == 200:
-                try:
-                    items_json = items_response.json()
-                    # تحقق من أن items_json هو قاموس وأن له مفتاح 'data'
-                    if isinstance(items_json, dict):
-                        data = items_json.get('data')
-                        if isinstance(data, list):
-                            items_data = data
-                        else:
-                            current_app.logger.warning(f"Expected list for items data, got {type(data)}")
-                    else:
-                        current_app.logger.warning(f"Expected dict for items response, got {type(items_json)}")
-                except Exception as e:
-                    current_app.logger.error(f"Error parsing items data: {str(e)}")
-            
-            # معالجة العناصر
-            processed_items = []
-            for item in items_data:
-                if not isinstance(item, dict):
-                    continue
-                    
-                # استخراج صورة المنتج
-                image_url = ''
-                
-                # المحاولة 1: استخدام product_thumbnail
-                product_thumbnail = item.get('product_thumbnail')
-                if product_thumbnail and isinstance(product_thumbnail, str):
-                    image_url = product_thumbnail
-                
-                # المحاولة 2: استخدام images
-                if not image_url:
-                    images = item.get('images')
-                    if images and isinstance(images, list) and len(images) > 0:
-                        first_image = images[0]
-                        if isinstance(first_image, dict):
-                            image_url = first_image.get('image', '')
-                        elif isinstance(first_image, str):
-                            image_url = first_image
-                
-                # المحاولة 3: استخدام image مباشرة
-                if not image_url:
-                    image_field = item.get('image')
-                    if image_field and isinstance(image_field, str):
-                        image_url = image_field
-                
-                # إذا كان الرابط لا يبدأ بـ http، نضيف النطاق الأساسي لسلة
-                if image_url and not image_url.startswith(('http://', 'https://')):
-                    image_url = f"https://cdn.salla.sa{image_url}"
-                
-                # استخراج الخيارات
-                options = []
-                item_options = item.get('options')
-                if item_options and isinstance(item_options, list):
-                    for option in item_options:
-                        if isinstance(option, dict):
-                            # معالجة قيمة الخيار
-                            raw_value = option.get('value', '')
-                            display_value = 'غير محدد'
-                            
-                            if isinstance(raw_value, dict):
-                                display_value = raw_value.get('name') or raw_value.get('value') or str(raw_value)
-                            elif isinstance(raw_value, list):
-                                values_list = []
-                                for val in raw_value:
-                                    if isinstance(val, dict):
-                                        value_str = val.get('name') or val.get('value') or str(val)
-                                        values_list.append(value_str)
-                                    else:
-                                        values_list.append(str(val))
-                                display_value = ', '.join(values_list)
-                            else:
-                                display_value = str(raw_value) if raw_value else 'غير محدد'
-                            
-                            options.append({
-                                'name': option.get('name', ''),
-                                'value': display_value
-                            })
-                
-                processed_items.append({
-                    'name': item.get('name', ''),
-                    'quantity': item.get('quantity', 1),
-                    'image_url': image_url,
-                    'options': options,
-                    'sku': item.get('sku', '')
-                })
-            
-            # معلومات العميل
-            customer = order.get('customer', {})
-            customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip()
-            if not customer_name:
-                customer_name = customer.get('name', 'غير معروف')
-            
-            # معلومات الحالة
-            status_info = order.get('status', {})
-            
-            # معلومات المبلغ
-            total_info = order.get('total', {})
-            total_amount = 0
+            # استخدام دالة process_order_data من utils.py لمعالجة بيانات الطلب
             try:
-                total_amount = float(total_info.get('amount', 0)) if total_info else 0
-            except (ValueError, TypeError):
-                total_amount = 0
+                # جلب عناصر الطلب باستخدام process_order_data
+                processed_order = process_order_data(order_id, [])
                 
-            currency = total_info.get('currency', 'SAR') if total_info else 'SAR'
-            
-            # معلومات التاريخ
-            created_at = order.get('created_at', '')
-            created_at_display = 'غير معروف'
-            if created_at:
+                # جلب تفاصيل الطلب (بما في ذلك العناصر) من سلة
+                order_detail_response = requests.get(
+                    f"{Config.SALLA_ORDERS_API}/{order_id}",
+                    headers=headers,
+                    timeout=15
+                )
+                
+                if order_detail_response.status_code == 200:
+                    try:
+                        order_details = order_detail_response.json().get('data', {})
+                        if not isinstance(order_details, dict):
+                            order_details = {}
+                        
+                        # جلب عناصر الطلب من تفاصيل الطلب
+                        items = order_details.get('items', [])
+                        if not isinstance(items, list):
+                            items = []
+                        
+                        # معالجة العناصر باستخدام process_order_data
+                        processed_order = process_order_data(order_id, items)
+                        
+                    except Exception as e:
+                        current_app.logger.error(f"Error parsing order details: {str(e)}")
+                        processed_order = process_order_data(order_id, [])
+                else:
+                    processed_order = process_order_data(order_id, [])
+                
+                # معلومات العميل
+                customer = order.get('customer', {})
+                customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip()
+                if not customer_name:
+                    customer_name = customer.get('name', 'غير معروف')
+                
+                # معلومات الحالة
+                status_info = order.get('status', {})
+                
+                # معلومات المبلغ
+                total_info = order.get('total', {})
+                total_amount = 0
                 try:
-                    # تحويل تنسيق التاريخ
-                    if '.' in created_at:
-                        dt = datetime.strptime(created_at.split('.')[0], '%Y-%m-%d %H:%M:%S')
-                    else:
-                        dt = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S')
-                    created_at_display = humanize_time(dt)
-                except (ValueError, TypeError) as e:
-                    current_app.logger.warning(f"Error parsing date {created_at}: {str(e)}")
-                    created_at_display = created_at
-            
-            processed_orders.append({
-                'id': order_id,
-                'customer_name': customer_name,
-                'created_at': created_at_display,
-                'status': {
-                    'slug': status_info.get('slug', ''),
-                    'name': status_info.get('name', '')
-                },
-                'items': processed_items,
-                'total_amount': total_amount,
-                'currency': currency
-            })
+                    total_amount = float(total_info.get('amount', 0)) if total_info else 0
+                except (ValueError, TypeError):
+                    total_amount = 0
+                    
+                currency = total_info.get('currency', 'SAR') if total_info else 'SAR'
+                
+                # معلومات التاريخ
+                created_at = order.get('created_at', '')
+                created_at_display = 'غير معروف'
+                if created_at:
+                    try:
+                        # تحويل تنسيق التاريخ
+                        if '.' in created_at:
+                            dt = datetime.strptime(created_at.split('.')[0], '%Y-%m-%d %H:%M:%S')
+                        else:
+                            dt = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S')
+                        created_at_display = humanize_time(dt)
+                    except (ValueError, TypeError) as e:
+                        current_app.logger.warning(f"Error parsing date {created_at}: {str(e)}")
+                        created_at_display = created_at
+                
+                # إعداد البيانات للعرض
+                order_data = {
+                    'id': order_id,
+                    'customer_name': customer_name,
+                    'created_at': created_at_display,
+                    'status': {
+                        'slug': status_info.get('slug', ''),
+                        'name': status_info.get('name', '')
+                    },
+                    'items': processed_order.get('order_items', []),
+                    'total_amount': total_amount,
+                    'currency': currency
+                }
+                
+                processed_orders.append(order_data)
+                
+            except Exception as e:
+                current_app.logger.error(f"Error processing order {order_id}: {str(e)}")
+                continue
         
         # إعداد بيانات الترحيل للقالب
         total_pages = pagination_data.get('totalPages', 1)
