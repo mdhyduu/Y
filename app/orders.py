@@ -1576,27 +1576,30 @@ def quick_list():
                     order_details = {}
                 
                 # جلب عناصر الطلب
-                items_response = requests.get(
-                    f"{Config.SALLA_BASE_URL}/orders/items",
-                    params={'order_id': order_id, 'include': 'images'},
-                    headers=headers,
-                    timeout=15
-                )
-                
-                if items_response.status_code == 200:
-                    try:
-                        items_json = items_response.json()
-                        if isinstance(items_json, dict):
-                            data = items_json.get('data')
-                            if isinstance(data, list):
-                                items_data = data
-                            else:
-                                current_app.logger.warning(f"Expected list for items data, got {type(data)}")
+                # جلب عناصر الطلب
+            items_response = requests.get(
+                f"{Config.SALLA_BASE_URL}/orders/items",
+                params={'order_id': order_id, 'include': 'images'},
+                headers=headers,
+                timeout=15
+            )
+            
+            items_data = []  # افتراضيًا قائمة فارغة
+            
+            if items_response.status_code == 200:
+                try:
+                    items_json = items_response.json()
+                    # تحقق من أن items_json هو قاموس وأن له مفتاح 'data'
+                    if isinstance(items_json, dict):
+                        data = items_json.get('data')
+                        if isinstance(data, list):
+                            items_data = data
                         else:
-                            current_app.logger.warning(f"Expected dict for items response, got {type(items_json)}")
-                    except Exception as e:
-                        current_app.logger.error(f"Error parsing items data: {str(e)}")
-                        items_data = []
+                            current_app.logger.warning(f"Expected list for items data, got {type(data)}")
+                    else:
+                        current_app.logger.warning(f"Expected dict for items response, got {type(items_json)}")
+                except Exception as e:
+                    current_app.logger.error(f"Error parsing items data: {str(e)}")
             
             # معالجة العناصر
             processed_items = []
