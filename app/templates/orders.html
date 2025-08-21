@@ -119,9 +119,7 @@
     <i class="fas fa-eye"></i> قائمة سريعة
 </button>
 {% endif %}
-
-<!-- نافذة القائمة السريعة -->
-<div class="modal fade" id="quickListModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal fade" id="quickListModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
@@ -131,9 +129,43 @@
                 </button>
             </div>
             <div class="modal-body">
+                <!-- خانة تحديد الكل -->
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="selectAllQuickList" checked>
+                    <label class="form-check-label fw-bold" for="selectAllQuickList">
+                        تحديد جميع الطلبات
+                    </label>
+                    <span class="text-muted ms-2" id="selectedOrdersCountQuick">0 طلب محدد</span>
+                </div>
+                
                 <div id="quickListContent">
                     <!-- سيتم ملء المحتوى هنا عبر JavaScript -->
                 </div>
+                
+                <!-- قسم إسناد الطلبات (يظهر فقط للمراجع) -->
+                {% if is_reviewer and employees %}
+                <div class="mt-4 pt-3 border-top">
+                    <h6 class="mb-3"><i class="fas fa-user-check me-2"></i>إسناد الطلبات المحددة</h6>
+                    <div class="row align-items-end">
+                        <div class="col-md-8">
+                            <label for="quickListAssignSelect" class="form-label">اختر موظفًا للإسناد:</label>
+                            <select class="form-select" id="quickListAssignSelect">
+                                <option value="">اختر موظفًا...</option>
+                                {% for employee in employees %}
+                                    {% if employee.role == 'general' %}
+                                    <option value="{{ employee.id }}">{{ employee.email }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="button" class="btn btn-primary w-100" id="quickListAssignBtn">
+                                <i class="fas fa-user-plus me-1"></i> إسناد الطلبات المحددة
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">إغلاق</button>
@@ -141,7 +173,7 @@
         </div>
     </div>
 </div>
-            <!-- في قسم quick-actions -->
+           <!-- في قسم quick-actions -->
 <button type="button" class="btn btn-warning rounded-pill px-3 me-2" id="print-orders-btn" disabled>
     <i class="fas fa-print me-1"></i> 
     <span id="selected-orders-count-print">0</span> طباعة
@@ -1058,11 +1090,42 @@ $(document).on('click', '#print-orders-btn', function() {
     }
 });
 
+// ... (الأكواد السابقة) ...
+
 // تفعيل/تعطيل زر القائمة السريعة بناءً على الطلبات المحددة
 function toggleQuickListButton() {
     const selectedOrders = document.querySelectorAll('input.order-checkbox:checked');
     document.getElementById('quickListViewBtn').disabled = selectedOrders.length === 0;
 }
+
+// تحديث عدد الطلبات المحددة في القائمة السريعة
+function updateQuickListSelectionCount() {
+    const selectedCount = document.querySelectorAll('#quickListContent input.quick-list-order:checked').length;
+    document.getElementById('selectedOrdersCountQuick').textContent = `${selectedCount} طلب محدد`;
+    
+    // تحديث زر الإسناد
+    const assignBtn = document.getElementById('quickListAssignBtn');
+    if (assignBtn) {
+        assignBtn.disabled = selectedCount === 0;
+    }
+    
+    // تحديث خانة تحديد الكل
+    const totalOrders = document.querySelectorAll('#quickListContent input.quick-list-order').length;
+    const selectAll = document.getElementById('selectAllQuickList');
+    if (selectAll && totalOrders > 0) {
+        selectAll.checked = selectedCount === totalOrders;
+        selectAll.indeterminate = selectedCount > 0 && selectedCount < totalOrders;
+    }
+}
+
+// معالج حدث تحديد/إلغاء تحديد الكل في القائمة السريعة
+document.getElementById('selectAllQuickList').addEventListener('change', function() {
+    const isChecked = this.checked;
+    document.querySelectorAll('#quickListContent input.quick-list-order').forEach(checkbox => {
+        checkbox.checked = isChecked;
+    });
+    updateQuickListSelectionCount();
+});
 
 // عرض القائمة السريعة
 document.getElementById('quickListViewBtn').addEventListener('click', function() {
@@ -1072,17 +1135,20 @@ document.getElementById('quickListViewBtn').addEventListener('click', function()
     });
 
     if (selectedOrders.length === 0) {
-        alert('يرجى تحديد طلب واحد على الأقل');
+        showSweetAlert('warning', 'تحذير', 'يرجى تحديد طلب واحد على الأقل');
         return;
     }
 
+    // حفظ الطلبات المحددة في متغير عام للاستخدام لاحقاً
+    window.currentSelectedOrders = selectedOrders;
+
     // إظهار مؤشر التحميل
     document.getElementById('quickListContent').innerHTML = `
-        <div class="text-center">
+        <div class="text-center py-4">
             <div class="spinner-border text-primary" role="status">
                 <span class="sr-only">جاري التحميل...</span>
             </div>
-            <p>جاري تحميل بيانات الطلبات...</p>
+            <p class="mt-2">جاري تحميل بيانات الطلبات...</p>
         </div>
     `;
 
@@ -1105,8 +1171,15 @@ document.getElementById('quickListViewBtn').addEventListener('click', function()
             data.orders.forEach(order => {
                 html += `
                 <div class="card mb-3">
-                    <div class="card-header">
-                        <h6 class="mb-0">الطلب #${order.reference_id}</h6>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="form-check">
+                            <input class="form-check-input quick-list-order" type="checkbox" 
+                                   value="${order.id}" id="quick-order-${order.id}" checked>
+                            <label class="form-check-label fw-bold" for="quick-order-${order.id}">
+                                الطلب #${order.reference_id}
+                            </label>
+                        </div>
+                        <span class="badge bg-${order.status_class}">${order.status_text}</span>
                     </div>
                     <div class="card-body">
                         <div class="row">
@@ -1115,18 +1188,18 @@ document.getElementById('quickListViewBtn').addEventListener('click', function()
                 if (order.items && order.items.length > 0) {
                     order.items.forEach(item => {
                         html += `
-                            <div class="col-md-3 mb-2 text-center">
+                            <div class="col-md-3 mb-3 text-center">
                                 <img src="${item.main_image || '/static/images/no-image.png'}" 
                                      alt="${item.name}" 
-                                     class="img-fluid rounded" 
+                                     class="img-fluid rounded border" 
                                      style="max-height: 100px; object-fit: cover;">
-                                <p class="mt-1 small">${item.name}</p>
+                                <p class="mt-1 small text-truncate">${item.name}</p>
                                 <p class="text-muted small">الكمية: ${item.quantity}</p>
                             </div>
                         `;
                     });
                 } else {
-                    html += `<p class="text-muted">لا توجد منتجات في هذا الطلب</p>`;
+                    html += `<p class="text-muted text-center">لا توجد منتجات في هذا الطلب</p>`;
                 }
                 
                 html += `
@@ -1137,6 +1210,14 @@ document.getElementById('quickListViewBtn').addEventListener('click', function()
             });
             
             document.getElementById('quickListContent').innerHTML = html;
+            
+            // إضافة معالج الأحداث لخانات الاختيار
+            document.querySelectorAll('#quickListContent input.quick-list-order').forEach(checkbox => {
+                checkbox.addEventListener('change', updateQuickListSelectionCount);
+            });
+            
+            // تحديث عدد الطلبات المحددة
+            updateQuickListSelectionCount();
         } else {
             document.getElementById('quickListContent').innerHTML = `
                 <div class="alert alert-danger">${data.error || 'حدث خطأ أثناء جلب البيانات'}</div>
@@ -1150,13 +1231,95 @@ document.getElementById('quickListViewBtn').addEventListener('click', function()
     });
 });
 
+// معالج حدث إسناد الطلبات من القائمة السريعة
+document.getElementById('quickListAssignBtn').addEventListener('click', function() {
+    const employeeId = document.getElementById('quickListAssignSelect').value;
+    
+    // الحصول على الطلبات المحددة في القائمة السريعة
+    const selectedOrderIds = [];
+    document.querySelectorAll('#quickListContent input.quick-list-order:checked').forEach(checkbox => {
+        selectedOrderIds.push(checkbox.value);
+    });
+    
+    if (!employeeId) {
+        showSweetAlert('warning', 'تحذير', 'يرجى اختيار موظف للإسناد');
+        return;
+    }
+    
+    if (selectedOrderIds.length === 0) {
+        showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للإسناد');
+        return;
+    }
+    
+    // تعطيل الزر أثناء المعالجة
+    const assignBtn = document.getElementById('quickListAssignBtn');
+    assignBtn.disabled = true;
+    assignBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> جاري الإسناد';
+    
+    // إرسال طلب الإسناد
+    fetch("{{ url_for('orders.assign_orders') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+            employee_id: employeeId,
+            order_ids: selectedOrderIds,
+            current_user_id: "{{ session.get('user_id') }}"
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSweetAlert('success', 'تم الإسناد بنجاح', data.message);
+            // إغلاق النافذة بعد ثانيتين
+            setTimeout(() => {
+                $('#quickListModal').modal('hide');
+                // إعادة تحميل الصفحة لتحديث البيانات
+                location.reload();
+            }, 2000);
+        } else {
+            showSweetAlert('error', 'فشل الإسناد', data.error || 'حدث خطأ أثناء الإسناد');
+            assignBtn.disabled = false;
+            assignBtn.innerHTML = '<i class="fas fa-user-plus me-1"></i> إسناد الطلبات المحددة';
+        }
+    })
+    .catch(error => {
+        showSweetAlert('error', 'خطأ في الاتصال', error);
+        assignBtn.disabled = false;
+        assignBtn.innerHTML = '<i class="fas fa-user-plus me-1"></i> إسناد الطلبات المحددة';
+    });
+});
+
 // إضافة event listeners لتفعيل الزر عند تحديد الطلبات
 document.addEventListener('DOMContentLoaded', function() {
     const checkboxes = document.querySelectorAll('input.order-checkbox');
     checkboxes.forEach(checkbox => {
         checkbox.addEventListener('change', toggleQuickListButton);
     });
+    
+    // تهيئة زر القائمة السريعة
+    toggleQuickListButton();
 });
 </script>
+
+<style>
+/* إضافة بعض الأنماط الإضافية */
+#selectAllQuickList:indeterminate {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.quick-list-order {
+    transform: scale(1.2);
+    margin-right: 8px;
+}
+
+#selectedOrdersCountQuick {
+    font-size: 0.9rem;
+}
+</style>
+
 {% endblock %}
 {% endblock %}
