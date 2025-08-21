@@ -217,30 +217,39 @@
                             </span>
                         </td>
                         {% if is_reviewer %}
-                        <td>
-                            {% if order.assignments %} 
-                                <div class="avatar-group">
-                                    {% for assignment in order.assignments[:3] %}
-                                    <div class="avatar avatar-xs" data-bs-toggle="tooltip" 
-                                         title="{{ assignment.employee.email }}">
-                                        <span class="avatar-text bg-primary text-white">
-                                            {{ assignment.employee.email|first|upper }}
-                                        </span>
-                                    </div>
-                                    {% endfor %}
-                                    {% if order.assignments|length > 3 %}
-                                    <div class="avatar avatar-xs" data-bs-toggle="tooltip" 
-                                         title="و {{ order.assignments|length - 3 }} أكثر">
-                                        <span class="avatar-text bg-light text-dark">
-                                            +{{ order.assignments|length - 3 }}
-                                        </span>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                            {% else %}
-                                <span class="badge bg-light text-muted">غير مسند</span>
-                            {% endif %}
-                        </td>
+                      <td>
+    {% if order.assignments %} 
+        <div class="avatar-group">
+            {% for assignment in order.assignments[:3] %}
+                {% if assignment.employee.role == 'delivery' %}
+                    <div class="avatar avatar-xs" data-bs-toggle="tooltip" 
+                         title="{{ assignment.employee.email }} (مندوب توصيل)">
+                        <span class="avatar-text bg-success text-white">
+                            {{ assignment.employee.email|first|upper }}
+                        </span>
+                    </div>
+                {% else %}
+                    <div class="avatar avatar-xs" data-bs-toggle="tooltip" 
+                         title="{{ assignment.employee.email }} (موظف عام)">
+                        <span class="avatar-text bg-primary text-white">
+                            {{ assignment.employee.email|first|upper }}
+                        </span>
+                    </div>
+                {% endif %}
+            {% endfor %}
+            {% if order.assignments|length > 3 %}
+                <div class="avatar avatar-xs" data-bs-toggle="tooltip" 
+                     title="و {{ order.assignments|length - 3 }} أكثر">
+                    <span class="avatar-text bg-light text-dark">
+                        +{{ order.assignments|length - 3 }}
+                    </span>
+                </div>
+            {% endif %}
+        </div>
+    {% else %}
+        <span class="badge bg-light text-muted">غير مسند</span>
+    {% endif %}
+</td>
                         {% endif %}
                         <td class="text-end pe-4 actions-cell">
                             <div class="d-flex justify-content-end gap-2">
