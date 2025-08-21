@@ -1094,10 +1094,7 @@ $(document).on('click', '#print-orders-btn', function() {
 
 // تفعيل/تعطيل زر القائمة السريعة بناءً على الطلبات المحددة
 
-function toggleQuickListButton() {
-    const selectedOrders = document.querySelectorAll('input.order-checkbox:checked');
-    document.getElementById('quickListViewBtn').disabled = selectedOrders.length === 0;
-}
+
 // ... (الأكواد السابقة) ...
 function updateQuickListSelectionCount() {
     const selectedCount = document.querySelectorAll('#quickListContent input.quick-list-order:checked').length;
