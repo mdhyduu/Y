@@ -474,7 +474,23 @@
     </div>
   </div>
 </div>
-
+<!-- في قسم رأس الصفحة، بعد زر العودة للطلبات -->
+<div class="bg-light p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h2 class="mb-0 fs-4">
+        <i class="fas fa-file-invoice ms-2"></i> تفاصيل الطلب #{{ order.reference_id | safe }}
+    </h2>
+    <div class="d-flex gap-2">
+        <a id="prev-order-btn" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-chevron-right me-1"></i> الطلب السابق
+        </a>
+        <a id="next-order-btn" class="btn btn-outline-primary btn-sm">
+            الطلب التالي <i class="fas fa-chevron-left me-1"></i>
+        </a>
+        <a href="{{ url_for('orders.index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left ms-1"></i> العودة للطلبات
+        </a>
+    </div>
+</div>
 <style>
   /* أنماط عامة للجدول */
   .table {
@@ -725,5 +741,100 @@
     timer: 3000
   });
   {% endif %}
+ 
+document.addEventListener('DOMContentLoaded', function() {
+    const currentOrderId = {{ order.id }};
+    const prevButton = document.getElementById('prev-order-btn');
+    const nextButton = document.getElementById('next-order-btn');
+    
+    // التحقق من وجود بيانات الفلترة في localStorage
+    const savedOrderIds = JSON.parse(localStorage.getItem('filteredOrderIds') || '[]');
+    const savedTimestamp = localStorage.getItem('filteredOrderIdsTimestamp');
+    const filterParams = localStorage.getItem('filterParams') || '';
+    
+    // إذا مر أكثر من 30 دقيقة منذ الحفظ، نتجاهل القائمة
+    const now = Date.now();
+    if (now - savedTimestamp > 30 * 60 * 1000) {
+        console.log('بيانات التنقل قديمة، سيتم تعطيل الأزرار');
+        disableNavigationButtons();
+        return;
+    }
+    
+    if (savedOrderIds.length === 0) {
+        console.log('لا توجد طلبات محفوظة للتنقل');
+        disableNavigationButtons();
+        return;
+    }
+    
+    // البحث عن موقع الطلب الحالي في القائمة
+    const currentIndex = savedOrderIds.indexOf(currentOrderId);
+    
+    if (currentIndex === -1) {
+        console.log('الطلب الحالي غير موجود في القائمة المحفوظة');
+        disableNavigationButtons();
+        return;
+    }
+    
+    // تحديد الطلبات المجاورة
+    const prevOrderId = currentIndex > 0 ? savedOrderIds[currentIndex - 1] : null;
+    const nextOrderId = currentIndex < savedOrderIds.length - 1 ? savedOrderIds[currentIndex + 1] : null;
+    
+    // تعيين روابط التنقل
+    if (prevOrderId) {
+        prevButton.href = `{{ url_for('orders.order_details', order_id=0) }}`.replace('0', prevOrderId) + 
+                         (filterParams ? `?${filterParams}` : '');
+    } else {
+        prevButton.classList.add('disabled');
+        prevButton.onclick = (e) => e.preventDefault();
+    }
+    
+    if (nextOrderId) {
+        nextButton.href = `{{ url_for('orders.order_details', order_id=0) }}`.replace('0', nextOrderId) + 
+                         (filterParams ? `?${filterParams}` : '');
+    } else {
+        nextButton.classList.add('disabled');
+        nextButton.onclick = (e) => e.preventDefault();
+    }
+    
+    // إضافة إمكانية التنقل باستخدام لوحة المفاتيح
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowLeft' && prevOrderId) {
+            window.location.href = prevButton.href;
+        } else if (e.key === 'ArrowRight' && nextOrderId) {
+            window.location.href = nextButton.href;
+        }
+    });
+    
+    function disableNavigationButtons() {
+        prevButton.classList.add('disabled');
+        nextButton.classList.add('disabled');
+        prevButton.onclick = (e) => e.preventDefault();
+        nextButton.onclick = (e) => e.preventDefault();
+    }
+});
 </script>
+
+<style>
+/* تنسيق أزرار التنقل */
+#prev-order-btn, #next-order-btn {
+    min-width: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* تنسيق للوضع الليلي */
+body.dark-mode #prev-order-btn,
+body.dark-mode #next-order-btn {
+    color: #f8f9fa;
+    border-color: #4a4f66;
+}
+
+body.dark-mode #prev-order-btn:hover,
+body.dark-mode #next-order-btn:hover {
+    background-color: #4a4f66;
+    color: #f8f9fa;
+}
+</style>
+
 {% endblock %} 
