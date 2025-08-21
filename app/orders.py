@@ -759,7 +759,7 @@ def order_details(order_id):
 
 # ========== [5] استخراج بيانات العنوان بشكل صحيح ==========
         # تهيئة بيانات المستلم مسبقًا لتجنب الخطأ
-        receiver_info = {}
+        receiver_info =order_data.get('receiver',{})
         address_data = {}
         full_address = 'لم يتم تحديد العنوان'
         
