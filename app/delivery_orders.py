@@ -66,8 +66,10 @@ def delivery_orders():
         delivered_order_ids = {d.order_id for d in delivered_orders}
         
         # جلب جميع الإسنادات للمتجر
+        # جلب جميع الإسنادات للمتجر (لمندوبي التوصيل فقط)
         assignments = OrderAssignment.query.join(Employee).filter(
-            Employee.store_id == store_id
+            Employee.store_id == store_id,
+            Employee.role == 'delivery'  # إضافة هذا الشرط
         ).all()
         assignment_dict = {a.order_id: a.employee for a in assignments}
         
