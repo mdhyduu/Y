@@ -1474,203 +1474,108 @@ def print_orders():
         current_app.logger.error(f"Error generating PDF: {str(e)}")
         flash(f'حدث خطأ أثناء إنشاء PDF: {str(e)}', 'error')
         return redirect(url_for('orders.index'))
-@orders_bp.route('/quick_list')
-def quick_list():
-    """صفحة القائمة السريعة - تجلب البيانات مباشرة من سلة"""
+@orders_bp.route('/get_quick_list_data', methods=['POST'])
+def get_quick_list_data():
+    """جلب بيانات القائمة السريعة للطلبات المحددة"""
     user, employee = get_user_from_cookies()
     
     if not user:
-        flash('الرجاء تسجيل الدخول أولاً', 'error')
-        response = make_response(redirect(url_for('user_auth.login')))
-        response.set_cookie('user_id', '', expires=0)
-        response.set_cookie('is_admin', '', expires=0)
-        return response
+        return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
     
-    # التحقق من وجود توكن الوصول
-    if not user.salla_access_token:
-        flash('يجب ربط المتجر مع سلة أولاً', 'error')
-        return redirect(url_for('auth.link_store' if request.cookies.get('is_admin') == 'true' else 'user_auth.logout'))
+    # التحقق من الصلاحيات
+    is_reviewer = False
+    if request.cookies.get('is_admin') == 'true':
+        is_reviewer = True
+    else:
+        if employee and employee.role in ['reviewer', 'manager']:
+            is_reviewer = True
     
-    # جلب معلمات التصفية
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 10, type=int)
-    status_filter = request.args.get('status', '')
-    search_query = request.args.get('search', '')
+    if not is_reviewer:
+        return jsonify({'success': False, 'error': 'غير مصرح لك بهذا الإجراء'}), 403
     
-    # التحقق من صحة معاملات الترحيل
-    if page < 1: 
-        page = 1
-    if per_page not in [5, 10, 20, 50]: 
-        per_page = 10
+    data = request.get_json()
+    order_ids = data.get('order_ids', [])
     
-    try:
-        # جلب الطلبات مباشرة من سلة API
-        headers = {
-            'Authorization': f'Bearer {user.salla_access_token}',
-            'Accept': 'application/json'
-        }
-        
-        # إعداد معلمات الطلب
-        params = {
-            'page': page,
-            'perPage': per_page,
-            'sort_by': 'created_at-desc'
-        }
-        
-        # إضافة الفلاتر إذا كانت موجودة
-        if status_filter:
-            params['status'] = status_filter
-        
-        if search_query:
-            params['search'] = search_query
-        
-        # جلب الطلبات من سلة
-        response = requests.get(
-            f"{Config.SALLA_API_BASE_URL}/orders",
-            headers=headers,
-            params=params,
-            timeout=30
-        )
-        
-        # التحقق من استجابة API
-        if response.status_code != 200:
-            error_msg = f"خطأ في استجابة سلة: {response.status_code}"
-            flash(error_msg, 'error')
-            return redirect(url_for('orders.index'))
-        
-        data = response.json()
-        orders_data = data.get('data', [])
-        if not isinstance(orders_data, list):
-            current_app.logger.error(f"Expected list for orders data, got {type(orders_data)}")
-            orders_data = []
-        
-        pagination_data = data.get('pagination', {})
-        
-        # معالجة بيانات كل طلب
-        processed_orders = []
-        for order in orders_data:
-            if not isinstance(order, dict):
-                continue
-                
-            order_id = order.get('id')
-            if not order_id:
-                continue
+    if not order_ids:
+        return jsonify({'success': False, 'error': 'لم يتم تحديد أي طلبات'}), 400
+    
+    access_token = user.salla_access_token
+    if not access_token:
+        return jsonify({'success': False, 'error': 'يجب ربط المتجر مع سلة أولاً'}), 400
+    
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Accept': 'application/json'
+    }
+    
+    orders_data = []
+    
+    for order_id in order_ids:
+        try:
+            # جلب بيانات الطلب الأساسية
+            order_response = requests.get(
+                f"{Config.SALLA_ORDERS_API}/{order_id}",
+                headers=headers,
+                timeout=10
+            )
             
-            # استخدام دالة process_order_data من utils.py لمعالجة بيانات الطلب
-            try:
-                # جلب عناصر الطلب باستخدام process_order_data
-                processed_order = process_order_data(order_id, [])
-                
-                # جلب تفاصيل الطلب (بما في ذلك العناصر) من سلة
-                order_detail_response = requests.get(
-                    f"{Config.SALLA_ORDERS_API}/{order_id}",
-                    headers=headers,
-                    timeout=15
-                )
-                
-                if order_detail_response.status_code == 200:
-                    try:
-                        order_details = order_detail_response.json().get('data', {})
-                        if not isinstance(order_details, dict):
-                            order_details = {}
-                        
-                        # جلب عناصر الطلب من تفاصيل الطلب
-                        items = order_details.get('items', [])
-                        if not isinstance(items, list):
-                            items = []
-                        
-                        # معالجة العناصر باستخدام process_order_data
-                        processed_order = process_order_data(order_id, items)
-                        
-                    except Exception as e:
-                        current_app.logger.error(f"Error parsing order details: {str(e)}")
-                        processed_order = process_order_data(order_id, [])
-                else:
-                    processed_order = process_order_data(order_id, [])
-                
-                # معلومات العميل
-                customer = order.get('customer', {})
-                customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip()
-                if not customer_name:
-                    customer_name = customer.get('name', 'غير معروف')
-                
-                # معلومات الحالة
-                status_info = order.get('status', {})
-                
-                # معلومات المبلغ
-                total_info = order.get('total', {})
-                total_amount = 0
-                try:
-                    total_amount = float(total_info.get('amount', 0)) if total_info else 0
-                except (ValueError, TypeError):
-                    total_amount = 0
-                    
-                currency = total_info.get('currency', 'SAR') if total_info else 'SAR'
-                
-                # معلومات التاريخ
-                created_at = order.get('created_at', '')
-                created_at_display = 'غير معروف'
-                if created_at:
-                    try:
-                        # تحويل تنسيق التاريخ
-                        if '.' in created_at:
-                            dt = datetime.strptime(created_at.split('.')[0], '%Y-%m-%d %H:%M:%S')
-                        else:
-                            dt = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S')
-                        created_at_display = humanize_time(dt)
-                    except (ValueError, TypeError) as e:
-                        current_app.logger.warning(f"Error parsing date {created_at}: {str(e)}")
-                        created_at_display = created_at
-                
-                # إعداد البيانات للعرض
-                order_data = {
-                    'id': order_id,
-                    'customer_name': customer_name,
-                    'created_at': created_at_display,
-                    'status': {
-                        'slug': status_info.get('slug', ''),
-                        'name': status_info.get('name', '')
-                    },
-                    'items': processed_order.get('order_items', []),
-                    'total_amount': total_amount,
-                    'currency': currency
-                }
-                
-                processed_orders.append(order_data)
-                
-            except Exception as e:
-                current_app.logger.error(f"Error processing order {order_id}: {str(e)}")
+            if order_response.status_code != 200:
                 continue
-        
-        # إعداد بيانات الترحيل للقالب
-        total_pages = pagination_data.get('totalPages', 1)
-        current_page = pagination_data.get('currentPage', page)
-        
-        pagination = {
-            'page': current_page,
-            'per_page': pagination_data.get('perPage', per_page),
-            'total_items': pagination_data.get('total', 0),
-            'total_pages': total_pages,
-            'has_prev': current_page > 1,
-            'has_next': current_page < total_pages,
-            'prev_page': current_page - 1 if current_page > 1 else None,
-            'next_page': current_page + 1 if current_page < total_pages else None
-        }
-        
-        return render_template('quick_list.html', 
-                            orders=processed_orders,
-                            pagination=pagination,
-                            status_filter=status_filter,
-                            search_query=search_query)
+                
+            order_data = order_response.json().get('data', {})
+            
+            # جلب عناصر الطلب
+            items_response = requests.get(
+                f"{Config.SALLA_BASE_URL}/orders/items",
+                params={'order_id': order_id},
+                headers=headers,
+                timeout=10
+            )
+            
+            items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
+            
+            # معالجة بيانات العناصر
+            processed_items = []
+            for item in items_data:
+                # استخراج الصورة الرئيسية
+                main_image = ''
+                thumbnail_url = item.get('product_thumbnail') or item.get('thumbnail')
+                if thumbnail_url and isinstance(thumbnail_url, str):
+                    main_image = thumbnail_url
+                else:
+                    images = item.get('images', [])
+                    if images and isinstance(images, list) and len(images) > 0:
+                        first_image = images[0]
+                        image_url = first_image.get('image', '')
+                        if image_url:
+                            if not image_url.startswith(('http://', 'https://')):
+                                base_domain = "https://cdn.salla.sa"
+                                main_image = f"{base_domain}{image_url}"
+                            else:
+                                main_image = image_url
+                    else:
+                        for field in ['image', 'url', 'image_url', 'picture']:
+                            if item.get(field):
+                                main_image = item[field]
+                                break
+                
+                processed_items.append({
+                    'name': item.get('name', ''),
+                    'quantity': item.get('quantity', 0),
+                    'main_image': main_image
+                })
+            
+            orders_data.append({
+                'id': order_id,
+                'reference_id': order_data.get('reference_id', order_id),
+                'items': processed_items
+            })
+            
+        except Exception as e:
+            current_app.logger.error(f"Error processing order {order_id} for quick list: {str(e)}")
+            continue
     
-    except requests.exceptions.RequestException as e:
-        error_msg = f"خطأ في الاتصال بسلة: {str(e)}"
-        flash(error_msg, 'error')
-        logger.error(error_msg, exc_info=True)
-        return redirect(url_for('orders.index'))
-    
-    except Exception as e:
-        error_msg = f'حدث خطأ غير متوقع: {str(e)}'
-        flash(error_msg, 'error')
-        logger.exception(error_msg)
-        return redirect(url_for('orders.index'))
+    return jsonify({
+        'success': True,
+        'orders': orders_data
+    })

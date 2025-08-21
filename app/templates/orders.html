@@ -113,10 +113,34 @@
                 <span id="selected-orders-count">0</span> إسناد
             </button>
             {% endif %}
-        <!-- إضافة هذا الزر في مكان مناسب في واجهة الطلبات -->
-<a href="{{ url_for('orders.quick_list') }}" class="btn btn-outline-info">
-    <i class="bi bi-list-check"></i> القائمة السريعة
-</a>
+        {% if is_reviewer %}
+<!-- زر القائمة السريعة -->
+<button type="button" class="btn btn-info mb-3" id="quickListViewBtn" disabled>
+    <i class="fas fa-eye"></i> قائمة سريعة
+</button>
+{% endif %}
+
+<!-- نافذة القائمة السريعة -->
+<div class="modal fade" id="quickListModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">القائمة السريعة للطلبات المحددة</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="quickListContent">
+                    <!-- سيتم ملء المحتوى هنا عبر JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
             <!-- في قسم quick-actions -->
 <button type="button" class="btn btn-warning rounded-pill px-3 me-2" id="print-orders-btn" disabled>
     <i class="fas fa-print me-1"></i> 
@@ -1032,6 +1056,106 @@ $(document).on('click', '#print-orders-btn', function() {
         $('.sidebar').removeClass('show');
         $('.sidebar__backdrop').removeClass('show');
     }
+});
+
+// تفعيل/تعطيل زر القائمة السريعة بناءً على الطلبات المحددة
+function toggleQuickListButton() {
+    const selectedOrders = document.querySelectorAll('input.order-checkbox:checked');
+    document.getElementById('quickListViewBtn').disabled = selectedOrders.length === 0;
+}
+
+// عرض القائمة السريعة
+document.getElementById('quickListViewBtn').addEventListener('click', function() {
+    const selectedOrders = [];
+    document.querySelectorAll('input.order-checkbox:checked').forEach(checkbox => {
+        selectedOrders.push(checkbox.value);
+    });
+
+    if (selectedOrders.length === 0) {
+        alert('يرجى تحديد طلب واحد على الأقل');
+        return;
+    }
+
+    // إظهار مؤشر التحميل
+    document.getElementById('quickListContent').innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="sr-only">جاري التحميل...</span>
+            </div>
+            <p>جاري تحميل بيانات الطلبات...</p>
+        </div>
+    `;
+
+    // فتح النافذة المنبثقة
+    $('#quickListModal').modal('show');
+
+    // جلب بيانات الطلبات المحددة
+    fetch("{{ url_for('orders.get_quick_list_data') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({ order_ids: selectedOrders })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            let html = '';
+            data.orders.forEach(order => {
+                html += `
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">الطلب #${order.reference_id}</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                `;
+                
+                if (order.items && order.items.length > 0) {
+                    order.items.forEach(item => {
+                        html += `
+                            <div class="col-md-3 mb-2 text-center">
+                                <img src="${item.main_image || '/static/images/no-image.png'}" 
+                                     alt="${item.name}" 
+                                     class="img-fluid rounded" 
+                                     style="max-height: 100px; object-fit: cover;">
+                                <p class="mt-1 small">${item.name}</p>
+                                <p class="text-muted small">الكمية: ${item.quantity}</p>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += `<p class="text-muted">لا توجد منتجات في هذا الطلب</p>`;
+                }
+                
+                html += `
+                        </div>
+                    </div>
+                </div>
+                `;
+            });
+            
+            document.getElementById('quickListContent').innerHTML = html;
+        } else {
+            document.getElementById('quickListContent').innerHTML = `
+                <div class="alert alert-danger">${data.error || 'حدث خطأ أثناء جلب البيانات'}</div>
+            `;
+        }
+    })
+    .catch(error => {
+        document.getElementById('quickListContent').innerHTML = `
+            <div class="alert alert-danger">حدث خطأ في الاتصال: ${error}</div>
+        `;
+    });
+});
+
+// إضافة event listeners لتفعيل الزر عند تحديد الطلبات
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('input.order-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', toggleQuickListButton);
+    });
 });
 </script>
 {% endblock %}
