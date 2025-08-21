@@ -1099,6 +1099,10 @@ function toggleQuickListButton() {
     document.getElementById('quickListViewBtn').disabled = selectedOrders.length === 0;
 }
 // ... (الأكواد السابقة) ...
+
+// ... (الأكواد السابقة) ...
+
+// تحديث عدد الطلبات المحددة في القائمة السريعة
 function updateQuickListSelectionCount() {
     const selectedCount = document.querySelectorAll('#quickListContent input.quick-list-order:checked').length;
     document.getElementById('selectedOrdersCountQuick').textContent = `${selectedCount} طلب محدد`;
@@ -1117,12 +1121,21 @@ function updateQuickListSelectionCount() {
         selectAll.indeterminate = selectedCount > 0 && selectedCount < totalOrders;
     }
 }
+
+// معالج حدث تحديد/إلغاء تحديد الكل في القائمة السريعة
 document.addEventListener('click', function(e) {
     if (e.target && e.target.id === 'selectAllQuickList') {
         const isChecked = e.target.checked;
         document.querySelectorAll('#quickListContent input.quick-list-order').forEach(checkbox => {
             checkbox.checked = isChecked;
         });
+        updateQuickListSelectionCount();
+    }
+});
+
+// استخدام event delegation للتعامل مع التغييرات في القائمة السريعة
+document.addEventListener('change', function(e) {
+    if (e.target && e.target.classList.contains('quick-list-order')) {
         updateQuickListSelectionCount();
     }
 });
@@ -1182,17 +1195,11 @@ document.getElementById('quickListViewBtn').addEventListener('click', function()
                         <span class="badge bg-${order.status_class || 'secondary'}">${order.status_text || 'غير معروف'}</span>
                     </div>
                     <div class="card-body">
-                        <div class="row" id="order-images-${order.id}">
+                        <div class="row">
                 `;
                 
                 if (order.items && order.items.length > 0) {
-                    // عرض الصور بشكل أفقي (4 صور في الصف)
                     order.items.forEach((item, index) => {
-                        // بدء صف جديد كل 4 صور
-                        if (index % 4 === 0) {
-                            html += `</div><div class="row">`;
-                        }
-                        
                         html += `
                             <div class="col-3 mb-3 text-center">
                                 <img src="${item.main_image || '/static/images/no-image.png'}" 
@@ -1217,12 +1224,7 @@ document.getElementById('quickListViewBtn').addEventListener('click', function()
             
             document.getElementById('quickListContent').innerHTML = html;
             
-            // إضافة معالج الأحداث لخانات الاختيار
-            document.querySelectorAll('#quickListContent input.quick-list-order').forEach(checkbox => {
-                checkbox.addEventListener('change', updateQuickListSelectionCount);
-            });
-            
-            // تحديث عدد الطلبات المحددة
+            // تحديث عدد الطلبات المحددة بعد تحميل المحتوى
             updateQuickListSelectionCount();
         } else {
             document.getElementById('quickListContent').innerHTML = `
@@ -1277,7 +1279,6 @@ document.getElementById('quickListAssignBtn').addEventListener('click', function
         })
     })
     .then(response => {
-        // التحقق من حالة الاستجابة أولاً
         if (!response.ok) {
             throw new Error(`خطأ في الشبكة: ${response.status}`);
         }
@@ -1285,7 +1286,6 @@ document.getElementById('quickListAssignBtn').addEventListener('click', function
     })
     .then(data => {
         if (data.success) {
-            // استخدام SweetAlert2 لعرض رسالة النجاح
             Swal.fire({
                 icon: 'success',
                 title: 'تم الإسناد بنجاح',
@@ -1295,7 +1295,6 @@ document.getElementById('quickListAssignBtn').addEventListener('click', function
                     confirmButton: 'btn btn-success'
                 }
             }).then(() => {
-                // إغلاق النافذة وتحديث الصفحة
                 $('#quickListModal').modal('hide');
                 location.reload();
             });
@@ -1304,7 +1303,6 @@ document.getElementById('quickListAssignBtn').addEventListener('click', function
         }
     })
     .catch(error => {
-        // إعادة تمكين الزر وعرض رسالة الخطأ
         assignBtn.disabled = false;
         assignBtn.innerHTML = originalText;
         
@@ -1320,11 +1318,20 @@ document.getElementById('quickListAssignBtn').addEventListener('click', function
     });
 });
 
-// ... (بقية الأكواد) ...
+// إضافة event listeners لتفعيل الزر عند تحديد الطلبات
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('input.order-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', toggleQuickListButton);
+    });
+    
+    // تهيئة زر القائمة السريعة
+    toggleQuickListButton();
+});
 </script>
 
 <style>
-/* تحسينات لعرض الصور */
+/* تحسينات إضافية */
 #quickListContent .row {
     display: flex;
     flex-wrap: wrap;
@@ -1357,6 +1364,27 @@ document.getElementById('quickListAssignBtn').addEventListener('click', function
 .swal2-title {
     font-weight: 700;
 }
-</style
+
+/* تحسينات للخانات */
+#selectAllQuickList:indeterminate {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.quick-list-order {
+    transform: scale(1.2);
+    margin-right: 8px;
+}
+
+#selectedOrdersCountQuick {
+    font-size: 0.9rem;
+}
+
+/* تحسينات للزر المعطل */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+</style>
 {% endblock %}
 {% endblock %}
