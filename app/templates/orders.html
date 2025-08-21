@@ -1029,16 +1029,6 @@ $(document).on('click', '#print-orders-btn', function() {
         $('.sidebar__backdrop').removeClass('show');
     }
 });
-// ... الكود الحالي ...
-
-// حفظ order IDs ومعايير الفلترة في localStorage
-const orderIds = {{ orders | map(attribute='id') | list | tojson }};
-const filterParams = buildQueryParams();
-localStorage.setItem('filteredOrderIds', JSON.stringify(orderIds));
-localStorage.setItem('filterParams', filterParams);
-localStorage.setItem('filteredOrderIdsTimestamp', Date.now());
-
-// ... باقي الكود الحالي ...
 
 </script>
 
