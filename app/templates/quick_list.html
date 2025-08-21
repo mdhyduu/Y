@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>القائمة السريعة - نظام إدارة الطلبات</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        .card {
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .order-header {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            border-radius: 10px 10px 0 0;
+        }
+        .product-image {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 5px;
+        }
+        .product-card {
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #fafafa;
+        }
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+        .options-list {
+            font-size: 0.85rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <div class="row mb-4">
+            <div class="col">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h1 class="h3 mb-0">القائمة السريعة</h1>
+                    <a href="{{ url_for('orders.index') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-right"></i> العودة للطلبات
+                    </a>
+                </div>
+                <p class="text-muted">عرض سريع للطلبات والمنتجات مع الصور المصغرة</p>
+            </div>
+        </div>
+
+        <!-- فلترة البحث -->
+        <div class="row mb-4">
+            <div class="col">
+                <div class="card">
+                    <div class="card-body">
+                        <form method="get" class="row g-3">
+                            <div class="col-md-4">
+                                <input type="text" name="search" class="form-control" placeholder="ابحث بالعميل أو رقم الطلب" value="{{ search_query }}">
+                            </div>
+                            <div class="col-md-3">
+                                <select name="status" class="form-select">
+                                    <option value="">جميع الحالات</option>
+                                    <option value="new" {% if status_filter == 'new' %}selected{% endif %}>جديد</option>
+                                    <option value="processing" {% if status_filter == 'processing' %}selected{% endif %}>قيد المعالجة</option>
+                                    <option value="shipped" {% if status_filter == 'shipped' %}selected{% endif %}>تم الشحن</option>
+                                    <option value="delivered" {% if status_filter == 'delivered' %}selected{% endif %}>تم التوصيل</option>
+                                    <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>ملغي</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-primary w-100">بحث</button>
+                            </div>
+                            <div class="col-md-3 text-start">
+                                <select name="per_page" class="form-select" onchange="this.form.submit()">
+                                    <option value="5" {% if pagination.per_page == 5 %}selected{% endif %}>5 عناصر لكل صفحة</option>
+                                    <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10 عناصر لكل صفحة</option>
+                                    <option value="20" {% if pagination.per_page == 20 %}selected{% endif %}>20 عناصر لكل صفحة</option>
+                                    <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50 عناصر لكل صفحة</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- قائمة الطلبات -->
+        {% for order in orders %}
+        <div class="card">
+            <div class="order-header d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0">الطلب #{{ order.id }}</h5>
+                    <span class="text-muted">{{ order.customer_name }}</span>
+                </div>
+                <div class="text-start">
+                    <span class="badge status-badge bg-{% if order.status.slug == 'new' %}primary{% elif order.status.slug == 'processing' %}warning{% elif order.status.slug == 'shipped' %}info{% elif order.status.slug == 'delivered' %}success{% elif order.status.slug == 'cancelled' %}danger{% else %}secondary{% endif %}">
+                        {{ order.status.name }}
+                    </span>
+                    <div class="text-muted small mt-1">{{ order.created_at }}</div>
+                    <div class="fw-bold mt-1">{{ order.total_amount }} {{ order.currency }}</div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for item in order.items %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="product-card">
+                            <div class="d-flex align-items-center">
+                                {% if item.image_url %}
+                                <img src="{{ item.image_url }}" alt="{{ item.name }}" class="product-image me-3">
+                                {% else %}
+                                <div class="product-image me-3 bg-light d-flex align-items-center justify-content-center">
+                                    <i class="bi bi-image text-muted"></i>
+                                </div>
+                                {% endif %}
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">{{ item.name }}</h6>
+                                    <div class="d-flex justify-content-between">
+                                        <span class="text-muted">الكمية: {{ item.quantity }}</span>
+                                        {% if item.sku %}
+                                        <span class="text-muted">SKU: {{ item.sku }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if item.options %}
+                                    <div class="options-list mt-2">
+                                        {% for option in item.options %}
+                                        <div><small>{{ option.name }}: {{ option.value }}</small></div>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox display-1 text-muted"></i>
+            <p class="text-muted mt-3">لا توجد طلبات لعرضها</p>
+        </div>
+        {% endfor %}
+
+        <!-- الترحيل -->
+        {% if pagination.total_pages > 1 %}
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center">
+                {% if pagination.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('orders.quick_list', page=pagination.prev_page, per_page=pagination.per_page, status=status_filter, search=search_query) }}">السابق</a>
+                </li>
+                {% endif %}
+                
+                {% for page_num in range(1, pagination.total_pages + 1) %}
+                <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('orders.quick_list', page=page_num, per_page=pagination.per_page, status=status_filter, search=search_query) }}">{{ page_num }}</a>
+                </li>
+                {% endfor %}
+                
+                {% if pagination.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('orders.quick_list', page=pagination.next_page, per_page=pagination.per_page, status=status_filter, search=search_query) }}">التالي</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1474,3 +1474,116 @@ def print_orders():
         current_app.logger.error(f"Error generating PDF: {str(e)}")
         flash(f'حدث خطأ أثناء إنشاء PDF: {str(e)}', 'error')
         return redirect(url_for('orders.index'))
+@orders_bp.route('/quick_list')
+def quick_list():
+    """صفحة القائمة السريعة لعرض الطلبات والمنتجات بشكل مصغر"""
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        flash('الرجاء تسجيل الدخول أولاً', 'error')
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
+    
+    # جلب معلمات التصفية والترحيل
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    status_filter = request.args.get('status', '')
+    search_query = request.args.get('search', '')
+    
+    # التحقق من صحة معاملات الترحيل
+    if page < 1: 
+        page = 1
+    if per_page not in [5, 10, 20, 50]: 
+        per_page = 10
+    
+    try:
+        # جلب الطلبات من قاعدة البيانات المحلية
+        query = SallaOrder.query.filter_by(store_id=user.store_id)
+        
+        # تطبيق الفلاتر
+        if status_filter:
+            query = query.filter_by(status_slug=status_filter)
+        
+        if search_query:
+            query = query.filter(
+                SallaOrder.customer_name.ilike(f'%{search_query}%') | 
+                SallaOrder.id.ilike(f'%{search_query}%')
+            )
+        
+        # الترحيل والترتيب حسب أحدث الطلبات
+        pagination_obj = query.order_by(
+            nullslast(SallaOrder.created_at.desc())
+        ).paginate(page=page, per_page=per_page)
+        
+        # معالجة بيانات كل طلب
+        processed_orders = []
+        for order in pagination_obj.items:
+            # تحليل البيانات الخام للطلب
+            raw_data = json.loads(order.raw_data) if order.raw_data else {}
+            
+            # استخراج معلومات المنتجات من البيانات الخام
+            items = raw_data.get('items', [])
+            processed_items = []
+            
+            for item in items:
+                # استخراج صورة المنتج
+                image_url = ''
+                if item.get('product_thumbnail'):
+                    image_url = item.get('product_thumbnail')
+                elif item.get('images') and len(item.get('images', [])) > 0:
+                    image_url = item.get('images')[0].get('image', '')
+                
+                # استخراج الخيارات
+                options = []
+                for option in item.get('options', []):
+                    options.append({
+                        'name': option.get('name', ''),
+                        'value': option.get('value', '')
+                    })
+                
+                processed_items.append({
+                    'name': item.get('name', ''),
+                    'quantity': item.get('quantity', 1),
+                    'image_url': image_url,
+                    'options': options,
+                    'sku': item.get('sku', '')
+                })
+            
+            processed_orders.append({
+                'id': order.id,
+                'customer_name': order.customer_name,
+                'created_at': humanize_time(order.created_at) if order.created_at else '',
+                'status': {
+                    'slug': order.status_slug,
+                    'name': order.status
+                },
+                'items': processed_items,
+                'total_amount': order.total_amount,
+                'currency': order.currency
+            })
+        
+        # إعداد بيانات الترحيل للقالب
+        pagination = {
+            'page': pagination_obj.page,
+            'per_page': pagination_obj.per_page,
+            'total_items': pagination_obj.total,
+            'total_pages': pagination_obj.pages,
+            'has_prev': pagination_obj.has_prev,
+            'has_next': pagination_obj.has_next,
+            'prev_page': pagination_obj.prev_num,
+            'next_page': pagination_obj.next_num
+        }
+        
+        return render_template('quick_list.html', 
+                            orders=processed_orders,
+                            pagination=pagination,
+                            status_filter=status_filter,
+                            search_query=search_query)
+    
+    except Exception as e:
+        error_msg = f'حدث خطأ غير متوقع: {str(e)}'
+        flash(error_msg, 'error')
+        logger.exception(error_msg)
+        return redirect(url_for('orders.index'))

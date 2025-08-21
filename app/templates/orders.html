@@ -113,6 +113,10 @@
                 <span id="selected-orders-count">0</span> إسناد
             </button>
             {% endif %}
+        <!-- إضافة هذا الزر في مكان مناسب في واجهة الطلبات -->
+<a href="{{ url_for('orders.quick_list') }}" class="btn btn-outline-info">
+    <i class="bi bi-list-check"></i> القائمة السريعة
+</a>
             <!-- في قسم quick-actions -->
 <button type="button" class="btn btn-warning rounded-pill px-3 me-2" id="print-orders-btn" disabled>
     <i class="fas fa-print me-1"></i> 
