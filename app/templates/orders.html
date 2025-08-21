@@ -1094,7 +1094,10 @@ $(document).on('click', '#print-orders-btn', function() {
 
 // تفعيل/تعطيل زر القائمة السريعة بناءً على الطلبات المحددة
 
-
+function toggleQuickListButton() {
+    const selectedOrders = document.querySelectorAll('input.order-checkbox:checked');
+    document.getElementById('quickListViewBtn').disabled = selectedOrders.length === 0;
+}
 // ... (الأكواد السابقة) ...
 function updateQuickListSelectionCount() {
     const selectedCount = document.querySelectorAll('#quickListContent input.quick-list-order:checked').length;
@@ -1114,6 +1117,15 @@ function updateQuickListSelectionCount() {
         selectAll.indeterminate = selectedCount > 0 && selectedCount < totalOrders;
     }
 }
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.id === 'selectAllQuickList') {
+        const isChecked = e.target.checked;
+        document.querySelectorAll('#quickListContent input.quick-list-order').forEach(checkbox => {
+            checkbox.checked = isChecked;
+        });
+        updateQuickListSelectionCount();
+    }
+});
 
 // عرض القائمة السريعة
 document.getElementById('quickListViewBtn').addEventListener('click', function() {
