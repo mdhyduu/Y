@@ -1099,6 +1099,24 @@ function toggleQuickListButton() {
     document.getElementById('quickListViewBtn').disabled = selectedOrders.length === 0;
 }
 // ... (الأكواد السابقة) ...
+function updateQuickListSelectionCount() {
+    const selectedCount = document.querySelectorAll('#quickListContent input.quick-list-order:checked').length;
+    document.getElementById('selectedOrdersCountQuick').textContent = `${selectedCount} طلب محدد`;
+    
+    // تحديث زر الإسناد
+    const assignBtn = document.getElementById('quickListAssignBtn');
+    if (assignBtn) {
+        assignBtn.disabled = selectedCount === 0;
+    }
+    
+    // تحديث خانة تحديد الكل
+    const totalOrders = document.querySelectorAll('#quickListContent input.quick-list-order').length;
+    const selectAll = document.getElementById('selectAllQuickList');
+    if (selectAll && totalOrders > 0) {
+        selectAll.checked = selectedCount === totalOrders;
+        selectAll.indeterminate = selectedCount > 0 && selectedCount < totalOrders;
+    }
+}
 
 // عرض القائمة السريعة
 document.getElementById('quickListViewBtn').addEventListener('click', function() {
