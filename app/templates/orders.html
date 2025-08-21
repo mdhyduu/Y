@@ -552,18 +552,7 @@
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/locale/ar.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
-<script>
-// ... الكود الحالي ...
 
-// حفظ order IDs ومعايير الفلترة في localStorage
-const orderIds = {{ orders | map(attribute='id') | list | tojson }};
-const filterParams = buildQueryParams();
-localStorage.setItem('filteredOrderIds', JSON.stringify(orderIds));
-localStorage.setItem('filterParams', filterParams);
-localStorage.setItem('filteredOrderIdsTimestamp', Date.now());
-
-// ... باقي الكود الحالي ...
-</script>
 <script>
 // استخدم $(document).ready() بدلاً من DOMContentLoaded
 $(document).ready(function () {
@@ -1001,6 +990,16 @@ $(document).on('click', '#print-orders-btn', function() {
         reloadOrders();
     });
     
+// ... الكود الحالي ...
+
+// حفظ order IDs ومعايير الفلترة في localStorage
+const orderIds = {{ orders | map(attribute='id') | list | tojson }};
+const filterParams = buildQueryParams();
+localStorage.setItem('filteredOrderIds', JSON.stringify(orderIds));
+localStorage.setItem('filterParams', filterParams);
+localStorage.setItem('filteredOrderIdsTimestamp', Date.now());
+
+// ... باقي الكود الحالي ...
     // البحث مع تأخير لمنع طلبات متعددة
     $(document).on('input', '#search-order-id', _.debounce(function() {
         reloadOrders();
@@ -1039,7 +1038,8 @@ $(document).on('click', '#print-orders-btn', function() {
         $('.sidebar').removeClass('show');
         $('.sidebar__backdrop').removeClass('show');
     }
-});
+});    
+
 </script>
 {% endblock %}
 {% endblock %}
