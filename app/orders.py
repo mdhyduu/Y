@@ -1540,12 +1540,21 @@ def quick_list():
         
         data = response.json()
         orders_data = data.get('data', [])
+        if not isinstance(orders_data, list):
+            current_app.logger.error(f"Expected list for orders data, got {type(orders_data)}")
+            orders_data = []
+        
         pagination_data = data.get('pagination', {})
         
         # معالجة بيانات كل طلب
         processed_orders = []
         for order in orders_data:
+            if not isinstance(order, dict):
+                continue
+                
             order_id = order.get('id')
+            if not order_id:
+                continue
             
             # جلب تفاصيل الطلب (بما في ذلك العناصر) من سلة
             order_detail_response = requests.get(
@@ -1558,7 +1567,13 @@ def quick_list():
             items_data = []
             
             if order_detail_response.status_code == 200:
-                order_details = order_detail_response.json().get('data', {})
+                try:
+                    order_details = order_detail_response.json().get('data', {})
+                    if not isinstance(order_details, dict):
+                        order_details = {}
+                except Exception as e:
+                    current_app.logger.error(f"Error parsing order details: {str(e)}")
+                    order_details = {}
                 
                 # جلب عناصر الطلب
                 items_response = requests.get(
@@ -1569,11 +1584,26 @@ def quick_list():
                 )
                 
                 if items_response.status_code == 200:
-                    items_data = items_response.json().get('data', [])
+                    try:
+                        items_json = items_response.json()
+                        if isinstance(items_json, dict):
+                            data = items_json.get('data')
+                            if isinstance(data, list):
+                                items_data = data
+                            else:
+                                current_app.logger.warning(f"Expected list for items data, got {type(data)}")
+                        else:
+                            current_app.logger.warning(f"Expected dict for items response, got {type(items_json)}")
+                    except Exception as e:
+                        current_app.logger.error(f"Error parsing items data: {str(e)}")
+                        items_data = []
             
             # معالجة العناصر
             processed_items = []
             for item in items_data:
+                if not isinstance(item, dict):
+                    continue
+                    
                 # استخراج صورة المنتج
                 image_url = ''
                 
@@ -1584,7 +1614,7 @@ def quick_list():
                 
                 # المحاولة 2: استخدام images
                 if not image_url:
-                    images = item.get('images', [])
+                    images = item.get('images')
                     if images and isinstance(images, list) and len(images) > 0:
                         first_image = images[0]
                         if isinstance(first_image, dict):
@@ -1604,8 +1634,8 @@ def quick_list():
                 
                 # استخراج الخيارات
                 options = []
-                item_options = item.get('options', [])
-                if isinstance(item_options, list):
+                item_options = item.get('options')
+                if item_options and isinstance(item_options, list):
                     for option in item_options:
                         if isinstance(option, dict):
                             # معالجة قيمة الخيار
@@ -1650,11 +1680,17 @@ def quick_list():
             
             # معلومات المبلغ
             total_info = order.get('total', {})
-            total_amount = float(total_info.get('amount', 0)) if total_info else 0
+            total_amount = 0
+            try:
+                total_amount = float(total_info.get('amount', 0)) if total_info else 0
+            except (ValueError, TypeError):
+                total_amount = 0
+                
             currency = total_info.get('currency', 'SAR') if total_info else 'SAR'
             
             # معلومات التاريخ
             created_at = order.get('created_at', '')
+            created_at_display = 'غير معروف'
             if created_at:
                 try:
                     # تحويل تنسيق التاريخ
@@ -1663,10 +1699,9 @@ def quick_list():
                     else:
                         dt = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S')
                     created_at_display = humanize_time(dt)
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
+                    current_app.logger.warning(f"Error parsing date {created_at}: {str(e)}")
                     created_at_display = created_at
-            else:
-                created_at_display = 'غير معروف'
             
             processed_orders.append({
                 'id': order_id,
@@ -1682,15 +1717,18 @@ def quick_list():
             })
         
         # إعداد بيانات الترحيل للقالب
+        total_pages = pagination_data.get('totalPages', 1)
+        current_page = pagination_data.get('currentPage', page)
+        
         pagination = {
-            'page': pagination_data.get('currentPage', page),
+            'page': current_page,
             'per_page': pagination_data.get('perPage', per_page),
             'total_items': pagination_data.get('total', 0),
-            'total_pages': pagination_data.get('totalPages', 1),
-            'has_prev': page > 1,
-            'has_next': page < pagination_data.get('totalPages', 1),
-            'prev_page': page - 1 if page > 1 else None,
-            'next_page': page + 1 if page < pagination_data.get('totalPages', 1) else None
+            'total_pages': total_pages,
+            'has_prev': current_page > 1,
+            'has_next': current_page < total_pages,
+            'prev_page': current_page - 1 if current_page > 1 else None,
+            'next_page': current_page + 1 if current_page < total_pages else None
         }
         
         return render_template('quick_list.html', 
