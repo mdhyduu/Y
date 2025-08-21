@@ -1474,7 +1474,7 @@ def print_orders():
         current_app.logger.error(f"Error generating PDF: {str(e)}")
         flash(f'حدث خطأ أثناء إنشاء PDF: {str(e)}', 'error')
         return redirect(url_for('orders.index'))
-@orders_bp.route('/quick_list')
+@orders_bp.route('/quick_list') 
 def quick_list():
     """صفحة القائمة السريعة لعرض الطلبات والمنتجات بشكل مصغر"""
     user, employee = get_user_from_cookies()
@@ -1521,27 +1521,60 @@ def quick_list():
         processed_orders = []
         for order in pagination_obj.items:
             # تحليل البيانات الخام للطلب
-            raw_data = json.loads(order.raw_data) if order.raw_data else {}
+            raw_data = {}
+            if order.raw_data:
+                try:
+                    raw_data = json.loads(order.raw_data)
+                except json.JSONDecodeError:
+                    raw_data = {}
+                    current_app.logger.error(f"Failed to parse raw_data for order {order.id}")
             
             # استخراج معلومات المنتجات من البيانات الخام
             items = raw_data.get('items', [])
             processed_items = []
             
             for item in items:
-                # استخراج صورة المنتج
-                image_url = ''
-                if item.get('product_thumbnail'):
-                    image_url = item.get('product_thumbnail')
-                elif item.get('images') and len(item.get('images', [])) > 0:
-                    image_url = item.get('images')[0].get('image', '')
+                if not isinstance(item, dict):
+                    continue  # تخطي العناصر غير الصالحة
                 
-                # استخراج الخيارات
+                # استخراج صورة المنتج بشكل آمن
+                image_url = ''
+                
+                # المحاولة 1: استخدام product_thumbnail
+                product_thumbnail = item.get('product_thumbnail')
+                if product_thumbnail and isinstance(product_thumbnail, str):
+                    image_url = product_thumbnail
+                
+                # المحاولة 2: استخدام images إذا كانت موجودة
+                if not image_url:
+                    images = item.get('images')
+                    if images and isinstance(images, list) and len(images) > 0:
+                        first_image = images[0]
+                        if isinstance(first_image, dict):
+                            image_url = first_image.get('image', '')
+                        elif isinstance(first_image, str):
+                            image_url = first_image
+                
+                # المحاولة 3: استخدام image مباشرة
+                if not image_url:
+                    image_field = item.get('image')
+                    if image_field and isinstance(image_field, str):
+                        image_url = image_field
+                
+                # إذا كان الرابط لا يبدأ بـ http، نضيف النطاق الأساسي لسلة
+                if image_url and not image_url.startswith(('http://', 'https://')):
+                    image_url = f"https://cdn.salla.sa{image_url}"
+                
+                # استخراج الخيارات بشكل آمن
                 options = []
-                for option in item.get('options', []):
-                    options.append({
-                        'name': option.get('name', ''),
-                        'value': option.get('value', '')
-                    })
+                item_options = item.get('options', [])
+                if isinstance(item_options, list):
+                    for option in item_options:
+                        if isinstance(option, dict):
+                            options.append({
+                                'name': option.get('name', ''),
+                                'value': option.get('value', '')
+                            })
                 
                 processed_items.append({
                     'name': item.get('name', ''),
