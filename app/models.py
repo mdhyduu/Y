@@ -382,7 +382,41 @@ class EmployeeCustomStatus(db.Model):
     
     employee = relationship('Employee', back_populates='custom_statuses')
     order_statuses = relationship('OrderEmployeeStatus', back_populates='status')
+# أضف هذا الكود بعد تعريف نموذج EmployeeCustomStatus
+
+def create_default_employee_custom_statuses(employee_id):
+    """إنشاء الحالات المخصصة الافتراضية للموظف"""
+    default_statuses = [
+        {'name': 'قيد التنفيذ', 'color': '#ffc107'},
+        {'name': 'تم التنفيذ', 'color': '#28a745'},
+        {'name': 'جاهز للشحن', 'color': '#17a2b8'},
+        {'name': 'تم الشحن', 'color': '#6f42c1'},
+        {'name': 'جاري التوصيل', 'color': '#fd7e14'},
+        {'name': 'تم التوصيل', 'color': '#20c997'}
+    ]
     
+    for status in default_statuses:
+        # التحقق إذا كانت الحالة موجودة مسبقاً
+        existing_status = EmployeeCustomStatus.query.filter_by(
+            employee_id=employee_id,
+            name=status['name']
+        ).first()
+        
+        if not existing_status:
+            new_status = EmployeeCustomStatus(
+                name=status['name'],
+                color=status['color'],
+                employee_id=employee_id
+            )
+            db.session.add(new_status)
+    
+    db.session.commit()
+
+# حدث لإنشاء الحالات الافتراضية عند إنشاء موظف جديد
+@event.listens_for(Employee, 'after_insert')
+def create_default_statuses_for_new_employee(mapper, connection, target):
+    """إنشاء الحالات الافتراضية عند إنشاء موظف جديد"""
+    create_default_employee_custom_statuses(target.id)    
 class CustomNoteStatus(db.Model):
     __tablename__ = 'custom_note_statuses'
     
