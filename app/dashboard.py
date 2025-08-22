@@ -321,6 +321,9 @@ def index():
                                         recent_statuses=recent_statuses,
                                         assigned_orders=assigned_orders,
                                         is_reviewer=False)
+        except Exception as e:
+        flash(f"حدث خطأ في جلب بيانات لوحة التحكم: {str(e)}", "error")
+        return redirect(url_for('user_auth.login'))
 @dashboard_bp.route('/settings')
 @login_required
 def settings():
