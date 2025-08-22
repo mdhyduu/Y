@@ -403,6 +403,7 @@ def create_default_employee_statuses(employee_id):
             existing_status = EmployeeCustomStatus.query.filter_by(
                 name=status_info["name"],
                 employee_id=employee_id,
+                is_default=True
                 
             ).first()
             
