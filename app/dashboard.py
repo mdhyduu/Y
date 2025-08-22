@@ -177,14 +177,15 @@ def index():
                     )])
                 }
                 
-                # جلب الحالات المخصصة للموظف الحالي
-                custom_statuses = EmployeeCustomStatus.query.filter_by(
-                    employee_id=employee.id
+                # جلب الحالات التلقائية فقط (التي تم إنشاؤها تلقائياً)
+                default_statuses = EmployeeCustomStatus.query.filter_by(
+                    employee_id=employee.id,
+                    is_default=True
                 ).all()
                 
-                # حساب عدد الطلبات لكل حالة مخصصة للموظف الحالي
+                # حساب عدد الطلبات لكل حالة تلقائية
                 custom_status_stats = []
-                for status in custom_statuses:
+                for status in default_statuses:
                     count = OrderEmployeeStatus.query.filter(
                         OrderEmployeeStatus.status_id == status.id,
                         OrderEmployeeStatus.order_id.in_(assigned_order_ids)
@@ -205,40 +206,6 @@ def index():
                 ).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
                 
                 # إذا كان الموظف مراجعًا (reviewer أو manager)، نضيف إحصائيات جميع الموظفين
-                if employee.role in ['reviewer', 'manager']:
-                    # جلب جميع الموظفين في المتجر
-                    all_employees = Employee.query.filter_by(
-                        store_id=employee.store_id,
-                        is_active=True
-                    ).all()
-                    
-                    # جلب معرف الموظف المحدد من query string إذا وجد
-                    selected_employee_id = request.args.get('employee_id', type=int)
-                    
-                    # إذا تم اختيار موظف معين
-                    if selected_employee_id:
-                        selected_employee = next((emp for emp in all_employees if emp.id == selected_employee_id), None)
-                        if selected_employee:
-                            # جلب الحالات التلقائية للموظف المحدد
-                            default_statuses = EmployeeCustomStatus.query.filter_by(
-                    employee_id=employee.id,
-                    is_default=True  # إضافة شرط للحالات التلقائية فقط
-                ).all()
-                
-                # حساب عدد الطلبات لكل حالة تلقائية
-                custom_status_stats = []
-                for status in default_statuses:
-                    count = OrderEmployeeStatus.query.filter(
-                        OrderEmployeeStatus.status_id == status.id,
-                        OrderEmployeeStatus.order_id.in_(assigned_order_ids)
-                    ).count() if assigned_order_ids else 0
-                    
-                    custom_status_stats.append({
-                        'status': status,
-                        'count': count
-                    })
-                
-                # إذا كان الموظف مراجعًا (reviewer أو manager)
                 if employee.role in ['reviewer', 'manager']:
                     # جلب جميع الموظفين في المتجر
                     all_employees = Employee.query.filter_by(
@@ -275,7 +242,7 @@ def index():
                             # جلب الحالات المخصصة التي أضافها الموظف المحدد
                             custom_statuses_selected = EmployeeCustomStatus.query.filter_by(
                                 employee_id=selected_employee_id,
-                                is_default=False  # الحالات المخصصة فقط
+                                is_default=False
                             ).all()
                             
                             # حساب عدد الطلبات لكل حالة مخصصة للموظف المحدد
@@ -295,7 +262,7 @@ def index():
                                                 current_user=user,
                                                 employee=employee,
                                                 stats=stats,
-                                                custom_statuses=default_statuses,  # الحالات التلقائية فقط
+                                                custom_statuses=default_statuses,
                                                 custom_status_stats=custom_status_stats,
                                                 recent_statuses=recent_statuses,
                                                 assigned_orders=assigned_orders,
@@ -318,7 +285,7 @@ def index():
                         count = OrderEmployeeStatus.query.filter(
                             OrderEmployeeStatus.status_id == status.id
                         ).count()
-
+            
                         if status.name in status_stats_dict:
                             status_stats_dict[status.name]['count'] += count
                         else:
@@ -327,7 +294,7 @@ def index():
                                 'color': status.color,
                                 'count': count
                             }
-
+            
                     # تحويل القاموس إلى قائمة
                     all_employee_status_stats = list(status_stats_dict.values())
                     
@@ -349,15 +316,11 @@ def index():
                                         current_user=user,
                                         employee=employee,
                                         stats=stats,
-                                        custom_statuses=default_statuses,  # الحالات التلقائية فقط
+                                        custom_statuses=default_statuses,
                                         custom_status_stats=custom_status_stats,
                                         recent_statuses=recent_statuses,
                                         assigned_orders=assigned_orders,
                                         is_reviewer=False)
-        
-    except Exception as e:
-        flash(f"حدث خطأ في جلب بيانات لوحة التحكم: {str(e)}", "error")
-        return redirect(url_for('user_auth.login'))
 @dashboard_bp.route('/settings')
 @login_required
 def settings():
