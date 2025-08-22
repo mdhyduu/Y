@@ -379,7 +379,7 @@ class EmployeeCustomStatus(db.Model):
     color = db.Column(db.String(20), default='#6c757d')
     employee_id = db.Column(db.Integer, ForeignKey('employees.id'), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
-    
+    is_default = db.Column(db.Boolean, default=False)
     employee = relationship('Employee', back_populates='custom_statuses')
     order_statuses = relationship('OrderEmployeeStatus', back_populates='status')
 # ... (الكود الحالي)
@@ -402,7 +402,8 @@ def create_default_employee_statuses(employee_id):
             # التحقق من عدم وجود الحالة مسبقاً
             existing_status = EmployeeCustomStatus.query.filter_by(
                 name=status_info["name"],
-                employee_id=employee_id
+                employee_id=employee_id,
+                
             ).first()
             
             if not existing_status:
@@ -431,7 +432,8 @@ def after_employee_insert(mapper, connection, target):
             stmt = EmployeeCustomStatus.__table__.insert().values(
                 name=status_info["name"],
                 color=status_info["color"],
-                employee_id=target.id
+                employee_id=target.id,
+                is_default=True
             )
             connection.execute(stmt)
     except Exception as e:
