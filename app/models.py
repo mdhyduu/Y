@@ -522,15 +522,29 @@ def ensure_default_statuses_for_existing_employees():
     try:
         employees = Employee.query.all()
         for employee in employees:
-            # التحقق من وجود حالات للموظف
-            status_count = EmployeeCustomStatus.query.filter_by(employee_id=employee.id).count()
-            if status_count == 0:
-                create_default_employee_statuses(employee.id)
-                current_app.logger.info(f"تم إنشاء الحالات الافتراضية للموظف {employee.id}")
+            # التحقق من وجود حالات تلقائية للموظف
+            default_statuses = EmployeeCustomStatus.query.filter_by(
+                employee_id=employee.id,
+                is_default=True
+            ).count()
+            
+            # إذا لم يكن للموظف حالات تلقائية، ننشئها
+            if default_statuses == 0:
+                # إنشاء الحالات التلقائية
+                for status_info in DEFAULT_EMPLOYEE_STATUSES:
+                    status = EmployeeCustomStatus(
+                        name=status_info["name"],
+                        color=status_info["color"],
+                        employee_id=employee.id,
+                        is_default=True  # تمييزها كحالات تلقائية
+                    )
+                    db.session.add(status)
+                
+                current_app.logger.info(f"تم إنشاء الحالات التلقائية للموظف {employee.id}")
         
         db.session.commit()
         return True
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"فشل إنشاء الحالات الافتراضية للموظفين الحاليين: {str(e)}")
+        current_app.logger.error(f"فشل إنشاء الحالات التلقائية للموظفين الحاليين: {str(e)}")
         return False
