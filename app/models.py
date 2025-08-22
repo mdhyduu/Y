@@ -244,7 +244,7 @@ class Employee(db.Model):
     store_id = db.Column(db.Integer, nullable=False, index=True)
     is_active = db.Column(db.Boolean, default=True)
     role = db.Column(db.String(50), default='general')
-    is_delivery_manager = db.Column(db.Boolean, default=False)
+    
     region = db.Column(db.String(100))
     added_by = db.Column(db.Integer, db.ForeignKey('employees.id'))  # المدير الذي أضاف الموظف
     deactivated_at = db.Column(db.DateTime)

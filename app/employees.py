@@ -99,7 +99,7 @@ def delete_employee(employee_id):
         flash('غير مصرح لك بهذا الإجراء', 'error')
         return redirect(url_for('user_auth.login'))
     
-    # الحصول على المستخدم الحالي ومتجره
+    # الحصول على المستخدم الحالي
     current_user = User.query.get(user_id)
     if not current_user:
         flash('المستخدم غير موجود', 'error')
@@ -120,12 +120,45 @@ def delete_employee(employee_id):
         return redirect(url_for('employees.list_employees'))
     
     try:
+        # إلغاء جميع العلاقات المرتبطة بالموظف أولاً
+        # 1. تحديث الموظفين الذين أضافهم هذا الموظف
+        employees_added_by_this = Employee.query.filter_by(added_by=employee.id).all()
+        for emp in employees_added_by_this:
+            emp.added_by = None
+            db.session.add(emp)
+        
+        # 2. حذف الصلاحيات المرتبطة
+        permissions = EmployeePermission.query.filter_by(employee_id=employee.id).all()
+        for perm in permissions:
+            db.session.delete(perm)
+        
+        # 3. حذف الحالات المخصصة
+        custom_statuses = EmployeeCustomStatus.query.filter_by(employee_id=employee.id).all()
+        for status in custom_statuses:
+            db.session.delete(status)
+        
+        # 4. تحديث تعيينات الطلبات
+        assignments = OrderAssignment.query.filter_by(employee_id=employee.id).all()
+        for assignment in assignments:
+            assignment.employee_id = None
+            db.session.add(assignment)
+        
+        # 5. تحديث ملاحظات حالة الطلبات
+        status_notes = OrderStatusNote.query.filter_by(employee_id=employee.id).all()
+        for note in status_notes:
+            note.employee_id = None
+            db.session.add(note)
+        
+        # أخيراً، حذف الموظف نفسه
         db.session.delete(employee)
         db.session.commit()
+        
         flash('تم حذف الموظف بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'حدث خطأ أثناء حذف الموظف: {str(e)}', 'error')
+        # يمكنك تسجيل الخطأ للتحليل لاحقاً
+        # logger.error(f"Error deleting employee: {str(e)}")
     
     return redirect(url_for('employees.list_employees'))
 
