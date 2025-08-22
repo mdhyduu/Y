@@ -133,7 +133,6 @@ def index():
                                 is_admin=True)
     
         else:
-            # للموظفين
             employee = request.current_user  
             if not employee:
                 flash('بيانات الموظف غير موجودة', 'error')
@@ -206,9 +205,6 @@ def index():
                 ).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
                 
                 # إذا كان الموظف مراجعًا (reviewer أو manager)، نضيف إحصائيات جميع الموظفين
-                # ... (الكود السابق)
-
-# داخل else (للموظفين) وفي جزء المراجعين (reviewer أو manager)
                 if employee.role in ['reviewer', 'manager']:
                     # جلب جميع الحالات المخصصة لجميع الموظفين في المتجر
                     all_employee_statuses = EmployeeCustomStatus.query.join(
@@ -216,41 +212,26 @@ def index():
                     ).filter(
                         Employee.store_id == employee.store_id
                     ).all()
-                
-                    # تجميع الحالات حسب الاسم واللون (للتخلص من التكرار)
-                    status_count_map = {}
+                    
+                    # تجميع الحالات المخصصة حسب الاسم (بدون تكرار) وجمع عدد الطلبات لكل حالة
+                    status_stats_dict = {}
                     for status in all_employee_statuses:
-                        key = (status.name, status.color)
-                        if key not in status_count_map:
-                            status_count_map[key] = {
-                                'name': status.name,
-                                'color': status.color,
-                                'count': 0
-                            }
-                        # حساب عدد الطلبات لهذه الحالة (بغض النظر عن الموظف)
                         count = OrderEmployeeStatus.query.filter(
                             OrderEmployeeStatus.status_id == status.id
                         ).count()
-                        status_count_map[key]['count'] += count
-                
+
+                        if status.name in status_stats_dict:
+                            status_stats_dict[status.name]['count'] += count
+                        else:
+                            status_stats_dict[status.name] = {
+                                'name': status.name,
+                                'color': status.color,
+                                'count': count
+                            }
+
                     # تحويل القاموس إلى قائمة
-                    all_employee_status_stats = list(status_count_map.values())
-                
-                    # جلب آخر النشاطات لجميع الموظفين
-                    all_recent_statuses = db.session.query(
-                        OrderEmployeeStatus,
-                        EmployeeCustomStatus,
-                        Employee
-                    ).join(
-                        EmployeeCustomStatus,
-                        OrderEmployeeStatus.status_id == EmployeeCustomStatus.id
-                    ).join(
-                        Employee,
-                        EmployeeCustomStatus.employee_id == Employee.id
-                    ).filter(
-                        Employee.store_id == employee.store_id
-                    ).order_by(OrderEmployeeStatus.created_at.desc()).limit(5).all()
-                
+                    all_employee_status_stats = list(status_stats_dict.values())
+                    
                     return render_template('employee_dashboard.html',
                                         current_user=user,
                                         employee=employee,
@@ -261,10 +242,7 @@ def index():
                                         assigned_orders=assigned_orders,
                                         # البيانات الجديدة لجميع الموظفين
                                         all_employee_status_stats=all_employee_status_stats,
-                                        all_recent_statuses=all_recent_statuses,
                                         is_reviewer=True)
-
-# ... (بقية الكود)
                 
                 else:
                     # للموظفين العاديين

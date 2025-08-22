@@ -53,26 +53,28 @@
             </div>
         </div>
     </div>
+<!-- ... (الكود الحالي) ... -->
+
 {% if is_reviewer %}
-    <div class="scrolling-stats-container mb-4">
-        <h6 class="mb-2 fw-bold"><i class="fas fa-users me-2"></i>إحصائيات حالات جميع الموظفين</h6>
-        <div class="d-flex flex-nowrap">
-            {% for item in all_employee_status_stats %}
-            <div class="stat-card-item">
-                <div class="stat-card h-100" style="background-color: {{ item.status.color }}; color: {% if item.status.color in ['#ffffff', '#f8f9fa', '#ffc107', '#0dcaf0'] %}#212529{% else %}white{% endif %}">
-                    <div class="stat-card-icon"><i class="fas fa-user-tag"></i></div>
-                    <div class="stat-card-content">
-                        <h5 class="mb-0 fw-bolder">{{ item.count }}</h5>
-                        <p class="mb-0 small">{{ item.status.name }}</p>
-                        <small class="opacity-75">{{ item.status.employee.email }}</small>
-                    </div>
+<div class="scrolling-stats-container mb-4">
+    <h6 class="mb-2 fw-bold"><i class="fas fa-users me-2"></i>إحصائيات حالات جميع الموظفين</h6>
+    <div class="d-flex flex-nowrap">
+        {% for item in all_employee_status_stats %}
+        <div class="stat-card-item">
+            <div class="stat-card h-100" style="background-color: {{ item.color }}; color: {% if item.color in ['#ffffff', '#f8f9fa', '#ffc107', '#0dcaf0'] %}#212529{% else %}white{% endif %}">
+                <div class="stat-card-icon"><i class="fas fa-user-tag"></i></div>
+                <div class="stat-card-content">
+                    <h5 class="mb-0 fw-bolder">{{ item.count }}</h5>
+                    <p class="mb-0 small">{{ item.name }}</p>
                 </div>
             </div>
-            {% endfor %}
         </div>
+        {% endfor %}
     </div>
-    {% endif %}
+</div>
+{% endif %}
 
+<!-- ... (بقية القالب) ... -->
      <div class="scrolling-stats-container mb-4">
         <h6 class="mb-2 fw-bold"><i class="fas fa-tags me-2"></i>حالاتي لمتابعة الطلبات</h6>
         <div class="d-flex flex-nowrap">
