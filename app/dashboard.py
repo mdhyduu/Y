@@ -206,6 +206,9 @@ def index():
                 ).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
                 
                 # إذا كان الموظف مراجعًا (reviewer أو manager)، نضيف إحصائيات جميع الموظفين
+                # ... (الكود السابق)
+
+# داخل else (للموظفين) وفي جزء المراجعين (reviewer أو manager)
                 if employee.role in ['reviewer', 'manager']:
                     # جلب جميع الحالات المخصصة لجميع الموظفين في المتجر
                     all_employee_statuses = EmployeeCustomStatus.query.join(
@@ -213,19 +216,26 @@ def index():
                     ).filter(
                         Employee.store_id == employee.store_id
                     ).all()
-                    
-                    # حساب عدد الطلبات لكل حالة مخصصة لجميع الموظفين
-                    all_employee_status_stats = []
+                
+                    # تجميع الحالات حسب الاسم واللون (للتخلص من التكرار)
+                    status_count_map = {}
                     for status in all_employee_statuses:
+                        key = (status.name, status.color)
+                        if key not in status_count_map:
+                            status_count_map[key] = {
+                                'name': status.name,
+                                'color': status.color,
+                                'count': 0
+                            }
+                        # حساب عدد الطلبات لهذه الحالة (بغض النظر عن الموظف)
                         count = OrderEmployeeStatus.query.filter(
                             OrderEmployeeStatus.status_id == status.id
                         ).count()
-                        
-                        all_employee_status_stats.append({
-                            'status': status,
-                            'count': count
-                        })
-                    
+                        status_count_map[key]['count'] += count
+                
+                    # تحويل القاموس إلى قائمة
+                    all_employee_status_stats = list(status_count_map.values())
+                
                     # جلب آخر النشاطات لجميع الموظفين
                     all_recent_statuses = db.session.query(
                         OrderEmployeeStatus,
@@ -240,7 +250,7 @@ def index():
                     ).filter(
                         Employee.store_id == employee.store_id
                     ).order_by(OrderEmployeeStatus.created_at.desc()).limit(5).all()
-                    
+                
                     return render_template('employee_dashboard.html',
                                         current_user=user,
                                         employee=employee,
@@ -253,6 +263,8 @@ def index():
                                         all_employee_status_stats=all_employee_status_stats,
                                         all_recent_statuses=all_recent_statuses,
                                         is_reviewer=True)
+
+# ... (بقية الكود)
                 
                 else:
                     # للموظفين العاديين
