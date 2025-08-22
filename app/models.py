@@ -244,19 +244,29 @@ class Employee(db.Model):
     store_id = db.Column(db.Integer, nullable=False, index=True)
     is_active = db.Column(db.Boolean, default=True)
     role = db.Column(db.String(50), default='general')
-    
+    is_delivery_manager = db.Column(db.Boolean, default=False)
     region = db.Column(db.String(100))
     added_by = db.Column(db.Integer, db.ForeignKey('employees.id'))  # المدير الذي أضاف الموظف
     deactivated_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     remember_token = db.Column(db.String(100))  # New field for remember me functionality
-    status_notes = relationship('OrderStatusNote', back_populates='employee', foreign_keys='OrderStatusNote.employee_id')
-    permissions = relationship('EmployeePermission', back_populates='employee')
-    custom_statuses = relationship('EmployeeCustomStatus', back_populates='employee')
-    assignments = relationship('OrderAssignment', back_populates='employee')
+    status_notes = relationship('OrderStatusNote', back_populates='employee', 
+                              foreign_keys='OrderStatusNote.employee_id',
+                              cascade='all, delete-orphan')
     
-    added_employees = relationship('Employee', backref=db.backref('added_by_manager', remote_side=[id]))
+    permissions = relationship('EmployeePermission', back_populates='employee',
+                             cascade='all, delete-orphan')
+    
+    custom_statuses = relationship('EmployeeCustomStatus', back_populates='employee',
+                                 cascade='all, delete-orphan')
+    
+    assignments = relationship('OrderAssignment', back_populates='employee',
+                             cascade='all, delete-orphan')
+    
+    added_employees = relationship('Employee', 
+                                 backref=db.backref('added_by_manager', remote_side=[id]),
+                                 cascade='all, delete-orphan')
      
 
     def set_password(self, password: str):

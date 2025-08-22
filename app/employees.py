@@ -99,69 +99,34 @@ def delete_employee(employee_id):
         flash('غير مصرح لك بهذا الإجراء', 'error')
         return redirect(url_for('user_auth.login'))
     
-    # الحصول على المستخدم الحالي
-    current_user = User.query.get(user_id)
-    if not current_user:
-        flash('المستخدم غير موجود', 'error')
-        return redirect(url_for('user_auth.login'))
-    
-    employee = Employee.query.get(employee_id)
-    if not employee:
-        flash('الموظف غير موجود', 'error')
-        return redirect(url_for('employees.list_employees'))
-    
-    # التأكد من أن الموظف ينتمي إلى نفس المتجر
-    if employee.store_id != current_user.store_id:
-        flash('الموظف غير موجود في متجرك', 'error')
-        return redirect(url_for('employees.list_employees'))
-    
-    if is_delivery_manager and employee.role == 'delivery_manager':
-        flash('لا يمكنك حذف مدراء آخرين', 'error')
-        return redirect(url_for('employees.list_employees'))
-    
     try:
-        # إلغاء جميع العلاقات المرتبطة بالموظف أولاً
-        # 1. تحديث الموظفين الذين أضافهم هذا الموظف
-        employees_added_by_this = Employee.query.filter_by(added_by=employee.id).all()
-        for emp in employees_added_by_this:
-            emp.added_by = None
-            db.session.add(emp)
+        employee = Employee.query.get(employee_id)
+        if not employee:
+            flash('الموظف غير موجود', 'error')
+            return redirect(url_for('employees.list_employees'))
         
-        # 2. حذف الصلاحيات المرتبطة
-        permissions = EmployeePermission.query.filter_by(employee_id=employee.id).all()
-        for perm in permissions:
-            db.session.delete(perm)
+        if is_delivery_manager and employee.role == 'delivery_manager':
+            flash('لا يمكنك حذف مدراء آخرين', 'error')
+            return redirect(url_for('employees.list_employees'))
         
-        # 3. حذف الحالات المخصصة
-        custom_statuses = EmployeeCustomStatus.query.filter_by(employee_id=employee.id).all()
-        for status in custom_statuses:
-            db.session.delete(status)
+        # حذف جميع السجلات المرتبطة بالموظف
+        OrderStatusNote.query.filter_by(employee_id=employee_id).delete()
+        EmployeePermission.query.filter_by(employee_id=employee_id).delete()
+        EmployeeCustomStatus.query.filter_by(employee_id=employee_id).delete()
+        OrderAssignment.query.filter_by(employee_id=employee_id).delete()
         
-        # 4. تحديث تعيينات الطلبات
-        assignments = OrderAssignment.query.filter_by(employee_id=employee.id).all()
-        for assignment in assignments:
-            assignment.employee_id = None
-            db.session.add(assignment)
-        
-        # 5. تحديث ملاحظات حالة الطلبات
-        status_notes = OrderStatusNote.query.filter_by(employee_id=employee.id).all()
-        for note in status_notes:
-            note.employee_id = None
-            db.session.add(note)
-        
-        # أخيراً، حذف الموظف نفسه
+        # حذف الموظف نفسه
         db.session.delete(employee)
         db.session.commit()
         
         flash('تم حذف الموظف بنجاح', 'success')
+        return redirect(url_for('employees.list_employees'))
+    
     except Exception as e:
         db.session.rollback()
-        flash(f'حدث خطأ أثناء حذف الموظف: {str(e)}', 'error')
-        # يمكنك تسجيل الخطأ للتحليل لاحقاً
-        # logger.error(f"Error deleting employee: {str(e)}")
-    
-    return redirect(url_for('employees.list_employees'))
-
+        flash('حدث خطأ أثناء حذف الموظف', 'error')
+        current_app.logger.error(f"Error deleting employee: {str(e)}")
+        return redirect(url_for('employees.list_employees'))
 @employees_bp.route('/employees/<int:employee_id>/toggle_active', methods=['POST'])
 def toggle_employee_active(employee_id):
     user_id = request.cookies.get('user_id')
