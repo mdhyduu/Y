@@ -378,7 +378,7 @@ class OrderStatusNote(db.Model):
     custom_status_id = db.Column(db.Integer, ForeignKey('custom_note_statuses.id'),nullable=True)
     # تحديث العلاقات مع الأعمدة الجديدة
     admin = relationship('User', foreign_keys=[admin_id])
-    employee = relationship('Employee', foreign_keys=[employee_id])
+    employee = relationship('Employee', foreign_keys=[employee_id], back_populates='status_notes')
     order = relationship('SallaOrder', back_populates='status_notes')
     custom_status = relationship('CustomNoteStatus', back_populates='notes', foreign_keys=[custom_status_id])  # 
 class EmployeeCustomStatus(db.Model):
