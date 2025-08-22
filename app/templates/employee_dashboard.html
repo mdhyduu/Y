@@ -316,7 +316,12 @@
         transform: translateY(-4px);
         box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
     }
-    .stat-card-compact {
+    .stats-grid-compact {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 0.5rem;
+    }
+ .stat-card-compact {
     /* Set a transparent background based on the status color */
     background-color: rgba(var(--status-color-rgb, 108, 117, 125), 0.1);
     border-radius: var(--bs-border-radius-sm);
@@ -343,7 +348,7 @@
     font-size: 0.75rem; 
     color: var(--bs-secondary-color); 
     font-weight: 500;
-}
+} 
 
 /* Dark mode override to make the background slightly more visible */
 body.dark-mode .stat-card-compact {
