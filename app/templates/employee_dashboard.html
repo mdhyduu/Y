@@ -5,7 +5,7 @@
     
     <div class="scrolling-stats-container mb-3">
         <h6 class="mb-2 fw-bold"><i class="fas fa-chart-bar me-2"></i>إحصائيات الطلبات</h6>
-        <div class="d-flex flex-nowrap">
+        <div class="stats-grid">
             <div class="stat-card-item">
                 <div class="stat-card h-100 bg-danger text-white">
                     <div class="stat-card-icon"><i class="fas fa-exclamation-triangle"></i></div>
@@ -53,20 +53,18 @@
             </div>
         </div>
     </div>
-<!-- ... (الكود الحالي) ... -->
 
     <!-- إضافة قائمة الموظفين للتصفية (للمراجعين فقط) -->
     {% if is_reviewer %}
-    <div class="card mb-4">
-        <div class="card-header">
-            <h6 class="mb-0"><i class="fas fa-filter me-2"></i>تصفية حسب الموظف</h6>
+    <div class="card mb-4 compact-filter">
+        <div class="card-header py-2">
+            <h6 class="mb-0 small"><i class="fas fa-filter me-2"></i>تصفية حسب الموظف</h6>
         </div>
-        <div class="card-body">
+        <div class="card-body py-2">
             <form method="GET" action="{{ url_for('dashboard.index') }}">
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-8">
-                        <label for="employee_id" class="form-label">اختر الموظف</label>
-                        <select class="form-select" id="employee_id" name="employee_id">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-9 col-8">
+                        <select class="form-select form-select-sm" id="employee_id" name="employee_id">
                             <option value="">جميع الموظفين</option>
                             {% for emp in all_employees %}
                             <option value="{{ emp.id }}" {% if selected_employee and selected_employee.id == emp.id %}selected{% endif %}>
@@ -75,8 +73,8 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-4">
-                        <button type="submit" class="btn btn-primary w-100">تطبيق</button>
+                    <div class="col-md-3 col-4">
+                        <button type="submit" class="btn btn-primary btn-sm w-100">تطبيق</button>
                     </div>
                 </div>
             </form>
@@ -84,105 +82,68 @@
     </div>
     {% endif %}
     
-    <div class="scrolling-stats-container mb-3">
-        <h6 class="mb-2 fw-bold"><i class="fas fa-chart-bar me-2"></i>إحصائيات الطلبات</h6>
-        <div class="d-flex flex-nowrap">
-            <!-- ... (إحصائيات الطلبات الحالية) ... -->
-        </div>
-    </div>
-
     <!-- عرض إحصائيات حسب الموظف المحدد أو جميع الموظفين -->
-   
-{% if is_reviewer %}
-<div class="card mb-4">
-    <div class="card-header">
-        <h6 class="mb-0"><i class="fas fa-filter me-2"></i>تصفية حسب الموظف</h6>
-    </div>
-    <div class="card-body">
-        <form method="GET" action="{{ url_for('dashboard.index') }}">
-            <div class="row g-2 align-items-end">
-                <div class="col-md-8">
-                    <label for="employee_id" class="form-label">اختر الموظف</label>
-                    <select class="form-select" id="employee_id" name="employee_id">
-                        <option value="">جميع الموظفين</option>
-                        {% for emp in all_employees %}
-                        <option value="{{ emp.id }}" {% if selected_employee and selected_employee.id == emp.id %}selected{% endif %}>
-                            {{ emp.email }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <button type="submit" class="btn btn-primary w-100">تطبيق</button>
+    {% if is_reviewer %}
+        {% if selected_employee %}
+            <!-- عرض إحصائيات الحالات التلقائية للموظف المحدد -->
+            <div class="scrolling-stats-container mb-3">
+                <h6 class="mb-2 fw-bold small"><i class="fas fa-tags me-2"></i>الحالات التلقائية للموظف: {{ selected_employee.email }}</h6>
+                <div class="stats-grid">
+                    {% for item in default_status_stats %}
+                    <div class="stat-card-item">
+                        <div class="stat-card h-100" style="background-color: {{ item.color }}; color: {% if item.color in ['#ffffff', '#f8f9fa', '#ffc107', '#0dcaf0'] %}#212529{% else %}white{% endif %}">
+                            <div class="stat-card-icon"><i class="fas fa-tag"></i></div>
+                            <div class="stat-card-content">
+                                <h5 class="mb-0 fw-bolder">{{ item.count }}</h5>
+                                <p class="mb-0 small">{{ item.name }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
-        </form>
-    </div>
-</div>
-{% endif %}
 
-<!-- عرض إحصائيات حسب الموظف المحدد أو جميع الموظفين -->
-{% if is_reviewer %}
-    {% if selected_employee %}
-        <!-- عرض إحصائيات الحالات التلقائية للموظف المحدد -->
-        <div class="scrolling-stats-container mb-4">
-            <h6 class="mb-2 fw-bold"><i class="fas fa-tags me-2"></i>الحالات التلقائية للموظف: {{ selected_employee.email }}</h6>
-            <div class="d-flex flex-nowrap">
-                {% for item in default_status_stats %}
-                <div class="stat-card-item">
-                    <div class="stat-card h-100" style="background-color: {{ item.color }}; color: {% if item.color in ['#ffffff', '#f8f9fa', '#ffc107', '#0dcaf0'] %}#212529{% else %}white{% endif %}">
-                        <div class="stat-card-icon"><i class="fas fa-tag"></i></div>
-                        <div class="stat-card-content">
-                            <h5 class="mb-0 fw-bolder">{{ item.count }}</h5>
-                            <p class="mb-0 small">{{ item.name }}</p>
+            <!-- عرض إحصائيات الحالات المخصصة للموظف المحدد -->
+            <div class="scrolling-stats-container mb-3">
+                <h6 class="mb-2 fw-bold small"><i class="fas fa-user-tag me-2"></i>الحالات المخصصة للموظف: {{ selected_employee.email }}</h6>
+                <div class="stats-grid">
+                    {% for item in custom_status_stats_selected %}
+                    <div class="stat-card-item">
+                        <div class="stat-card h-100" style="background-color: {{ item.color }}; color: {% if item.color in ['#ffffff', '#f8f9fa', '#ffc107', '#0dcaf0'] %}#212529{% else %}white{% endif %}">
+                            <div class="stat-card-icon"><i class="fas fa-tag"></i></div>
+                            <div class="stat-card-content">
+                                <h5 class="mb-0 fw-bolder">{{ item.count }}</h5>
+                                <p class="mb-0 small">{{ item.name }}</p>
+                            </div>
                         </div>
                     </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
             </div>
-        </div>
-
-        <!-- عرض إحصائيات الحالات المخصصة للموظف المحدد -->
-        <div class="scrolling-stats-container mb-4">
-            <h6 class="mb-2 fw-bold"><i class="fas fa-user-tag me-2"></i>الحالات المخصصة للموظف: {{ selected_employee.email }}</h6>
-            <div class="d-flex flex-nowrap">
-                {% for item in custom_status_stats_selected %}
-                <div class="stat-card-item">
-                    <div class="stat-card h-100" style="background-color: {{ item.color }}; color: {% if item.color in ['#ffffff', '#f8f9fa', '#ffc107', '#0dcaf0'] %}#212529{% else %}white{% endif %}">
-                        <div class="stat-card-icon"><i class="fas fa-tag"></i></div>
-                        <div class="stat-card-content">
-                            <h5 class="mb-0 fw-bolder">{{ item.count }}</h5>
-                            <p class="mb-0 small">{{ item.name }}</p>
+        {% else %}
+            <!-- عرض إحصائيات الحالات التلقائية لجميع الموظفين -->
+            <div class="scrolling-stats-container mb-3">
+                <h6 class="mb-2 fw-bold small"><i class="fas fa-users me-2"></i>إحصائيات الحالات التلقائية لجميع الموظفين</h6>
+                <div class="stats-grid">
+                    {% for item in all_employee_status_stats %}
+                    <div class="stat-card-item">
+                        <div class="stat-card h-100" style="background-color: {{ item.color }}; color: {% if item.color in ['#ffffff', '#f8f9fa', '#ffc107', '#0dcaf0'] %}#212529{% else %}white{% endif %}">
+                            <div class="stat-card-icon"><i class="fas fa-user-tag"></i></div>
+                            <div class="stat-card-content">
+                                <h5 class="mb-0 fw-bolder">{{ item.count }}</h5>
+                                <p class="mb-0 small">{{ item.name }}</p>
+                            </div>
                         </div>
                     </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
             </div>
-        </div>
-    {% else %}
-        <!-- عرض إحصائيات الحالات التلقائية لجميع الموظفين -->
-        <div class="scrolling-stats-container mb-4">
-            <h6 class="mb-2 fw-bold"><i class="fas fa-users me-2"></i>إحصائيات الحالات التلقائية لجميع الموظفين</h6>
-            <div class="d-flex flex-nowrap">
-                {% for item in all_employee_status_stats %}
-                <div class="stat-card-item">
-                    <div class="stat-card h-100" style="background-color: {{ item.color }}; color: {% if item.color in ['#ffffff', '#f8f9fa', '#ffc107', '#0dcaf0'] %}#212529{% else %}white{% endif %}">
-                        <div class="stat-card-icon"><i class="fas fa-user-tag"></i></div>
-                        <div class="stat-card-content">
-                            <h5 class="mb-0 fw-bolder">{{ item.count }}</h5>
-                            <p class="mb-0 small">{{ item.name }}</p>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
+        {% endif %}
     {% endif %}
-{% endif %}
-<!-- ... (بقية القالب) ... -->
-     <div class="scrolling-stats-container mb-4">
-        <h6 class="mb-2 fw-bold"><i class="fas fa-tags me-2"></i>حالاتي لمتابعة الطلبات</h6>
-        <div class="d-flex flex-nowrap">
+
+    <div class="scrolling-stats-container mb-4">
+        <h6 class="mb-2 fw-bold small"><i class="fas fa-tags me-2"></i>حالاتي لمتابعة الطلبات</h6>
+        <div class="stats-grid">
             {% for item in custom_status_stats %}
             <div class="stat-card-item">
                 <div class="stat-card h-100" style="background-color: {{ item.status.color }}; color: {% if item.status.color in ['#ffffff', '#f8f9fa', '#ffc107', '#0dcaf0'] %}#212529{% else %}white{% endif %}">
@@ -200,8 +161,8 @@
     <div class="row g-4">
         <div class="col-lg-8">
             <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0 fs-5"><i class="fas fa-tasks me-2"></i>الطلبات المسندة إليك</h5>
+                <div class="card-header d-flex justify-content-between align-items-center py-2">
+                    <h5 class="mb-0 fs-6"><i class="fas fa-tasks me-2"></i>الطلبات المسندة إليك</h5>
                     <span class="badge bg-primary rounded-pill">{{ assigned_orders|length }}</span>
                 </div> 
                 <div class="card-body p-0">
@@ -258,64 +219,58 @@
         </div>
         <div class="col-lg-4">
             <div class="card mb-4">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fas fa-chart-pie text-primary me-2"></i>توزيع الحالات الحرجة</h6>
+                <div class="card-header py-2">
+                    <h6 class="mb-0 small"><i class="fas fa-chart-pie text-primary me-2"></i>توزيع الحالات الحرجة</h6>
                 </div>
-                <div class="card-body">
+                <div class="card-body py-2">
                     <canvas id="statusChart" height="200"></canvas>
                 </div>
             </div>
-          <!-- ... الأجزاء السابقة ... -->
-<!-- ... الأجزاء السابقة ... -->
 
-<!-- ... الأجزاء السابقة ... -->
-<div class="card">
-    <div class="card-header">
-        <h6 class="mb-0"><i class="fas fa-history me-2"></i>آخر النشاطات</h6>
-    </div>
-    <div class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
-        {% for status in recent_statuses %}
-        <a href="{{ url_for('orders.order_details', order_id=status.order_id) }}" class="list-group-item list-group-item-action border-0 py-2">
-            <div class="d-flex w-100 justify-content-between">
-                <h6 class="mb-1 fw-bold">
-                     #{{ status.order_id }} - 
-                    {% if status.custom_status %}
-                        <!-- حالة مخصصة -->
-                        <span class="badge" 
-                              style="background-color: {{ status.custom_status.color }};
-                                     color: {% if status.custom_status.color in ['#ffffff', '#f8f9fa'] %}#212529{% else %}white{% endif %};
-                                     border: 1px solid {{ status.custom_status.color }};">
-                            {{ status.custom_status.name }}
-                        </span>
+            <div class="card">
+                <div class="card-header py-2">
+                    <h6 class="mb-0 small"><i class="fas fa-history me-2"></i>آخر النشاطات</h6>
+                </div>
+                <div class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
+                    {% for status in recent_statuses %}
+                    <a href="{{ url_for('orders.order_details', order_id=status.order_id) }}" class="list-group-item list-group-item-action border-0 py-2">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 fw-bold small">
+                                 #{{ status.order_id }} - 
+                                {% if status.custom_status %}
+                                    <!-- حالة مخصصة -->
+                                    <span class="badge" 
+                                          style="background-color: {{ status.custom_status.color }};
+                                                 color: {% if status.custom_status.color in ['#ffffff', '#f8f9fa'] %}#212529{% else %}white{% endif %};
+                                                 border: 1px solid {{ status.custom_status.color }};">
+                                        {{ status.custom_status.name }}
+                                    </span>
+                                {% else %}
+                                    <!-- الحالات الأساسية -->
+                                    {% if status.status_flag == 'late' %}
+                                        <span class="badge-late">متأخر</span>
+                                    {% elif status.status_flag == 'missing' %}
+                                        <span class="badge-missing">واصل ناقص</span>
+                                    {% elif status.status_flag == 'refunded' %}
+                                        <span class="badge-refunded">مسترجع</span>
+                                    {% elif status.status_flag == 'not_shipped' %}
+                                        <span class="badge-not_shipped">لم يتم الشحن</span>
+                                    {% endif %}
+                                {% endif %}
+                            </h6>
+                            <small class="text-muted flex-shrink-0 ms-2">{{ status.created_at|time_ago }}</small>
+                        </div>
+                        <p class="mb-1 small text-muted">
+                            {{ status.note|truncate(80) if status.note else 'تم تحديث الحالة بدون ملاحظات.' }}
+                        </p>
+                    </a>
                     {% else %}
-                        <!-- الحالات الأساسية -->
-                        {% if status.status_flag == 'late' %}
-                            <span class="badge-late">متأخر</span>
-                        {% elif status.status_flag == 'missing' %}
-                            <span class="badge-missing">واصل ناقص</span>
-                        {% elif status.status_flag == 'refunded' %}
-                            <span class="badge-refunded">مسترجع</span>
-                        {% elif status.status_flag == 'not_shipped' %}
-                            <span class="badge-not_shipped">لم يتم الشحن</span>
-                        {% endif %}
-                    {% endif %}
-                </h6>
-                <small class="text-muted flex-shrink-0 ms-2">{{ status.created_at|time_ago }}</small>
+                    <div class="list-group-item text-center p-4">
+                        <p class="text-muted small mb-0">لا توجد نشاطات حديثة.</p>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
-            <p class="mb-1 small text-muted">
-                {{ status.note|truncate(80) if status.note else 'تم تحديث الحالة بدون ملاحظات.' }}
-            </p>
-        </a>
-        {% else %}
-        <div class="list-group-item text-center p-4">
-            <p class="text-muted small mb-0">لا توجد نشاطات حديثة.</p>
-        </div>
-        {% endfor %}
-    </div>
-</div>
-<!-- ... الأجزاء اللاحقة ... -->
-<!-- ... الأجزاء اللاحقة ... -->
-<!-- ... الأجزاء اللاحقة ... -->
         </div>
     </div>
 </div>
@@ -323,44 +278,100 @@
 <style>
     /* General styles for both modes */
     .scrolling-stats-container {
-        overflow-x: auto;
         padding-bottom: 1rem;
-        scrollbar-width: thin;
-        scrollbar-color: #d1d5db #f1f5f9;
     }
-    .scrolling-stats-container::-webkit-scrollbar { height: 6px; }
-    .scrolling-stats-container::-webkit-scrollbar-track { background: transparent; border-radius: 10px; }
-    .scrolling-stats-container::-webkit-scrollbar-thumb { background-color: #d1d5db; border-radius: 10px; }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.5rem;
+    }
     
     .stat-card-item {
         flex: 0 0 auto;
-        width: 110px; /* تم تعديل الحجم قليلاً */
-        margin-left: 0.5rem;
     }
-    .stat-card-item:first-child { margin-left: 2px; }
+    
     .stat-card {
         display: flex;
-        flex-direction: column; /* تعديل التخطيط */
+        flex-direction: column;
         align-items: center;
         justify-content: center;
         text-align: center;
-        padding: 0.75rem;
+        padding: 0.5rem;
         border-radius: var(--border-radius);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
-        height: 100px; /* تحديد ارتفاع ثابت */
+        height: 80px;
     }
+    
     .stat-card:hover {
         transform: translateY(-3px);
         box-shadow: 0 0.25rem 0.75rem rgba(0,0,0,0.07);
     }
+    
     .stat-card-icon {
-        font-size: 1.25rem;
-        margin-bottom: 0.5rem; /* مسافة بين الأيقونة والمحتوى */
+        font-size: 1rem;
+        margin-bottom: 0.25rem;
     }
-    .stat-card-content { line-height: 1.2; }
-    .stat-card-content h5 { font-size: 1.2rem; }
-    .table th, .table td { padding: 0.75rem; font-size: 0.9rem; vertical-align: middle; }
-    .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+    
+    .stat-card-content { 
+        line-height: 1.1; 
+    }
+    
+    .stat-card-content h5 { 
+        font-size: 1rem; 
+    }
+    
+    .table th, .table td { 
+        padding: 0.5rem; 
+        font-size: 0.8rem; 
+        vertical-align: middle; 
+    }
+    
+    .btn-sm { 
+        padding: 0.2rem 0.4rem; 
+        font-size: 0.7rem; 
+    }
+    
+    .compact-filter .card-header {
+        padding: 0.5rem 1rem;
+    }
+    
+    .compact-filter .card-body {
+        padding: 0.5rem 1rem;
+    }
+    
+    /* Responsive adjustments */
+    @media (min-width: 768px) {
+        .stats-grid {
+            grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+        }
+    }
+    
+    @media (max-width: 767px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+        }
+        
+        .stat-card {
+            height: 70px;
+            padding: 0.4rem;
+        }
+        
+        .stat-card-icon {
+            font-size: 0.9rem;
+        }
+        
+        .stat-card-content h5 { 
+            font-size: 0.9rem; 
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
 
     /* Dark Mode Overrides */
     body.dark-mode .scrolling-stats-container { scrollbar-color: #4b5563 var(--bg-dark); }
@@ -373,85 +384,72 @@
         background-color: var(--content-dark);
         border-color: var(--border-color-dark) !important;
     }
+    
     body.dark-mode .list-group-item-action:hover,
     body.dark-mode .list-group-item-action:focus {
-        background-color: #3a3f58; /* لون أغمق قليلاً عند التمرير
-    */
-    /* إضافة هذه الأنماط لقسم الـ CSS */
-
+        background-color: #3a3f58;
     }
+
     .badge-late {
-    background-color: rgba(220, 38, 38, 0.1) !important;
-    color: #dc2626 !important;
-    border: 1px solid #dc2626;
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-/* إضافة هذا للأنماط العامة */
-.badge {
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
+        background-color: rgba(220, 38, 38, 0.1) !important;
+        color: #dc2626 !important;
+        border: 1px solid #dc2626;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 500;
+    }
+    
+    .badge-missing {
+        background-color: rgba(234, 88, 12, 0.1) !important;
+        color: #ea580c !important;
+        border: 1px solid #ea580c;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 500;
+    }
 
-/* للوضع الليلي - تخصيص الألوان */
-body.dark-mode .badge {
-    border: 1px solid rgba(255,255,255,0.1) !important;
-}
+    .badge-refunded {
+        background-color: rgba(109, 40, 217, 0.1) !important;
+        color: #6d28d9 !important;
+        border: 1px solid #6d28d9;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 500;
+    }
 
-.badge-missing {
-    background-color: rgba(234, 88, 12, 0.1) !important;
-    color: #ea580c !important;
-    border: 1px solid #ea580c;
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
+    .badge-not_shipped {
+        background-color: rgba(16, 185, 129, 0.1) !important;
+        color: #10b981 !important;
+        border: 1px solid #10b981;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 500;
+    }
 
-.badge-refunded {
-    background-color: rgba(109, 40, 217, 0.1) !important;
-    color: #6d28d9 !important;
-    border: 1px solid #6d28d9;
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
+    /* للوضع الليلي */
+    body.dark-mode .badge-late {
+        background-color: rgba(220, 38, 38, 0.2) !important;
+        color: #fca5a5 !important;
+    }
 
-.badge-not_shipped {
-    background-color: rgba(16, 185, 129, 0.1) !important;
-    color: #10b981 !important;
-    border: 1px solid #10b981;
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
+    body.dark-mode .badge-missing {
+        background-color: rgba(234, 88, 12, 0.2) !important;
+        color: #fdba74 !important;
+    }
 
-/* للوضع الليلي */
-body.dark-mode .badge-late {
-    background-color: rgba(220, 38, 38, 0.2) !important;
-    color: #fca5a5 !important;
-}
+    body.dark-mode .badge-refunded {
+        background-color: rgba(109, 40, 217, 0.2) !important;
+        color: #c4b5fd !important;
+    }
 
-body.dark-mode .badge-missing {
-    background-color: rgba(234, 88, 12, 0.2) !important;
-    color: #fdba74 !important;
-}
-
-body.dark-mode .badge-refunded {
-    background-color: rgba(109, 40, 217, 0.2) !important;
-    color: #c4b5fd !important;
-}
-
-body.dark-mode .badge-not_shipped {
-    background-color: rgba(16, 185, 129, 0.2) !important;
-    color: #6ee7b7 !important;
-}
+    body.dark-mode .badge-not_shipped {
+        background-color: rgba(16, 185, 129, 0.2) !important;
+        color: #6ee7b7 !important;
+    }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -486,20 +484,21 @@ body.dark-mode .badge-not_shipped {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        display: true, position: 'bottom',
+                        display: true, 
+                        position: 'bottom',
                         labels: { 
-                            font: { family: 'inherit', size: 12 }, 
-                            padding: 15, 
+                            font: { family: 'inherit', size: 10 }, 
+                            padding: 10, 
                             usePointStyle: true,
-                            color: chartTextColor // لون نصوص التسميات
+                            color: chartTextColor
                         }
                     },
                     tooltip: {
                         rtl: true,
                         backgroundColor: '#212529',
-                        titleFont: { size: 12, family: 'inherit' }, 
-                        bodyFont: { size: 11, family: 'inherit' },
-                        padding: 8,
+                        titleFont: { size: 10, family: 'inherit' }, 
+                        bodyFont: { size: 9, family: 'inherit' },
+                        padding: 6,
                     }
                 },
                 cutout: '70%'
