@@ -149,8 +149,22 @@ def create_app():
         return mapping.get(status_slug, 'light text-dark')
     
     # Register the filters with Jinja2 environment
+    # ... (near your other filters)
+
+    def hex_to_rgb(hex_code):
+        """Converts a HEX color string to an RGB string 'R, G, B'."""
+        hex_code = hex_code.lstrip('#')
+        if len(hex_code) != 6:
+            return "108, 117, 125" # Default to grey if format is wrong
+        try:
+            return f"{int(hex_code[0:2], 16)}, {int(hex_code[2:4], 16)}, {int(hex_code[4:6], 16)}"
+        except ValueError:
+            return "108, 117, 125" # Default to grey on error
+    
+    # Register the new filter along with the old ones
     app.jinja_env.filters['get_text_color'] = get_text_color
     app.jinja_env.filters['get_status_badge'] = get_status_badge
+    app.jinja_env.filters['hex_to_rgb'] = hex_to_rgb # <-- أضف هذا السطر
 
 
     return app

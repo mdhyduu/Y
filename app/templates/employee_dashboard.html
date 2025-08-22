@@ -122,7 +122,7 @@
                     {% endfor %}
                 {% else %}
                     {% for item in all_employee_status_stats %}
-                    <div class="stat-card-compact" style="--status-color: {{ item.color }};">
+               <div class="stat-card-compact" style="--status-color: {{ item.color }}; --status-color-rgb: {{ item.color | hex_to_rgb }};">
                          <div class="stat-content">
                             <span class="stat-count">{{ item.count }}</span>
                             <span class="stat-name">{{ item.name }}</span>
@@ -316,25 +316,51 @@
         transform: translateY(-4px);
         box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
     }
-    .stats-grid-compact {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        gap: 0.5rem;
-    }
     .stat-card-compact {
-        background-color: var(--bs-tertiary-bg);
-        border-radius: var(--bs-border-radius-sm);
-        padding: 0.5rem 0.75rem;
-        border-left: 4px solid var(--status-color, var(--bs-secondary));
-    }
-    .stat-card-compact .stat-content {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-    }
-    .stat-card-compact .stat-count { font-weight: 700; font-size: 1.1rem; }
-    .stat-card-compact .stat-name { font-size: 0.75rem; color: var(--bs-secondary-color); }
-    
+    /* Set a transparent background based on the status color */
+    background-color: rgba(var(--status-color-rgb, 108, 117, 125), 0.1);
+    border-radius: var(--bs-border-radius-sm);
+    padding: 0.5rem 0.75rem;
+    /* The colored border is still a good accent */
+    border-left: 3px solid var(--status-color, var(--bs-secondary));
+    transition: background-color 0.2s ease;
+}
+.stat-card-compact:hover {
+     background-color: rgba(var(--status-color-rgb, 108, 117, 125), 0.15);
+}
+.stat-card-compact .stat-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+.stat-card-compact .stat-count { 
+    font-weight: 700; 
+    font-size: 1.1rem; 
+    /* The count will use the main status color for emphasis */
+    color: var(--status-color, var(--bs-body-color));
+}
+.stat-card-compact .stat-name { 
+    font-size: 0.75rem; 
+    color: var(--bs-secondary-color); 
+    font-weight: 500;
+}
+
+/* Dark mode override to make the background slightly more visible */
+body.dark-mode .stat-card-compact {
+    background-color: rgba(var(--status-color-rgb, 108, 117, 125), 0.2);
+}
+body.dark-mode .stat-card-compact:hover {
+     background-color: rgba(var(--status-color-rgb, 108, 117, 125), 0.25);
+}
+/* In dark mode, the count might be too dark, so we use the default text color */
+body.dark-mode .stat-card-compact .stat-count {
+    color: var(--bs-body-color);
+}
+body.dark-mode .stat-card-compact .stat-name {
+    /* Make the status name pop a bit more in dark mode using its own color */
+    color: var(--status-color, var(--bs-secondary-color));
+    opacity: 0.9;
+}
     /* Table styling */
     .table th { font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;}
     .table td { vertical-align: middle; font-size: 0.85rem; }
