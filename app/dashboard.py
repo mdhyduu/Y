@@ -206,7 +206,70 @@ def index():
                 
                 # إذا كان الموظف مراجعًا (reviewer أو manager)، نضيف إحصائيات جميع الموظفين
                 if employee.role in ['reviewer', 'manager']:
-                    # جلب جميع الحالات المخصصة لجميع الموظفين في المتجر
+                    # جلب جميع الموظفين في المتجر
+                    all_employees = Employee.query.filter_by(
+                        store_id=employee.store_id,
+                        is_active=True
+                    ).all()
+                    
+                    # جلب معرف الموظف المحدد من query string إذا وجد
+                    selected_employee_id = request.args.get('employee_id', type=int)
+                    
+                    # إذا تم اختيار موظف معين
+                    if selected_employee_id:
+                        selected_employee = next((emp for emp in all_employees if emp.id == selected_employee_id), None)
+                        if selected_employee:
+                            # جلب الحالات التلقائية للموظف المحدد
+                            default_statuses = EmployeeCustomStatus.query.filter_by(
+                                employee_id=selected_employee_id
+                            ).all()
+                            
+                            # حساب عدد الطلبات لكل حالة تلقائية للموظف المحدد
+                            default_status_stats = []
+                            for status in default_statuses:
+                                count = OrderEmployeeStatus.query.filter(
+                                    OrderEmployeeStatus.status_id == status.id
+                                ).count()
+                                
+                                default_status_stats.append({
+                                    'name': status.name,
+                                    'color': status.color,
+                                    'count': count
+                                })
+                            
+                            # جلب الحالات المخصصة التي أضافها الموظف المحدد
+                            custom_statuses_selected = EmployeeCustomStatus.query.filter_by(
+                                employee_id=selected_employee_id
+                            ).all()
+                            
+                            # حساب عدد الطلبات لكل حالة مخصصة للموظف المحدد
+                            custom_status_stats_selected = []
+                            for status in custom_statuses_selected:
+                                count = OrderEmployeeStatus.query.filter(
+                                    OrderEmployeeStatus.status_id == status.id
+                                ).count()
+                                
+                                custom_status_stats_selected.append({
+                                    'name': status.name,
+                                    'color': status.color,
+                                    'count': count
+                                })
+                            
+                            return render_template('employee_dashboard.html',
+                                                current_user=user,
+                                                employee=employee,
+                                                stats=stats,
+                                                custom_statuses=custom_statuses,
+                                                custom_status_stats=custom_status_stats,
+                                                recent_statuses=recent_statuses,
+                                                assigned_orders=assigned_orders,
+                                                all_employees=all_employees,
+                                                selected_employee=selected_employee,
+                                                default_status_stats=default_status_stats,
+                                                custom_status_stats_selected=custom_status_stats_selected,
+                                                is_reviewer=True)
+                    
+                    # إذا لم يتم اختيار موظف، نعرض إحصائيات جميع الموظفين مجتمعة
                     all_employee_statuses = EmployeeCustomStatus.query.join(
                         Employee
                     ).filter(
@@ -240,7 +303,7 @@ def index():
                                         custom_status_stats=custom_status_stats,
                                         recent_statuses=recent_statuses,
                                         assigned_orders=assigned_orders,
-                                        # البيانات الجديدة لجميع الموظفين
+                                        all_employees=all_employees,
                                         all_employee_status_stats=all_employee_status_stats,
                                         is_reviewer=True)
                 
