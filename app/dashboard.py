@@ -183,7 +183,7 @@ def index():
                     employee_id=employee.id
                 ).all()
                 
-                # حساب عدد الطلبات لكل حالة مخصصة
+                # حساب عدد الطلبات لكل حالة مخصصة للموظف الحالي
                 custom_status_stats = []
                 for status in custom_statuses:
                     count = OrderEmployeeStatus.query.filter(
@@ -202,22 +202,70 @@ def index():
                 ).options(
                     db.joinedload(OrderStatusNote.admin),
                     db.joinedload(OrderStatusNote.employee),
-                    db.joinedload(OrderStatusNote.custom_status)  # تحميل الحالات المخصصة
+                    db.joinedload(OrderStatusNote.custom_status)
                 ).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
                 
-                return render_template('employee_dashboard.html',
-                                    current_user=user,
-                                    employee=employee,
-                                    stats=stats,
-                                    custom_statuses=custom_statuses,
-                                    custom_status_stats=custom_status_stats,
-                                    recent_statuses=recent_statuses,
-                                    assigned_orders=assigned_orders,recnt_statuses=recent_statuses)
+                # إذا كان الموظف مراجعًا (reviewer أو manager)، نضيف إحصائيات جميع الموظفين
+                if employee.role in ['reviewer', 'manager']:
+                    # جلب جميع الحالات المخصصة لجميع الموظفين في المتجر
+                    all_employee_statuses = EmployeeCustomStatus.query.join(
+                        Employee
+                    ).filter(
+                        Employee.store_id == employee.store_id
+                    ).all()
+                    
+                    # حساب عدد الطلبات لكل حالة مخصصة لجميع الموظفين
+                    all_employee_status_stats = []
+                    for status in all_employee_statuses:
+                        count = OrderEmployeeStatus.query.filter(
+                            OrderEmployeeStatus.status_id == status.id
+                        ).count()
+                        
+                        all_employee_status_stats.append({
+                            'status': status,
+                            'count': count
+                        })
+                    
+                    # جلب آخر النشاطات لجميع الموظفين
+                    all_recent_statuses = db.session.query(
+                        OrderEmployeeStatus,
+                        EmployeeCustomStatus,
+                        Employee
+                    ).join(
+                        EmployeeCustomStatus,
+                        OrderEmployeeStatus.status_id == EmployeeCustomStatus.id
+                    ).join(
+                        Employee,
+                        EmployeeCustomStatus.employee_id == Employee.id
+                    ).filter(
+                        Employee.store_id == employee.store_id
+                    ).order_by(OrderEmployeeStatus.created_at.desc()).limit(5).all()
+                    
+                    return render_template('employee_dashboard.html',
+                                        current_user=user,
+                                        employee=employee,
+                                        stats=stats,
+                                        custom_statuses=custom_statuses,
+                                        custom_status_stats=custom_status_stats,
+                                        recent_statuses=recent_statuses,
+                                        assigned_orders=assigned_orders,
+                                        # البيانات الجديدة لجميع الموظفين
+                                        all_employee_status_stats=all_employee_status_stats,
+                                        all_recent_statuses=all_recent_statuses,
+                                        is_reviewer=True)
+                
+                else:
+                    # للموظفين العاديين
+                    return render_template('employee_dashboard.html',
+                                        current_user=user,
+                                        employee=employee,
+                                        stats=stats,
+                                        custom_statuses=custom_statuses,
+                                        custom_status_stats=custom_status_stats,
+                                        recent_statuses=recent_statuses,
+                                        assigned_orders=assigned_orders,
+                                        is_reviewer=False)
         
-    except Exception as e:
-        flash(f"حدث خطأ في جلب بيانات لوحة التحكم: {str(e)}", "error")
-        return redirect(url_for('user_auth.login'))
-    
     except Exception as e:
         flash(f"حدث خطأ في جلب بيانات لوحة التحكم: {str(e)}", "error")
         return redirect(url_for('user_auth.login'))
