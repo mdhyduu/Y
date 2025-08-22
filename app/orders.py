@@ -1112,9 +1112,8 @@ def scan_barcode():
 
 
  
-@orders_bp.route('/employee_status_actions', methods=['POST'], endpoint='employee_status_actions')
-def employee_status_actions():
-    # ... باقي الكود إذا كان هناك مسار آخر ...
+@orders_bp.route('/employee_status', methods=['GET', 'POST'])
+def manage_employee_status():
     user, employee = get_user_from_cookies()
     
     if not user:
@@ -1580,53 +1579,3 @@ def get_quick_list_data():
         'success': True,
         'orders': orders_data
     })
-@orders_bp.route('/employee_status', methods=['GET', 'POST'], endpoint='manage_employee_custom_status')
-def manage_employee_status():
-
-    user, employee = get_user_from_cookies()
-    
-    if not user:
-        flash('الرجاء تسجيل الدخول أولاً', 'error')
-        response = make_response(redirect(url_for('user_auth.login')))
-        response.set_cookie('user_id', '', expires=0)
-        response.set_cookie('is_admin', '', expires=0)
-        return response
-    
-    # للموظفين العاديين: جلب بيانات الموظف
-    if not request.cookies.get('is_admin') == 'true':
-        if not employee:
-            flash('غير مصرح لك بالوصول', 'error')
-            response = make_response(redirect(url_for('user_auth.login')))
-            response.set_cookie('user_id', '', expires=0)
-            response.set_cookie('is_admin', '', expires=0)
-            return response
-    
-    # التأكد من وجود الحالات الافتراضية للموظف
-    if not request.cookies.get('is_admin') == 'true':
-        if employee and len(employee.custom_statuses) == 0:
-            create_default_employee_custom_statuses(employee.id)
-    
-    if request.method == 'POST':
-        name = request.form.get('name')
-        color = request.form.get('color', '#6c757d')
-        
-        if name:
-            # للمديرين: استخدام user_id، للموظفين: استخدام employee.id
-            employee_id = request.cookies.get('user_id') if request.cookies.get('is_admin') == 'true' else employee.id
-            new_status = EmployeeCustomStatus(
-                name=name,
-                color=color,
-                employee_id=employee_id
-            )
-            db.session.add(new_status)
-            db.session.commit()
-            flash('تمت إضافة الحالة بنجاح', 'success')
-        return redirect(url_for('orders.manage_employee_status'))
-    
-    # جلب الحالات حسب نوع المستخدم
-    if request.cookies.get('is_admin') == 'true':
-        statuses = EmployeeCustomStatus.query.filter_by(employee_id=request.cookies.get('user_id')).all()
-    else:
-        statuses = employee.custom_statuses
-    
-    return render_template('manage_custom_status.html', statuses=statuses)
