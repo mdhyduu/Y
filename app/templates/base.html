@@ -350,7 +350,7 @@
     <i class="fas fa-camera"></i> مسح الباركود
   </a>
   
-  <a class="nav-link {% if request.path == url_for('orders.manage_employee_status') %}active{% endif %}" href="{{ url_for('orders.manage_employee_status') }}">
+  <a class="nav-link {% if request.path == url_for('orders.manage_employee_status') %}active{% endif %}" href="{{ url_for('orders.manage_employee_custom_status') }}">
     <i class="fas fa-tags"></i> حالات الطلبات
   </a>
   
