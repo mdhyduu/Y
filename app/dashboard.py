@@ -221,12 +221,47 @@ def index():
                         if selected_employee:
                             # جلب الحالات التلقائية للموظف المحدد
                             default_statuses = EmployeeCustomStatus.query.filter_by(
-                                employee_id=selected_employee_id
+                    employee_id=employee.id,
+                    is_default=True  # إضافة شرط للحالات التلقائية فقط
+                ).all()
+                
+                # حساب عدد الطلبات لكل حالة تلقائية
+                custom_status_stats = []
+                for status in default_statuses:
+                    count = OrderEmployeeStatus.query.filter(
+                        OrderEmployeeStatus.status_id == status.id,
+                        OrderEmployeeStatus.order_id.in_(assigned_order_ids)
+                    ).count() if assigned_order_ids else 0
+                    
+                    custom_status_stats.append({
+                        'status': status,
+                        'count': count
+                    })
+                
+                # إذا كان الموظف مراجعًا (reviewer أو manager)
+                if employee.role in ['reviewer', 'manager']:
+                    # جلب جميع الموظفين في المتجر
+                    all_employees = Employee.query.filter_by(
+                        store_id=employee.store_id,
+                        is_active=True
+                    ).all()
+                    
+                    # جلب معرف الموظف المحدد من query string إذا وجد
+                    selected_employee_id = request.args.get('employee_id', type=int)
+                    
+                    # إذا تم اختيار موظف معين
+                    if selected_employee_id:
+                        selected_employee = next((emp for emp in all_employees if emp.id == selected_employee_id), None)
+                        if selected_employee:
+                            # جلب الحالات التلقائية للموظف المحدد
+                            default_statuses_selected = EmployeeCustomStatus.query.filter_by(
+                                employee_id=selected_employee_id,
+                                is_default=True
                             ).all()
                             
                             # حساب عدد الطلبات لكل حالة تلقائية للموظف المحدد
                             default_status_stats = []
-                            for status in default_statuses:
+                            for status in default_statuses_selected:
                                 count = OrderEmployeeStatus.query.filter(
                                     OrderEmployeeStatus.status_id == status.id
                                 ).count()
@@ -239,7 +274,8 @@ def index():
                             
                             # جلب الحالات المخصصة التي أضافها الموظف المحدد
                             custom_statuses_selected = EmployeeCustomStatus.query.filter_by(
-                                employee_id=selected_employee_id
+                                employee_id=selected_employee_id,
+                                is_default=False  # الحالات المخصصة فقط
                             ).all()
                             
                             # حساب عدد الطلبات لكل حالة مخصصة للموظف المحدد
@@ -259,7 +295,7 @@ def index():
                                                 current_user=user,
                                                 employee=employee,
                                                 stats=stats,
-                                                custom_statuses=custom_statuses,
+                                                custom_statuses=default_statuses,  # الحالات التلقائية فقط
                                                 custom_status_stats=custom_status_stats,
                                                 recent_statuses=recent_statuses,
                                                 assigned_orders=assigned_orders,
@@ -269,16 +305,16 @@ def index():
                                                 custom_status_stats_selected=custom_status_stats_selected,
                                                 is_reviewer=True)
                     
-                    # إذا لم يتم اختيار موظف، نعرض إحصائيات جميع الموظفين مجتمعة
-                    all_employee_statuses = EmployeeCustomStatus.query.join(
-                        Employee
-                    ).filter(
+                    # إذا لم يتم اختيار موظف، نعرض إحصائيات الحالات التلقائية لجميع الموظفين
+                    all_default_statuses = EmployeeCustomStatus.query.filter_by(
+                        is_default=True
+                    ).join(Employee).filter(
                         Employee.store_id == employee.store_id
                     ).all()
                     
-                    # تجميع الحالات المخصصة حسب الاسم (بدون تكرار) وجمع عدد الطلبات لكل حالة
+                    # تجميع الحالات التلقائية حسب الاسم (بدون تكرار) وجمع عدد الطلبات لكل حالة
                     status_stats_dict = {}
-                    for status in all_employee_statuses:
+                    for status in all_default_statuses:
                         count = OrderEmployeeStatus.query.filter(
                             OrderEmployeeStatus.status_id == status.id
                         ).count()
@@ -299,7 +335,7 @@ def index():
                                         current_user=user,
                                         employee=employee,
                                         stats=stats,
-                                        custom_statuses=custom_statuses,
+                                        custom_statuses=default_statuses,
                                         custom_status_stats=custom_status_stats,
                                         recent_statuses=recent_statuses,
                                         assigned_orders=assigned_orders,
@@ -313,7 +349,7 @@ def index():
                                         current_user=user,
                                         employee=employee,
                                         stats=stats,
-                                        custom_statuses=custom_statuses,
+                                        custom_statuses=default_statuses,  # الحالات التلقائية فقط
                                         custom_status_stats=custom_status_stats,
                                         recent_statuses=recent_statuses,
                                         assigned_orders=assigned_orders,
