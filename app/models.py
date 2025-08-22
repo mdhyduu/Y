@@ -397,16 +397,46 @@ DEFAULT_EMPLOYEE_STATUSES = [
 # أضف دالة لإنشاء الحالات الافتراضية للموظف
 def create_default_employee_statuses(employee_id):
     """إنشاء الحالات المخصصة الافتراضية للموظف"""
-    for status_info in DEFAULT_EMPLOYEE_STATUSES:
-        status = EmployeeCustomStatus(
-            name=status_info["name"],
-            color=status_info["color"],
-            employee_id=employee_id
-        )
-        db.session.add(status)
-    
+    try:
+        for status_info in DEFAULT_EMPLOYEE_STATUSES:
+            # التحقق من عدم وجود الحالة مسبقاً
+            existing_status = EmployeeCustomStatus.query.filter_by(
+                name=status_info["name"],
+                employee_id=employee_id
+            ).first()
+            
+            if not existing_status:
+                status = EmployeeCustomStatus(
+                    name=status_info["name"],
+                    color=status_info["color"],
+                    employee_id=employee_id
+                )
+                db.session.add(status)
+        
+        db.session.commit()
+        return True
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"فشل إنشاء الحالات الافتراضية للموظف {employee_id}: {str(e)}")
+        return False
 
 # أضف حدثًا لإنشاء الحالات الافتراضية بعد إضافة موظف جديد
+@event.listens_for(Employee, 'after_insert')
+def after_employee_insert(mapper, connection, target):
+    """بعد إضافة موظف جديد، إنشاء الحالات المخصصة الافتراضية له"""
+    # استخدام connection بدلاً من db.session للعمل ضمن نفس الجلسة
+    try:
+        # إنشاء الحالات الافتراضية
+        for status_info in DEFAULT_EMPLOYEE_STATUSES:
+            stmt = EmployeeCustomStatus.__table__.insert().values(
+                name=status_info["name"],
+                color=status_info["color"],
+                employee_id=target.id
+            )
+            connection.execute(stmt)
+    except Exception as e:
+        # تسجيل الخطأ ولكن لا نوقف التطبيق
+        current_app.logger.error(f"فشل إنشاء الحالات الافتراضية للموظف {target.id}: {str(e)}")
 
 # ... (بقية الكود الحالي)
 class CustomNoteStatus(db.Model):
@@ -483,11 +513,21 @@ def validate_user(mapper, connection, target):
 def validate_employee(mapper, connection, target):
     if not target.email:
         raise ValueError("البريد الإلكتروني مطلوب")
-@event.listens_for(Employee, 'after_insert')
-def after_employee_insert(mapper, connection, target):
-    """بعد إضافة موظف جديد، إنشاء الحالات المخصصة الافتراضية له"""
+# أضف هذه الدالة في نهاية الملف
+def ensure_default_statuses_for_existing_employees():
+    """ضمان وجود الحالات الافتراضية لجميع الموظفين الحاليين"""
     try:
-        create_default_employee_statuses(target.id)
+        employees = Employee.query.all()
+        for employee in employees:
+            # التحقق من وجود حالات للموظف
+            status_count = EmployeeCustomStatus.query.filter_by(employee_id=employee.id).count()
+            if status_count == 0:
+                create_default_employee_statuses(employee.id)
+                current_app.logger.info(f"تم إنشاء الحالات الافتراضية للموظف {employee.id}")
+        
+        db.session.commit()
+        return True
     except Exception as e:
-        # تسجيل الخطأ ولكن لا نوقف التطبيق
-        current_app.logger.error(f"فشل إنشاء الحالات الافتراضية للموظف {target.id}: {str(e)}")
+        db.session.rollback()
+        current_app.logger.error(f"فشل إنشاء الحالات الافتراضية للموظفين الحاليين: {str(e)}")
+        return False
