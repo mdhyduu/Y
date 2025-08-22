@@ -99,19 +99,34 @@ def delete_employee(employee_id):
         flash('غير مصرح لك بهذا الإجراء', 'error')
         return redirect(url_for('user_auth.login'))
     
+    # الحصول على المستخدم الحالي ومتجره
+    current_user = User.query.get(user_id)
+    if not current_user:
+        flash('المستخدم غير موجود', 'error')
+        return redirect(url_for('user_auth.login'))
+    
     employee = Employee.query.get(employee_id)
     if not employee:
         flash('الموظف غير موجود', 'error')
+        return redirect(url_for('employees.list_employees'))
+    
+    # التأكد من أن الموظف ينتمي إلى نفس المتجر
+    if employee.store_id != current_user.store_id:
+        flash('الموظف غير موجود في متجرك', 'error')
         return redirect(url_for('employees.list_employees'))
     
     if is_delivery_manager and employee.role == 'delivery_manager':
         flash('لا يمكنك حذف مدراء آخرين', 'error')
         return redirect(url_for('employees.list_employees'))
     
-    db.session.delete(employee)
-    db.session.commit()
+    try:
+        db.session.delete(employee)
+        db.session.commit()
+        flash('تم حذف الموظف بنجاح', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ أثناء حذف الموظف: {str(e)}', 'error')
     
-    flash('تم حذف الموظف بنجاح', 'success')
     return redirect(url_for('employees.list_employees'))
 
 @employees_bp.route('/employees/<int:employee_id>/toggle_active', methods=['POST'])
