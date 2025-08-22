@@ -371,6 +371,7 @@ class OrderStatusNote(db.Model):
     employee = relationship('Employee', foreign_keys=[employee_id])
     order = relationship('SallaOrder', back_populates='status_notes')
     custom_status = relationship('CustomNoteStatus', back_populates='notes', foreign_keys=[custom_status_id])  # 
+# models.py
 class EmployeeCustomStatus(db.Model):
     __tablename__ = 'employee_custom_statuses'
     
@@ -379,20 +380,20 @@ class EmployeeCustomStatus(db.Model):
     color = db.Column(db.String(20), default='#6c757d')
     employee_id = db.Column(db.Integer, ForeignKey('employees.id'), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
+    is_system = db.Column(db.Boolean, default=False)  # جديد: للتمييز بين الحالات النظامية والمخصصة
     
     employee = relationship('Employee', back_populates='custom_statuses')
     order_statuses = relationship('OrderEmployeeStatus', back_populates='status')
-# أضف هذا الكود بعد تعريف نموذج EmployeeCustomStatus
 
 def create_default_employee_custom_statuses(employee_id):
     """إنشاء الحالات المخصصة الافتراضية للموظف"""
     default_statuses = [
-        {'name': 'قيد التنفيذ', 'color': '#ffc107'},
-        {'name': 'تم التنفيذ', 'color': '#28a745'},
-        {'name': 'جاهز للشحن', 'color': '#17a2b8'},
-        {'name': 'تم الشحن', 'color': '#6f42c1'},
-        {'name': 'جاري التوصيل', 'color': '#fd7e14'},
-        {'name': 'تم التوصيل', 'color': '#20c997'}
+        {'name': 'قيد التنفيذ', 'color': '#ffc107', 'is_system': True},
+        {'name': 'تم التنفيذ', 'color': '#28a745', 'is_system': True},
+        {'name': 'جاهز للشحن', 'color': '#17a2b8', 'is_system': True},
+        {'name': 'تم الشحن', 'color': '#6f42c1', 'is_system': True},
+        {'name': 'جاري التوصيل', 'color': '#fd7e14', 'is_system': True},
+        {'name': 'تم التوصيل', 'color': '#20c997', 'is_system': True}
     ]
     
     for status in default_statuses:
@@ -406,7 +407,8 @@ def create_default_employee_custom_statuses(employee_id):
             new_status = EmployeeCustomStatus(
                 name=status['name'],
                 color=status['color'],
-                employee_id=employee_id
+                employee_id=employee_id,
+                is_system=status['is_system']
             )
             db.session.add(new_status)
     
@@ -416,7 +418,7 @@ def create_default_employee_custom_statuses(employee_id):
 @event.listens_for(Employee, 'after_insert')
 def create_default_statuses_for_new_employee(mapper, connection, target):
     """إنشاء الحالات الافتراضية عند إنشاء موظف جديد"""
-    create_default_employee_custom_statuses(target.id)    
+    create_default_employee_custom_statuses(target.id)
 class CustomNoteStatus(db.Model):
     __tablename__ = 'custom_note_statuses'
     
