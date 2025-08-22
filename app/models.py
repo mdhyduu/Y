@@ -404,7 +404,7 @@ def create_default_employee_statuses(employee_id):
             employee_id=employee_id
         )
         db.session.add(status)
-    db.session.commit()
+    
 
 # أضف حدثًا لإنشاء الحالات الافتراضية بعد إضافة موظف جديد
 
