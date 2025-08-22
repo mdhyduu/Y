@@ -7,7 +7,6 @@ from .config import Config
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 from flask import session
-import webcolors
 
 # إنشاء كائنات الإضافات
 db = SQLAlchemy()
@@ -112,45 +111,7 @@ def create_app():
                             app.logger.info(f"تم تجديد التوكن للمستخدم {user.id}")
                 except Exception as e:
                     app.logger.error(f"فشل تجديد التوكن للمستخدم {user.id}: {str(e)}")
-    
-
-    def get_text_color(hex_color):
-        """
-        Determines if text should be black or white based on background hex color.
-        """
-        try:
-            # Normalize color if it's a known name
-            if not hex_color.startswith('#'):
-                hex_color = webcolors.name_to_hex(hex_color)
-                
-            hex_color = hex_color.lstrip('#')
-            rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-            # Formula for perceived brightness (YIQ)
-            yiq = ((rgb[0] * 299) + (rgb[1] * 587) + (rgb[2] * 114)) / 1000
-            return '#212529' if yiq >= 128 else '#ffffff'
-        except (ValueError, AttributeError):
-            # Default for invalid colors
-            return '#ffffff'
-    
-    def get_status_badge(status_slug):
-        """
-        Maps order status slugs to Bootstrap badge background colors.
-        """
-        mapping = {
-            'under_review': 'warning text-dark',
-            'processing': 'info text-dark',
-            'completed': 'success',
-            'awaiting_payment': 'warning text-dark',
-            'shipped': 'primary',
-            'delivered': 'success',
-            'canceled': 'danger',
-            'refunded': 'secondary',
-        }
-        return mapping.get(status_slug, 'light text-dark')
-    
-    # Register the filters with Jinja2 environment
-    app.jinja_env.filters['get_text_color'] = get_text_color
-    app.jinja_env.filters['get_status_badge'] = get_status_badge
+        
 
 
     return app
