@@ -1579,8 +1579,9 @@ def get_quick_list_data():
         'success': True,
         'orders': orders_data
     })
-@orders_bp.route('/employee_status', methods=['GET', 'POST'])
+@orders_bp.route('/employee_status', methods=['GET', 'POST'], endpoint='manage_employee_custom_status')
 def manage_employee_status():
+
     user, employee = get_user_from_cookies()
     
     if not user:
