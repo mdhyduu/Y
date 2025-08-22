@@ -371,7 +371,6 @@ class OrderStatusNote(db.Model):
     employee = relationship('Employee', foreign_keys=[employee_id])
     order = relationship('SallaOrder', back_populates='status_notes')
     custom_status = relationship('CustomNoteStatus', back_populates='notes', foreign_keys=[custom_status_id])  # 
-# models.py
 class EmployeeCustomStatus(db.Model):
     __tablename__ = 'employee_custom_statuses'
     
@@ -380,68 +379,36 @@ class EmployeeCustomStatus(db.Model):
     color = db.Column(db.String(20), default='#6c757d')
     employee_id = db.Column(db.Integer, ForeignKey('employees.id'), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
-    is_system = db.Column(db.Boolean, default=False)  # جديد: للتمييز بين الحالات النظامية والمخصصة
     
     employee = relationship('Employee', back_populates='custom_statuses')
     order_statuses = relationship('OrderEmployeeStatus', back_populates='status')
+# ... (الكود الحالي)
 
-@event.listens_for(Employee, 'after_insert')
-def create_default_statuses_for_new_employee(mapper, connection, target):
-    """إنشاء الحالات الافتراضية عند إنشاء موظف جديد"""
-    try:
-        # استخدام اتصال منفصل لتجنب مشاكل الجلسة
-        from app import db
-        engine = db.get_engine()
-        
-        with engine.connect() as conn:
-            # التحقق من وجود حقل is_system أولاً
-            result = conn.execute(text(
-                "SELECT column_name FROM information_schema.columns "
-                "WHERE table_name = 'employee_custom_statuses' "
-                "AND column_name = 'is_system'"
-            ))
-            
-            has_is_system_field = result.fetchone() is not None
-            
-            # إنشاء الحالات الافتراضية
-            default_statuses = [
-                {'name': 'قيد التنفيذ', 'color': '#ffc107', 'is_system': True},
-                {'name': 'تم التنفيذ', 'color': '#28a745', 'is_system': True},
-                {'name': 'جاهز للشحن', 'color': '#17a2b8', 'is_system': True},
-                {'name': 'تم الشحن', 'color': '#6f42c1', 'is_system': True},
-                {'name': 'جاري التوصيل', 'color': '#fd7e14', 'is_system': True},
-                {'name': 'تم التوصيل', 'color': '#20c997', 'is_system': True}
-            ]
-            
-            for status in default_statuses:
-                if has_is_system_field:
-                    conn.execute(text(
-                        "INSERT INTO employee_custom_statuses "
-                        "(name, color, employee_id, is_system) "
-                        "VALUES (:name, :color, :employee_id, :is_system)"
-                    ), {
-                        'name': status['name'],
-                        'color': status['color'],
-                        'employee_id': target.id,
-                        'is_system': status['is_system']
-                    })
-                else:
-                    conn.execute(text(
-                        "INSERT INTO employee_custom_statuses "
-                        "(name, color, employee_id) "
-                        "VALUES (:name, :color, :employee_id)"
-                    ), {
-                        'name': status['name'],
-                        'color': status['color'],
-                        'employee_id': target.id
-                    })
-            
-            conn.commit()
-            
-    except Exception as e:
-        # تسجيل الخطأ دون إيقاف التطبيق
-        import logging
-        logging.error(f"فشل في إنشاء الحالات الافتراضية للموظف {target.id}: {str(e)}")
+# بعد تعريف نموذج EmployeeCustomStatus مباشرة، أضف القائمة الثابتة للحالات الافتراضية
+DEFAULT_EMPLOYEE_STATUSES = [
+    {"name": "قيد التنفيذ", "color": "#17a2b8"},
+    {"name": "تم التنفيذ", "color": "#28a745"},
+    {"name": "جاهز للشحن", "color": "#ffc107"},
+    {"name": "تم الشحن", "color": "#6f42c1"},
+    {"name": "جاري التوصيل", "color": "#fd7e14"},
+    {"name": "تم التوصيل", "color": "#20c997"}
+]
+
+# أضف دالة لإنشاء الحالات الافتراضية للموظف
+def create_default_employee_statuses(employee_id):
+    """إنشاء الحالات المخصصة الافتراضية للموظف"""
+    for status_info in DEFAULT_EMPLOYEE_STATUSES:
+        status = EmployeeCustomStatus(
+            name=status_info["name"],
+            color=status_info["color"],
+            employee_id=employee_id
+        )
+        db.session.add(status)
+    db.session.commit()
+
+# أضف حدثًا لإنشاء الحالات الافتراضية بعد إضافة موظف جديد
+
+# ... (بقية الكود الحالي)
 class CustomNoteStatus(db.Model):
     __tablename__ = 'custom_note_statuses'
     
@@ -516,3 +483,11 @@ def validate_user(mapper, connection, target):
 def validate_employee(mapper, connection, target):
     if not target.email:
         raise ValueError("البريد الإلكتروني مطلوب")
+@event.listens_for(Employee, 'after_insert')
+def after_employee_insert(mapper, connection, target):
+    """بعد إضافة موظف جديد، إنشاء الحالات المخصصة الافتراضية له"""
+    try:
+        create_default_employee_statuses(target.id)
+    except Exception as e:
+        # تسجيل الخطأ ولكن لا نوقف التطبيق
+        current_app.logger.error(f"فشل إنشاء الحالات الافتراضية للموظف {target.id}: {str(e)}")
