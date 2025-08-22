@@ -1112,8 +1112,9 @@ def scan_barcode():
 
 
  
-@orders_bp.route('/employee_status', methods=['GET', 'POST'])
-def manage_employee_status():
+@orders_bp.route('/employee_status_actions', methods=['POST'], endpoint='employee_status_actions')
+def employee_status_actions():
+    # ... باقي الكود إذا كان هناك مسار آخر ...
     user, employee = get_user_from_cookies()
     
     if not user:
