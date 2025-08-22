@@ -1,7 +1,7 @@
 from flask_wtf.csrf import CSRFProtect
 csrf = CSRFProtect()
 from flask import Blueprint, render_template, redirect, url_for, request, flash, make_response
-from .models import db, User, Employee, OrderStatusNote
+from .models import db, User, Employee, OrderStatusNote, EmployeePermission, EmployeeCustomStatus, OrderAssignment
 from datetime import datetime
 
 employees_bp = Blueprint('employees', __name__, url_prefix='/dashboard')
