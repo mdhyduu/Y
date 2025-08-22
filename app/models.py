@@ -385,40 +385,63 @@ class EmployeeCustomStatus(db.Model):
     employee = relationship('Employee', back_populates='custom_statuses')
     order_statuses = relationship('OrderEmployeeStatus', back_populates='status')
 
-def create_default_employee_custom_statuses(employee_id):
-    """إنشاء الحالات المخصصة الافتراضية للموظف"""
-    default_statuses = [
-        {'name': 'قيد التنفيذ', 'color': '#ffc107', 'is_system': True},
-        {'name': 'تم التنفيذ', 'color': '#28a745', 'is_system': True},
-        {'name': 'جاهز للشحن', 'color': '#17a2b8', 'is_system': True},
-        {'name': 'تم الشحن', 'color': '#6f42c1', 'is_system': True},
-        {'name': 'جاري التوصيل', 'color': '#fd7e14', 'is_system': True},
-        {'name': 'تم التوصيل', 'color': '#20c997', 'is_system': True}
-    ]
-    
-    for status in default_statuses:
-        # التحقق إذا كانت الحالة موجودة مسبقاً
-        existing_status = EmployeeCustomStatus.query.filter_by(
-            employee_id=employee_id,
-            name=status['name']
-        ).first()
-        
-        if not existing_status:
-            new_status = EmployeeCustomStatus(
-                name=status['name'],
-                color=status['color'],
-                employee_id=employee_id,
-                is_system=status['is_system']
-            )
-            db.session.add(new_status)
-    
-    db.session.commit()
-
-# حدث لإنشاء الحالات الافتراضية عند إنشاء موظف جديد
 @event.listens_for(Employee, 'after_insert')
 def create_default_statuses_for_new_employee(mapper, connection, target):
     """إنشاء الحالات الافتراضية عند إنشاء موظف جديد"""
-    create_default_employee_custom_statuses(target.id)
+    try:
+        # استخدام اتصال منفصل لتجنب مشاكل الجلسة
+        from app import db
+        engine = db.get_engine()
+        
+        with engine.connect() as conn:
+            # التحقق من وجود حقل is_system أولاً
+            result = conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'employee_custom_statuses' "
+                "AND column_name = 'is_system'"
+            ))
+            
+            has_is_system_field = result.fetchone() is not None
+            
+            # إنشاء الحالات الافتراضية
+            default_statuses = [
+                {'name': 'قيد التنفيذ', 'color': '#ffc107', 'is_system': True},
+                {'name': 'تم التنفيذ', 'color': '#28a745', 'is_system': True},
+                {'name': 'جاهز للشحن', 'color': '#17a2b8', 'is_system': True},
+                {'name': 'تم الشحن', 'color': '#6f42c1', 'is_system': True},
+                {'name': 'جاري التوصيل', 'color': '#fd7e14', 'is_system': True},
+                {'name': 'تم التوصيل', 'color': '#20c997', 'is_system': True}
+            ]
+            
+            for status in default_statuses:
+                if has_is_system_field:
+                    conn.execute(text(
+                        "INSERT INTO employee_custom_statuses "
+                        "(name, color, employee_id, is_system) "
+                        "VALUES (:name, :color, :employee_id, :is_system)"
+                    ), {
+                        'name': status['name'],
+                        'color': status['color'],
+                        'employee_id': target.id,
+                        'is_system': status['is_system']
+                    })
+                else:
+                    conn.execute(text(
+                        "INSERT INTO employee_custom_statuses "
+                        "(name, color, employee_id) "
+                        "VALUES (:name, :color, :employee_id)"
+                    ), {
+                        'name': status['name'],
+                        'color': status['color'],
+                        'employee_id': target.id
+                    })
+            
+            conn.commit()
+            
+    except Exception as e:
+        # تسجيل الخطأ دون إيقاف التطبيق
+        import logging
+        logging.error(f"فشل في إنشاء الحالات الافتراضية للموظف {target.id}: {str(e)}")
 class CustomNoteStatus(db.Model):
     __tablename__ = 'custom_note_statuses'
     
