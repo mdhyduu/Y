@@ -1,5 +1,8 @@
 from flask import Flask
-import os
+import os 
+from flask import current_app
+
+from PIL import Image
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
@@ -166,9 +169,45 @@ def create_app():
     app.jinja_env.filters['get_text_color'] = get_text_color
     app.jinja_env.filters['get_status_badge'] = get_status_badge
     app.jinja_env.filters['hex_to_rgb'] = hex_to_rgb # <-- أضف هذا السطر
+
+
+    def generate_pwa_icons(base_icon_path):
+        """
+        إنشاء أيقونات PWA بأحجام مختلفة من أيقونة أساسية
+        """
+        sizes = [72, 96, 128, 144, 152, 192, 384, 512]
+        icons_dir = os.path.join(current_app.static_folder, 'icons')
+        
+        # إنشاء مجلد الأيقونات إذا لم يكن موجودًا
+        if not os.path.exists(icons_dir):
+            os.makedirs(icons_dir)
+        
+        # فتح الصورة الأساسية
+        try:
+            with Image.open(base_icon_path) as img:
+                for size in sizes:
+                    # تغيير حجم الصورة
+                    resized_img = img.resize((size, size), Image.Resampling.LANCZOS)
+                    
+                    # حفظ الصورة بالحجم الجديد
+                    icon_path = os.path.join(icons_dir, f'icon-{size}x{size}.png')
+                    resized_img.save(icon_path)
+                    print(f"تم إنشاء: {icon_path}")
+                    
+        except Exception as e:
+            print(f"خطأ في إنشاء الأيقونات: {e}")
     
+    # في دالة manifest، تحقق من وجود الأيقونات أو أنشئها
     @app.route('/manifest.json')
     def manifest():
+        # المسار إلى الأيقونة الأساسية (افترض أنها موجودة في static/icon.png)
+        base_icon_path = os.path.join(current_app.static_folder, 'icon.png')
+        icons_dir = os.path.join(current_app.static_folder, 'icons')
+        
+        # إذا لم يوجد مجلد الأيقونات أو كان فارغًا، أنشئ الأيقونات
+        if not os.path.exists(icons_dir) or not os.listdir(icons_dir):
+            generate_pwa_icons(base_icon_path)
+        
         manifest_json = '''
         {
           "short_name": "لوحة التحكم",
