@@ -677,6 +677,11 @@ function setupPWAInstall() {
   
   if (!installBtn) return;
   
+  // إظهار الزر إذا كان التطبيق غير مثبت
+  if (!window.matchMedia('(display-mode: standalone)').matches) {
+    installBtn.style.display = 'block';
+  }
+  
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
@@ -698,12 +703,7 @@ function setupPWAInstall() {
     installBtn.style.display = 'none';
     deferredPrompt = null;
   });
-  
-  if (window.matchMedia('(display-mode: standalone)').matches) {
-    installBtn.style.display = 'none';
-  }
 }
-
 function setupConnectionStatus() {
   const offlineAlert = document.getElementById('pwaOfflineAlert');
   if (!offlineAlert) return;
