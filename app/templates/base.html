@@ -677,105 +677,40 @@ function setupPWAInstall() {
   
   if (!installBtn) return;
   
-  // التحقق من حالة التثبيت السابقة
-  checkInstallDismissal();
+  // إخفاء الزر افتراضيًا حتى يتم تنشيط event beforeinstallprompt
+  installBtn.style.display = 'none';
   
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    
-    // التحقق مما إذا كان المستخدم قد رفض التثبيت مؤخراً
-    const dismissedTime = localStorage.getItem('installDismissed');
-    if (dismissedTime) {
-      const now = Date.now();
-      const twentyFourHours = 24 * 60 * 60 * 1000;
-      
-      if (now - parseInt(dismissedTime) < twentyFourHours) {
-        installBtn.style.display = 'none';
-        return;
-      } else {
-        localStorage.removeItem('installDismissed');
-      }
-    }
-    
+    // عرض زر التثبيت عندما يكون الحدث متاحًا
     installBtn.style.display = 'block';
     
     installBtn.onclick = async () => {
       if (deferredPrompt) {
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
-        
-        if (outcome === 'accepted') {
-          console.log('تم قبول التثبيت');
-          installBtn.style.display = 'none';
-          // مسح حالة الرفض إذا كانت موجودة
-          localStorage.removeItem('installDismissed');
-        } else {
-          console.log('تم رفض التثبيت');
-          hideButtonTemporarily();
-        }
-        
+        console.log(`User response: ${outcome}`);
         deferredPrompt = null;
-      } else {
-        showCannotInstallMessage();
+        // إخفاء الزر بعد محاولة التثبيت
+        installBtn.style.display = 'none';
       }
     };
   });
   
   window.addEventListener('appinstalled', () => {
-    console.log('تم تثبيت PWA بنجاح');
-    installBtn.style.display = 'none';
+    console.log('PWA installed');
     deferredPrompt = null;
-    // مسح حالة الرفض إذا كانت موجودة
-    localStorage.removeItem('installDismissed');
+    installBtn.style.display = 'none';
   });
 }
-// إخفاء الزر مؤقتًا بعد رفض التثبيت
-function hideButtonTemporarily() {
-  const installBtn = document.getElementById('pwaInstallBtn');
-  if (!installBtn) return;
-  
-  installBtn.style.display = 'none';
-  
-  // تخزين وقت الرفض
-  localStorage.setItem('installDismissed', Date.now().toString());
-}
 
-// التحقق مما إذا كان المستخدم قد رفض التثبيت مؤخرًا
-function checkInstallDismissal() {
-  const installBtn = document.getElementById('pwaInstallBtn');
-  if (!installBtn) return;
-  
-  const dismissedTime = localStorage.getItem('installDismissed');
-  if (dismissedTime) {
-    const now = Date.now();
-    const twentyFourHours = 24 * 60 * 60 * 1000;
-    
-    if (now - parseInt(dismissedTime) < twentyFourHours) {
-      installBtn.style.display = 'none';
-    } else {
-      // مسح القيمة القديمة بعد مرور 24 ساعة
-      localStorage.removeItem('installDismissed');
-    }
-  }
-}
-// عرض رسالة خطأ عند فشل التثبيت
-function showInstallError() {
-  const toast = document.createElement('div');
-  toast.className = 'alert alert-danger position-fixed top-0 start-50 translate-middle-x mt-3';
-  toast.style.zIndex = '1070';
-  toast.innerHTML = `
-    <i class="fas fa-exclamation-circle me-2"></i>تعذر تثبيت التطبيق. يرجى المحاولة لاحقًا.
-    <button type="button" class="btn-close ms-2" data-bs-dismiss="alert"></button>
-  `;
-  document.body.appendChild(toast);
-  
-  setTimeout(() => {
-    if (toast.parentNode) {
-      toast.parentNode.removeChild(toast);
-    }
-  }, 5000);
-}
+// إزالة الدوال التالية تماماً:
+// - hideButtonTemporarily()
+// - checkInstallDismissal()
+// - showInstallError() (ما لم تكن تستخدم في مكان آخر)
+
+// ... (بقية الكود يبقى كما هو)
 
 // عرض رسالة عندما لا يكون التثبيت متاحًا
 function showCannotInstallMessage() {
