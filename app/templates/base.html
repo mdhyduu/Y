@@ -671,39 +671,85 @@ function registerServiceWorker() {
   }
 }
 
+
 function setupPWAInstall() {
-  let deferredPrompt;
+  let deferredPrompt = null;
   const installBtn = document.getElementById('pwaInstallBtn');
   
   if (!installBtn) return;
   
-  // إظهار الزر إذا كان التطبيق غير مثبت
-  if (!window.matchMedia('(display-mode: standalone)').matches) {
-    installBtn.style.display = 'block';
+  // إخفاء الزر افتراضيًا
+  installBtn.style.display = 'none';
+  
+  // دالة للتحقق مما إذا كان التطبيق مثبتًا بالفعل
+  function isAppInstalled() {
+    return window.matchMedia('(display-mode: standalone)').matches || 
+           navigator.standalone ||
+           document.referrer.includes('android-app://');
   }
   
+  // إذا كان التطبيق مثبتًا بالفعل، نخفي الزر
+  if (isAppInstalled()) {
+    installBtn.style.display = 'none';
+    return;
+  }
+  
+  // حدث beforeinstallprompt - يُطلق عندما يكون التطبيق جاهزًا للتثبيت
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
+    console.log('beforeinstallprompt event fired');
+    
+    // إظهار زر التثبيت
     installBtn.style.display = 'block';
     
+    // إزالة أي معالج أحداث سابق لمنع التكرار
+    installBtn.onclick = null;
+    
+    // إضافة معالج الأحداث الجديد
     installBtn.addEventListener('click', async () => {
-      if (deferredPrompt) {
+      if (!deferredPrompt) {
+        console.log('No deferred prompt available');
+        return;
+      }
+      
+      console.log('Showing install prompt');
+      
+      try {
+        // عرض موجه التثبيت
         deferredPrompt.prompt();
+        
+        // انتظار اختيار المستخدم
         const { outcome } = await deferredPrompt.userChoice;
-        console.log(`User response to the install prompt: ${outcome}`);
+        console.log(`User response: ${outcome}`);
+        
+        // إخفاء الزر بغض النظر عن النتيجة
         installBtn.style.display = 'none';
+        
+        // مسح deferredPrompt بعد الاستخدام
         deferredPrompt = null;
+      } catch (error) {
+        console.error('Error showing install prompt:', error);
+        installBtn.style.display = 'none';
       }
     });
   });
   
+  // حدث appinstalled - يُطلق عند تثبيت التطبيق بنجاح
   window.addEventListener('appinstalled', () => {
     console.log('PWA was installed');
     installBtn.style.display = 'none';
     deferredPrompt = null;
   });
+  
+  // التحقق من حالة التثبيت عند تحميل الصفحة
+  window.addEventListener('load', () => {
+    if (isAppInstalled()) {
+      installBtn.style.display = 'none';
+    }
+  });
 }
+
 function setupConnectionStatus() {
   const offlineAlert = document.getElementById('pwaOfflineAlert');
   if (!offlineAlert) return;
