@@ -1581,7 +1581,7 @@ def get_quick_list_data():
         'success': True,
         'orders': orders_data
     })
-    @app.route('/manifest.json')
+@app.route('/manifest.json')
     def manifest():
         manifest_json = '''
         {
