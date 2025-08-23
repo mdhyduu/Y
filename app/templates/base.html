@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="{{ csrf_token() }}">  
   <title>{% block title %}لوحة التحكم{% endblock %}</title>
-  
+      <!-- إضافة PWA Manifest -->
+<link rel="manifest" href="{{ url_for('manifest') }}">
+
 
 <!-- إزالة الأنماط المضمنة واستبدالها بـ -->
 
@@ -21,7 +23,6 @@
   <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" as="style">
   
   <!-- إضافة manifest مرة أخرى للتأكد -->
-  <link rel="manifest" href="{{ url_for('manifest') }}" crossorigin="use-credentials">
 
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
   
@@ -281,22 +282,6 @@ function setupPWAInstall() {
 // ... (بقية الكود يبقى كما هو)
 
 // عرض رسالة عندما لا يكون التثبيت متاحًا
-function showCannotInstallMessage() {
-  const toast = document.createElement('div');
-  toast.className = 'alert alert-info position-fixed top-0 start-50 translate-middle-x mt-3';
-  toast.style.zIndex = '1070';
-  toast.innerHTML = `
-    <i class="fas fa-info-circle me-2"></i>تثبيت التطبيق غير متاح حاليًا. يرجى المحاولة لاحقًا.
-    <button type="button" class="btn-close ms-2" data-bs-dismiss="alert"></button>
-  `;
-  document.body.appendChild(toast);
-  
-  setTimeout(() => {
-    if (toast.parentNode) {
-      toast.parentNode.removeChild(toast);
-    }
-  }, 5000);
-}
 
 
 
