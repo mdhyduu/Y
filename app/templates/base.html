@@ -5,34 +5,385 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="{{ csrf_token() }}">  
   <title>{% block title %}لوحة التحكم{% endblock %}</title>
-      <!-- إضافة PWA Manifest -->
-<link rel="manifest" href="{{ url_for('manifest') }}">
-
-
-<!-- إزالة الأنماط المضمنة واستبدالها بـ -->
-
+  
+  <!-- إضافة PWA Manifest -->
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
   <meta name="theme-color" content="#1e3a8a">
   
-
-
-  <!-- ... المحتوى الحالي ... -->
-  
-  <!-- Precaching للموارد الحرجة -->
-<!-- إزالة الأنماط المضمنة واستبدالها بـ -->
-<link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
   
-  <!-- إضافة manifest مرة أخرى للتأكد -->
-
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
-  
   <!-- إضافة أيقونات PWA -->
-  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/s.png') }}">
-  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/s.png') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
+  
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #3b82f6;
+      --secondary: #6c757d;
+      --success: #198754;
+      --danger: #dc3545;
+      --bg-light: #f8fafc;
+      --bg-dark: #1e1e2f;
+      --sidebar-dark: #0f172a;
+      --content-dark: #2a2e42;
+      --text-light: #f8f9fa;
+      --text-dark: #212529; /* لون أغمق قليلاً من السابق */
+      --border-color-light: #e5e7eb;
+      --border-color-dark: #444;
+      --border-radius: 8px;
+      --transition: all 0.3s ease;
+    }
+    
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: var(--bg-light);
+      color: var(--text-dark);
+      font-family: 'Tajawal', sans-serif;
+      overflow-x: hidden;
+    }
+    
+    body.dark-mode {
+      background-color: var(--bg-dark);
+      color: var(--text-light);
+    }
+    
+    .dashboard {
+      display: flex;
+      flex-direction: row;
+      min-height: 100vh;
+      width: 100%;
+    }
+    
+    /* Sidebar Improvements */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      right: -300px;
+      height: 100%;
+      width: 280px;
+      background-color: var(--sidebar-dark);
+      z-index: 1050;
+      display: flex;
+      flex-direction: column;
+      padding: 1.5rem 1rem;
+      transition: right 0.3s ease-in-out;
+      overflow-y: auto;
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .sidebar.show {
+      right: 0;
+    }
+    
+    .sidebar h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 2rem;
+      text-align: center;
+      color: #fff;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .sidebar .nav-link {
+      color: #e0e0e0;
+      padding: 0.75rem 1rem;
+      margin: 0.25rem 0;
+      border-radius: var(--border-radius);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: var(--transition);
+      font-weight: 500;
+    }
+    
+    .sidebar .nav-link:hover, .sidebar .nav-link.active {
+      background-color: var(--primary-light);
+      color: #fff;
+      transform: translateX(-5px);
+    }
+    
+    .sidebar .nav-link i {
+      width: 20px;
+      text-align: center;
+    }
+    
+    .main {
+      flex-grow: 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      margin-right: 0;
+      transition: margin-right 0.3s ease;
+    }
+    
+    .main-with-sidebar {
+       margin-right: 280px;
+    }
+    
+    @media (min-width: 992px) {
+      .sidebar {
+        position: sticky;
+        top: 0;
+        right: 0;
+        height: 100vh;
+      }
+    }
+    
+    /* Topbar Improvements */
+    .topbar {
+      background-color: #fff;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid var(--border-color-light);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 1040;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    
+    body.dark-mode .topbar {
+      background-color: var(--content-dark);
+      border-bottom-color: var(--border-color-dark);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .topbar .actions {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
 
+    .action-icon {
+      cursor: pointer;
+      color: var(--primary);
+      font-size: 1.25rem;
+      transition: var(--transition);
+      text-decoration: none;
+    }
+    
+    .action-icon:hover {
+      transform: rotate(10deg) scale(1.1);
+    }
+    
+    body.dark-mode .action-icon {
+      color: #facc15;
+    }
+    
+    .sidebar-toggle {
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--primary);
+      transition: var(--transition);
+    }
+    
+    .sidebar-toggle:hover {
+      color: var(--primary-light);
+    }
+    
+    body.dark-mode .sidebar-toggle {
+      color: #fff;
+    }
+    
+    .sidebar__backdrop {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0,0,0,0.5);
+      z-index: 1040;
+      opacity: 0;
+      visibility: hidden;
+      transition: var(--transition);
+    }
+    
+    .sidebar__backdrop.show {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    /* Content Area Improvements */
+    .content {
+      padding: 2.5rem;
+      flex-grow: 1;
+      width: 100%;
+      max-width: 100%;
+    }
+    
+    @media (max-width: 768px) {
+      .content { padding: 1.5rem; }
+    }
+    
+    .alert { direction: rtl; border-radius: var(--border-radius); }
+    
+    .container-fluid {
+      width: 100%;
+      padding-right: 0;
+      padding-left: 0;
+      margin-right: auto;
+      margin-left: auto;
+    }
+    
+    /* ---- Dark Mode Component Styles ---- */
+    
+    /* Cards */
+    .card {
+      border-radius: var(--border-radius);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      border: none;
+      margin-bottom: 1.5rem;
+    }
+    body.dark-mode .card {
+      background-color: var(--content-dark);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+    .card-header {
+      background-color: #f8f9fa;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      font-weight: 700;
+      padding: 1.25rem 1.5rem;
+      border-radius: var(--border-radius) var(--border-radius) 0 0 !important;
+    }
+    body.dark-mode .card-header {
+      background-color: #3a3f58;
+      border-bottom-color: var(--border-color-dark);
+    }
+    
+    /* Buttons */
+    .btn {
+      border-radius: var(--border-radius);
+      font-weight: 500;
+      padding: 0.5rem 1.25rem;
+      transition: var(--transition);
+    }
+    .btn-primary { background-color: var(--primary); border-color: var(--primary); }
+    .btn-primary:hover { background-color: var(--primary-light); border-color: var(--primary-light); transform: translateY(-2px); }
 
+    /* Forms */
+    .form-control, .form-select {
+      border-radius: var(--border-radius);
+      padding: 0.5rem 1rem;
+    }
+    body.dark-mode .form-control, body.dark-mode .form-select {
+      background-color: var(--bg-dark);
+      border-color: var(--border-color-dark);
+      color: var(--text-light);
+    }
+    body.dark-mode .form-control:focus, body.dark-mode .form-select:focus {
+      background-color: var(--bg-dark);
+      border-color: var(--primary-light);
+      color: var(--text-light);
+      box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
+    }
+    
+    /* Tables */
+    .table {
+      border-radius: var(--border-radius);
+      overflow: hidden;
+    }
+    body.dark-mode .table {
+      color: var(--text-light);
+      border-color: var(--border-color-dark);
+    }
+    body.dark-mode .table > :not(caption) > * > * {
+       background-color: var(--content-dark);
+       border-bottom-width: 1px;
+    }
+    body.dark-mode .table-hover > tbody > tr:hover > * {
+        background-color: #3a3f58;
+    }
+    
+    /* General Text & Links */
+    body.dark-mode a {
+      color: var(--primary-light);
+    }
+
+    /* ======================================================= */
+    /* التعديل الأول: ضمان لون النص الفاتح لكل العناصر في الوضع الليلي */
+    /* ======================================================= */
+    body.dark-mode h1,
+    body.dark-mode h2,
+    body.dark-mode h3,
+    body.dark-mode h4,
+    body.dark-mode h5,
+    body.dark-mode h6,
+    body.dark-mode p,
+    body.dark-mode span,
+    body.dark-mode label,
+    body.dark-mode strong,
+    body.dark-mode .form-label,
+    body.dark-mode th,
+    body.dark-mode td {
+      color: var(--text-light) !important;
+    }
+    
+    /* أنماط PWA الإضافية */
+    .pwa-install-btn {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 30px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      display: none;
+      z-index: 1050;
+      font-weight: 500;
+      transition: var(--transition);
+    }
+    
+    .pwa-install-btn:hover {
+      background-color: var(--primary-light);
+      transform: translateY(-2px);
+    }
+    
+    .pwa-offline-alert {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background-color: #f8d7da;
+      color: #721c24;
+      padding: 10px;
+      text-align: center;
+      z-index: 1060;
+      display: none;
+    }
+    
+    body.dark-mode .pwa-offline-alert {
+      background-color: #4a1c24;
+      color: #f8d7da;
+    }
+    
+    /* Responsive Adjustments */
+    @media (max-width: 991.98px) {
+      .main-with-sidebar {
+        margin-right: 0;
+      }
+      .sidebar {
+        right: -280px;
+        width: 280px;
+      }
+      .sidebar.show { right: 0; }
+    }
+    
+    /* Animation for page transitions */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .content-container {
+      animation: fadeIn 0.3s ease-out;
+    }
+  </style>
 </head>
 <body>
   <!-- زر تثبيت التطبيق -->
@@ -50,7 +401,6 @@
     {% if request.cookies.get('is_admin') == 'true' or request.cookies.get('is_admin') == 'false' %}
  <aside class="sidebar">
   <h2>لوحة التحكم</h2>
-  
   <a class="nav-link {% if request.path == url_for('orders.index') %}active{% endif %}" href="{{ url_for('orders.index') }}">
     <i class="fas fa-shopping-bag"></i> الطلبات
   </a>
@@ -137,268 +487,9 @@
     </div>
   </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-// تهيئة التطبيق بعد تحميل DOM
-document.addEventListener('DOMContentLoaded', function() {
-  initializeApp();
-});
-
-function initializeApp() {
-  // تهيئة المظهر
-  initializeAppearance();
-  
-  // تهيئة أحداث الواجهة
-  initializeUIEvents();
-  
-  // تهيئة PWA
-  initializePWA();
-  
-  // تهيئة الشريط الجانبي
-  initializeSidebar();
-  
-  // تهيئة CSRF Token
-  initializeCSRFToken();
-}
-
-function initializeAppearance() {
-  const darkModeCookie = document.cookie.split('; ').find(row => row.startsWith('darkMode='));
-  if (darkModeCookie && darkModeCookie.split('=')[1] === 'true') {
-    document.body.classList.add('dark-mode');
-    document.getElementById('themeToggle').className = 'fas fa-sun action-icon';
-  }
-}
-
-function initializeUIEvents() {
-  // حدث تغيير المظهر
-  const themeToggle = document.getElementById('themeToggle');
-  if (themeToggle) {
-    themeToggle.addEventListener('click', toggleDarkMode);
-  }
-  
-  // أحداث إعادة الحجم
-  window.addEventListener('resize', handleResize);
-}
-
-function initializePWA() {
-  // تسجيل Service Worker
-  registerServiceWorker();
-  
-  // إعداد تثبيت PWA
-  setupPWAInstall();
-  
-  // إعداد حالة الاتصال
-  setupConnectionStatus();
-}
-
-function initializeSidebar() {
-  const currentPath = window.location.pathname;
-  const sidebarLinks = document.querySelectorAll('.sidebar .nav-link');
-  
-  sidebarLinks.forEach(link => {
-    if (link.getAttribute('href') && currentPath.startsWith(link.getAttribute('href'))) {
-      link.classList.add('active');
-    }
-    
-    // إضافة event listener لكل رابط
-    link.addEventListener('click', function() {
-      if (window.innerWidth < 992) {
-        toggleSidebar();
-      }
-    });
-  });
-}
-
-function initializeCSRFToken() {
-  const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-  if (window.jQuery) {
-    $.ajaxSetup({
-      headers: { 'X-CSRFToken': csrfToken }
-    });
-  }
-}
-
-function toggleDarkMode() {
-  document.body.classList.toggle('dark-mode');
-  const isDark = document.body.classList.contains('dark-mode');
-  document.cookie = `darkMode=${isDark}; path=/; max-age=${60*60*24*365}`;
-  const themeIcon = document.getElementById('themeToggle');
-  themeIcon.className = isDark ? 'fas fa-sun action-icon' : 'fas fa-moon action-icon';
-}
-
-function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    // تأخير تسجيل Service Worker لتحسين الأداء
-    setTimeout(() => {
-      navigator.serviceWorker.register('{{ url_for("static", filename="sw.js") }}')
-        .then(function(registration) {
-          console.log('Service Worker registered with scope:', registration.scope);
-        })
-        .catch(function(error) {
-          console.log('Service Worker registration failed:', error);
-        });
-    }, 1000);
-  }
-}
-
-function setupPWAInstall() {
-  let deferredPrompt;
-  const installBtn = document.getElementById('pwaInstallBtn');
-  
-  if (!installBtn) return;
-  
-  // إخفاء الزر افتراضيًا حتى يتم تنشيط event beforeinstallprompt
-  installBtn.style.display = 'none';
-  
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    // عرض زر التثبيت عندما يكون الحدث متاحًا
-    installBtn.style.display = 'block';
-    
-    installBtn.onclick = async () => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log(`User response: ${outcome}`);
-        deferredPrompt = null;
-        // إخفاء الزر بعد محاولة التثبيت
-        installBtn.style.display = 'block';
-      }
-    };
-  });
-  
-  window.addEventListener('appinstalled', () => {
-    console.log('PWA installed');
-    deferredPrompt = null;
-    installBtn.style.display = 'block';
-  });
-}
-
-// إزالة الدوال التالية تماماً:
-// - hideButtonTemporarily()
-// - checkInstallDismissal()
-// - showInstallError() (ما لم تكن تستخدم في مكان آخر)
-
-// ... (بقية الكود يبقى كما هو)
-
-// عرض رسالة عندما لا يكون التثبيت متاحًا
-
-
-
-function setupConnectionStatus() {
-  const offlineAlert = document.getElementById('pwaOfflineAlert');
-  if (!offlineAlert) return;
-  
-  window.addEventListener('online', () => {
-    offlineAlert.style.display = 'none';
-    showOnlineToast();
-  });
-  
-  window.addEventListener('offline', () => {
-    offlineAlert.style.display = 'block ';
-  });
-  
-  if (!navigator.onLine) {
-    offlineAlert.style.display = 'block';
-  }
-}
-
-function showOnlineToast() {
-  const toast = document.createElement('div');
-  toast.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
-  toast.style.zIndex = '1070';
-  toast.innerHTML = `
-    <i class="fas fa-wifi me-2"></i>تم استعادة الاتصال بالإنترنت
-    <button type="button" class="btn-close ms-2" data-bs-dismiss="alert"></button>
-  `;
-  document.body.appendChild(toast);
-  
-  setTimeout(() => {
-    if (toast.parentNode) {
-      toast.parentNode.removeChild(toast);
-    }
-  }, 3000);
-}
-
-function toggleSidebar() {
-  const sidebar = document.querySelector('.sidebar');
-  const backdrop = document.querySelector('.sidebar__backdrop');
-  if (sidebar && backdrop) {
-    sidebar.classList.toggle('show');
-    backdrop.classList.toggle('show');
-    document.body.style.overflow = sidebar.classList.contains('show') ? 'hidden' : '';
-  }
-}
-
-function handleResize() {
-  if (window.innerWidth >= 992) {
-    const sidebar = document.querySelector('.sidebar');
-    const backdrop = document.querySelector('.sidebar__backdrop');
-    if (sidebar && sidebar.classList.contains('show')) {
-      toggleSidebar();
-    }
-  }
-}
-
-// إدارة شاشة التحميل
-function showSplashScreen() {
-  // فقط في وضع PWA
-  if (!window.matchMedia('(display-mode: standalone)').matches) {
-    return;
-  }
-  
-  const splashHtml = `
-    <div class="app-splash">
-      <div class="app-splash-content">
-        <img src="{{ url_for('static', filename='icons/s.png') }}" 
-             alt="شعار التطبيق" class="app-splash-logo">
-        <div class="app-splash-text">نظام إدارة الطلبات</div>
-        <div class="app-splash-loading"></div>
-      </div>
-    </div>
-  `;
-  
-  document.body.insertAdjacentHTML('beforeend', splashHtml);
-  
-  setTimeout(() => {
-    const splash = document.querySelector('.app-splash');
-    if (splash) {
-      splash.classList.add('hide');
-      setTimeout(() => splash.remove(), 500);
-    }
-  }, 2000);
-}
-
-// تفعيل شاشة التحميل عند فتح التطبيق
-if (window.matchMedia('(display-mode: standalone)').matches) {
-  document.addEventListener('DOMContentLoaded', showSplashScreen);
-}
-
-// إصلاح مشكلة double-tap للتكبير على iOS
-document.documentElement.addEventListener('touchstart', function (event) {
-  if (event.touches.length > 1) {
-    event.preventDefault();
-  }
-}, { passive: false });
-
-// منع التمرير عند فتح الشريط الجانبي
-let lastScrollTop = 0;
-document.addEventListener('scroll', function() {
-  const sidebar = document.querySelector('.sidebar');
-  if (sidebar && sidebar.classList.contains('show')) {
-    window.scrollTo(0, lastScrollTop);
-  } else {
-    lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
-  }
-}, { passive: true });
-
-// كشف الأخطاء العالمية
-window.addEventListener('error', function(e) {
-  console.error('Error:', e.error);
-  // يمكنك إضافة إرسال تقرير خطأ إلى الخادم هنا
-});
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script>
     function toggleDarkMode() {
       document.body.classList.toggle('dark-mode');
       const isDark = document.body.classList.contains('dark-mode');
@@ -407,12 +498,93 @@ window.addEventListener('error', function(e) {
       themeIcon.className = isDark ? 'fas fa-sun action-icon' : 'fas fa-moon action-icon';
     }
     
+    // دالة تسجيل Service Worker
+    function registerServiceWorker() {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('{{ url_for("static", filename="sw.js") }}')
+          .then(function(registration) {
+            console.log('Service Worker registered with scope:', registration.scope);
+          })
+          .catch(function(error) {
+            console.log('Service Worker registration failed:', error);
+          });
+      }
+    }
+    
+    // دالة التعامل مع تثبيت PWA
+    function setupPWAInstall() {
+      let deferredPrompt;
+      const installBtn = document.getElementById('pwaInstallBtn');
+      
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        installBtn.style.display = 'block';
+        
+        installBtn.addEventListener('click', async () => {
+          if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+              installBtn.style.display = 'none';
+            }
+            deferredPrompt = null;
+          }
+        });
+      });
+      
+      window.addEventListener('appinstalled', () => {
+        installBtn.style.display = 'none';
+        deferredPrompt = null;
+        console.log('PWA installed successfully');
+      });
+    }
+    
+    // دالة التعامل مع حالة الاتصال
+    function setupConnectionStatus() {
+      const offlineAlert = document.getElementById('pwaOfflineAlert');
+      
+      window.addEventListener('online', () => {
+        offlineAlert.style.display = 'none';
+        // إظهار رسالة نجاح الاتصال
+        const toast = document.createElement('div');
+        toast.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
+        toast.style.zIndex = '1070';
+        toast.innerHTML = `
+          <i class="fas fa-wifi me-2"></i>تم استعادة الاتصال بالإنترنت
+          <button type="button" class="btn-close ms-2" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(toast);
+        
+        // إزالة الرسالة بعد 3 ثوان
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+          }
+        }, 3000);
+      });
+      
+      window.addEventListener('offline', () => {
+        offlineAlert.style.display = 'block';
+      });
+      
+      // التحقق من حالة الاتصال عند التحميل
+      if (!navigator.onLine) {
+        offlineAlert.style.display = 'block';
+      }
+    }
+    
     window.addEventListener('DOMContentLoaded', () => {
       const darkModeCookie = document.cookie.split('; ').find(row => row.startsWith('darkMode='));
       if (darkModeCookie && darkModeCookie.split('=')[1] === 'true') {
         document.body.classList.add('dark-mode');
         document.getElementById('themeToggle').className = 'fas fa-sun action-icon';
       }
+      
+      // تهيئة PWA
+      registerServiceWorker();
+      setupPWAInstall();
+      setupConnectionStatus();
       
       const currentPath = window.location.pathname;
       const sidebarLinks = document.querySelectorAll('.sidebar .nav-link');
@@ -465,8 +637,8 @@ window.addEventListener('error', function(e) {
             }
        }
     });
-</script>
+  </script>
   
   {% block scripts %}{% endblock %}
 </body>
-</html> 
+</html>
