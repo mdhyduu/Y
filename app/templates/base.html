@@ -671,43 +671,38 @@ function registerServiceWorker() {
   }
 }
 
-
 function setupPWAInstall() {
   let deferredPrompt;
   const installBtn = document.getElementById('pwaInstallBtn');
   
   if (!installBtn) return;
   
-  // إخفاء الزر افتراضيًا
-  installBtn.style.display = 'none';
+  // إظهار الزر إذا كان التطبيق غير مثبت
+  if (!window.matchMedia('(display-mode: standalone)').matches) {
+    installBtn.style.display = 'block';
+  }
   
-  // التحقق من دعم المتصفح وإظهار الزر عند الحاجة
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    
-    // إظهار الزر فقط إذا لم يكن التطبيق مثبتًا بالفعل
-    if (!window.matchMedia('(display-mode: standalone)').matches) {
-      installBtn.style.display = 'block';
-    }
+    installBtn.style.display = 'block';
     
     installBtn.addEventListener('click', async () => {
       if (deferredPrompt) {
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') {
-          console.log('تم قبول تثبيت التطبيق');
-          installBtn.style.display = 'none';
-        }
+        console.log(`User response to the install prompt: ${outcome}`);
+        installBtn.style.display = 'none';
         deferredPrompt = null;
       }
     });
   });
   
-  // إخفاء الزر إذا كان التطبيق مثبتًا بالفعل
-  if (window.matchMedia('(display-mode: standalone)').matches) {
+  window.addEventListener('appinstalled', () => {
+    console.log('PWA was installed');
     installBtn.style.display = 'none';
-  }
+    deferredPrompt = null;
+  });
 }
 // إخفاء الزر مؤقتًا بعد رفض التثبيت
 function hideButtonTemporarily() {
