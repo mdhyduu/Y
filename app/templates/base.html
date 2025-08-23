@@ -412,9 +412,7 @@
     {% if request.cookies.get('is_admin') == 'true' or request.cookies.get('is_admin') == 'false' %}
  <aside class="sidebar">
   <h2>لوحة التحكم</h2>
-   <button id="pwaInstallBtn" class="pwa-install-btn">
-    <i class="fas fa-download me-2"></i>تثبيت التطبيق
-  </button>
+  
   <a class="nav-link {% if request.path == url_for('orders.index') %}active{% endif %}" href="{{ url_for('orders.index') }}">
     <i class="fas fa-shopping-bag"></i> الطلبات
   </a>
@@ -463,7 +461,9 @@
     
     <div class="sidebar__backdrop" onclick="toggleSidebar()"></div>
     {% endif %}
-
+ <button id="pwaInstallBtn" class="pwa-install-btn">
+    <i class="fas fa-download me-2"></i>تثبيت التطبيق
+  </button> 
     <div class="main {% if request.cookies.get('is_admin') == 'true' or request.cookies.get('is_admin') == 'false' %}main-with-sidebar{% endif %}">
       <div class="topbar">
         {% if request.cookies.get('is_admin') == 'true' or request.cookies.get('is_admin') == 'false' %}
