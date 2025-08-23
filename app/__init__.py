@@ -201,7 +201,7 @@ def create_app():
     @app.route('/manifest.json')
     def manifest():
         # المسار إلى الأيقونة الأساسية (افترض أنها موجودة في static/icon.png)
-        base_icon_path = os.path.join(current_app.static_folder, 'icon.png')
+        base_icon_path = os.path.join(current_app.static_folder, 's.png')
         icons_dir = os.path.join(current_app.static_folder, 'icons')
         
         # إذا لم يوجد مجلد الأيقونات أو كان فارغًا، أنشئ الأيقونات
@@ -265,11 +265,11 @@ def create_app():
               "purpose": "maskable any"
             }
           ],
-          "start_url": "{{ url_for('index') }}",
+          "start_url": "{{ url_for('orders.index') }}",
           "background_color": "#1e3a8a",
           "theme_color": "#1e3a8a",
           "display": "standalone",
-          "scope": "{{ url_for('index', _external=True) }}"
+          "scope": "{{ url_for('orders.index', _external=True) }}"
         }
         '''
         return render_template_string(manifest_json), 200, {'Content-Type': 'application/json'}
