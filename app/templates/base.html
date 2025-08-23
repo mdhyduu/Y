@@ -431,6 +431,15 @@ body.dark-mode .pwa-install-btn:hover {
     {% if request.cookies.get('is_admin') == 'true' or request.cookies.get('is_admin') == 'false' %}
  <aside class="sidebar">
   <h2>لوحة التحكم</h2>
+    <!-- زر تثبيت التطبيق -->
+  <button id="pwaInstallBtn" class="pwa-install-btn">
+    <i class="fas fa-download me-2"></i>تثبيت التطبيق
+  </button>
+  
+  <!-- تنبيه حالة الاتصال -->
+  <div id="pwaOfflineAlert" class="pwa-offline-alert">
+    <i class="fas fa-wifi-slash me-2"></i>أنت غير متصل بالإنترنت
+  </div>
   <a class="nav-link {% if request.path == url_for('orders.index') %}active{% endif %}" href="{{ url_for('orders.index') }}">
     <i class="fas fa-shopping-bag"></i> الطلبات
   </a>
