@@ -231,30 +231,42 @@ function registerServiceWorker() {
   }
 }
 
+
 function setupPWAInstall() {
-  let deferredPrompt;
+  let deferredPrompt = null;
   const installBtn = document.getElementById('pwaInstallBtn');
   
   if (!installBtn) return;
   
-  // إظهار الزر إذا كان التطبيق غير مثبت
-  if (!window.matchMedia('(display-mode: standalone)').matches) {
-    installBtn.style.display = 'block';
-  }
+  // إخفاء الزر افتراضيًا
+  installBtn.style.display = 'none';
   
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    installBtn.style.display = 'block';
+    console.log('beforeinstallprompt event fired');
     
+    // إظهار الزر فقط إذا كان التطبيق غير مثبت
+    if (!isAppInstalled()) {
+      installBtn.style.display = 'block';
+    }
+    
+    // إزالة أي event listeners سابقة لمنع التكرار
+    installBtn.onclick = null;
+    
+    // إضافة event listener جديد
     installBtn.addEventListener('click', async () => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log(`User response to the install prompt: ${outcome}`);
-        installBtn.style.display = 'none';
-        deferredPrompt = null;
-      }
+      if (!deferredPrompt) return;
+      
+      console.log('Showing install prompt');
+      deferredPrompt.prompt();
+      
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User response: ${outcome}`);
+      
+      // إخفاء الزر بغض النظر عن النتيجة
+      installBtn.style.display = 'none';
+      deferredPrompt = null;
     });
   });
   
@@ -263,7 +275,21 @@ function setupPWAInstall() {
     installBtn.style.display = 'none';
     deferredPrompt = null;
   });
+  
+  // التحقق من حالة التثبيت عند التحميل
+  if (isAppInstalled()) {
+    installBtn.style.display = 'none';
+  }
 }
+
+// دالة مساعدة للتحقق مما إذا كان التطبيق مثبتًا
+function isAppInstalled() {
+  return window.matchMedia('(display-mode: standalone)').matches || 
+         navigator.standalone ||
+         document.referrer.includes('android-app://');
+}
+
+// ... بقية الكود ...
 function setupConnectionStatus() {
   const offlineAlert = document.getElementById('pwaOfflineAlert');
   if (!offlineAlert) return;
