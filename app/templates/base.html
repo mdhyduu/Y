@@ -351,42 +351,7 @@ body.dark-mode .pwa-install-btn:hover {
     body.dark-mode td {
       color: var(--text-light) !important;
     }
-    
-    /* أنماط PWA الإضافية */
-    .pwa-install-btn {
-      position: fixed;
-      bottom: 20px;
-      left: 20px;
-      background-color: var(--primary);
-      color: white;
-      border: none;
-      padding: 12px 20px;
-      border-radius: 30px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      display: none;
-      z-index: 1050;
-      font-weight: 500;
-      transition: var(--transition);
-    }
-    
-    .pwa-install-btn:hover {
-      background-color: var(--primary-light);
-      transform: translateY(-2px);
-    }
-    
-    .pwa-offline-alert {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      background-color: #f8d7da;
-      color: #721c24;
-      padding: 10px;
-      text-align: center;
-      z-index: 1060;
-      display: none;
-    }
-    
+ 
     body.dark-mode .pwa-offline-alert {
       background-color: #4a1c24;
       color: #f8d7da;
@@ -431,15 +396,7 @@ body.dark-mode .pwa-install-btn:hover {
     {% if request.cookies.get('is_admin') == 'true' or request.cookies.get('is_admin') == 'false' %}
  <aside class="sidebar">
   <h2>لوحة التحكم</h2>
-    <!-- زر تثبيت التطبيق -->
-  <button id="pwaInstallBtn" class="pwa-install-btn">
-    <i class="fas fa-download me-2"></i>تثبيت التطبيق
-  </button>
   
-  <!-- تنبيه حالة الاتصال -->
-  <div id="pwaOfflineAlert" class="pwa-offline-alert">
-    <i class="fas fa-wifi-slash me-2"></i>أنت غير متصل بالإنترنت
-  </div>
   <a class="nav-link {% if request.path == url_for('orders.index') %}active{% endif %}" href="{{ url_for('orders.index') }}">
     <i class="fas fa-shopping-bag"></i> الطلبات
   </a>
