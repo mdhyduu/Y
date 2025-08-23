@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dashboard-cache-v1';
+const CACHE_NAME = 'dashboard-cache-v2';
 const urlsToCache = [
   '/',
   '/static/css/main.css',
@@ -16,20 +16,7 @@ self.addEventListener('install', function(event) {
         console.log('Opened cache');
         return cache.addAll(urlsToCache);
       })
-  );
-});
-
-// Fetch events
-self.addEventListener('fetch', function(event) {
-  event.respondWith(
-    caches.match(event.request)
-      .then(function(response) {
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
-      }
-    )
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -40,10 +27,42 @@ self.addEventListener('activate', function(event) {
       return Promise.all(
         cacheNames.map(function(cacheName) {
           if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
+  );
+});
+
+// Fetch events
+self.addEventListener('fetch', function(event) {
+  event.respondWith(
+    caches.match(event.request)
+      .then(function(response) {
+        // إذا وجدت في الكاش، أعرضها
+        if (response) {
+          return response;
+        }
+        
+        // إذا لم توجد، أحمل من الشبكة
+        return fetch(event.request).then(function(response) {
+          // تحقق إذا كان الرد صالح للتخزين
+          if(!response || response.status !== 200 || response.type !== 'basic') {
+            return response;
+          }
+          
+          // استنساخ الرد
+          var responseToCache = response.clone();
+          
+          caches.open(CACHE_NAME)
+            .then(function(cache) {
+              cache.put(event.request, responseToCache);
+            });
+          
+          return response;
+        });
+      })
   );
 });
