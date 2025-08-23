@@ -118,8 +118,8 @@ self.addEventListener('push', function(event) {
     event.waitUntil(
       self.registration.showNotification(data.title, {
         body: data.body,
-        icon: '/static/icons/s.png',
-        badge: '/static/icons/icon-192x192.png'
+        icon: '/static/icons/icon-192x192.png',
+        badge: '/static/icons/s.png'
       })
     );
   }
