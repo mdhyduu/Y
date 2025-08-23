@@ -728,6 +728,56 @@
             }
        }
     });
+    // التحقق من حالة التخزين
+function checkCacheStatus() {
+  if ('caches' in window) {
+    caches.open('dashboard-full-cache-v1').then(function(cache) {
+      cache.keys().then(function(keys) {
+        console.log('عدد الملفات المخزنة محلياً:', keys.length);
+        if (keys.length > 0) {
+          console.log('التطبيق يعمل بشكل مستقل');
+        }
+      });
+    });
+  }
+}
+
+// مزامنة البيانات عند العودة للاتصال
+function syncDataWhenOnline() {
+  if (navigator.onLine) {
+    console.log('الاتصال متاح - مزامنة البيانات');
+    // هنا يمكنك إضافة كود لمزامنة البيانات مع الخادم
+  }
+}
+
+// تفعيل الميزات عند التحميل
+document.addEventListener('DOMContentLoaded', function() {
+  checkCacheStatus();
+  
+  // الاستماع لتغيرات حالة الاتصال
+  window.addEventListener('online', syncDataWhenOnline);
+  
+  // إذا كان التطبيق مثبتاً كـ PWA
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    console.log('التطبيق يعمل في وضع standalone');
+    document.body.classList.add('pwa-mode');
+  }
+});
+
+// إضافة صنف خاص لوضع PWA
+const style = document.createElement('style');
+style.textContent = `
+  .pwa-mode .pwa-install-btn {
+    display: none !important;
+  }
+  .pwa-mode header {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pwa-mode .content {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+`;
+document.head.appendChild(style);
   </script>
   
   {% block scripts %}{% endblock %}
