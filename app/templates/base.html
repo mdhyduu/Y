@@ -563,257 +563,172 @@
       </div>
     </div>
   </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-// تهيئة التطبيق بعد تحميل DOM
-document.addEventListener('DOMContentLoaded', function() {
-  initializeApp();
-});
 
-function initializeApp() {
-  // تهيئة المظهر
-  initializeAppearance();
-  
-  // تهيئة أحداث الواجهة
-  initializeUIEvents();
-  
-  // تهيئة PWA
-  initializePWA();
-  
-  // تهيئة الشريط الجانبي
-  initializeSidebar();
-  
-  // تهيئة CSRF Token
-  initializeCSRFToken();
-}
-
-function initializeAppearance() {
-  const darkModeCookie = document.cookie.split('; ').find(row => row.startsWith('darkMode='));
-  if (darkModeCookie && darkModeCookie.split('=')[1] === 'true') {
-    document.body.classList.add('dark-mode');
-    document.getElementById('themeToggle').className = 'fas fa-sun action-icon';
-  }
-}
-
-function initializeUIEvents() {
-  // حدث تغيير المظهر
-  const themeToggle = document.getElementById('themeToggle');
-  if (themeToggle) {
-    themeToggle.addEventListener('click', toggleDarkMode);
-  }
-  
-  // أحداث إعادة الحجم
-  window.addEventListener('resize', handleResize);
-}
-
-function initializePWA() {
-  // تسجيل Service Worker
-  registerServiceWorker();
-  
-  // إعداد تثبيت PWA
-  setupPWAInstall();
-  
-  // إعداد حالة الاتصال
-  setupConnectionStatus();
-}
-
-function initializeSidebar() {
-  const currentPath = window.location.pathname;
-  const sidebarLinks = document.querySelectorAll('.sidebar .nav-link');
-  
-  sidebarLinks.forEach(link => {
-    if (link.getAttribute('href') && currentPath.startsWith(link.getAttribute('href'))) {
-      link.classList.add('active');
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script>
+    function toggleDarkMode() {
+      document.body.classList.toggle('dark-mode');
+      const isDark = document.body.classList.contains('dark-mode');
+      document.cookie = `darkMode=${isDark}; path=/; max-age=${60*60*24*365}`;
+      const themeIcon = document.getElementById('themeToggle');
+      themeIcon.className = isDark ? 'fas fa-sun action-icon' : 'fas fa-moon action-icon';
     }
     
-    // إضافة event listener لكل رابط
-    link.addEventListener('click', function() {
-      if (window.innerWidth < 992) {
-        toggleSidebar();
+    // دالة تسجيل Service Worker
+    function registerServiceWorker() {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('{{ url_for("static", filename="sw.js") }}')
+          .then(function(registration) {
+            console.log('Service Worker registered with scope:', registration.scope);
+          })
+          .catch(function(error) {
+            console.log('Service Worker registration failed:', error);
+          });
       }
-    });
-  });
-}
-
-function initializeCSRFToken() {
-  const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-  if (window.jQuery) {
-    $.ajaxSetup({
-      headers: { 'X-CSRFToken': csrfToken }
-    });
-  }
-}
-
-function toggleDarkMode() {
-  document.body.classList.toggle('dark-mode');
-  const isDark = document.body.classList.contains('dark-mode');
-  document.cookie = `darkMode=${isDark}; path=/; max-age=${60*60*24*365}`;
-  const themeIcon = document.getElementById('themeToggle');
-  themeIcon.className = isDark ? 'fas fa-sun action-icon' : 'fas fa-moon action-icon';
-}
-
-function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    // تأخير تسجيل Service Worker لتحسين الأداء
-    setTimeout(() => {
-      navigator.serviceWorker.register('{{ url_for("static", filename="sw.js") }}')
-        .then(function(registration) {
-          console.log('Service Worker registered with scope:', registration.scope);
-        })
-        .catch(function(error) {
-          console.log('Service Worker registration failed:', error);
-        });
-    }, 1000);
-  }
-}
-
-function setupPWAInstall() {
+    }
+    
+    // دالة التعامل مع تثبيت PWA
+    function setupPWAInstall() {
   let deferredPrompt;
   const installBtn = document.getElementById('pwaInstallBtn');
   
-  if (!installBtn) return;
-  
   window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('beforeinstallprompt event fired');
+    // منع المتصفح من عرض رسالة التثبيت التلقائية
     e.preventDefault();
+    // حفظ event لاستخدامه لاحقاً
     deferredPrompt = e;
+    // إظهار زر التثبيت
     installBtn.style.display = 'block';
     
+    // إضافة event listener للزر
     installBtn.addEventListener('click', async () => {
       if (deferredPrompt) {
+        // عرض رسالة التثبيت
         deferredPrompt.prompt();
+        // انتظار اختيار المستخدم
         const { outcome } = await deferredPrompt.userChoice;
         console.log(`User response to the install prompt: ${outcome}`);
+        //不管用户选择什么，我们都隐藏按钮
         installBtn.style.display = 'none';
+        //清除保存的event
         deferredPrompt = null;
       }
     });
   });
   
+  // حدث عندما يتم تثبيت التطبيق
   window.addEventListener('appinstalled', () => {
     console.log('PWA was installed');
     installBtn.style.display = 'none';
     deferredPrompt = null;
   });
   
+  // إخفاء الزر إذا كان التطبيق مثبتاً بالفعل
   if (window.matchMedia('(display-mode: standalone)').matches) {
     installBtn.style.display = 'none';
   }
 }
-
-function setupConnectionStatus() {
-  const offlineAlert = document.getElementById('pwaOfflineAlert');
-  if (!offlineAlert) return;
-  
-  window.addEventListener('online', () => {
-    offlineAlert.style.display = 'none';
-    showOnlineToast();
-  });
-  
-  window.addEventListener('offline', () => {
-    offlineAlert.style.display = 'block';
-  });
-  
-  if (!navigator.onLine) {
-    offlineAlert.style.display = 'block';
-  }
-}
-
-function showOnlineToast() {
-  const toast = document.createElement('div');
-  toast.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
-  toast.style.zIndex = '1070';
-  toast.innerHTML = `
-    <i class="fas fa-wifi me-2"></i>تم استعادة الاتصال بالإنترنت
-    <button type="button" class="btn-close ms-2" data-bs-dismiss="alert"></button>
-  `;
-  document.body.appendChild(toast);
-  
-  setTimeout(() => {
-    if (toast.parentNode) {
-      toast.parentNode.removeChild(toast);
+    
+    // دالة التعامل مع حالة الاتصال
+    function setupConnectionStatus() {
+      const offlineAlert = document.getElementById('pwaOfflineAlert');
+      
+      window.addEventListener('online', () => {
+        offlineAlert.style.display = 'none';
+        // إظهار رسالة نجاح الاتصال
+        const toast = document.createElement('div');
+        toast.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
+        toast.style.zIndex = '1070';
+        toast.innerHTML = `
+          <i class="fas fa-wifi me-2"></i>تم استعادة الاتصال بالإنترنت
+          <button type="button" class="btn-close ms-2" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(toast);
+        
+        // إزالة الرسالة بعد 3 ثوان
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+          }
+        }, 3000);
+      });
+      
+      window.addEventListener('offline', () => {
+        offlineAlert.style.display = 'block';
+      });
+      
+      // التحقق من حالة الاتصال عند التحميل
+      if (!navigator.onLine) {
+        offlineAlert.style.display = 'block';
+      }
     }
-  }, 3000);
-}
-
-function toggleSidebar() {
-  const sidebar = document.querySelector('.sidebar');
-  const backdrop = document.querySelector('.sidebar__backdrop');
-  if (sidebar && backdrop) {
-    sidebar.classList.toggle('show');
-    backdrop.classList.toggle('show');
-    document.body.style.overflow = sidebar.classList.contains('show') ? 'hidden' : '';
-  }
-}
-
-function handleResize() {
-  if (window.innerWidth >= 992) {
-    const sidebar = document.querySelector('.sidebar');
-    const backdrop = document.querySelector('.sidebar__backdrop');
-    if (sidebar && sidebar.classList.contains('show')) {
-      toggleSidebar();
+    
+    window.addEventListener('DOMContentLoaded', () => {
+      const darkModeCookie = document.cookie.split('; ').find(row => row.startsWith('darkMode='));
+      if (darkModeCookie && darkModeCookie.split('=')[1] === 'true') {
+        document.body.classList.add('dark-mode');
+        document.getElementById('themeToggle').className = 'fas fa-sun action-icon';
+      }
+      
+      // تهيئة PWA
+      registerServiceWorker();
+      setupPWAInstall();
+      setupConnectionStatus();
+      
+      const currentPath = window.location.pathname;
+      const sidebarLinks = document.querySelectorAll('.sidebar .nav-link');
+      if (sidebarLinks.length > 0) {
+        sidebarLinks.forEach(link => {
+            if (link.getAttribute('href') && link.getAttribute('href') !== '#') {
+                if (currentPath.startsWith(link.getAttribute('href'))) {
+                    link.classList.add('active');
+                }
+            }
+        });
+      }
+    });
+    
+    function toggleSidebar() {
+      const sidebar = document.querySelector('.sidebar');
+      const backdrop = document.querySelector('.sidebar__backdrop');
+      if (sidebar && backdrop) {
+        sidebar.classList.toggle('show');
+        backdrop.classList.toggle('show');
+        document.body.style.overflow = sidebar.classList.contains('show') ? 'hidden' : '';
+      }
     }
-  }
-}
-
-// إدارة شاشة التحميل
-function showSplashScreen() {
-  // فقط في وضع PWA
-  if (!window.matchMedia('(display-mode: standalone)').matches) {
-    return;
-  }
-  
-  const splashHtml = `
-    <div class="app-splash">
-      <div class="app-splash-content">
-        <img src="{{ url_for('static', filename='icons/icon-192x192.png') }}" 
-             alt="شعار التطبيق" class="app-splash-logo">
-        <div class="app-splash-text">نظام إدارة الطلبات</div>
-        <div class="app-splash-loading"></div>
-      </div>
-    </div>
-  `;
-  
-  document.body.insertAdjacentHTML('beforeend', splashHtml);
-  
-  setTimeout(() => {
-    const splash = document.querySelector('.app-splash');
-    if (splash) {
-      splash.classList.add('hide');
-      setTimeout(() => splash.remove(), 500);
+    
+    const sidebarNavLinks = document.querySelectorAll('.sidebar .nav-link');
+    if (sidebarNavLinks.length > 0) {
+        sidebarNavLinks.forEach(link => {
+          link.addEventListener('click', () => {
+            if (window.innerWidth < 992) toggleSidebar();
+          });
+        });
     }
-  }, 2000);
-}
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+      
+      if (window.jQuery) {
+        $.ajaxSetup({
+          headers: { 'X-CSRFToken': csrfToken }
+        });
+      }
+    });
 
-// تفعيل شاشة التحميل عند فتح التطبيق
-if (window.matchMedia('(display-mode: standalone)').matches) {
-  document.addEventListener('DOMContentLoaded', showSplashScreen);
-}
-
-// إصلاح مشكلة double-tap للتكبير على iOS
-document.documentElement.addEventListener('touchstart', function (event) {
-  if (event.touches.length > 1) {
-    event.preventDefault();
-  }
-}, { passive: false });
-
-// منع التمرير عند فتح الشريط الجانبي
-let lastScrollTop = 0;
-document.addEventListener('scroll', function() {
-  const sidebar = document.querySelector('.sidebar');
-  if (sidebar && sidebar.classList.contains('show')) {
-    window.scrollTo(0, lastScrollTop);
-  } else {
-    lastScrollTop = window.pageYOffset || document.documentElement.scrollTop;
-  }
-}, { passive: true });
-
-// كشف الأخطاء العالمية
-window.addEventListener('error', function(e) {
-  console.error('Error:', e.error);
-  // يمكنك إضافة إرسال تقرير خطأ إلى الخادم هنا
-});
-</script>
+    window.addEventListener('resize', () => {
+       if (window.innerWidth >= 992) {
+            const sidebar = document.querySelector('.sidebar');
+            const backdrop = document.querySelector('.sidebar__backdrop');
+            if (sidebar && sidebar.classList.contains('show')) {
+                toggleSidebar();
+            }
+       }
+    });
+  </script>
   
   {% block scripts %}{% endblock %}
 </body>
