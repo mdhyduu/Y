@@ -8,6 +8,8 @@
   
   <!-- إضافة PWA Manifest -->
 <link rel="manifest" href="{{ url_for('manifest') }}">
+<!-- إزالة الأنماط المضمنة واستبدالها بـ -->
+<link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
   <meta name="theme-color" content="#1e3a8a">
   
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
