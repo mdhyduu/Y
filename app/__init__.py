@@ -221,6 +221,12 @@ def create_app():
               "sizes": "72x72",
               "type": "image/png",
               "purpose": "maskable any"
+            },
+            {
+              "src": "{{ url_for('static', filename='icons/s.png') }}",
+              "sizes": "72x72",
+              "type": "image/png",
+              "purpose": "maskable any"
             }
           ],
           "start_url": "{{ url_for('orders.index') }}",
