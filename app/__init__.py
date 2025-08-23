@@ -266,9 +266,10 @@ def create_app():
             }
           ],
           "start_url": "{{ url_for('orders.index') }}",
-          "background_color": "#1e3a8a",
-          "theme_color": "#1e3a8a",
+          "background_color": "#1e3a8a",  // لون الخلفية عند التحميل
+          "theme_color": "#1e3a8a",       // لون شريط العنوان
           "display": "standalone",
+          "orientation": "portrait",      // إضافة لتحديد الاتجاه
           "scope": "{{ url_for('orders.index', _external=True) }}"
         }
         '''
