@@ -217,7 +217,7 @@ def create_app():
           "dir": "rtl",
           "icons": [
             {
-              "src": "{{ url_for('static', filename='icons/s.png') }}",
+              "src": "{{ url_for('static', filename='icons/icon-192x192.png') }}",
               "sizes": "72x72",
               "type": "image/png",
               "purpose": "maskable any"
