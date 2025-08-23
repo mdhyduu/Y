@@ -9,6 +9,8 @@ from .models import (
     Product, OrderDelivery, SallaOrder, OrderAssignment,
     OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, CustomNoteStatus
 )
+from flask import jsonify, render_template_string
+
 from .config import Config
 from .utils import process_order_data, format_date, generate_barcode, humanize_time
 from .token_utils import exchange_code_for_token, get_store_info, set_token_cookies, refresh_salla_token
@@ -1579,3 +1581,71 @@ def get_quick_list_data():
         'success': True,
         'orders': orders_data
     })
+    @app.route('/manifest.json')
+    def manifest():
+        manifest_json = '''
+        {
+          "short_name": "لوحة التحكم",
+          "name": "نظام إدارة الطلبات - لوحة التحكم",
+          "description": "نظام متكامل لإدارة الطلبات والمبيعات",
+          "lang": "ar",
+          "dir": "rtl",
+          "icons": [
+            {
+              "src": "{{ url_for('static', filename='icons/icon-72x72.png') }}",
+              "sizes": "72x72",
+              "type": "image/png",
+              "purpose": "maskable any"
+            },
+            {
+              "src": "{{ url_for('static', filename='icons/icon-96x96.png') }}",
+              "sizes": "96x96",
+              "type": "image/png",
+              "purpose": "maskable any"
+            },
+            {
+              "src": "{{ url_for('static', filename='icons/icon-128x128.png') }}",
+              "sizes": "128x128",
+              "type": "image/png",
+              "purpose": "maskable any"
+            },
+            {
+              "src": "{{ url_for('static', filename='icons/icon-144x144.png') }}",
+              "sizes": "144x144",
+              "type": "image/png",
+              "purpose": "maskable any"
+            },
+            {
+              "src": "{{ url_for('static', filename='icons/icon-152x152.png') }}",
+              "sizes": "152x152",
+              "type": "image/png",
+              "purpose": "maskable any"
+            },
+            {
+              "src": "{{ url_for('static', filename='icons/icon-192x192.png') }}",
+              "sizes": "192x192",
+              "type": "image/png",
+              "purpose": "maskable any"
+            },
+            {
+              "src": "{{ url_for('static', filename='icons/icon-384x384.png') }}",
+              "sizes": "384x384",
+              "type": "image/png",
+              "purpose": "maskable any"
+            },
+            {
+              "src": "{{ url_for('static', filename='icons/icon-512x512.png') }}",
+              "sizes": "512x512",
+              "type": "image/png",
+              "purpose": "maskable any"
+            }
+          ],
+          "start_url": "{{ url_for('index') }}",
+          "background_color": "#1e3a8a",
+          "theme_color": "#1e3a8a",
+          "display": "standalone",
+          "scope": "{{ url_for('index', _external=True) }}"
+        }
+        '''
+        return render_template_string(manifest_json), 200, {'Content-Type': 'application/json'}
+# أضف هذا الكود في ملف __init__.py بعد تعريف التطبيق وقبل return app
