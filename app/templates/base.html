@@ -217,7 +217,8 @@
    .pwa-install-btn {
       position: fixed;
       bottom: 20px;
-      right: 20px;
+      right:0;
+      left: 0;
       background-color: var(--primary);
       color: white;
       border: none;
@@ -564,7 +565,7 @@
   
   // إخفاء الزر إذا كان التطبيق مثبتاً بالفعل
   if (window.matchMedia('(display-mode: standalone)').matches) {
-    installBtn.style.display = 'none';
+    
   }
 }
     
