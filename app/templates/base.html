@@ -673,7 +673,7 @@ function registerServiceWorker() {
 
 
 function setupPWAInstall() {
-  let deferredPrompt = null;
+  let deferredPrompt;
   const installBtn = document.getElementById('pwaInstallBtn');
   
   if (!installBtn) return;
@@ -681,96 +681,34 @@ function setupPWAInstall() {
   // إخفاء الزر افتراضيًا
   installBtn.style.display = 'none';
   
-  // دالة للتحقق مما إذا كان التطبيق مثبتًا بالفعل
-  function isAppInstalled() {
-    return window.matchMedia('(display-mode: standalone)').matches || 
-           navigator.standalone ||
-           document.referrer.includes('android-app://');
-  }
-  
-  // التحقق من دعم المتصفح للتثبيت
-  function isInstallSupported() {
-    return 'BeforeInstallPromptEvent' in window;
-  }
-  
-  // إذا كان التطبيق مثبتًا بالفعل أو لا يدعم التثبيت، نخفي الزر
-  if (isAppInstalled() || !isInstallSupported()) {
-    installBtn.style.display = 'none';
-    return;
-  }
-  
-  // حدث beforeinstallprompt - يُطلق عندما يكون التطبيق جاهزًا للتثبيت
+  // التحقق من دعم المتصفح وإظهار الزر عند الحاجة
   window.addEventListener('beforeinstallprompt', (e) => {
-    console.log('beforeinstallprompt event fired');
-    
-    // منع المتصفح من عرض موجه التثبيت التلقائي
     e.preventDefault();
-    
-    // تخزين الحدث لعرضه لاحقًا
     deferredPrompt = e;
     
-    // إظهار زر التثبيت
-    installBtn.style.display = 'block';
+    // إظهار الزر فقط إذا لم يكن التطبيق مثبتًا بالفعل
+    if (!window.matchMedia('(display-mode: standalone)').matches) {
+      installBtn.style.display = 'block';
+    }
     
-    // إزالة أي معالج أحداث سابق لمنع التكرار
-    installBtn.onclick = null;
-    
-    // إضافة معالج الأحداث الجديد
     installBtn.addEventListener('click', async () => {
-      if (!deferredPrompt) {
-        console.log('No deferred prompt available');
-        showCannotInstallMessage();
-        return;
-      }
-      
-      console.log('Showing install prompt');
-      
-      try {
-        // عرض موجه التثبيت
+      if (deferredPrompt) {
         deferredPrompt.prompt();
-        
-        // انتظار اختيار المستخدم
-        const choiceResult = await deferredPrompt.userChoice;
-        console.log('User choice:', choiceResult.outcome);
-        
-        if (choiceResult.outcome === 'accepted') {
-          console.log('User accepted the install prompt');
-        } else {
-          console.log('User dismissed the install prompt');
-          // إخفاء الزر لمدة 24 ساعة إذا رفض المستخدم التثبيت
-          hideButtonTemporarily();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          console.log('تم قبول تثبيت التطبيق');
+          installBtn.style.display = 'none';
         }
-        
-        // مسح deferredPrompt بعد الاستخدام
         deferredPrompt = null;
-      } catch (error) {
-        console.error('Error showing install prompt:', error);
-        showInstallError();
       }
     });
   });
   
-  // حدث appinstalled - يُطلق عند تثبيت التطبيق بنجاح
-  window.addEventListener('appinstalled', () => {
-    console.log('PWA was installed successfully');
+  // إخفاء الزر إذا كان التطبيق مثبتًا بالفعل
+  if (window.matchMedia('(display-mode: standalone)').matches) {
     installBtn.style.display = 'none';
-    deferredPrompt = null;
-    
-    // إظهار رسالة نجاح
-    showInstallSuccessMessage();
-  });
-  
-  // التحقق من حالة التثبيت عند تحميل الصفحة
-  window.addEventListener('load', () => {
-    if (isAppInstalled()) {
-      installBtn.style.display = 'none';
-    } else {
-      // التحقق مما إذا كان المستخدم قد رفض التثبيت مؤخرًا
-      checkInstallDismissal();
-    }
-  });
+  }
 }
-
 // إخفاء الزر مؤقتًا بعد رفض التثبيت
 function hideButtonTemporarily() {
   const installBtn = document.getElementById('pwaInstallBtn');
