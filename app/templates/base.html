@@ -718,43 +718,7 @@
         });
       }
     });
-// إدارة شاشة التحميل عند فتح التطبيق
-function showSplashScreen() {
-  const splashHtml = `
-    <div class="app-splash">
-      <div class="app-splash-content">
-        <img src="{{ url_for('static', filename='icons/icon-192x192.png') }}" 
-             alt="شعار التطبيق" class="app-splash-logo">
-        <div class="app-splash-text">نظام إدارة الطلبات</div>
-        <div class="app-splash-loading"></div>
-      </div>
-    </div>
-  `;
-  
-  document.body.insertAdjacentHTML('beforeend', splashHtml);
-  
-  // إخفاء شاشة التحميل بعد تأخير قصير
-  setTimeout(() => {
-    const splash = document.querySelector('.app-splash');
-    if (splash) {
-      splash.classList.add('hide');
-      
-      // إزالة شاشة التحميل بعد انتهاء الانتقال
-      setTimeout(() => {
-        splash.remove();
-      }, 500);
-    }
-  }, 2000);
-}
 
-// تفعيل شاشة التحميل عند فتح التطبيق
-if ('standalone' in navigator || window.matchMedia('(display-mode: standalone)').matches) {
-  // التطبيق مثبت كـ PWA
-  document.addEventListener('DOMContentLoaded', showSplashScreen);
-} else {
-  // التطبيق يعمل في المتصفح العادي
-  window.addEventListener('load', showSplashScreen);
-}
     window.addEventListener('resize', () => {
        if (window.innerWidth >= 992) {
             const sidebar = document.querySelector('.sidebar');
