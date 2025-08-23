@@ -214,37 +214,55 @@
       width: 100%;
       max-width: 100%;
     }
-    .pwa-install-btn {
-  position: fixed;
-  bottom: 20px;
-  right: 20px; /* تغيير من left إلى right للتوافق مع الاتجاه RTL */
-  background-color: var(--primary);
-  color: white;
-  border: none;
-  padding: 12px 20px;
-  border-radius: 30px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  display: none;
-  z-index: 1050;
-  font-weight: 500;
-  transition: var(--transition);
-  font-family: 'Tajawal', sans-serif;
-}
+   .pwa-install-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 30px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      display: none;
+      z-index: 1050;
+      font-weight: 500;
+      transition: var(--transition);
+      font-family: 'Tajawal', sans-serif;
+    }
 
-.pwa-install-btn:hover {
-  background-color: var(--primary-light);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
-}
+    .pwa-install-btn:hover {
+      background-color: var(--primary-light);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+    }
 
-body.dark-mode .pwa-install-btn {
-  background-color: #3b82f6;
-  color: white;
-}
+    body.dark-mode .pwa-install-btn {
+      background-color: #3b82f6;
+      color: white;
+    }
 
-body.dark-mode .pwa-install-btn:hover {
-  background-color: #2563eb;
-}
+    body.dark-mode .pwa-install-btn:hover {
+      background-color: #2563eb;
+    }
+
+    .pwa-offline-alert {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background-color: #f8d7da;
+      color: #721c24;
+      padding: 10px;
+      text-align: center;
+      z-index: 1060;
+      display: none;
+    }
+    
+    body.dark-mode .pwa-offline-alert {
+      background-color: #4a1c24;
+      color: #f8d7da;
+    }
     @media (max-width: 768px) {
       .content { padding: 1.5rem; }
     }
