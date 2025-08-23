@@ -1,4 +1,5 @@
-const CACHE_NAME = 'dashboard-cache-v2';
+// sw.js - النسخة المحسنة
+const CACHE_NAME = 'dashboard-cache-v3'; // زيادة رقم الإصدار
 const urlsToCache = [
   '/',
   '/static/css/main.css',
@@ -16,7 +17,9 @@ self.addEventListener('install', function(event) {
         console.log('Opened cache');
         return cache.addAll(urlsToCache);
       })
-      .then(() => self.skipWaiting())
+      .catch(error => {
+        console.error('Failed to cache:', error);
+      })
   );
 });
 
@@ -32,12 +35,17 @@ self.addEventListener('activate', function(event) {
           }
         })
       );
-    }).then(() => self.clients.claim())
+    })
   );
 });
 
-// Fetch events
+// Fetch events - نسخة مبسطة وأكثر أماناً
 self.addEventListener('fetch', function(event) {
+  // تجاهل طلبات غير GET
+  if (event.request.method !== 'GET') {
+    return;
+  }
+  
   event.respondWith(
     caches.match(event.request)
       .then(function(response) {
@@ -62,6 +70,9 @@ self.addEventListener('fetch', function(event) {
             });
           
           return response;
+        }).catch(function() {
+          // في حالة الخطأ، يمكن إرجاع صفحة بديلة
+          return caches.match('/offline.html');
         });
       })
   );
