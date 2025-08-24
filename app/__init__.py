@@ -210,7 +210,7 @@ def create_app():
         
         manifest_json = '''
         {
-          "short_name": "لوحة التحكم",
+          "short_name": "سلطانة",
           "name": "نظام إدارة الطلبات - لوحة التحكم",
           "description": "نظام متكامل لإدارة الطلبات والمبيعات",
           "lang": "ar",
