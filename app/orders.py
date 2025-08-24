@@ -45,46 +45,9 @@ def get_user_from_cookies():
             user = User.query.filter_by(store_id=employee.store_id).first()
             return user, employee
         return None, None
-@orders_bp.route('/sync_statuses', methods=['POST'])
-def sync_order_statuses():
-    """مزامنة حالات الطلبات من سلة إلى قاعدة البيانات المحلية"""
+def sync_order_statuses_internal(user, access_token, store_id):
+    """دالة مساعدة لمزامنة حالات الطلبات (يمكن استدعاؤها داخلياً)"""
     try:
-        user, employee = get_user_from_cookies()
-        
-        if not user:
-            response = jsonify({
-                'success': False, 
-                'error': 'الرجاء تسجيل الدخول أولاً',
-                'code': 'UNAUTHORIZED'
-            })
-            response.set_cookie('user_id', '', expires=0)
-            response.set_cookie('is_admin', '', expires=0)
-            return response, 401
-        
-        store_id = None
-        access_token = None
-        
-        if request.cookies.get('is_admin') == 'true':
-            store_id = user.store_id
-            access_token = user.salla_access_token
-        else:
-            if not employee:
-                return jsonify({
-                    'success': False,
-                    'error': 'الموظف غير موجود',
-                    'code': 'EMPLOYEE_NOT_FOUND'
-                }), 404
-                
-            store_id = employee.store_id
-            access_token = user.salla_access_token
-        
-        if not access_token:
-            return jsonify({
-                'success': False,
-                'error': 'يجب ربط المتجر مع سلة أولاً',
-                'code': 'MISSING_ACCESS_TOKEN'
-            }), 400
-        
         headers = {
             'Authorization': f'Bearer {access_token}',
             'Accept': 'application/json'
@@ -102,23 +65,14 @@ def sync_order_statuses():
         if response.status_code != 200:
             error_msg = f"خطأ في استجابة سلة: {response.status_code} - {response.text}"
             current_app.logger.error(error_msg)
-            return jsonify({
-                'success': False,
-                'error': "فشل في جلب حالات الطلبات من سلة",
-                'code': 'SALLA_API_ERROR',
-                'details': response.text[:200] if response.text else ''
-            }), 500
+            return False, f"فشل في جلب حالات الطلبات من سلة: {response.text[:200] if response.text else ''}"
         
         data = response.json()
         
         if 'data' not in data:
             error_msg = "استجابة غير متوقعة من سلة: هيكل البيانات غير مطابق للمواصفات"
             current_app.logger.error(error_msg)
-            return jsonify({
-                'success': False,
-                'error': error_msg,
-                'code': 'INVALID_RESPONSE_FORMAT'
-            }), 500
+            return False, error_msg
         
         statuses = data['data']
         current_app.logger.info(f"تم جلب {len(statuses)} حالة طلب للمزامنة")
@@ -191,25 +145,72 @@ def sync_order_statuses():
         
         current_app.logger.info(f"تمت مزامنة حالات الطلبات بنجاح: {new_count} جديد، {updated_count} محدث")
         
-        return jsonify({
-            'success': True,
-            'message': f'تمت مزامنة حالات الطلبات بنجاح: {new_count} حالة جديدة، {updated_count} حالة محدثة',
-            'stats': {
-                'new_statuses': new_count,
-                'updated_statuses': updated_count,
-                'total_processed': len(statuses)
-            }
-        })
+        return True, f'تمت مزامنة حالات الطلبات بنجاح: {new_count} حالة جديدة، {updated_count} حالة محدثة'
     
     except requests.exceptions.RequestException as e:
         error_msg = f"خطأ في الاتصال بسلة: {str(e)}"
         current_app.logger.error(error_msg, exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': error_msg,
-            'code': 'NETWORK_ERROR'
-        }), 500
+        return False, error_msg
         
+    except Exception as e:
+        error_msg = f"خطأ غير متوقع: {str(e)}"
+        current_app.logger.error(error_msg, exc_info=True)
+        return False, error_msg
+@orders_bp.route('/sync_statuses', methods=['POST'])
+def sync_order_statuses():
+    """مزامنة حالات الطلبات من سلة إلى قاعدة البيانات المحلية"""
+    try:
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            response = jsonify({
+                'success': False, 
+                'error': 'الرجاء تسجيل الدخول أولاً',
+                'code': 'UNAUTHORIZED'
+            })
+            response.set_cookie('user_id', '', expires=0)
+            response.set_cookie('is_admin', '', expires=0)
+            return response, 401
+        
+        store_id = None
+        access_token = None
+        
+        if request.cookies.get('is_admin') == 'true':
+            store_id = user.store_id
+            access_token = user.salla_access_token
+        else:
+            if not employee:
+                return jsonify({
+                    'success': False,
+                    'error': 'الموظف غير موجود',
+                    'code': 'EMPLOYEE_NOT_FOUND'
+                }), 404
+                
+            store_id = employee.store_id
+            access_token = user.salla_access_token
+        
+        if not access_token:
+            return jsonify({
+                'success': False,
+                'error': 'يجب ربط المتجر مع سلة أولاً',
+                'code': 'MISSING_ACCESS_TOKEN'
+            }), 400
+        
+        # استخدام الدالة المساعدة للمزامنة
+        success, message = sync_order_statuses_internal(user, access_token, store_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': message
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': message,
+                'code': 'SYNC_ERROR'
+            }), 500
+            
     except Exception as e:
         error_msg = f"خطأ غير متوقع: {str(e)}"
         current_app.logger.error(error_msg, exc_info=True)
@@ -218,7 +219,6 @@ def sync_order_statuses():
             'error': error_msg,
             'code': 'INTERNAL_ERROR'
         }), 500
-    # معالجة الاستجابة وحفظ حالات الطلبات في جدول جديد
 @orders_bp.route('/sync_orders', methods=['POST'])
 def sync_orders():
     """مزامنة الطلبات من سلة إلى قاعدة البيانات المحلية وفق المواصفات الرسمية"""
@@ -445,8 +445,8 @@ def sync_orders():
         # تحديث وقت آخر مزامنة
         user.last_sync = datetime.utcnow()
         db.session.commit()
-        
-        status_success, status_message = sync_order_statuses(user, access_token)
+
+        status_success, status_message = sync_order_statuses_internal(user, access_token, user.store_id)
         if not status_success:
             current_app.logger.warning(f"فشل مزامنة حالات الطلبات: {status_message}")
         
