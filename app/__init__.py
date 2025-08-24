@@ -237,7 +237,7 @@ def create_app():
           "scope": "/"
         }
         '''
-        
+        return render_template_string(manifest_json), 200, {'Content-Type': 'application/json'}
 
     return app
     
