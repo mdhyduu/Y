@@ -260,24 +260,7 @@ function initializeCSRFToken() {
   }
 }
 
-function showSplashScreen() {
-  const splashHtml = `
-    <div class="app-splash">
-      <div class="app-splash-content">
-        <img src="{{ url_for('static', filename='icons/s.png') }}" alt="شعار التطبيق" class="app-splash-logo">
 
-      </div>
-    </div>`;
-  
-  document.body.insertAdjacentHTML('beforeend', splashHtml);
-  setTimeout(() => {
-    const splash = document.querySelector('.app-splash');
-    if (splash) {
-      splash.classList.add('hide');
-      setTimeout(() => splash.remove(), 500);
-    }
-  }, 2000);
-}
 </script>
   
 {% block scripts %}{% endblock %}
