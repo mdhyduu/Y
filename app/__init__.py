@@ -210,34 +210,34 @@ def create_app():
         
         manifest_json = '''
         {
-          "short_name": "لوحة jjjjj تحكم",
+          "short_name": "لوحة التحكم",
           "name": "نظام إدارة الطلبات - لوحة التحكم",
           "description": "نظام متكامل لإدارة الطلبات والمبيعات",
-          "lang": "er",
+          "lang": "ar",
           "dir": "rtl",
           "icons": [
             {
-              "src": "{{ url_for('static', filename='icons/icon-192x192.png') }}",
-              "sizes": "72x72",
+              "src": "/static/icons/icon-192x192.png",
+              "sizes": "192x192",
               "type": "image/png",
               "purpose": "maskable any"
             },
             {
-              "src": "{{ url_for('static', filename='icons/s.png') }}",
-              "sizes": "72x72",
+              "src": "/static/icons/s.png",
+              "sizes": "512x512",
               "type": "image/png",
               "purpose": "maskable any"
             }
           ],
-          "start_url": "{{ url_for('orders.index') }}",
-          "background_color": "#1e3a8a",  // لون الخلفية عند التحميل
-          "theme_color": "#1e3a8a",       // لون شريط العنوان
+          "start_url": "/",
+          "background_color": "#1e3a8a",
+          "theme_color": "#1e3a8a",
           "display": "standalone",
-          "orientation": "portrait",      // إضافة لتحديد الاتجاه
-          "scope": "{{ url_for('orders.index', _external=True) }}"
+          "orientation": "portrait",
+          "scope": "/"
         }
         '''
-        return render_template_string(manifest_json), 200, {'Content-Type': 'application/json'}
+        
 
     return app
     
