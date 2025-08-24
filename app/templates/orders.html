@@ -42,8 +42,8 @@
     <option value="">الكل</option>
     <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>قيد الانتظار</option>
     <option value="payment_pending" {% if filters.status == 'payment_pending' %}selected{% endif %}>انتظار الدفع</option>
-    <option value="waiting_to_receive" {% if filters.status == 'waiting_to_receive' %}selected{% endif %}>في انتظار الاستلام</option>
-    <option value="processing" {% if filters.status == 'processing' %}selected{% endif %}>قيد التنفيذ</option>
+    <option value="payment_pending" {% if filters.status == 'payment_pending' %}selected{% endif %}>في انتظار الاستلام</option>
+    <option value="in_progress" {% if filters.status == 'in_progress' %}selected{% endif %}>قيد التنفيذ</option>
     <option value="under_review" {% if filters.status == 'under_review' %}selected{% endif %}>بانتظار المراجعة</option>
     <option value="completed" {% if filters.status == 'completed' %}selected{% endif %}>تم التنفيذ</option>
     <option value="delivering" {% if filters.status == 'delivering' %}selected{% endif %}>قيد التوصيل</option>

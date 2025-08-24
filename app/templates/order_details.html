@@ -21,7 +21,7 @@
       <div class="card shadow-sm mb-3 border-0">
         <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap py-2">
           <h5 class="mb-0 fs-5">معلومات الطلب</h5>
-          <span class="badge rounded-pill bg-{{ order.status.slug | replace('under_review', 'warning') | replace('processing', 'info') | replace('completed', 'success') | replace('awaiting_payment', 'warning') | replace('shipped', 'primary') | replace('delivered', 'success') | replace('canceled', 'danger') | replace('refunded', 'secondary') }}">
+          <span class="badge rounded-pill bg-{{ order.status.slug | replace('under_review', 'warning') | replace('in_progress', 'info') | replace('completed', 'success') | replace('payment_pending', 'warning') | replace('shipped', 'primary') | replace('delivered', 'success') | replace('canceled', 'danger') | replace('restored', 'secondary') }}">
             {{ order.status.name | safe }}
           </span>
         </div>
@@ -277,7 +277,7 @@
 <!-- نهاية التعديل -->
 <!-- نهاية التعديل -->
       <!-- قسم تحديث حالة الطلب -->
-      {% if is_reviewer %}
+      {% if is_reviewer  %}
       <div class="card shadow-sm mb-3 border-0">
         <div class="card-header bg-white py-2">
           <h5 class="mb-0 fs-5"><i class="fas fa-sync-alt ms-2"></i>تحديث حالة الطلب</h5>
@@ -293,7 +293,7 @@
                   ('under_review', 'بإنتظار المراجعة'),
                   ('in_progress', 'قيد التنفيذ'),
                   ('completed', 'تم التنفيذ'),
-                  ('awaiting_payment', 'بإنتظار الدفع'),
+                  ('payment_pending', 'بإنتظار الدفع'),
                   ('shipped', 'تم الشحن'),
                   ('delivered', 'تم التوصيل'),
                   ('canceled', 'ملغي'),
