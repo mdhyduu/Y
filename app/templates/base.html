@@ -126,9 +126,6 @@
 // =================================================================
 document.addEventListener('DOMContentLoaded', initializeApp);
 
-/**
- * Fonction principale qui initialise toutes les fonctionnalités de la page.
- */
 function initializeApp() {
   console.log("Application initialisée...");
   
@@ -137,28 +134,21 @@ function initializeApp() {
   initializePWA();
   initializeCSRFToken();
   
-  // Activer l'écran de démarrage uniquement en mode PWA
   if (window.matchMedia('(display-mode: standalone)').matches) {
     showSplashScreen();
   }
 }
 
 // -----------------------------------------------------------------
-// SECTION APPARENCE (Thème sombre, Barre latérale)
+// APPARENCE
 // -----------------------------------------------------------------
-
-/**
- * Initialise le thème (sombre/clair) et l'état de la barre latérale.
- */
 function initializeAppearance() {
-  // Configurer le mode sombre à partir du cookie
   const isDarkMode = document.cookie.split('; ').find(row => row.startsWith('darkMode='))?.split('=')[1] === 'true';
   if (isDarkMode) {
     document.body.classList.add('dark-mode');
     document.getElementById('themeToggle').className = 'fas fa-sun action-icon';
   }
 
-  // Activer le lien actif dans la barre latérale
   const currentPath = window.location.pathname;
   document.querySelectorAll('.sidebar .nav-link').forEach(link => {
     const linkPath = link.getAttribute('href');
@@ -168,13 +158,8 @@ function initializeAppearance() {
   });
 }
 
-/**
- * Ajoute tous les écouteurs d'événements pour l'interface utilisateur.
- */
 function initializeUIEventListeners() {
   document.getElementById('themeToggle')?.addEventListener('click', toggleDarkMode);
-  
-  // Fermer la barre latérale en cliquant sur un lien sur mobile
   document.querySelectorAll('.sidebar .nav-link').forEach(link => {
     link.addEventListener('click', () => {
       if (window.innerWidth < 992 && document.querySelector('.sidebar').classList.contains('show')) {
@@ -182,18 +167,13 @@ function initializeUIEventListeners() {
       }
     });
   });
-
-  // Gérer le redimensionnement de la fenêtre pour la barre latérale
   window.addEventListener('resize', () => {
     if (window.innerWidth >= 992 && document.querySelector('.sidebar')?.classList.contains('show')) {
-      toggleSidebar(); // Fermer la barre latérale si la fenêtre est agrandie
+      toggleSidebar();
     }
   });
 }
 
-/**
- * Gère le basculement entre le mode sombre et le mode clair.
- */
 function toggleDarkMode() {
   document.body.classList.toggle('dark-mode');
   const isDark = document.body.classList.contains('dark-mode');
@@ -201,9 +181,6 @@ function toggleDarkMode() {
   document.getElementById('themeToggle').className = isDark ? 'fas fa-sun action-icon' : 'fas fa-moon action-icon';
 }
 
-/**
- * Affiche ou masque la barre latérale.
- */
 function toggleSidebar() {
   const sidebar = document.querySelector('.sidebar');
   const backdrop = document.querySelector('.sidebar__backdrop');
@@ -215,21 +192,14 @@ function toggleSidebar() {
 }
 
 // -----------------------------------------------------------------
-// SECTION PWA (Service Worker, Installation, Statut de connexion)
+// PWA
 // -----------------------------------------------------------------
-
-/**
- * Initialise les fonctionnalités de l'application web progressive (PWA).
- */
 function initializePWA() {
   registerServiceWorker();
   setupPWAInstall();
   setupConnectionStatus();
 }
 
-/**
- * Enregistre le Service Worker pour le fonctionnement hors ligne.
- */
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}")
@@ -238,85 +208,49 @@ function registerServiceWorker() {
   }
 }
 
-/**
- * Gère la logique d'affichage du bouton d'installation de la PWA.
- */
 function setupPWAInstall() {
   let deferredPrompt;
   const installBtn = document.getElementById('pwaInstallBtn');
-
-  // التحقق مما إذا كان التطبيق مثبتًا بالفعل
-  const isAppInstalled = () => {
-    return window.matchMedia('(display-mode: standalone)').matches || 
-           window.navigator.standalone === true;
-  };
-
-  // التحقق من حالة التثبيت عند تحميل الصفحة
-  if (!isAppInstalled()) {
-    installBtn.style.display = 'block';
-  }
+  installBtn.style.display = 'none';
 
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    
-    // عرض الزر فقط إذا لم يكن التطبيق مثبتًا
-    if (!isAppInstalled()) {
-      installBtn.style.display = 'block';
-    }
-    console.log("L'événement 'beforeinstallprompt' a été déclenché. Le bouton d'installation est affiché.");
+    installBtn.style.display = 'block';
+  });
 
-    installBtn.onclick = async () => {
-      installBtn.style.display = 'none';
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log(`Réponse de l'utilisateur à l'invite : ${outcome}`);
-        deferredPrompt = null;
-      }
-    };
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) {
+      console.warn("🚫 حدث التثبيت غير متاح حالياً.");
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log("🔔 اختيار المستخدم:", outcome);
+    deferredPrompt = null;
+    installBtn.style.display = 'none';
   });
 
   window.addEventListener('appinstalled', () => {
-    console.log('PWA installée avec succès !');
+    console.log('✅ التطبيق تم تثبيته بنجاح!');
     installBtn.style.display = 'none';
     deferredPrompt = null;
   });
-
-  // إخفاء الزر إذا كان التطبيق مثبتًا بالفعل
-  window.addEventListener('load', () => {
-    if (isAppInstalled()) {
-      installBtn.style.display = 'none';
-    }
-  });
 }
-/**
- * Gère l'affichage des alertes de connexion en ligne/hors ligne.
- */
+
 function setupConnectionStatus() {
   const offlineAlert = document.getElementById('pwaOfflineAlert');
-  
   const updateOnlineStatus = () => {
-    if (navigator.onLine) {
-      offlineAlert.style.display = 'none';
-    } else {
-      offlineAlert.style.display = 'block';
-    }
+    offlineAlert.style.display = navigator.onLine ? 'none' : 'block';
   };
-
   window.addEventListener('online', updateOnlineStatus);
   window.addEventListener('offline', updateOnlineStatus);
-  
-  updateOnlineStatus(); // Vérifier l'état initial
+  updateOnlineStatus();
 }
 
 // -----------------------------------------------------------------
-// SECTION UTILITAIRES
+// UTILITAIRES
 // -----------------------------------------------------------------
-
-/**
- * Initialise le jeton CSRF pour les requêtes AJAX sécurisées.
- */
 function initializeCSRFToken() {
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
   if (csrfToken && window.jQuery) {
@@ -326,9 +260,6 @@ function initializeCSRFToken() {
   }
 }
 
-/**
- * Affiche un écran de démarrage lors de l'ouverture en mode PWA.
- */
 function showSplashScreen() {
   const splashHtml = `
     <div class="app-splash">
@@ -340,16 +271,14 @@ function showSplashScreen() {
     </div>`;
   
   document.body.insertAdjacentHTML('beforeend', splashHtml);
-  
   setTimeout(() => {
     const splash = document.querySelector('.app-splash');
     if (splash) {
       splash.classList.add('hide');
-      setTimeout(() => splash.remove(), 500); // Retirer du DOM après la transition
+      setTimeout(() => splash.remove(), 500);
     }
-  }, 2000); // Durée de l'écran de démarrage
+  }, 2000);
 }
-
 </script>
   
 {% block scripts %}{% endblock %}
