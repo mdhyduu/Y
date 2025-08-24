@@ -291,13 +291,13 @@
               <select class="form-select form-select-sm" id="status" name="status_slug" required>
                 {% for slug, label in [
                   ('under_review', 'بإنتظار المراجعة'),
-                  ('in_processing', 'قيد التنفيذ'),
+                  ('in_progress', 'قيد التنفيذ'),
                   ('completed', 'تم التنفيذ'),
                   ('awaiting_payment', 'بإنتظار الدفع'),
                   ('shipped', 'تم الشحن'),
                   ('delivered', 'تم التوصيل'),
                   ('canceled', 'ملغي'),
-                  ('refunded', 'مسترجع')
+                  ('restored', 'مسترجع')
                 ] %}
                 <option value="{{ slug }}" {% if order.status.slug == slug %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
