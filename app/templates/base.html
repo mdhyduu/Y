@@ -247,7 +247,7 @@ function setupConnectionStatus() {
   window.addEventListener('offline', updateOnlineStatus);
   updateOnlineStatus();
 }
-
+ 
 // -----------------------------------------------------------------
 // UTILITAIRES
 // -----------------------------------------------------------------
@@ -265,8 +265,7 @@ function showSplashScreen() {
     <div class="app-splash">
       <div class="app-splash-content">
         <img src="{{ url_for('static', filename='icons/s.png') }}" alt="شعار التطبيق" class="app-splash-logo">
-        <div class="app-splash-text">نظام إدارة الطلبات</div>
-        <div class="app-splash-loading"></div>
+
       </div>
     </div>`;
   
