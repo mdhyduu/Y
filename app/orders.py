@@ -374,12 +374,12 @@ def sync_orders():
         for order in all_orders:
             try:
                 order_id = str(order.get('id'))
-                status_info = order.get('status', {})
-                status_id = str(status_info.get('id', ''))
+                
                 if not order_id:
                     skipped_count += 1
                     continue
-                
+                status_info = order.get('status', {})
+                status_id = str(status_info.get('id', ''))
                 # البحث عن الطلب في قاعدة البيانات
                 existing_order = SallaOrder.query.get(order_id)
                 
