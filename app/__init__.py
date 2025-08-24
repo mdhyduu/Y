@@ -238,9 +238,7 @@ def create_app():
         }
         '''
         return render_template_string(manifest_json), 200, {'Content-Type': 'application/json'}
-    @app.route('/offline')
-    def offline():
-        return render_template('offline.html')
+    
 
     return app
     
