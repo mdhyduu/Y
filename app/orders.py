@@ -496,9 +496,10 @@ def index():
     
     # جلب معلمات الترحيل والتصفية
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    per_page = request.args.get('per_page', 20, type=int) 
     status_filter = request.args.get('status', '')
     employee_filter = request.args.get('employee', '')
+    order_statuses = OrderStatus.query.filter_by(store_id=user.store_id).order_by(OrderStatus.sort).all()
     custom_status_filter = request.args.get('custom_status', '')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
@@ -738,6 +739,7 @@ def index():
                             custom_statuses=custom_statuses,
                             pagination=pagination,
                             filters=filters,
+                            order_statuses=order_statuses,  
                             is_reviewer=is_reviewer,
                             current_employee=employee)
     
