@@ -41,21 +41,17 @@
 <select id="filter-order-status" class="form-select">
     <option value="">الكل</option>
     <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>قيد الانتظار</option>
-    <option value="awaiting_payment" {% if filters.status == 'awaiting_payment' %}selected{% endif %}>بانتظار الدفع</option>
     <option value="payment_pending" {% if filters.status == 'payment_pending' %}selected{% endif %}>انتظار الدفع</option>
-    <option value="waiting_for_payment_confirmation" {% if filters.status == 'waiting_for_payment_confirmation' %}selected{% endif %}>انتظار تأكيد الدفع</option>
-    <option value="payment_failed" {% if filters.status == 'payment_failed' %}selected{% endif %}>فشل الدفع</option>
     <option value="waiting_to_receive" {% if filters.status == 'waiting_to_receive' %}selected{% endif %}>في انتظار الاستلام</option>
-    <option value="in_progress" {% if filters.status == 'in_progress' %}selected{% endif %}>قيد المعالجة</option>
-    <option value="processing" {% if filters.status == 'processing' %}selected{% endif %}>قيد المعالجة</option>
-    <option value="under_review" {% if filters.status == 'under_review' %}selected{% endif %}>قيد المراجعة</option>
+    <option value="processing" {% if filters.status == 'processing' %}selected{% endif %}>قيد التنفيذ</option>
+    <option value="under_review" {% if filters.status == 'under_review' %}selected{% endif %}>بانتظار المراجعة</option>
     <option value="completed" {% if filters.status == 'completed' %}selected{% endif %}>تم التنفيذ</option>
     <option value="delivering" {% if filters.status == 'delivering' %}selected{% endif %}>قيد التوصيل</option>
     <option value="delivered" {% if filters.status == 'delivered' %}selected{% endif %}>تم التوصيل</option>
     <option value="shipped" {% if filters.status == 'shipped' %}selected{% endif %}>تم الشحن</option>
     <option value="canceled" {% if filters.status == 'canceled' %}selected{% endif %}>ملغي</option>
     <option value="restored" {% if filters.status == 'restored' %}selected{% endif %}>تم الاسترجاع</option>
-    <option value="restoring" {% if filters.status == 'restoring' %}selected{% endif %}>قيد الاسترجاع</option>
+
 </select>
                 </div>
                 {% endif %}
