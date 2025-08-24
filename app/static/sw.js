@@ -1,5 +1,5 @@
 // sw.js - النسخة المحسنة والمستقرة
-const CACHE_NAME = 'dashboard-cache-v5';
+const CACHE_NAME = 'dashboard-cache-v16';
 const urlsToCache = [
   '/',
   '/static/css/main.css',
@@ -119,7 +119,7 @@ self.addEventListener('push', function(event) {
       self.registration.showNotification(data.title, {
         body: data.body,
         icon: '/static/icons/s.png',
-        badge: '/static/icons/s.png'
+        badge: '/static/icons/icon-192x192.png'
       })
     );
   }
