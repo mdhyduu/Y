@@ -7,7 +7,7 @@ from sqlalchemy import nullslast
 from .models import (
     db, User, Employee, Department, EmployeePermission, 
     Product, OrderDelivery, SallaOrder, OrderAssignment,
-    OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, CustomNoteStatus
+    OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, CustomNoteStatus, OrderStatus
 )
 from .config import Config
 from .utils import process_order_data, format_date, generate_barcode, humanize_time
@@ -45,7 +45,180 @@ def get_user_from_cookies():
             user = User.query.filter_by(store_id=employee.store_id).first()
             return user, employee
         return None, None
-
+@orders_bp.route('/sync_statuses', methods=['POST'])
+def sync_order_statuses():
+    """مزامنة حالات الطلبات من سلة إلى قاعدة البيانات المحلية"""
+    try:
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            response = jsonify({
+                'success': False, 
+                'error': 'الرجاء تسجيل الدخول أولاً',
+                'code': 'UNAUTHORIZED'
+            })
+            response.set_cookie('user_id', '', expires=0)
+            response.set_cookie('is_admin', '', expires=0)
+            return response, 401
+        
+        store_id = None
+        access_token = None
+        
+        if request.cookies.get('is_admin') == 'true':
+            store_id = user.store_id
+            access_token = user.salla_access_token
+        else:
+            if not employee:
+                return jsonify({
+                    'success': False,
+                    'error': 'الموظف غير موجود',
+                    'code': 'EMPLOYEE_NOT_FOUND'
+                }), 404
+                
+            store_id = employee.store_id
+            access_token = user.salla_access_token
+        
+        if not access_token:
+            return jsonify({
+                'success': False,
+                'error': 'يجب ربط المتجر مع سلة أولاً',
+                'code': 'MISSING_ACCESS_TOKEN'
+            }), 400
+        
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Accept': 'application/json'
+        }
+        
+        current_app.logger.info(f"بدء مزامنة حالات الطلبات للمتجر {store_id}")
+        
+        # جلب حالات الطلبات من Salla API
+        response = requests.get(
+            f"{Config.SALLA_API_BASE_URL}/orders/statuses",
+            headers=headers,
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            error_msg = f"خطأ في استجابة سلة: {response.status_code} - {response.text}"
+            current_app.logger.error(error_msg)
+            return jsonify({
+                'success': False,
+                'error': "فشل في جلب حالات الطلبات من سلة",
+                'code': 'SALLA_API_ERROR',
+                'details': response.text[:200] if response.text else ''
+            }), 500
+        
+        data = response.json()
+        
+        if 'data' not in data:
+            error_msg = "استجابة غير متوقعة من سلة: هيكل البيانات غير مطابق للمواصفات"
+            current_app.logger.error(error_msg)
+            return jsonify({
+                'success': False,
+                'error': error_msg,
+                'code': 'INVALID_RESPONSE_FORMAT'
+            }), 500
+        
+        statuses = data['data']
+        current_app.logger.info(f"تم جلب {len(statuses)} حالة طلب للمزامنة")
+        
+        # معالجة حالات الطلبات وتخزينها
+        new_count = 0
+        updated_count = 0
+        
+        for status_data in statuses:
+            try:
+                status_id = str(status_data.get('id'))
+                if not status_id:
+                    continue
+                
+                # البحث عن الحالة في قاعدة البيانات
+                existing_status = OrderStatus.query.get(status_id)
+                
+                if existing_status:
+                    # تحديث الحالة الموجودة
+                    existing_status.name = status_data.get('name', '')
+                    existing_status.type = status_data.get('type', '')
+                    existing_status.slug = status_data.get('slug', '')
+                    existing_status.sort = status_data.get('sort', 0)
+                    existing_status.message = status_data.get('message', '')
+                    existing_status.icon = status_data.get('icon', '')
+                    existing_status.is_active = status_data.get('is_active', True)
+                    
+                    # معالجة الحالة الأصلية (original)
+                    original_data = status_data.get('original', {})
+                    if original_data and 'id' in original_data:
+                        existing_status.original_id = str(original_data['id'])
+                    
+                    # معالجة الحالة الأب (parent)
+                    parent_data = status_data.get('parent', {})
+                    if parent_data and 'id' in parent_data:
+                        existing_status.parent_id = str(parent_data['id'])
+                    
+                    updated_count += 1
+                else:
+                    # إنشاء حالة جديدة
+                    new_status = OrderStatus(
+                        id=status_id,
+                        name=status_data.get('name', ''),
+                        type=status_data.get('type', ''),
+                        slug=status_data.get('slug', ''),
+                        sort=status_data.get('sort', 0),
+                        message=status_data.get('message', ''),
+                        icon=status_data.get('icon', ''),
+                        is_active=status_data.get('is_active', True),
+                        store_id=store_id
+                    )
+                    
+                    # معالجة الحالة الأصلية (original)
+                    original_data = status_data.get('original', {})
+                    if original_data and 'id' in original_data:
+                        new_status.original_id = str(original_data['id'])
+                    
+                    # معالجة الحالة الأب (parent)
+                    parent_data = status_data.get('parent', {})
+                    if parent_data and 'id' in parent_data:
+                        new_status.parent_id = str(parent_data['id'])
+                    
+                    db.session.add(new_status)
+                    new_count += 1
+                    
+            except Exception as e:
+                current_app.logger.error(f"خطأ في معالجة الحالة {status_data.get('id', 'unknown')}: {str(e)}")
+        
+        db.session.commit()
+        
+        current_app.logger.info(f"تمت مزامنة حالات الطلبات بنجاح: {new_count} جديد، {updated_count} محدث")
+        
+        return jsonify({
+            'success': True,
+            'message': f'تمت مزامنة حالات الطلبات بنجاح: {new_count} حالة جديدة، {updated_count} حالة محدثة',
+            'stats': {
+                'new_statuses': new_count,
+                'updated_statuses': updated_count,
+                'total_processed': len(statuses)
+            }
+        })
+    
+    except requests.exceptions.RequestException as e:
+        error_msg = f"خطأ في الاتصال بسلة: {str(e)}"
+        current_app.logger.error(error_msg, exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': error_msg,
+            'code': 'NETWORK_ERROR'
+        }), 500
+        
+    except Exception as e:
+        error_msg = f"خطأ غير متوقع: {str(e)}"
+        current_app.logger.error(error_msg, exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': error_msg,
+            'code': 'INTERNAL_ERROR'
+        }), 500
+    # معالجة الاستجابة وحفظ حالات الطلبات في جدول جديد
 @orders_bp.route('/sync_orders', methods=['POST'])
 def sync_orders():
     """مزامنة الطلبات من سلة إلى قاعدة البيانات المحلية وفق المواصفات الرسمية"""
@@ -273,7 +446,11 @@ def sync_orders():
         user.last_sync = datetime.utcnow()
         db.session.commit()
         
-        current_app.logger.info(f"تمت المزامنة بنجاح: {new_count} جديد، {updated_count} محدث، {skipped_count} تم تخطيه")
+        status_success, status_message = sync_order_statuses(user, access_token)
+        if not status_success:
+            current_app.logger.warning(f"فشل مزامنة حالات الطلبات: {status_message}")
+        
+        current_app.logger.info(f"تمت المزامنة بنجاح: {new_count} جديد، {updated_count} محدث")
         
         return jsonify({
             'success': True,
@@ -285,6 +462,7 @@ def sync_orders():
                 'total_processed': len(all_orders)
             }
         })
+    
     
     except requests.exceptions.RequestException as e:
         error_msg = f"خطأ في الاتصال بسلة: {str(e)}"

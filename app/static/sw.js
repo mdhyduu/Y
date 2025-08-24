@@ -3,7 +3,6 @@ const urlsToCache = [
   "/",
   "/static/css/main.css",
   "/static/icons/icon-192x192.png",
-  "/static/icons/icon-512x512.png",
   "/static/icons/s.png",
   "/static/manifest.json",
   "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css",

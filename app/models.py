@@ -359,7 +359,8 @@ class SallaOrder(db.Model):
     status_slug = db.Column(db.String(50))
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     raw_data = db.Column(db.JSON)
-    
+    status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'))
+    status_rel = db.relationship('OrderStatus', backref='orders')
     status_notes = relationship('OrderStatusNote', back_populates='order')
     employee_statuses = relationship('OrderEmployeeStatus', back_populates='order')
     assignments = relationship('OrderAssignment', back_populates='order')
@@ -514,8 +515,27 @@ class OrderEmployeeStatus(db.Model):
     order = relationship('SallaOrder', back_populates='employee_statuses')
 # أضف هذا في نهاية models.py قبل @event.listens_for
 
-
-
+class OrderStatus(db.Model):
+    __tablename__ = 'order_statuses'
+    
+    id = db.Column(db.String(50), primary_key=True)
+    name = db.Column(db.String(100))
+    type = db.Column(db.String(20))  # 'original' or 'custom'
+    slug = db.Column(db.String(50))
+    sort = db.Column(db.Integer)
+    message = db.Column(db.Text)
+    icon = db.Column(db.String(100))
+    is_active = db.Column(db.Boolean, default=True)
+    parent_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'))
+    original_id = db.Column(db.String(50))
+    store_id = db.Column(db.String(50), db.ForeignKey('stores.id'))
+    
+    # العلاقات
+    parent = db.relationship('OrderStatus', remote_side=[id])
+    store = db.relationship('Store', backref='order_statuses')
+    
+    def __repr__(self):
+        return f'<OrderStatus {self.name} ({self.type})>'
 # تبقى أحداث SQLAlchemy كما هي
 @event.listens_for(User, 'before_insert')
 def validate_user(mapper, connection, target):
