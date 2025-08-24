@@ -359,7 +359,7 @@ class SallaOrder(db.Model):
     status_slug = db.Column(db.String(50))
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     raw_data = db.Column(db.JSON)
-    status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'))
+    status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'),nullable=True)
     status_rel = db.relationship('OrderStatus', backref='orders')
     status_notes = relationship('OrderStatusNote', back_populates='order')
     employee_statuses = relationship('OrderEmployeeStatus', back_populates='order')
