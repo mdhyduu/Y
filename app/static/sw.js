@@ -1,4 +1,4 @@
-const CACHE_NAME = "pwa-cache-v2";  // زيادة رقم الإصدار لتحديث التخزين
+const CACHE_NAME = "pwa-cache-v01";  // زيادة رقم الإصدار لتحديث التخزين
 const urlsToCache = [
   "/",
   "/static/css/main.css",
