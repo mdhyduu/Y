@@ -119,7 +119,7 @@ self.addEventListener('push', function(event) {
       self.registration.showNotification(data.title, {
         body: data.body,
         icon: '/static/icons/s.png',
-        badge: '/static/icons/icon-192x192.png'
+        badge: '/static/icons/s.png'
       })
     );
   }
