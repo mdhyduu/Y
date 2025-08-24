@@ -379,7 +379,13 @@ def sync_orders():
                     skipped_count += 1
                     continue
                 status_info = order.get('status', {})
-                status_id = str(status_info.get('id', ''))
+                status_id = str(status_info.get('id', '')) if status_info.get('id') else None
+                status_name = status_info.get('name', '')
+                status_slug = status_info.get('slug', '')
+                status_exists = False
+                if status_id:
+                    status_exists = OrderStatus.query.filter_by(id=status_id, store_id=store_id).first() is not None
+        
                 # البحث عن الطلب في قاعدة البيانات
                 existing_order = SallaOrder.query.get(order_id)
                 
