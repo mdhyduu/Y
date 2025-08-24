@@ -6,446 +6,75 @@
   <meta name="csrf-token" content="{{ csrf_token() }}">  
   <title>{% block title %}لوحة التحكم{% endblock %}</title>
   
-  <!-- إضافة PWA Manifest -->
-  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <link rel="manifest" href="{{ url_for('manifest') }}">
   <meta name="theme-color" content="#1e3a8a">
   
+  <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
   
-  <!-- إضافة أيقونات PWA -->
-  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
-  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
-  
-  <style>
-    :root {
-      --primary: #1e3a8a;
-      --primary-light: #3b82f6;
-      --secondary: #6c757d;
-      --success: #198754;
-      --danger: #dc3545;
-      --bg-light: #f8fafc;
-      --bg-dark: #1e1e2f;
-      --sidebar-dark: #0f172a;
-      --content-dark: #2a2e42;
-      --text-light: #f8f9fa;
-      --text-dark: #212529; /* لون أغمق قليلاً من السابق */
-      --border-color-light: #e5e7eb;
-      --border-color-dark: #444;
-      --border-radius: 8px;
-      --transition: all 0.3s ease;
-    }
-    
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      background-color: var(--bg-light);
-      color: var(--text-dark);
-      font-family: 'Tajawal', sans-serif;
-      overflow-x: hidden;
-    }
-    
-    body.dark-mode {
-      background-color: var(--bg-dark);
-      color: var(--text-light);
-    }
-    
-    .dashboard {
-      display: flex;
-      flex-direction: row;
-      min-height: 100vh;
-      width: 100%;
-    }
-    
-    /* Sidebar Improvements */
-    .sidebar {
-      position: fixed;
-      top: 0;
-      right: -300px;
-      height: 100%;
-      width: 280px;
-      background-color: var(--sidebar-dark);
-      z-index: 1050;
-      display: flex;
-      flex-direction: column;
-      padding: 1.5rem 1rem;
-      transition: right 0.3s ease-in-out;
-      overflow-y: auto;
-      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
-    }
-    
-    .sidebar.show {
-      right: 0;
-    }
-    
-    .sidebar h2 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin-bottom: 2rem;
-      text-align: center;
-      color: #fff;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
-    .sidebar .nav-link {
-      color: #e0e0e0;
-      padding: 0.75rem 1rem;
-      margin: 0.25rem 0;
-      border-radius: var(--border-radius);
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      transition: var(--transition);
-      font-weight: 500;
-    }
-    
-    .sidebar .nav-link:hover, .sidebar .nav-link.active {
-      background-color: var(--primary-light);
-      color: #fff;
-      transform: translateX(-5px);
-    }
-    
-    .sidebar .nav-link i {
-      width: 20px;
-      text-align: center;
-    }
-    
-    .main {
-      flex-grow: 1;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      margin-right: 0;
-      transition: margin-right 0.3s ease;
-    }
-    
-    .main-with-sidebar {
-       margin-right: 280px;
-    }
-    
-    @media (min-width: 992px) {
-      .sidebar {
-        position: sticky;
-        top: 0;
-        right: 0;
-        height: 100vh;
-      }
-    }
-    
-    /* Topbar Improvements */
-    .topbar {
-      background-color: #fff;
-      padding: 1rem 2rem;
-      border-bottom: 1px solid var(--border-color-light);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 1040;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    }
-    
-    body.dark-mode .topbar {
-      background-color: var(--content-dark);
-      border-bottom-color: var(--border-color-dark);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-    
-    .topbar .actions {
-      display: flex;
-      align-items: center;
-      gap: 1.5rem;
-    }
-
-    .action-icon {
-      cursor: pointer;
-      color: var(--primary);
-      font-size: 1.25rem;
-      transition: var(--transition);
-      text-decoration: none;
-    }
-    
-    .action-icon:hover {
-      transform: rotate(10deg) scale(1.1);
-    }
-    
-    body.dark-mode .action-icon {
-      color: #facc15;
-    }
-    
-    .sidebar-toggle {
-      font-size: 1.5rem;
-      cursor: pointer;
-      color: var(--primary);
-      transition: var(--transition);
-    }
-    
-    .sidebar-toggle:hover {
-      color: var(--primary-light);
-    }
-    
-    body.dark-mode .sidebar-toggle {
-      color: #fff;
-    }
-    
-    .sidebar__backdrop {
-      position: fixed;
-      inset: 0;
-      background-color: rgba(0,0,0,0.5);
-      z-index: 1040;
-      opacity: 0;
-      visibility: hidden;
-      transition: var(--transition);
-    }
-    
-    .sidebar__backdrop.show {
-      opacity: 1;
-      visibility: visible;
-    }
-    
-    /* Content Area Improvements */
-    .content {
-      padding: 2.5rem;
-      flex-grow: 1;
-      width: 100%;
-      max-width: 100%;
-    }
-    
-    @media (max-width: 768px) {
-      .content { padding: 1.5rem; }
-    }
-    
-    .alert { direction: rtl; border-radius: var(--border-radius); }
-    
-    .container-fluid {
-      width: 100%;
-      padding-right: 0;
-      padding-left: 0;
-      margin-right: auto;
-      margin-left: auto;
-    }
-    
-    /* ---- Dark Mode Component Styles ---- */
-    
-    /* Cards */
-    .card {
-      border-radius: var(--border-radius);
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-      border: none;
-      margin-bottom: 1.5rem;
-    }
-    body.dark-mode .card {
-      background-color: var(--content-dark);
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    }
-    .card-header {
-      background-color: #f8f9fa;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-      font-weight: 700;
-      padding: 1.25rem 1.5rem;
-      border-radius: var(--border-radius) var(--border-radius) 0 0 !important;
-    }
-    body.dark-mode .card-header {
-      background-color: #3a3f58;
-      border-bottom-color: var(--border-color-dark);
-    }
-    
-    /* Buttons */
-    .btn {
-      border-radius: var(--border-radius);
-      font-weight: 500;
-      padding: 0.5rem 1.25rem;
-      transition: var(--transition);
-    }
-    .btn-primary { background-color: var(--primary); border-color: var(--primary); }
-    .btn-primary:hover { background-color: var(--primary-light); border-color: var(--primary-light); transform: translateY(-2px); }
-
-    /* Forms */
-    .form-control, .form-select {
-      border-radius: var(--border-radius);
-      padding: 0.5rem 1rem;
-    }
-    body.dark-mode .form-control, body.dark-mode .form-select {
-      background-color: var(--bg-dark);
-      border-color: var(--border-color-dark);
-      color: var(--text-light);
-    }
-    body.dark-mode .form-control:focus, body.dark-mode .form-select:focus {
-      background-color: var(--bg-dark);
-      border-color: var(--primary-light);
-      color: var(--text-light);
-      box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
-    }
-    
-    /* Tables */
-    .table {
-      border-radius: var(--border-radius);
-      overflow: hidden;
-    }
-    body.dark-mode .table {
-      color: var(--text-light);
-      border-color: var(--border-color-dark);
-    }
-    body.dark-mode .table > :not(caption) > * > * {
-       background-color: var(--content-dark);
-       border-bottom-width: 1px;
-    }
-    body.dark-mode .table-hover > tbody > tr:hover > * {
-        background-color: #3a3f58;
-    }
-    
-    /* General Text & Links */
-    body.dark-mode a {
-      color: var(--primary-light);
-    }
-
-    /* ======================================================= */
-    /* التعديل الأول: ضمان لون النص الفاتح لكل العناصر في الوضع الليلي */
-    /* ======================================================= */
-    body.dark-mode h1,
-    body.dark-mode h2,
-    body.dark-mode h3,
-    body.dark-mode h4,
-    body.dark-mode h5,
-    body.dark-mode h6,
-    body.dark-mode p,
-    body.dark-mode span,
-    body.dark-mode label,
-    body.dark-mode strong,
-    body.dark-mode .form-label,
-    body.dark-mode th,
-    body.dark-mode td {
-      color: var(--text-light) !important;
-    }
-    
-    /* أنماط PWA الإضافية */
-    .pwa-install-btn {
-      position: fixed;
-      bottom: 20px;
-      left: 20px;
-      background-color: var(--primary);
-      color: white;
-      border: none;
-      padding: 12px 20px;
-      border-radius: 30px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      display: none;
-      z-index: 1050;
-      font-weight: 500;
-      transition: var(--transition);
-    }
-    
-    .pwa-install-btn:hover {
-      background-color: var(--primary-light);
-      transform: translateY(-2px);
-    }
-    
-    .pwa-offline-alert {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      background-color: #f8d7da;
-      color: #721c24;
-      padding: 10px;
-      text-align: center;
-      z-index: 1060;
-      display: none;
-    }
-    
-    body.dark-mode .pwa-offline-alert {
-      background-color: #4a1c24;
-      color: #f8d7da;
-    }
-    
-    /* Responsive Adjustments */
-    @media (max-width: 991.98px) {
-      .main-with-sidebar {
-        margin-right: 0;
-      }
-      .sidebar {
-        right: -280px;
-        width: 280px;
-      }
-      .sidebar.show { right: 0; }
-    }
-    
-    /* Animation for page transitions */
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    
-    .content-container {
-      animation: fadeIn 0.3s ease-out;
-    }
-  </style>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/s.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/s.png') }}">
 </head>
 <body>
-  <!-- زر تثبيت التطبيق -->
-  <button id="pwaInstallBtn" class="pwa-install-btn">
+  <button id="pwaInstallBtn" class="pwa-install-btn" style="display: none;">
     <i class="fas fa-download me-2"></i>تثبيت التطبيق
   </button>
   
-  <!-- تنبيه حالة الاتصال -->
-  <div id="pwaOfflineAlert" class="pwa-offline-alert">
+  <div id="pwaOfflineAlert" class="pwa-offline-alert" style="display: none;">
     <i class="fas fa-wifi-slash me-2"></i>أنت غير متصل بالإنترنت
   </div>
 
   <div class="dashboard">
-
     {% if request.cookies.get('is_admin') == 'true' or request.cookies.get('is_admin') == 'false' %}
- <aside class="sidebar">
-  <h2>لوحة التحكم</h2>
-  <a class="nav-link {% if request.path == url_for('orders.index') %}active{% endif %}" href="{{ url_for('orders.index') }}">
-    <i class="fas fa-shopping-bag"></i> الطلبات
-  </a>
-  
-  <a class="nav-link {% if request.path == url_for('orders.scan_barcode') %}active{% endif %}" href="{{ url_for('orders.scan_barcode') }}">
-    <i class="fas fa-camera"></i> مسح الباركود
-  </a>
-  
-  <a class="nav-link {% if request.path == url_for('orders.manage_employee_status') %}active{% endif %}" href="{{ url_for('orders.manage_employee_status') }}">
-    <i class="fas fa-tags"></i> حالات الطلبات
-  </a>
-  
-  <!-- رابط إدارة حالات الملاحظات الجديد -->
-  {% if is_reviewer %}
-    <a class="nav-link {% if request.path == url_for('orders.manage_note_status') %}active{% endif %}" href="{{ url_for('orders.manage_note_status') }}">
-      <i class="fas fa-tags"></i>التنبيهات 
-    </a>
-  {% endif %}
-  
-  {% if not request.cookies.get('is_admin') == 'true' %}
-    <a class="nav-link {% if request.path.startswith('/dashboard') %}active{% endif %}" href="{{ url_for('dashboard.index') }}">
-      <i class="fas fa-tachometer-alt"></i> لوحتي
-    </a>
-  {% endif %}
-  
-  {% if request.cookies.get('is_admin') == 'true' %}
-    <a class="nav-link {% if request.path == url_for('employees.list_employees') %}active{% endif %}" href="{{ url_for('employees.list_employees') }}">
-      <i class="fas fa-users"></i> الموظفين
-    </a>
-    
-    <a class="nav-link {% if request.path == url_for('products.list_products') %}active{% endif %}" href="{{ url_for('products.list_products') }}">
-      <i class="fas fa-boxes"></i> المنتجات
-    </a>
-    
-    <a class="nav-link {% if request.path == url_for('auth.link_store') %}active{% endif %}" href="{{ url_for('auth.link_store') }}">
-      <i class="fas fa-link"></i> ربط المتجر
-    </a>
-  {% endif %}
-  
-  <hr class="text-white my-3 opacity-25" />
-  
-  <a class="nav-link" href="{{ url_for('user_auth.logout') }}">
-    <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
-  </a>
-</aside>
+    <aside class="sidebar">
+      <h2>لوحة التحكم</h2>
+      
+      <a class="nav-link {% if request.path == url_for('orders.index') %}active{% endif %}" href="{{ url_for('orders.index') }}">
+        <i class="fas fa-shopping-bag"></i> الطلبات
+      </a>
+      
+      <a class="nav-link {% if request.path == url_for('orders.scan_barcode') %}active{% endif %}" href="{{ url_for('orders.scan_barcode') }}">
+        <i class="fas fa-camera"></i> مسح الباركود
+      </a>
+      
+      <a class="nav-link {% if request.path == url_for('orders.manage_employee_status') %}active{% endif %}" href="{{ url_for('orders.manage_employee_status') }}">
+        <i class="fas fa-tags"></i> حالات الطلبات
+      </a>
+      
+      {% if is_reviewer %}
+        <a class="nav-link {% if request.path == url_for('orders.manage_note_status') %}active{% endif %}" href="{{ url_for('orders.manage_note_status') }}">
+          <i class="fas fa-tags"></i>التنبيهات 
+        </a>
+      {% endif %}
+      
+      {% if not request.cookies.get('is_admin') == 'true' %}
+        <a class="nav-link {% if request.path.startswith('/dashboard') %}active{% endif %}" href="{{ url_for('dashboard.index') }}">
+          <i class="fas fa-tachometer-alt"></i> لوحتي
+        </a>
+      {% endif %}
+      
+      {% if request.cookies.get('is_admin') == 'true' %}
+        <a class="nav-link {% if request.path == url_for('employees.list_employees') %}active{% endif %}" href="{{ url_for('employees.list_employees') }}">
+          <i class="fas fa-users"></i> الموظفين
+        </a>
+        
+        <a class="nav-link {% if request.path == url_for('products.list_products') %}active{% endif %}" href="{{ url_for('products.list_products') }}">
+          <i class="fas fa-boxes"></i> المنتجات
+        </a>
+        
+        <a class="nav-link {% if request.path == url_for('auth.link_store') %}active{% endif %}" href="{{ url_for('auth.link_store') }}">
+          <i class="fas fa-link"></i> ربط المتجر
+        </a>
+      {% endif %}
+      
+      <hr class="text-white my-3 opacity-25" />
+      
+      <a class="nav-link" href="{{ url_for('user_auth.logout') }}">
+        <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
+      </a>
+    </aside>
     
     <div class="sidebar__backdrop" onclick="toggleSidebar()"></div>
     {% endif %}
@@ -457,14 +86,16 @@
           <i class="fas fa-bars"></i>
         </div>
         {% else %}
-        <div></div> {% endif %}
+        <div></div> 
+        {% endif %}
 
         <strong class="fs-5">مرحبًا بك، {{ request.cookies.get('username', 'زائر') }}</strong>
         
         <div class="actions">
           <a href="{{ url_for('orders.scan_barcode') }}" class="action-icon" title="مسح الباركود">
-            <i class="fas fa-qrcode"></i> </a>
-          <i class="fas fa-moon action-icon" id="themeToggle" onclick="toggleDarkMode()"></i>
+            <i class="fas fa-qrcode"></i> 
+          </a>
+          <i class="fas fa-moon action-icon" id="themeToggle"></i>
         </div>
       </div>
 
@@ -487,158 +118,219 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script>
-    function toggleDarkMode() {
-      document.body.classList.toggle('dark-mode');
-      const isDark = document.body.classList.contains('dark-mode');
-      document.cookie = `darkMode=${isDark}; path=/; max-age=${60*60*24*365}`;
-      const themeIcon = document.getElementById('themeToggle');
-      themeIcon.className = isDark ? 'fas fa-sun action-icon' : 'fas fa-moon action-icon';
-    }
-    
-    // دالة تسجيل Service Worker
-    function registerServiceWorker() {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('{{ url_for("static", filename="sw.js") }}')
-          .then(function(registration) {
-            console.log('Service Worker registered with scope:', registration.scope);
-          })
-          .catch(function(error) {
-            console.log('Service Worker registration failed:', error);
-          });
-      }
-    }
-    
-    // دالة التعامل مع تثبيت PWA
-    function setupPWAInstall() {
-      let deferredPrompt;
-      const installBtn = document.getElementById('pwaInstallBtn');
-      
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        installBtn.style.display = 'block';
-        
-        installBtn.addEventListener('click', async () => {
-          if (deferredPrompt) {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            if (outcome === 'accepted') {
-              installBtn.style.display = 'none';
-            }
-            deferredPrompt = null;
-          }
-        });
-      });
-      
-      window.addEventListener('appinstalled', () => {
-        installBtn.style.display = 'none';
-        deferredPrompt = null;
-        console.log('PWA installed successfully');
-      });
-    }
-    
-    // دالة التعامل مع حالة الاتصال
-    function setupConnectionStatus() {
-      const offlineAlert = document.getElementById('pwaOfflineAlert');
-      
-      window.addEventListener('online', () => {
-        offlineAlert.style.display = 'none';
-        // إظهار رسالة نجاح الاتصال
-        const toast = document.createElement('div');
-        toast.className = 'alert alert-success position-fixed top-0 start-50 translate-middle-x mt-3';
-        toast.style.zIndex = '1070';
-        toast.innerHTML = `
-          <i class="fas fa-wifi me-2"></i>تم استعادة الاتصال بالإنترنت
-          <button type="button" class="btn-close ms-2" data-bs-dismiss="alert"></button>
-        `;
-        document.body.appendChild(toast);
-        
-        // إزالة الرسالة بعد 3 ثوان
-        setTimeout(() => {
-          if (toast.parentNode) {
-            toast.parentNode.removeChild(toast);
-          }
-        }, 3000);
-      });
-      
-      window.addEventListener('offline', () => {
-        offlineAlert.style.display = 'block';
-      });
-      
-      // التحقق من حالة الاتصال عند التحميل
-      if (!navigator.onLine) {
-        offlineAlert.style.display = 'block';
-      }
-    }
-    
-    window.addEventListener('DOMContentLoaded', () => {
-      const darkModeCookie = document.cookie.split('; ').find(row => row.startsWith('darkMode='));
-      if (darkModeCookie && darkModeCookie.split('=')[1] === 'true') {
-        document.body.classList.add('dark-mode');
-        document.getElementById('themeToggle').className = 'fas fa-sun action-icon';
-      }
-      
-      // تهيئة PWA
-      registerServiceWorker();
-      setupPWAInstall();
-      setupConnectionStatus();
-      
-      const currentPath = window.location.pathname;
-      const sidebarLinks = document.querySelectorAll('.sidebar .nav-link');
-      if (sidebarLinks.length > 0) {
-        sidebarLinks.forEach(link => {
-            if (link.getAttribute('href') && link.getAttribute('href') !== '#') {
-                if (currentPath.startsWith(link.getAttribute('href'))) {
-                    link.classList.add('active');
-                }
-            }
-        });
-      }
-    });
-    
-    function toggleSidebar() {
-      const sidebar = document.querySelector('.sidebar');
-      const backdrop = document.querySelector('.sidebar__backdrop');
-      if (sidebar && backdrop) {
-        sidebar.classList.toggle('show');
-        backdrop.classList.toggle('show');
-        document.body.style.overflow = sidebar.classList.contains('show') ? 'hidden' : '';
-      }
-    }
-    
-    const sidebarNavLinks = document.querySelectorAll('.sidebar .nav-link');
-    if (sidebarNavLinks.length > 0) {
-        sidebarNavLinks.forEach(link => {
-          link.addEventListener('click', () => {
-            if (window.innerWidth < 992) toggleSidebar();
-          });
-        });
-    }
-    
-    document.addEventListener('DOMContentLoaded', function() {
-      const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-      
-      if (window.jQuery) {
-        $.ajaxSetup({
-          headers: { 'X-CSRFToken': csrfToken }
-        });
-      }
-    });
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+// =================================================================
+// SCRIPT PRINCIPAL DE L'APPLICATION
+// =================================================================
+document.addEventListener('DOMContentLoaded', initializeApp);
 
-    window.addEventListener('resize', () => {
-       if (window.innerWidth >= 992) {
-            const sidebar = document.querySelector('.sidebar');
-            const backdrop = document.querySelector('.sidebar__backdrop');
-            if (sidebar && sidebar.classList.contains('show')) {
-                toggleSidebar();
-            }
-       }
-    });
-  </script>
+/**
+ * Fonction principale qui initialise toutes les fonctionnalités de la page.
+ */
+function initializeApp() {
+  console.log("Application initialisée...");
   
-  {% block scripts %}{% endblock %}
+  initializeAppearance();
+  initializeUIEventListeners();
+  initializePWA();
+  initializeCSRFToken();
+  
+  // Activer l'écran de démarrage uniquement en mode PWA
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    showSplashScreen();
+  }
+}
+
+// -----------------------------------------------------------------
+// SECTION APPARENCE (Thème sombre, Barre latérale)
+// -----------------------------------------------------------------
+
+/**
+ * Initialise le thème (sombre/clair) et l'état de la barre latérale.
+ */
+function initializeAppearance() {
+  // Configurer le mode sombre à partir du cookie
+  const isDarkMode = document.cookie.split('; ').find(row => row.startsWith('darkMode='))?.split('=')[1] === 'true';
+  if (isDarkMode) {
+    document.body.classList.add('dark-mode');
+    document.getElementById('themeToggle').className = 'fas fa-sun action-icon';
+  }
+
+  // Activer le lien actif dans la barre latérale
+  const currentPath = window.location.pathname;
+  document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+    const linkPath = link.getAttribute('href');
+    if (linkPath && currentPath.startsWith(linkPath)) {
+      link.classList.add('active');
+    }
+  });
+}
+
+/**
+ * Ajoute tous les écouteurs d'événements pour l'interface utilisateur.
+ */
+function initializeUIEventListeners() {
+  document.getElementById('themeToggle')?.addEventListener('click', toggleDarkMode);
+  
+  // Fermer la barre latérale en cliquant sur un lien sur mobile
+  document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+    link.addEventListener('click', () => {
+      if (window.innerWidth < 992 && document.querySelector('.sidebar').classList.contains('show')) {
+        toggleSidebar();
+      }
+    });
+  });
+
+  // Gérer le redimensionnement de la fenêtre pour la barre latérale
+  window.addEventListener('resize', () => {
+    if (window.innerWidth >= 992 && document.querySelector('.sidebar')?.classList.contains('show')) {
+      toggleSidebar(); // Fermer la barre latérale si la fenêtre est agrandie
+    }
+  });
+}
+
+/**
+ * Gère le basculement entre le mode sombre et le mode clair.
+ */
+function toggleDarkMode() {
+  document.body.classList.toggle('dark-mode');
+  const isDark = document.body.classList.contains('dark-mode');
+  document.cookie = `darkMode=${isDark}; path=/; max-age=${60*60*24*365}`;
+  document.getElementById('themeToggle').className = isDark ? 'fas fa-sun action-icon' : 'fas fa-moon action-icon';
+}
+
+/**
+ * Affiche ou masque la barre latérale.
+ */
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const backdrop = document.querySelector('.sidebar__backdrop');
+  if (sidebar && backdrop) {
+    const isShown = sidebar.classList.toggle('show');
+    backdrop.classList.toggle('show');
+    document.body.style.overflow = isShown ? 'hidden' : '';
+  }
+}
+
+// -----------------------------------------------------------------
+// SECTION PWA (Service Worker, Installation, Statut de connexion)
+// -----------------------------------------------------------------
+
+/**
+ * Initialise les fonctionnalités de l'application web progressive (PWA).
+ */
+function initializePWA() {
+  registerServiceWorker();
+  setupPWAInstall();
+  setupConnectionStatus();
+}
+
+/**
+ * Enregistre le Service Worker pour le fonctionnement hors ligne.
+ */
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}")
+      .then(reg => console.log('Service Worker enregistré avec succès:', reg.scope))
+      .catch(err => console.error('Échec de l\'enregistrement du Service Worker:', err));
+  }
+}
+
+/**
+ * Gère la logique d'affichage du bouton d'installation de la PWA.
+ */
+function setupPWAInstall() {
+  let deferredPrompt;
+  const installBtn = document.getElementById('pwaInstallBtn');
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault(); // Empêcher le navigateur d'afficher sa propre invite
+    deferredPrompt = e;
+    installBtn.style.display = 'block'; // Afficher notre bouton personnalisé
+    console.log("L'événement 'beforeinstallprompt' a été déclenché. Le bouton d'installation est affiché.");
+
+    installBtn.onclick = async () => {
+      installBtn.style.display = 'none'; // Cacher le bouton après le clic
+      if (deferredPrompt) {
+        deferredPrompt.prompt(); // Afficher l'invite d'installation
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`Réponse de l'utilisateur à l'invite : ${outcome}`);
+        deferredPrompt = null;
+      }
+    };
+  });
+
+  window.addEventListener('appinstalled', () => {
+    console.log('PWA installée avec succès !');
+    installBtn.style.display = 'none';
+    deferredPrompt = null;
+  });
+}
+
+/**
+ * Gère l'affichage des alertes de connexion en ligne/hors ligne.
+ */
+function setupConnectionStatus() {
+  const offlineAlert = document.getElementById('pwaOfflineAlert');
+  
+  const updateOnlineStatus = () => {
+    if (navigator.onLine) {
+      offlineAlert.style.display = 'none';
+    } else {
+      offlineAlert.style.display = 'block';
+    }
+  };
+
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
+  
+  updateOnlineStatus(); // Vérifier l'état initial
+}
+
+// -----------------------------------------------------------------
+// SECTION UTILITAIRES
+// -----------------------------------------------------------------
+
+/**
+ * Initialise le jeton CSRF pour les requêtes AJAX sécurisées.
+ */
+function initializeCSRFToken() {
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+  if (csrfToken && window.jQuery) {
+    $.ajaxSetup({
+      headers: { 'X-CSRFToken': csrfToken }
+    });
+  }
+}
+
+/**
+ * Affiche un écran de démarrage lors de l'ouverture en mode PWA.
+ */
+function showSplashScreen() {
+  const splashHtml = `
+    <div class="app-splash">
+      <div class="app-splash-content">
+        <img src="{{ url_for('static', filename='icons/s.png') }}" alt="شعار التطبيق" class="app-splash-logo">
+        <div class="app-splash-text">نظام إدارة الطلبات</div>
+        <div class="app-splash-loading"></div>
+      </div>
+    </div>`;
+  
+  document.body.insertAdjacentHTML('beforeend', splashHtml);
+  
+  setTimeout(() => {
+    const splash = document.querySelector('.app-splash');
+    if (splash) {
+      splash.classList.add('hide');
+      setTimeout(() => splash.remove(), 500); // Retirer du DOM après la transition
+    }
+  }, 2000); // Durée de l'écran de démarrage
+}
+
+</script>
+  
+{% block scripts %}{% endblock %}
 </body>
 </html>
