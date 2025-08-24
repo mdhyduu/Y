@@ -55,6 +55,7 @@ class Config:
     SALLA_ORDERS_API = os.environ.get('SALLA_ORDERS_API', f"{SALLA_API_BASE_URL}/orders")
     SALLA_SHIPMENTS_API = f"{SALLA_API_BASE_URL}/shipments"
     SALLA_ORDERS_ENDPOINT = f"{SALLA_API_BASE_URL}/orders"
+    SALLA_ORDER_STATUSES_API = f"{SALLA_API_BASE_URL}/orders/statuses"
     SALLA_PRODUCTS_ENDPOINT = f"{SALLA_API_BASE_URL}/products"
     SALLA_STORE_INFO_ENDPOINT = f"{SALLA_API_BASE_URL}/store/info"
     REDIRECT_URI = os.environ.get('REDIRECT_URI')
