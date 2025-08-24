@@ -245,16 +245,31 @@ function setupPWAInstall() {
   let deferredPrompt;
   const installBtn = document.getElementById('pwaInstallBtn');
 
+  // التحقق مما إذا كان التطبيق مثبتًا بالفعل
+  const isAppInstalled = () => {
+    return window.matchMedia('(display-mode: standalone)').matches || 
+           window.navigator.standalone === true;
+  };
+
+  // التحقق من حالة التثبيت عند تحميل الصفحة
+  if (!isAppInstalled()) {
+    installBtn.style.display = 'block';
+  }
+
   window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault(); // Empêcher le navigateur d'afficher sa propre invite
+    e.preventDefault();
     deferredPrompt = e;
-    installBtn.style.display = 'block'; // Afficher notre bouton personnalisé
+    
+    // عرض الزر فقط إذا لم يكن التطبيق مثبتًا
+    if (!isAppInstalled()) {
+      installBtn.style.display = 'block';
+    }
     console.log("L'événement 'beforeinstallprompt' a été déclenché. Le bouton d'installation est affiché.");
 
     installBtn.onclick = async () => {
-      installBtn.style.display = 'none'; // Cacher le bouton après le clic
+      installBtn.style.display = 'none';
       if (deferredPrompt) {
-        deferredPrompt.prompt(); // Afficher l'invite d'installation
+        deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
         console.log(`Réponse de l'utilisateur à l'invite : ${outcome}`);
         deferredPrompt = null;
@@ -267,8 +282,14 @@ function setupPWAInstall() {
     installBtn.style.display = 'none';
     deferredPrompt = null;
   });
-}
 
+  // إخفاء الزر إذا كان التطبيق مثبتًا بالفعل
+  window.addEventListener('load', () => {
+    if (isAppInstalled()) {
+      installBtn.style.display = 'none';
+    }
+  });
+}
 /**
  * Gère l'affichage des alertes de connexion en ligne/hors ligne.
  */
