@@ -1,11 +1,9 @@
-const CACHE_NAME = "pwa-cache-v2";
-const STATIC_CACHE = "static-cache-v1";
-
-// قائمة بجميع الملفات التي نريد تخزينها مؤقتاً
+const CACHE_NAME = "pwa-cache-v2";  // زيادة رقم الإصدار لتحديث التخزين
 const urlsToCache = [
   "/",
   "/static/css/main.css",
   "/static/icons/icon-192x192.png",
+  "/static/icons/icon-512x512.png",
   "/static/icons/s.png",
   "/static/manifest.json",
   "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css",
@@ -17,67 +15,83 @@ const urlsToCache = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE)
+    caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('تم فتح التخزين المؤقت');
-        return cache.addAll(urlsToCache);
+        return Promise.all(
+          urlsToCache.map(url => {
+            return fetch(url, { mode: 'no-cors' })
+              .then(response => {
+                if (response.status >= 400) {
+                  throw new Error("Failed to fetch: " + url);
+                }
+                return cache.put(url, response);
+              })
+              .catch(error => {
+                console.log("Could not cache: " + url, error);
+              });
+          })
+        );
       })
-      .then(() => self.skipWaiting())
   );
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
+    caches.keys().then(cacheNames =>
+      Promise.all(
         cacheNames.map(cache => {
-          if (cache !== STATIC_CACHE && cache !== CACHE_NAME) {
-            console.log('جاري حذف التخزين المؤقت القديم:', cache);
+          if (cache !== CACHE_NAME) {
+            console.log("Deleting old cache: ", cache);
             return caches.delete(cache);
           }
         })
-      );
-    })
+      )
+    )
   );
   self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
-  // تجاهل طلبات غير GET وطلبات أخرى غير مهمة
+  // تجاهل طلبات غير GET
   if (event.request.method !== 'GET') return;
   
   event.respondWith(
     caches.match(event.request)
       .then(response => {
-        // إذا وجدنا الملف في التخزين المؤقت، نرجعه
+        // إذا وجد المورد في الذاكرة المؤقتة
         if (response) {
+          // تحديث الذاكرة المؤقتة في الخلفية
+          fetchAndCache(event.request);
           return response;
         }
-
-        // إذا لم نجده، نحمله من الشبكة
-        return fetch(event.request)
-          .then(response => {
-            // تحقق من أن الرد صالح للتخزين
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-
-            // استنساخ الرد لأن الرد يمكن استخدامه مرة واحدة فقط
-            const responseToCache = response.clone();
-
-            caches.open(CACHE_NAME)
-              .then(cache => {
-                cache.put(event.request, responseToCache);
-              });
-
-            return response;
-          })
-          .catch(() => {
-            // إذا فشل التحميل، يمكننا إرجاع صفحة بديلة إذا كانت الصفحة الرئيسية
-            if (event.request.url.indexOf('/static/') !== -1) {
-              return caches.match('/');
-            }
-          });
+        
+        // إذا لم يكن موجودًا في الذاكرة، نحمله من الشبكة
+        return fetchAndCache(event.request);
+      })
+      .catch(() => {
+        // إذا فشل كل شيء، نعيد الصفحة الرئيسية للتطبيق
+        return caches.match('/');
       })
   );
 });
+
+function fetchAndCache(request) {
+  return fetch(request)
+    .then(response => {
+      // تحقق من أن الرد صالح للتخزين
+      if (!response || response.status !== 200 || response.type !== 'basic') {
+        return response;
+      }
+      
+      // استنساخ الرد لأن الجسم قابل للقراءة مرة واحدة فقط
+      const responseToCache = response.clone();
+      
+      caches.open(CACHE_NAME)
+        .then(cache => {
+          cache.put(request, responseToCache);
+        });
+      
+      return response;
+    });
+}
