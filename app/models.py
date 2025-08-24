@@ -513,7 +513,6 @@ class OrderEmployeeStatus(db.Model):
     
     status = relationship('EmployeeCustomStatus', back_populates='order_statuses')
     order = relationship('SallaOrder', back_populates='employee_statuses')
-# أضف هذا في نهاية models.py قبل @event.listens_for
 
 class OrderStatus(db.Model):
     __tablename__ = 'order_statuses'
@@ -528,14 +527,15 @@ class OrderStatus(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     parent_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'))
     original_id = db.Column(db.String(50))
-    store_id = db.Column(db.String(50), db.ForeignKey('stores.id'))
+    store_id = db.Column(db.Integer, nullable=False, index=True)  # تغيير من String إلى Integer وإزالة ForeignKey
     
     # العلاقات
     parent = db.relationship('OrderStatus', remote_side=[id])
-
     
     def __repr__(self):
         return f'<OrderStatus {self.name} ({self.type})>'
+
+# ... (بقية الكود)
 # تبقى أحداث SQLAlchemy كما هي
 @event.listens_for(User, 'before_insert')
 def validate_user(mapper, connection, target):
