@@ -532,7 +532,7 @@ class OrderStatus(db.Model):
     
     # العلاقات
     parent = db.relationship('OrderStatus', remote_side=[id])
-    store = db.relationship('Store', backref='order_statuses')
+
     
     def __repr__(self):
         return f'<OrderStatus {self.name} ({self.type})>'
