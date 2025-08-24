@@ -211,7 +211,7 @@
                     <h6 class="mb-0"><i class="fas fa-history me-2"></i>آخر النشاطات</h6>
                     <span class="badge bg-primary rounded-pill">{{ recent_statuses|length }}</span>
                 </div>
-                <div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
+                <div class="card-body"class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
                     {% for status in recent_statuses %}
                     <a href="{{ url_for('orders.order_details', order_id=status.order_id) }}" 
                        class="list-group-item list-group-item-action border-0 py-2">
