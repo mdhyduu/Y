@@ -224,7 +224,7 @@ def create_app():
             },
             {
               "src": "/static/icons/s.png",
-              "sizes": "512x512",
+              "sizes": "304x304",
               "type": "image/png",
               "purpose": "maskable any"
             }

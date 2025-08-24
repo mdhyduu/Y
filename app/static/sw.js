@@ -2,7 +2,7 @@ const CACHE_NAME = "pwa-cache-v1";
 const urlsToCache = [
   "/",
   "/static/css/bootstrap.min.css",
-  "/static/css/style.css",
+  "/static/css/main.css",
   "/static/icons/icon-192x192.png",
   "/static/icons/s.png",
   "/static/manifest.json"
