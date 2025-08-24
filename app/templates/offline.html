@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>غير متصل بالإنترنت</title>
+  <style>
+    body {
+      font-family: 'Tajawal', sans-serif;
+      background-color: #f8f9fa;
+      color: #343a40;
+      text-align: center;
+      padding: 50px;
+      direction: rtl;
+    }
+    .offline-container {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .icon {
+      font-size: 64px;
+      color: #6c757d;
+      margin-bottom: 20px;
+    }
+    h1 {
+      color: #495057;
+      margin-bottom: 20px;
+    }
+    p {
+      color: #6c757d;
+      margin-bottom: 30px;
+    }
+  </style>
+</head>
+<body>
+  <div class="offline-container">
+    <div class="icon">
+      <i class="fas fa-wifi-slash"></i>
+    </div>
+    <h1>أنت غير متصل بالإنترنت</h1>
+    <p>عذرًا، لا يمكن تحميل المحتوى المطلوب بسبب عدم وجود اتصال بالإنترنت.</p>
+    <p>يرجى التحقق من اتصالك ثم المحاولة مرة أخرى.</p>
+    <button onclick="window.location.reload()">إعادة المحاولة</button>
+  </div>
+</body>
+</html>
