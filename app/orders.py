@@ -374,6 +374,8 @@ def sync_orders():
         for order in all_orders:
             try:
                 order_id = str(order.get('id'))
+                status_info = order.get('status', {})
+                status_id = str(status_info.get('id', ''))
                 if not order_id:
                     skipped_count += 1
                     continue
@@ -411,6 +413,7 @@ def sync_orders():
                     existing_order.status = status_name
                     existing_order.status_slug = status_slug
                     existing_order.total_amount = total_amount
+                    existing_order.status_id = status_id  # تأكد من تعيين status_id
                     existing_order.currency = currency
                     existing_order.payment_method = order.get('payment_method', '')
                     existing_order.updated_at = datetime.utcnow()
@@ -425,6 +428,7 @@ def sync_orders():
                     # إنشاء طلب جديد
                     new_order = SallaOrder(
                         id=order_id,
+                        status_id=status_id,  # تأكد من تعيين status_id
                         store_id=store_id,
                         customer_name=customer_name,
                         created_at=created_at or datetime.utcnow(),

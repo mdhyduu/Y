@@ -231,8 +231,14 @@
                                           <td>
                             <span class="fw-bold">#{{ order.reference_id }}</span>
                         </td>
-<!-- في قسم عرض الحالة في الجدول -->
 <td>
+    <!-- للتصحيح: عرض ما إذا كان status_rel موجودًا -->
+    <!-- {% if order.status_rel %}
+        <span class="text-success">Status_rel exists: {{ order.status_rel.name }}</span>
+    {% else %}
+        <span class="text-danger">Status_rel is NULL</span>
+    {% endif %} -->
+    
     {% if order.status_rel %}
         <span class="status-badge status-{{ order.status_rel.slug }}" 
               data-bs-toggle="tooltip" 
