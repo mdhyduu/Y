@@ -35,9 +35,7 @@
         <i class="fas fa-shopping-bag"></i> الطلبات
       </a>
       
-      <a class="nav-link {% if request.path == url_for('orders.scan_barcode') %}active{% endif %}" href="{{ url_for('orders.scan_barcode') }}">
-        <i class="fas fa-camera"></i> مسح الباركود
-      </a>
+
       
       <a class="nav-link {% if request.path == url_for('orders.manage_employee_status') %}active{% endif %}" href="{{ url_for('orders.manage_employee_status') }}">
         <i class="fas fa-tags"></i> حالات الطلبات
@@ -49,11 +47,11 @@
         </a>
       {% endif %}
       
-      {% if not request.cookies.get('is_admin') == 'true' %}
+
         <a class="nav-link {% if request.path.startswith('/dashboard') %}active{% endif %}" href="{{ url_for('dashboard.index') }}">
           <i class="fas fa-tachometer-alt"></i> لوحتي
         </a>
-      {% endif %}
+
       
       {% if request.cookies.get('is_admin') == 'true' %}
         <a class="nav-link {% if request.path == url_for('employees.list_employees') %}active{% endif %}" href="{{ url_for('employees.list_employees') }}">
@@ -89,14 +87,9 @@
         <div></div> 
         {% endif %}
 
-        <strong class="fs-5">مرحبًا بك، {{ request.cookies.get('username', 'زائر') }}</strong>
+
         
-        <div class="actions">
-          <a href="{{ url_for('orders.scan_barcode') }}" class="action-icon" title="مسح الباركود">
-            <i class="fas fa-qrcode"></i> 
-          </a>
-          <i class="fas fa-moon action-icon" id="themeToggle"></i>
-        </div>
+       
       </div>
 
       <div class="content container-fluid" id="content-area">
