@@ -602,7 +602,10 @@ def index():
                 )
         
         # الترحيل
-        pagination_obj = query.order_by(
+        # في قسم جلب الطلبات، أضف joinedload لتحميل العلاقة
+        pagination_obj = query.options(
+            db.joinedload(SallaOrder.status_rel)
+        ).order_by(
             nullslast(SallaOrder.created_at.desc())
         ).paginate(page=page, per_page=per_page)
         
@@ -665,17 +668,18 @@ def index():
         processed_orders = []
         for order in pagination_obj.items:
             raw_data = json.loads(order.raw_data) if order.raw_data else {}
-            reference_id = raw_data.get('reference_id', order.id)  # استخدام id كاحتياطي
+            reference_id = raw_data.get('reference_id', order.id)
             
             processed_orders.append({
                 'id': order.id,
-                'reference_id': reference_id,  # إضافة reference_id 
+                'reference_id': reference_id,
                 'customer_name': order.customer_name,
                 'created_at': humanize_time(order.created_at) if order.created_at else '',
                 'status': {
                     'slug': order.status_slug,
                     'name': order.status
                 },
+                'status_rel': order.status_rel,  # أضف هذا السطر
                 'status_notes': notes_dict.get(order.id, []),
                 'employee_statuses': statuses_dict.get(order.id, []),
                 'assignments': assignments_dict.get(order.id, []),

@@ -231,9 +231,12 @@
                                           <td>
                             <span class="fw-bold">#{{ order.reference_id }}</span>
                         </td>
+<!-- في قسم عرض الحالة في الجدول -->
 <td>
     {% if order.status_rel %}
-        <span class="status-badge status-{{ order.status_rel.slug }}">
+        <span class="status-badge status-{{ order.status_rel.slug }}" 
+              data-bs-toggle="tooltip" 
+              title="{{ order.status_rel.name }} ({{ order.status_rel.type }})">
             <i class="fas fa-circle me-1 small"></i>
             {{ order.status_rel.name }}
         </span>
