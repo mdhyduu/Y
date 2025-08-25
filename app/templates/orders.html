@@ -240,9 +240,9 @@
             {{ order.status_rel.name }}
         </span>
     {% else %}
-        <span class="status-badge status-{{ order.status.slug|default('unknown') }}">
+        <span class="status-badge status-unknown" data-bs-toggle="tooltip" title="حالة غير معروفة">
             <i class="fas fa-circle me-1 small"></i>
-            {{ order.status.name|default(order.status) }}
+            غير محدد
         </span>
     {% endif %}
 </td>
