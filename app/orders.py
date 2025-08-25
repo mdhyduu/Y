@@ -102,8 +102,9 @@ def sync_order_statuses_internal(user, access_token, store_id):
         # الباقي كما هو...
                 
                 # البحث عن الحالة في قاعدة البيانات
-                existing_status = OrderStatus.query.get(status_id)
-                
+                                # في sync_order_statuses_internal
+                existing_status = OrderStatus.query.filter_by(id=status_id, store_id=store_id).first()
+                                
                 if existing_status:
                     # تحديث الحالة الموجودة
                     existing_status.name = status_data.get('name', '')
@@ -359,20 +360,22 @@ def sync_orders():
                     continue
                 
                 # --- بداية المنطق الجديد والمحسّن لربط الحالة ---
-                
+# في sync_orders داخل loop معالجة الطلبات
                 status_info = order_data.get('status', {})
                 status_id_from_api = str(status_info.get('id')) if status_info.get('id') else None
                 status_slug_from_api = status_info.get('slug')
                 
-                found_status = None
-                # 1. حاول البحث باستخدام المعرف (ID) أولاً
-                if status_id_from_api:
-                    found_status = OrderStatus.query.filter_by(id=status_id_from_api, store_id=store_id).first()
+                # البحث بالمعرف أولاً
+                found_status = OrderStatus.query.filter_by(id=status_id_from_api, store_id=store_id).first()
                 
-                # 2. إذا لم تجده، حاول البحث باستخدام الرابط (Slug)
+                # إذا لم يوجد، البحث بالـ slug
                 if not found_status and status_slug_from_api:
                     found_status = OrderStatus.query.filter_by(slug=status_slug_from_api, store_id=store_id).first()
-                    
+                
+                # إذا لم يوجد، البحث في الحالات العامة (بدون store_id) للمتاجر الأخرى
+                if not found_status and status_id_from_api:
+                    found_status = OrderStatus.query.filter_by(id=status_id_from_api).first()
+                
                 final_status_id = found_status.id if found_status else None
                 
                 # --- نهاية المنطق الجديد ---
@@ -506,7 +509,9 @@ def index():
     
     try:
         # جلب الطلبات من قاعدة البيانات المحلية
-        query = SallaOrder.query.filter_by(store_id=user.store_id)
+        query = SallaOrder.query.filter_by(store_id=user.store_id).options(
+            db.joinedload(SallaOrder.status_rel)
+        )
         
         # تطبيق الفلاتر المشتركة
         if status_filter:
