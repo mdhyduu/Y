@@ -624,8 +624,7 @@ def index():
         for order in pagination_obj.items:
             raw_data = json.loads(order.raw_data) if order.raw_data else {}
             reference_id = raw_data.get('reference_id', order.id)
-            status_name = order.status_rel.name if order.status_rel else order.status
-
+            status_name = order.status_rel.name if order.status_rel else 'غير محدد'
             status_slug = order.status_rel.slug if order.status_rel else order.status_slug
             processed_orders.append({
                 'id': order.id,
