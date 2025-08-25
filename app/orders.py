@@ -347,6 +347,9 @@ def sync_orders():
         current_app.logger.info(f"تم جلب {len(all_orders)} طلب إجمالاً للمعالجة")
         
         # معالجة الطلبات
+        # ... بعد سطر current_app.logger.info(f"تم جلب {len(all_orders)} طلب إجمالاً للمعالجة")
+
+# معالجة الطلبات
         new_count, updated_count, skipped_count = 0, 0, 0
         
         for order_data in all_orders:
@@ -356,12 +359,25 @@ def sync_orders():
                     skipped_count += 1
                     continue
                 
-                status_info = order_data.get('status', {})
-                status_id = str(status_info.get('id')) if status_info.get('id') else None
+                # --- بداية المنطق الجديد والمحسّن لربط الحالة ---
                 
-                ## التعديل: التحقق من وجود status_id في قائمة الحالات الصالحة
-                final_status_id = status_id if status_id in valid_status_ids else None
-
+                status_info = order_data.get('status', {})
+                status_id_from_api = str(status_info.get('id')) if status_info.get('id') else None
+                status_slug_from_api = status_info.get('slug')
+                
+                found_status = None
+                # 1. حاول البحث باستخدام المعرف (ID) أولاً
+                if status_id_from_api:
+                    found_status = OrderStatus.query.filter_by(id=status_id_from_api, store_id=store_id).first()
+                
+                # 2. إذا لم تجده، حاول البحث باستخدام الرابط (Slug)
+                if not found_status and status_slug_from_api:
+                    found_status = OrderStatus.query.filter_by(slug=status_slug_from_api, store_id=store_id).first()
+                    
+                final_status_id = found_status.id if found_status else None
+                
+                # --- نهاية المنطق الجديد ---
+        
                 existing_order = SallaOrder.query.get(order_id)
                 
                 # معالجة تاريخ الإنشاء
@@ -369,10 +385,10 @@ def sync_orders():
                 date_info = order_data.get('date', {})
                 if date_info and 'date' in date_info:
                     try:
-                        date_str = date_info['date'].split('.')[0] # تجاهل المايكروثانية للتبسيط
+                        date_str = date_info['date'].split('.')[0]
                         created_at = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
-                    except Exception as e:
-                        current_app.logger.warning(f"خطأ في تحويل التاريخ للطلب {order_id}: {str(e)}")
+                    except Exception:
+                        pass # تجاهل الخطأ إذا كان التنسيق غير صالح
                 
                 total_info = order_data.get('total', {})
                 total_amount = float(total_info.get('amount', 0))
@@ -380,21 +396,19 @@ def sync_orders():
                 
                 if existing_order:
                     # تحديث الطلب الموجود
-                    existing_order.store_id = store_id
                     existing_order.total_amount = total_amount
                     existing_order.currency = currency
                     existing_order.payment_method = order_data.get('payment_method', '')
                     existing_order.raw_data = json.dumps(order_data, ensure_ascii=False)
                     existing_order.updated_at = datetime.utcnow()
-                    ## التعديل: تحديث status_id فقط وعدم حفظ البيانات المكررة
-                    existing_order.status_id = final_status_id
+                    existing_order.status_id = final_status_id # <-- استخدام المعرف النهائي
                     
                     updated_count += 1
                 else:
                     # إنشاء طلب جديد
                     customer = order_data.get('customer', {})
                     customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip() or order_data.get('customer', '')
-
+        
                     new_order = SallaOrder(
                         id=order_id,
                         store_id=store_id,
@@ -404,8 +418,7 @@ def sync_orders():
                         currency=currency,
                         payment_method=order_data.get('payment_method', ''),
                         raw_data=json.dumps(order_data, ensure_ascii=False),
-                        ## التعديل: تعيين status_id فقط وعدم حفظ البيانات المكررة
-                        status_id=final_status_id
+                        status_id=final_status_id # <-- استخدام المعرف النهائي
                     )
                     db.session.add(new_order)
                     new_count += 1
@@ -413,6 +426,8 @@ def sync_orders():
             except Exception as e: 
                 skipped_count += 1
                 current_app.logger.error(f"خطأ في معالجة الطلب {order_data.get('id', 'unknown')}: {str(e)}", exc_info=True)
+
+# ... استكمل باقي الدالة من هنا (user.last_sync = ...)
         
         user.last_sync = datetime.utcnow()
         db.session.commit()
@@ -624,9 +639,9 @@ def index():
         for order in pagination_obj.items:
             raw_data = json.loads(order.raw_data) if order.raw_data else {}
             reference_id = raw_data.get('reference_id', order.id)
-            status_name = order.status_rel.name if order.status_rel else order.status
+            status_name = order.status_rel.name if order.status_rel else 'غير محدد'
 
-            status_slug = order.status_rel.slug if order.status_rel else order.status_slug
+            status_slug = order.status_rel.slug if order.status_rel else 'unknown' # يمكنك أيضاً توفير slug بديل
             processed_orders.append({
                 'id': order.id,
                 'reference_id': reference_id,
