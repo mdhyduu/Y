@@ -287,7 +287,6 @@ def sync_orders():
             }), 500
         
         ## التحسين: جلب كل معرفات الحالات (status IDs) الصالحة مرة واحدة لتحسين الأداء
-        valid_status_ids = {str(s.id) for s in OrderStatus.query.filter_by(store_id=store_id).with_entities(OrderStatus.id).all()}
         
         # تحديد وقت آخر مزامنة
         last_sync = getattr(user, 'last_sync', None)
