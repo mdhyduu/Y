@@ -1114,54 +1114,7 @@ $(document).on('click', '#print-orders-btn', function() {
     $(document).on('input', '#search-order-id', _.debounce(function() {
         reloadOrders();
     }, 500));
-    $(document).on('click', '#sync-statuses-btn', function() {
-    const btn = $(this);
-    const icon = btn.find('i');
-    const progressContainer = $('#sync-progress');
-    const progressBar = progressContainer.find('.progress-bar');
-    const detailsText = progressContainer.find('.sync-details');
 
-    btn.prop('disabled', true);
-    icon.addClass('fa-spin');
-    btn.find('.sync-text').text('جاري مزامنة الحالات...');
-    progressContainer.removeClass('d-none');
-    progressBar.css('width', '10%');
-    detailsText.text('جاري الاتصال بالخادم...');
-
-    // محاكاة التقدم
-    progressBar.animate({ width: "70%" }, 1500);
-
-    $.ajax({
-        url: "{{ url_for('orders.sync_order_statuses') }}",
-        type: "POST",
-        contentType: "application/json",
-        data: JSON.stringify({}),
-        headers: { 'X-CSRFToken': csrfToken }
-    })
-    .done(function(response) {
-        progressBar.css('width', '100%');
-        if (response.success) {
-            detailsText.text(response.message);
-            showSweetAlert('success', 'نجحت مزامنة الحالات!', response.message);
-            setTimeout(() => location.reload(), 2000);
-        } else {
-            showSweetAlert('error', 'فشلت مزامنة الحالات', response.error, 5000);
-            btn.prop('disabled', false);
-            icon.removeClass('fa-spin');
-            btn.find('.sync-text').text('مزامنة الحالات');
-            progressContainer.addClass('d-none');
-        }
-    })
-    .fail(function(xhr) {
-        progressBar.css('width', '100%');
-        const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم. تحقق من الشبكة.';
-        showSweetAlert('error', 'حدث خطأ فادح', errorMsg, 5000);
-        btn.prop('disabled', false);
-        icon.removeClass('fa-spin');
-        btn.find('.sync-text').text('مزامنة الحالات');
-        progressContainer.addClass('d-none');
-    });
-});
     
     // تغيير الفلاتر مع تأخير
     $(document).on('change', '#filter-order-status, #filter-employee, #filter-custom-status, #filter-special-status, #per-page-select', _.debounce(function() {
