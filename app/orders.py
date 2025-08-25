@@ -113,6 +113,7 @@ def sync_order_statuses_internal(user, access_token, store_id):
                     existing_status.message = status_data.get('message', '')
                     existing_status.icon = status_data.get('icon', '')
                     existing_status.is_active = status_data.get('is_active', True)
+                    existing_status.store_id = store_id  # ← أضف هذا السطر لتحديث store_id
                     
                     # معالجة الحالة الأصلية (original)
                     original_data = status_data.get('original', {})
