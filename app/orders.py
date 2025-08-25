@@ -408,7 +408,7 @@ def sync_orders():
                 status_id = str(status_info.get('id', '')) if status_info.get('id') else None
                 status_name = status_info.get('name', '')
                 status_slug = status_info.get('slug', '')
-                
+                if not status_slug and status_name:status_slug = status_name.lower().replace(' ', '_')
                 # البحث عن الطلب في قاعدة البيانات
                 existing_order = SallaOrder.query.get(order_id)
                 
