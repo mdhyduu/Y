@@ -82,11 +82,24 @@ def sync_order_statuses_internal(user, access_token, store_id):
         new_count = 0
         updated_count = 0
         
+        # في دالة sync_order_statuses_internal
         for status_data in statuses:
             try:
                 status_id = str(status_data.get('id'))
                 if not status_id:
                     continue
+                
+                # إضافة تحقق من وجود slug
+                slug = status_data.get('slug')
+                if not slug:
+                    # إنشاء slug من الاسم إذا لم يكن موجوداً
+                    name = status_data.get('name', '')
+                    if name:
+                        slug = name.lower().replace(' ', '_')
+                    else:
+                        continue  # تخطي إذا لم يكن هناك اسم أيضاً
+                
+        # الباقي كما هو...
                 
                 # البحث عن الحالة في قاعدة البيانات
                 existing_status = OrderStatus.query.get(status_id)
