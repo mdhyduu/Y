@@ -254,6 +254,8 @@ def sync_orders():
             return response, 401
         
         # الحصول على معرف المتجر وتوكن الوصول
+        store_id = None
+        access_token = None
         if request.cookies.get('is_admin') == 'true':
             store_id = user.store_id
             access_token = user.salla_access_token
@@ -264,7 +266,6 @@ def sync_orders():
                     'error': 'الموظف غير موجود',
                     'code': 'EMPLOYEE_NOT_FOUND'
                 }), 404
-                
             store_id = employee.store_id
             access_token = user.salla_access_token
         
@@ -276,7 +277,7 @@ def sync_orders():
                 'code': 'MISSING_ACCESS_TOKEN'
             }), 400
         
-        # مزامنة حالات الطلبات أولاً
+        # مزامنة حالات الطلبات أولاً لضمان وجود أحدث الحالات
         status_success, status_message = sync_order_statuses_internal(user, access_token, store_id)
         if not status_success:
             return jsonify({
@@ -285,12 +286,12 @@ def sync_orders():
                 'code': 'STATUS_SYNC_ERROR'
             }), 500
         
+        ## التحسين: جلب كل معرفات الحالات (status IDs) الصالحة مرة واحدة لتحسين الأداء
+        valid_status_ids = {str(s.id) for s in OrderStatus.query.filter_by(store_id=store_id).with_entities(OrderStatus.id).all()}
+        
         # تحديد وقت آخر مزامنة
         last_sync = getattr(user, 'last_sync', None)
-        if not last_sync:
-            from_date = (datetime.utcnow() - timedelta(days=7)).strftime('%Y-%m-%d')
-        else:
-            from_date = last_sync.strftime('%Y-%m-%d')
+        from_date = (datetime.utcnow() - timedelta(days=7)).strftime('%Y-%m-%d') if not last_sync else last_sync.strftime('%Y-%m-%d')
         
         headers = {
             'Authorization': f'Bearer {access_token}',
@@ -304,24 +305,15 @@ def sync_orders():
         token_refreshed = False
         
         while page <= total_pages:
-            params = {
-                'perPage': 100,
-                'page': page,
-                'from_date': from_date,
-                'sort_by': 'updated_at-desc'
-            }
+            params = {'perPage': 100, 'page': page, 'from_date': from_date, 'sort_by': 'updated_at-desc'}
             
+            # (اختياري) إضافة فلاتر من الطلب
             request_data = request.get_json() or {}
             for param in ['status', 'payment_method', 'country', 'city', 'product', 'tags']:
                 if param in request_data:
                     params[param] = request_data[param]
             
-            response = requests.get(
-                f"{Config.SALLA_API_BASE_URL}/orders",
-                headers=headers,
-                params=params,
-                timeout=30
-            )
+            response = requests.get(f"{Config.SALLA_API_BASE_URL}/orders", headers=headers, params=params, timeout=30)
             
             if response.status_code == 401 and not token_refreshed:
                 new_token = refresh_salla_token(user)
@@ -332,99 +324,77 @@ def sync_orders():
                     continue
                 else:
                     return jsonify({
-                        'success': False,
-                        'error': "انتهت صلاحية الجلسة، الرجاء تسجيل الخروج وإعادة تسجيل الدخول",
-                        'code': 'TOKEN_EXPIRED',
-                        'action_required': True,
-                        'redirect_url': url_for('user_auth.logout')
+                        'success': False, 'error': "انتهت صلاحية الجلسة، الرجاء إعادة تسجيل الدخول",
+                        'code': 'TOKEN_EXPIRED', 'action_required': True, 'redirect_url': url_for('user_auth.logout')
                     }), 401
             
             if response.status_code != 200:
                 error_msg = f"خطأ في استجابة سلة: {response.status_code} - {response.text}"
-                current_app.logger.error(error_msg)
-                return jsonify({
-                    'success': False,
-                    'error': "فشل في جلب البيانات من سلة",
-                    'code': 'SALLA_API_ERROR',
-                    'details': response.text[:200] if response.text else ''
-                }), 500
+                return jsonify({'success': False, 'error': "فشل في جلب البيانات من سلة", 'code': 'SALLA_API_ERROR', 'details': response.text[:200]}), 500
             
             data = response.json()
             if 'data' not in data or 'pagination' not in data:
-                error_msg = "استجابة غير متوقعة من سلة: هيكل البيانات غير مطابق"
-                current_app.logger.error(error_msg)
-                return jsonify({
-                    'success': False,
-                    'error': error_msg,
-                    'code': 'INVALID_RESPONSE_FORMAT'
-                }), 500
+                return jsonify({'success': False, 'error': "استجابة غير متوقعة من سلة", 'code': 'INVALID_RESPONSE_FORMAT'}), 500
             
             orders = data['data']
             all_orders.extend(orders)
-            
             pagination = data['pagination']
             total_pages = pagination.get('totalPages', 1)
-            current_page = pagination.get('currentPage', page)
-            
-            current_app.logger.info(f"تم جلب {len(orders)} طلب من الصفحة {current_page}/{total_pages}")
+            current_app.logger.info(f"تم جلب {len(orders)} طلب من الصفحة {pagination.get('currentPage', page)}/{total_pages}")
             page += 1
             time.sleep(0.2)
         
-        current_app.logger.info(f"تم جلب {len(all_orders)} طلب إجمالاً")
+        current_app.logger.info(f"تم جلب {len(all_orders)} طلب إجمالاً للمعالجة")
         
         # معالجة الطلبات
         new_count, updated_count, skipped_count = 0, 0, 0
         
-        for order in all_orders:
+        for order_data in all_orders:
             try:
-                order_id = str(order.get('id'))
+                order_id = str(order_data.get('id'))
                 if not order_id:
                     skipped_count += 1
                     continue
                 
-                status_info = order.get('status', {})
-                status_id = str(status_info.get('id', '')) if status_info.get('id') else None
-                status_name = status_info.get('name', '')
-                status_slug = status_info.get('slug', '')
-                if not status_slug and status_name:
-                    status_slug = status_name.lower().replace(' ', '_')
+                status_info = order_data.get('status', {})
+                status_id = str(status_info.get('id')) if status_info.get('id') else None
                 
+                ## التعديل: التحقق من وجود status_id في قائمة الحالات الصالحة
+                final_status_id = status_id if status_id in valid_status_ids else None
+
                 existing_order = SallaOrder.query.get(order_id)
                 
+                # معالجة تاريخ الإنشاء
                 created_at = None
-                date_info = order.get('date', {})
+                date_info = order_data.get('date', {})
                 if date_info and 'date' in date_info:
                     try:
-                        date_str = date_info['date']
-                        if '.' in date_str:
-                            created_at = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S.%f')
-                        else:
-                            created_at = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+                        date_str = date_info['date'].split('.')[0] # تجاهل المايكروثانية للتبسيط
+                        created_at = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
                     except Exception as e:
                         current_app.logger.warning(f"خطأ في تحويل التاريخ للطلب {order_id}: {str(e)}")
-                        created_at = datetime.utcnow()
                 
-                total_info = order.get('total', {})
-                total_amount = float(total_info.get('amount', 0)) if total_info else 0
-                currency = total_info.get('currency', 'SAR') if total_info else 'SAR'
+                total_info = order_data.get('total', {})
+                total_amount = float(total_info.get('amount', 0))
+                currency = total_info.get('currency', 'SAR')
                 
                 if existing_order:
-                    existing_order.store_id = store_id  # ← مهم
-                    existing_order.status = status_name
-                    existing_order.status_slug = status_slug
-                    existing_order.status_id = status_id if status_id and OrderStatus.query.get(status_id) else None
+                    # تحديث الطلب الموجود
+                    existing_order.store_id = store_id
                     existing_order.total_amount = total_amount
                     existing_order.currency = currency
-                    existing_order.payment_method = order.get('payment_method', '')
+                    existing_order.payment_method = order_data.get('payment_method', '')
+                    existing_order.raw_data = json.dumps(order_data, ensure_ascii=False)
                     existing_order.updated_at = datetime.utcnow()
-                    existing_order.raw_data = json.dumps(order, ensure_ascii=False)
+                    ## التعديل: تحديث status_id فقط وعدم حفظ البيانات المكررة
+                    existing_order.status_id = final_status_id
+                    
                     updated_count += 1
                 else:
-                    customer = order.get('customer', {})
-                    customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip()
-                    if not customer_name and 'customer' in order:
-                        customer_name = order.get('customer', '')
-                    
+                    # إنشاء طلب جديد
+                    customer = order_data.get('customer', {})
+                    customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip() or order_data.get('customer', '')
+
                     new_order = SallaOrder(
                         id=order_id,
                         store_id=store_id,
@@ -432,18 +402,17 @@ def sync_orders():
                         created_at=created_at or datetime.utcnow(),
                         total_amount=total_amount,
                         currency=currency,
-                        payment_method=order.get('payment_method', ''),
-                        status=status_name,
-                        status_slug=status_slug,
-                        status_id=status_id if status_id and OrderStatus.query.get(status_id) else None,
-                        raw_data=json.dumps(order, ensure_ascii=False)
+                        payment_method=order_data.get('payment_method', ''),
+                        raw_data=json.dumps(order_data, ensure_ascii=False),
+                        ## التعديل: تعيين status_id فقط وعدم حفظ البيانات المكررة
+                        status_id=final_status_id
                     )
                     db.session.add(new_order)
                     new_count += 1
                     
             except Exception as e: 
                 skipped_count += 1
-                current_app.logger.error(f"خطأ في معالجة الطلب {order.get('id', 'unknown')}: {str(e)}")
+                current_app.logger.error(f"خطأ في معالجة الطلب {order_data.get('id', 'unknown')}: {str(e)}", exc_info=True)
         
         user.last_sync = datetime.utcnow()
         db.session.commit()
@@ -452,12 +421,10 @@ def sync_orders():
         
         return jsonify({
             'success': True,
-            'message': f'تمت المزامنة بنجاح: {new_count} طلب جديد، {updated_count} محدث، {skipped_count} متخطى، {status_message}',
+            'message': f'تمت المزامنة بنجاح: {new_count} طلب جديد، {updated_count} محدث. {status_message}',
             'stats': {
-                'new_orders': new_count,
-                'updated_orders': updated_count,
-                'skipped_orders': skipped_count,
-                'total_processed': len(all_orders)
+                'new_orders': new_count, 'updated_orders': updated_count,
+                'skipped_orders': skipped_count, 'total_processed': len(all_orders)
             }
         })
     
@@ -657,15 +624,17 @@ def index():
         for order in pagination_obj.items:
             raw_data = json.loads(order.raw_data) if order.raw_data else {}
             reference_id = raw_data.get('reference_id', order.id)
-            
+            status_name = order.status_rel.name if order.status_rel else order.status
+
+            status_slug = order.status_rel.slug if order.status_rel else order.status_slug
             processed_orders.append({
                 'id': order.id,
                 'reference_id': reference_id,
                 'customer_name': order.customer_name,
                 'created_at': humanize_time(order.created_at) if order.created_at else '',
                 'status': {
-                    'slug': order.status_slug,
-                    'name': order.status
+                    'slug': status_slug,
+                    'name': status_name
                 },
                 'status_rel': order.status_rel,  # أضف هذا السطر
                 'status_notes': notes_dict.get(order.id, []),
