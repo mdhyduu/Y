@@ -355,7 +355,8 @@ class SallaOrder(db.Model):
     total_amount = db.Column(db.Float)
     currency = db.Column(db.String(10), default='SAR')
     payment_method = db.Column(db.String(100))
-
+    status = db.Column(db.String(50))
+    status_slug = db.Column(db.String(50))
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     raw_data = db.Column(db.JSON)
     status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'),nullable=True)
