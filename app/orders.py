@@ -411,9 +411,7 @@ def sync_orders():
                 status_slug = status_info.get('slug', '')
                 if not status_slug and status_name:status_slug = status_name.lower().replace(' ', '_')
                 # البحث عن الطلب في قاعدة البيانات
-                existing_order.status_id = status_id if status_id and OrderStatus.query.get(status_id) else None
-                existing_order.status_slug = status_slug
-                existing_order.status = status_name
+                existing_order = SallaOrder.query.get(order_id)
                 
                 # تحويل تاريخ الإنشاء إذا كان موجوداً
                 created_at = None
@@ -437,8 +435,9 @@ def sync_orders():
                 
                 if existing_order:
                     # تحديث الطلب الموجود
-                    existing_order.status = status_name
+                    existing_order.status_id = status_id if status_id and OrderStatus.query.get(status_id) else None
                     existing_order.status_slug = status_slug
+                    existing_order.status = status_name 
                     existing_order.total_amount = total_amount
                     existing_order.currency = currency
                     existing_order.payment_method = order.get('payment_method', '')
@@ -476,7 +475,7 @@ def sync_orders():
                     db.session.add(new_order)
                     new_count += 1
                     
-            except Exception as e:
+            except Exception as e: 
                 skipped_count += 1
                 current_app.logger.error(f"خطأ في معالجة الطلب {order.get('id', 'unknown')}: {str(e)}")
         
