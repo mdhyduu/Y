@@ -46,9 +46,185 @@ def get_user_from_cookies():
             return user, employee
         return None, None
 
+def sync_order_statuses_internal(user, access_token, store_id):
+    """دالة مساعدة لمزامنة حالات الطلبات (يمكن استدعاؤها داخلياً)"""
+    try:
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Accept': 'application/json'
+        }
+        
+        current_app.logger.info(f"بدء مزامنة حالات الطلبات للمتجر {store_id}")
+        
+        # جلب حالات الطلبات من Salla API
+        response = requests.get(
+            f"{Config.SALLA_API_BASE_URL}/orders/statuses",
+            headers=headers,
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            error_msg = f"خطأ في استجابة سلة: {response.status_code} - {response.text}"
+            current_app.logger.error(error_msg)
+            return False, f"فشل في جلب حالات الطلبات من سلة: {response.text[:200] if response.text else ''}"
+        
+        data = response.json()
+        
+        if 'data' not in data:
+            error_msg = "استجابة غير متوقعة من سلة: هيكل البيانات غير مطابق للمواصفات"
+            current_app.logger.error(error_msg)
+            return False, error_msg
+        
+        statuses = data['data']
+        current_app.logger.info(f"تم جلب {len(statuses)} حالة طلب للمزامنة")
+        
+        # معالجة حالات الطلبات وتخزينها
+        new_count = 0
+        updated_count = 0
+        
+        for status_data in statuses:
+            try:
+                status_id = str(status_data.get('id'))
+                if not status_id:
+                    continue
+                
+                # البحث عن الحالة في قاعدة البيانات
+                existing_status = OrderStatus.query.get(status_id)
+                
+                if existing_status:
+                    # تحديث الحالة الموجودة
+                    existing_status.name = status_data.get('name', '')
+                    existing_status.type = status_data.get('type', '')
+                    existing_status.slug = status_data.get('slug', '')
+                    existing_status.sort = status_data.get('sort', 0)
+                    existing_status.message = status_data.get('message', '')
+                    existing_status.icon = status_data.get('icon', '')
+                    existing_status.is_active = status_data.get('is_active', True)
+                    
+                    # معالجة الحالة الأصلية (original)
+                    original_data = status_data.get('original', {})
+                    if original_data and 'id' in original_data:
+                        existing_status.original_id = str(original_data['id'])
+                    
+                    # معالجة الحالة الأب (parent)
+                    parent_data = status_data.get('parent', {})
+                    if parent_data and 'id' in parent_data:
+                        existing_status.parent_id = str(parent_data['id'])
+                    
+                    updated_count += 1
+                else:
+                    # إنشاء حالة جديدة
+                    new_status = OrderStatus(
+                        id=status_id,
+                        name=status_data.get('name', ''),
+                        type=status_data.get('type', ''),
+                        slug=status_data.get('slug', ''),
+                        sort=status_data.get('sort', 0),
+                        message=status_data.get('message', ''),
+                        icon=status_data.get('icon', ''),
+                        is_active=status_data.get('is_active', True),
+                        store_id=store_id
+                    )
+                    
+                    # معالجة الحالة الأصلية (original)
+                    original_data = status_data.get('original', {})
+                    if original_data and 'id' in original_data:
+                        new_status.original_id = str(original_data['id'])
+                    
+                    # معالجة الحالة الأب (parent)
+                    parent_data = status_data.get('parent', {})
+                    if parent_data and 'id' in parent_data:
+                        new_status.parent_id = str(parent_data['id'])
+                    
+                    db.session.add(new_status)
+                    new_count += 1
+                    
+            except Exception as e:
+                current_app.logger.error(f"خطأ في معالجة الحالة {status_data.get('id', 'unknown')}: {str(e)}")
+        
+        db.session.commit()
+        
+        current_app.logger.info(f"تمت مزامنة حالات الطلبات بنجاح: {new_count} جديد، {updated_count} محدث")
+        
+        return True, f'تمت مزامنة حالات الطلبات بنجاح: {new_count} حالة جديدة، {updated_count} حالة محدثة'
+    
+    except requests.exceptions.RequestException as e:
+        error_msg = f"خطأ في الاتصال بسلة: {str(e)}"
+        current_app.logger.error(error_msg, exc_info=True)
+        return False, error_msg
+        
+    except Exception as e:
+        error_msg = f"خطأ غير متوقع: {str(e)}"
+        current_app.logger.error(error_msg, exc_info=True)
+        return False, error_msg
+
+@orders_bp.route('/sync_statuses', methods=['POST'])
+def sync_order_statuses():
+    """مزامنة حالات الطلبات من سلة إلى قاعدة البيانات المحلية"""
+    try:
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            response = jsonify({
+                'success': False, 
+                'error': 'الرجاء تسجيل الدخول أولاً',
+                'code': 'UNAUTHORIZED'
+            })
+            response.set_cookie('user_id', '', expires=0)
+            response.set_cookie('is_admin', '', expires=0)
+            return response, 401
+        
+        store_id = None
+        access_token = None
+        
+        if request.cookies.get('is_admin') == 'true':
+            store_id = user.store_id
+            access_token = user.salla_access_token
+        else:
+            if not employee:
+                return jsonify({
+                    'success': False,
+                    'error': 'الموظف غير موجود',
+                    'code': 'EMPLOYEE_NOT_FOUND'
+                }), 404
+                
+            store_id = employee.store_id
+            access_token = user.salla_access_token
+        
+        if not access_token:
+            return jsonify({
+                'success': False,
+                'error': 'يجب ربط المتجر مع سلة أولاً',
+                'code': 'MISSING_ACCESS_TOKEN'
+            }), 400
+        
+        # استخدام الدالة المساعدة للمزامنة
+        success, message = sync_order_statuses_internal(user, access_token, store_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': message
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': message,
+                'code': 'SYNC_ERROR'
+            }), 500
+            
+    except Exception as e:
+        error_msg = f"خطأ غير متوقع: {str(e)}"
+        current_app.logger.error(error_msg, exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': error_msg,
+            'code': 'INTERNAL_ERROR'
+        }), 500
+
 @orders_bp.route('/sync_orders', methods=['POST'])
 def sync_orders():
-    """مزامنة الطلبات وحالاتها من سلة إلى قاعدة البيانات المحلية"""
+    """مزامنة الطلبات من سلة إلى قاعدة البيانات المحلية وفق المواصفات الرسمية"""
     try:
         user, employee = get_user_from_cookies()
         
@@ -98,7 +274,7 @@ def sync_orders():
                 'code': 'STATUS_SYNC_ERROR'
             }), 500
         
-        # تحديد وقت آخر مزامنة
+        # تحديد وقت آخر مزامنة (استخدم تاريخًا فقط كما في المواصفات)
         last_sync = getattr(user, 'last_sync', None)
         if not last_sync:
             # إذا لم تكن هناك مزامنة سابقة، جلب طلبات آخر 7 أيام
@@ -107,7 +283,7 @@ def sync_orders():
             # استخدام تاريخ آخر مزامنة فقط (بدون وقت)
             from_date = last_sync.strftime('%Y-%m-%d')
         
-        # جلب الطلبات من سلة
+        # جلب الطلبات من سلة وفق المواصفات الرسمية
         headers = {
             'Authorization': f'Bearer {access_token}',
             'Accept': 'application/json'
@@ -121,11 +297,12 @@ def sync_orders():
         token_refreshed = False
         
         while page <= total_pages:
+            # استخدام المعلمات وفق مواصفات OpenAPI
             params = {
-                'perPage': 100,
+                'perPage': 100,  # لاحظ P الكبيرة كما في المواصفات
                 'page': page,
-                'from_date': from_date,
-                'sort_by': 'updated_at-desc'
+                'from_date': from_date,  # التنسيق yyyy-mm-dd
+                'sort_by': 'updated_at-desc'  # ترتيب حسب تاريخ التحديث
             }
             
             # إضافة معلمات تصفية إضافية إذا كانت متوفرة في الطلب
@@ -135,7 +312,7 @@ def sync_orders():
                     params[param] = request_data[param]
             
             response = requests.get(
-                f"{Config.SALLA_API_BASE_URL}/orders",
+                f"{Config.SALLA_API_BASE_URL}/orders",  # استخدام النقطة الأساسية
                 headers=headers,
                 params=params,
                 timeout=30
@@ -143,12 +320,13 @@ def sync_orders():
             
             # معالجة الأخطاء الخاصة بالتوكن
             if response.status_code == 401 and not token_refreshed:
+                # محاولة تجديد التوكن مرة واحدة فقط
                 new_token = refresh_salla_token(user)
                 if new_token:
                     headers['Authorization'] = f'Bearer {new_token}'
                     access_token = new_token
                     token_refreshed = True
-                    continue
+                    continue  # إعادة المحاولة بنفس الصفحة
                 else:
                     return jsonify({
                         'success': False,
@@ -158,6 +336,7 @@ def sync_orders():
                         'redirect_url': url_for('user_auth.logout')
                     }), 401
             
+            # التحقق من استجابة API
             if response.status_code != 200:
                 error_msg = f"خطأ في استجابة سلة: {response.status_code} - {response.text}"
                 current_app.logger.error(error_msg)
@@ -168,8 +347,10 @@ def sync_orders():
                     'details': response.text[:200] if response.text else ''
                 }), 500
             
+            # معالجة الاستجابة وفق هيكل OpenAPI
             data = response.json()
             
+            # التحقق من هيكل البيانات المتوقع
             if 'data' not in data or 'pagination' not in data:
                 error_msg = "استجابة غير متوقعة من سلة: هيكل البيانات غير مطابق للمواصفات"
                 current_app.logger.error(error_msg)
@@ -182,13 +363,17 @@ def sync_orders():
             orders = data['data']
             all_orders.extend(orders)
             
+            # تحديث معلومات الترقيم من الاستجابة
             pagination = data['pagination']
             total_pages = pagination.get('totalPages', 1)
             current_page = pagination.get('currentPage', page)
             
             current_app.logger.info(f"تم جلب {len(orders)} طلب من الصفحة {current_page}/{total_pages}")
             
+            # الانتقال للصفحة التالية
             page += 1
+            
+            # إضافة تأخير بسيط لتجنب تجاوز معدل الطلبات
             time.sleep(0.2)
         
         current_app.logger.info(f"تم جلب {len(all_orders)} طلب إجمالاً للمزامنة")
@@ -214,11 +399,12 @@ def sync_orders():
                 # البحث عن الطلب في قاعدة البيانات
                 existing_order = SallaOrder.query.get(order_id)
                 
-                # تحويل تاريخ الإنشاء
+                # تحويل تاريخ الإنشاء إذا كان موجوداً
                 created_at = None
                 date_info = order.get('date', {})
                 if date_info and 'date' in date_info:
                     try:
+                        # تحويل تنسيق التاريخ من "2022-06-16 14:48:20.000000"
                         date_str = date_info['date']
                         if '.' in date_str:
                             created_at = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S.%f')
