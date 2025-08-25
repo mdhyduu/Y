@@ -411,7 +411,9 @@ def sync_orders():
                 status_slug = status_info.get('slug', '')
                 if not status_slug and status_name:status_slug = status_name.lower().replace(' ', '_')
                 # البحث عن الطلب في قاعدة البيانات
-                existing_order = SallaOrder.query.get(order_id)
+                existing_order.status_id = status_id if status_id and OrderStatus.query.get(status_id) else None
+                existing_order.status_slug = status_slug
+                existing_order.status = status_name
                 
                 # تحويل تاريخ الإنشاء إذا كان موجوداً
                 created_at = None
