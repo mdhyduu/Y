@@ -747,17 +747,21 @@ def index():
             })
         
         # معالجة بيانات الطلبات الخاصة للعرض
+        # في قسم معالجة الطلبات الخاصة في دالة index
         for order in custom_pagination.items:
             status_name = order.status.name if order.status else 'غير محدد'
             status_slug = order.status.slug if order.status else 'unknown'
-            order_key = f"custom_{order.id}"
+            order_key = f"custom_{order.id}"  # هذا هو المفتاح الذي سيستخدم في الروابط
+            
+            # التأكد من وجود تاريخ الإنشاء
+            created_at = order.created_at or datetime.min
             
             all_orders.append({
-                'id': order_key,
+                'id': order_key,  # استخدام المفتاح مع البادئة
                 'order_number': order.order_number,
-                'reference_id': order.order_number,  # استخدام order_number كمرجع
+                'reference_id': order.order_number,
                 'customer_name': order.customer_name,
-                'created_at': humanize_time(order.created_at) if order.created_at else '',
+                'created_at': humanize_time(created_at),
                 'status': {
                     'slug': status_slug,
                     'name': status_name
@@ -766,11 +770,11 @@ def index():
                 'status_notes': notes_dict.get(order_key, []),
                 'employee_statuses': statuses_dict.get(order_key, []),
                 'assignments': assignments_dict.get(order_key, []),
-                'raw_created_at': order.created_at,
-                'order_type': 'custom',  # للتمييز في القالب
+                'raw_created_at': created_at,
+                'order_type': 'custom',
                 'total_amount': order.total_amount,
                 'currency': order.currency,
-                'has_image': bool(order.order_image)  # للإشارة إلى وجود صورة
+                'has_image': bool(order.order_image)
             })
         
 
@@ -951,7 +955,7 @@ def assign_orders():
             'error': f'حدث خطأ أثناء الإسناد: {str(e)}',
             'code': 'ASSIGNMENT_ERROR'
         }), 500
-@orders_bp.route('/<int:order_id>')
+@orders_bp.route('/<order_id>')
 def order_details(order_id):
     """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة"""
     if str(order_id).startswith('custom_'):
