@@ -1248,9 +1248,9 @@ def order_details(order_id):
             flash(error_msg, "error")
             logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
-    except Exception as e:
+        except Exception as e:
             # معالجة الأخطاء
-        pass
+            pa      ss
 
         # ========== [2] التحقق من صلاحية التوكن
 @orders_bp.route('/<int:order_id>/update_status', methods=['POST'])
@@ -1966,7 +1966,6 @@ def add_custom_order():
     
     return render_template('add_custom_order.html')
 
-@orders_bp.route('/custom/<int:order_id>')
 def custom_order_details(order_id):
     user, employee = get_user_from_cookies()
     
