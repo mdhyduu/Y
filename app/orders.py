@@ -1248,9 +1248,9 @@ def order_details(order_id):
             flash(error_msg, "error")
             logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
-        except Exception as e:
+    except Exception as e:
             # معالجة الأخطاء
-            pass
+        pass
 
         # ========== [2] التحقق من صلاحية التوكن
 @orders_bp.route('/<int:order_id>/update_status', methods=['POST'])
