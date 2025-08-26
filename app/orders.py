@@ -984,9 +984,7 @@ def order_details(order_id):
                 if current_employee.role in ['reviewer', 'manager']:
                     is_reviewer = True
 
-            # ========== [2] التحقق من صلاحية التوكن ==========
-            # ... (ننقل محتوى salla_order_details بالكامل هنا)
-             ==========
+
                 def refresh_and_get_token():
                     """دالة مساعدة لتجديد التوكن"""
                     new_token = refresh_salla_token(user)
