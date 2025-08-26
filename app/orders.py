@@ -1250,7 +1250,7 @@ def order_details(order_id):
         return redirect(url_for('orders.index'))
         except Exception as e:
             # معالجة الأخطاء
-            pa      ss
+            pass
 
         # ========== [2] التحقق من صلاحية التوكن
 @orders_bp.route('/<int:order_id>/update_status', methods=['POST'])
