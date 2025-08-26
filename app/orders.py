@@ -957,11 +957,27 @@ def assign_orders():
         }), 500
 @orders_bp.route('/<order_id>')
 def order_details(order_id):
+    user, current_employee = get_user_from_cookies()
+    
+    if not user:
+        flash("الرجاء تسجيل الدخول أولاً", "error")
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
+
+    # تحديد نوع الطلب (سلة أو خاص)
+    if order_id.startswith('custom_'):
+        # طلب خاص
+        custom_order_id = order_id.replace('custom_', '')
+        return custom_order_details(custom_order_id)
+    else:
+        # طلب سلة
+        return salla_order_details(order_id)
+
     """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة"""
-    if str(order_id).startswith('custom_'):
-        # Extract the actual ID and redirect to custom order route
-        actual_id = order_id.replace('custom_', '')
-        return redirect(url_for('orders.custom_order_details', order_id=actual_id))
+def salla_order_details(order_id):
+    
     user, current_employee = get_user_from_cookies()
     
     if not user:
