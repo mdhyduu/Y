@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>إضافة طلب خاص</h2>
+    
+    <form method="post" enctype="multipart/form-data">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="customer_name">اسم العميل *</label>
+                    <input type="text" class="form-control" id="customer_name" name="customer_name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="customer_phone">هاتف العميل</label>
+                    <input type="text" class="form-control" id="customer_phone" name="customer_phone">
+                </div>
+                
+                <div class="form-group">
+                    <label for="customer_address">عنوان العميل</label>
+                    <textarea class="form-control" id="customer_address" name="customer_address" rows="3"></textarea>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="total_amount">المبلغ الإجمالي *</label>
+                    <input type="number" step="0.01" class="form-control" id="total_amount" name="total_amount" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="order_image">صورة الطلب</label>
+                    <input type="file" class="form-control-file" id="order_image" name="order_image" accept="image/*">
+                    <small class="form-text text-muted">الصيغ المسموحة: PNG, JPG, JPEG, GIF, WEBP</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="notes">ملاحظات</label>
+                    <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                </div>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">إضافة الطلب</button>
+        <a href="{{ url_for('orders.index') }}" class="btn btn-secondary">إلغاء</a>
+    </form>
+</div>
+{% endblock %}
