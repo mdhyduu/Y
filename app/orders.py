@@ -956,7 +956,7 @@ def assign_orders():
             'error': f'حدث خطأ أثناء الإسناد: {str(e)}',
             'code': 'ASSIGNMENT_ERROR'
         }), 500
-@@orders_bp.route('/<order_id>')
+@orders_bp.route('/<order_id>')
 def order_details(order_id):
     user, current_employee = get_user_from_cookies()
     
