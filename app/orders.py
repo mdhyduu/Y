@@ -550,9 +550,14 @@ def index():
             if employee_filter:
                 # جلب الطلبات المسندة لموظف معين
                 assigned_salla_ids = [a.order_id for a in 
-                          OrderAssignment.query.filter_by(employee_id=employee_filter).all()]
-                assigned_custom_ids = [a.custom_order_id for a in 
-                         OrderAssignment.query.filter(employee_id=employee_filter, custom_order_id.isnot(None)).all()]
+                                    OrderAssignment.query.filter_by(employee_id=employee_filter).all()]
+                
+                # إصلاح بناء الجملة هنا - استخدام filter مع الشرط الصحيح
+                assigned_custom_assignments = OrderAssignment.query.filter(
+                    OrderAssignment.employee_id == employee_filter,
+                    OrderAssignment.custom_order_id.isnot(None)
+                ).all()
+                assigned_custom_ids = [a.custom_order_id for a in assigned_custom_assignments]
                 
                 salla_orders_query = salla_orders_query.filter(SallaOrder.id.in_(assigned_salla_ids))
                 custom_orders_query = custom_orders_query.filter(CustomOrder.id.in_(assigned_custom_ids))
@@ -561,9 +566,13 @@ def index():
                 # جلب الطلبات بحالة مخصصة معينة
                 salla_status_ids = [s.order_id for s in 
                                   OrderEmployeeStatus.query.filter_by(status_id=custom_status_filter).all()]
-                custom_status_ids = [s.custom_order_id for s in 
-                                   OrderEmployeeStatus.query.filter_by(status_id=custom_status_filter,
-                                                                     custom_order_id.isnot(None)).all()]
+                
+                # إصلاح بناء الجملة هنا
+                custom_status_assignments = OrderEmployeeStatus.query.filter(
+                    OrderEmployeeStatus.status_id == custom_status_filter,
+                    OrderEmployeeStatus.custom_order_id.isnot(None)
+                ).all()
+                custom_status_ids = [s.custom_order_id for s in custom_status_assignments]
                 
                 salla_orders_query = salla_orders_query.filter(SallaOrder.id.in_(salla_status_ids))
                 custom_orders_query = custom_orders_query.filter(CustomOrder.id.in_(custom_status_ids))
@@ -573,9 +582,13 @@ def index():
             # جلب الطلبات المسندة لهذا الموظف فقط
             assigned_salla_ids = [a.order_id for a in 
                                 OrderAssignment.query.filter_by(employee_id=employee.id).all()]
-            assigned_custom_ids = [a.custom_order_id for a in 
-                                 OrderAssignment.query.filter_by(employee_id=employee.id,
-                                                               custom_order_id.isnot(None)).all()]
+            
+            # إصلاح بناء الجملة هنا
+            assigned_custom_assignments = OrderAssignment.query.filter(
+                OrderAssignment.employee_id == employee.id,
+                OrderAssignment.custom_order_id.isnot(None)
+            ).all()
+            assigned_custom_ids = [a.custom_order_id for a in assigned_custom_assignments]
             
             salla_orders_query = salla_orders_query.filter(SallaOrder.id.in_(assigned_salla_ids))
             custom_orders_query = custom_orders_query.filter(CustomOrder.id.in_(assigned_custom_ids))
@@ -584,14 +597,16 @@ def index():
             if custom_status_filter:
                 salla_status_ids = [s.order_id for s in 
                                   OrderEmployeeStatus.query.filter_by(
-                                      status_id=custom_status_filter,
-                                      order_id=SallaOrder.id
+                                      status_id=custom_status_filter
+                                  ).filter(
+                                      OrderEmployeeStatus.order_id.isnot(None)
                                   ).all()]
-                custom_status_ids = [s.custom_order_id for s in 
-                                   OrderEmployeeStatus.query.filter_by(
-                                       status_id=custom_status_filter,
-                                       custom_order_id=CustomOrder.id
-                                   ).all()]
+                
+                custom_status_assignments = OrderEmployeeStatus.query.filter(
+                    OrderEmployeeStatus.status_id == custom_status_filter,
+                    OrderEmployeeStatus.custom_order_id.isnot(None)
+                ).all()
+                custom_status_ids = [s.custom_order_id for s in custom_status_assignments]
                 
                 salla_orders_query = salla_orders_query.filter(SallaOrder.id.in_(salla_status_ids))
                 custom_orders_query = custom_orders_query.filter(CustomOrder.id.in_(custom_status_ids))
@@ -600,9 +615,12 @@ def index():
             if status_filter in ['late', 'missing', 'refunded', 'not_shipped']:
                 salla_note_ids = [n.order_id for n in 
                                 OrderStatusNote.query.filter_by(status_flag=status_filter).all()]
-                custom_note_ids = [n.custom_order_id for n in 
-                                 OrderStatusNote.query.filter_by(status_flag=status_filter,
-                                                               custom_order_id.isnot(None)).all()]
+                
+                custom_note_assignments = OrderStatusNote.query.filter(
+                    OrderStatusNote.status_flag == status_filter,
+                    OrderStatusNote.custom_order_id.isnot(None)
+                ).all()
+                custom_note_ids = [n.custom_order_id for n in custom_note_assignments]
                 
                 salla_orders_query = salla_orders_query.filter(SallaOrder.id.in_(salla_note_ids))
                 custom_orders_query = custom_orders_query.filter(CustomOrder.id.in_(custom_note_ids))
@@ -643,9 +661,10 @@ def index():
                     assignments_dict[assignment.order_id] = []
                 assignments_dict[assignment.order_id].append(assignment)
             elif assignment.custom_order_id:
-                if assignment.custom_order_id not in assignments_dict:
-                    assignments_dict[assignment.custom_order_id] = []
-                assignments_dict[assignment.custom_order_id].append(assignment)
+                key = f"custom_{assignment.custom_order_id}"
+                if key not in assignments_dict:
+                    assignments_dict[key] = []
+                assignments_dict[key].append(assignment)
         
         # جلب جميع الحالات المخصصة للطلبات
         employee_statuses = db.session.query(
@@ -668,7 +687,11 @@ def index():
         # تجميع الحالات المخصصة حسب order_id و custom_order_id
         statuses_dict = {}
         for status in employee_statuses:
-            order_id = status.OrderEmployeeStatus.order_id or status.OrderEmployeeStatus.custom_order_id
+            if status.OrderEmployeeStatus.order_id:
+                order_id = status.OrderEmployeeStatus.order_id
+            else:
+                order_id = f"custom_{status.OrderEmployeeStatus.custom_order_id}"
+                
             if order_id not in statuses_dict:
                 statuses_dict[order_id] = []
             statuses_dict[order_id].append(status)
@@ -687,7 +710,11 @@ def index():
         # تجميع ملاحظات الحالة حسب order_id و custom_order_id
         notes_dict = {}
         for note in status_notes:
-            order_id = note.order_id or note.custom_order_id
+            if note.order_id:
+                order_id = note.order_id
+            else:
+                order_id = f"custom_{note.custom_order_id}"
+                
             if order_id not in notes_dict:
                 notes_dict[order_id] = []
             notes_dict[order_id].append(note)
@@ -723,9 +750,10 @@ def index():
         for order in custom_pagination.items:
             status_name = order.status.name if order.status else 'غير محدد'
             status_slug = order.status.slug if order.status else 'unknown'
+            order_key = f"custom_{order.id}"
             
             all_orders.append({
-                'id': f"custom_{order.id}",  # إضافة بادئة للتمييز
+                'id': order_key,
                 'order_number': order.order_number,
                 'reference_id': order.order_number,  # استخدام order_number كمرجع
                 'customer_name': order.customer_name,
@@ -735,9 +763,9 @@ def index():
                     'name': status_name
                 },
                 'status_obj': order.status,
-                'status_notes': notes_dict.get(order.id, []),
-                'employee_statuses': statuses_dict.get(order.id, []),
-                'assignments': assignments_dict.get(order.id, []),
+                'status_notes': notes_dict.get(order_key, []),
+                'employee_statuses': statuses_dict.get(order_key, []),
+                'assignments': assignments_dict.get(order_key, []),
                 'raw_created_at': order.created_at,
                 'order_type': 'custom',  # للتمييز في القالب
                 'total_amount': order.total_amount,
