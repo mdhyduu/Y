@@ -967,13 +967,21 @@ def order_details(order_id):
         response.set_cookie('is_admin', '', expires=0)
         return response
 
-    # تحديد نوع الطلب (سلة أو خاص)
+    # التحقق من وجود الطلب أولاً قبل التوجيه
     if order_id.startswith('custom_'):
         # طلب خاص
         custom_order_id = order_id.replace('custom_', '')
+        custom_order = CustomOrder.query.get(custom_order_id)
+        if not custom_order:
+            flash('الطلب الخاص غير موجود', 'error')
+            return redirect(url_for('orders.index'))
         return redirect(url_for('orders.custom_order_details', order_id=custom_order_id))
     else:
         # طلب سلة
+        salla_order = SallaOrder.query.get(order_id)
+        if not salla_order:
+            flash('طلب سلة غير موجود', 'error')
+            return redirect(url_for('orders.index'))
         return redirect(url_for('orders.salla_order_details', order_id=order_id))
 @orders_bp.route('/salla/<order_id>')
 def salla_order_details(order_id):
