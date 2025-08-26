@@ -10,6 +10,8 @@ from .models import (
     CustomOrder, OrderAssignment,
     OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, CustomNoteStatus, OrderStatus
 )
+from sqlalchemy import select, text
+        
 from .config import Config
 from .utils import process_order_data, format_date, generate_barcode, humanize_time
 from .token_utils import exchange_code_for_token, get_store_info, set_token_cookies, refresh_salla_token
@@ -554,13 +556,22 @@ def index():
                 pass
         
         # اتحاد الاستعلامات
-        combined_query = salla_query.union_all(custom_query).subquery()
+
         
-        # الترحيل على الاستعلام المدمج
+        # إنشاء استعلام منفصل للطلبات المدمجة
+        combined_query = select([
+            text("id, customer_name, created_at, total_amount, currency, status_id, 'salla' as order_type, raw_data")
+        ]).select_from(salla_query.subquery()).union_all(
+            select([
+                text("id, customer_name, created_at, total_amount, currency, status_id, 'custom' as order_type, NULL as raw_data")
+            ]).select_from(custom_query.subquery())
+        ).alias('combined_orders')
+        
+        # ثم استخدم الاستعلام بهذه الطريقة:
         pagination_obj = db.session.query(combined_query).order_by(
-            nullslast(combined_query.c.created_at.desc())
+            text("created_at DESC NULLS LAST")
         ).paginate(page=page, per_page=per_page)
-        
+                
         # معالجة البيانات للعرض
         processed_orders = []
         salla_ids = []
