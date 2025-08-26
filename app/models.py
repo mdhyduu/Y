@@ -369,6 +369,35 @@ class SallaOrder(db.Model):
     status_notes = relationship('OrderStatusNote', back_populates='order')
     employee_statuses = relationship('OrderEmployeeStatus', back_populates='order')
     assignments = relationship('OrderAssignment', back_populates='order')
+# إضافة إلى models.py
+class CustomOrder(db.Model):
+    __tablename__ = 'custom_orders'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    order_number = db.Column(db.String(50), unique=True, nullable=False)
+    customer_name = db.Column(db.String(255), nullable=False)
+    customer_phone = db.Column(db.String(50))
+    customer_address = db.Column(db.Text)
+    total_amount = db.Column(db.Float, nullable=False)
+    currency = db.Column(db.String(10), default='SAR')
+    order_image = db.Column(db.String(255))  # مسار حفظ الصورة
+    notes = db.Column(db.Text)
+    store_id = db.Column(db.Integer, nullable=False)
+    status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # العلاقات
+    status = db.relationship('OrderStatus', backref='custom_orders', lazy=True)
+    status_notes = relationship('OrderStatusNote', back_populates='custom_order', 
+                              foreign_keys='OrderStatusNote.custom_order_id')
+    employee_statuses = relationship('OrderEmployeeStatus', back_populates='custom_order',
+                                   foreign_keys='OrderEmployeeStatus.custom_order_id')
+    assignments = relationship('OrderAssignment', back_populates='custom_order',
+                             foreign_keys='OrderAssignment.custom_order_id')
+    
+    def __repr__(self):
+        return f'<CustomOrder {self.order_number}>'
 
 class OrderStatusNote(db.Model):
     __tablename__ = 'order_status_notes'
@@ -387,6 +416,9 @@ class OrderStatusNote(db.Model):
     employee = relationship('Employee', foreign_keys=[employee_id], back_populates='status_notes')
     order = relationship('SallaOrder', back_populates='status_notes')
     custom_status = relationship('CustomNoteStatus', back_populates='notes', foreign_keys=[custom_status_id])  # 
+    custom_order_id = db.Column(db.Integer, ForeignKey('custom_orders.id'), nullable=True)
+    custom_order = relationship('CustomOrder', back_populates='status_notes', foreign_keys=[custom_order_id])
+
 class EmployeeCustomStatus(db.Model):
     __tablename__ = 'employee_custom_statuses'
     
@@ -398,6 +430,9 @@ class EmployeeCustomStatus(db.Model):
     is_default = db.Column(db.Boolean, default=False)
     employee = relationship('Employee', back_populates='custom_statuses')
     order_statuses = relationship('OrderEmployeeStatus', back_populates='status')
+    custom_order_id = db.Column(db.Integer, ForeignKey('custom_orders.id'), nullable=True)
+    custom_order = relationship('CustomOrder', back_populates='employee_statuses', foreign_keys=[custom_order_id])
+
 # ... (الكود الحالي)
 
 # بعد تعريف نموذج EmployeeCustomStatus مباشرة، أضف القائمة الثابتة للحالات الافتراضية
@@ -500,7 +535,8 @@ class OrderAssignment(db.Model):
     
     employee = relationship('Employee', back_populates='assignments')
     order = relationship('SallaOrder', back_populates='assignments')
-
+    custom_order_id = db.Column(db.Integer, ForeignKey('custom_orders.id'), nullable=True)
+    custom_order = relationship('CustomOrder', back_populates='assignments', foreign_keys=[custom_order_id])
 class OrderDelivery(db.Model):
     __tablename__ = 'order_delivery'
     id = db.Column(db.Integer, primary_key=True)
