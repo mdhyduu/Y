@@ -775,7 +775,7 @@ def assign_orders():
             if not order:
                 failed_assignments.append({'order_id': order_id, 'reason': 'الطلب غير موجود'})
                 continue
-        
+         
             
             # التحقق من عدم تكرار الإسناد
             existing_assignment = OrderAssignment.query.filter_by(
