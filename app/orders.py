@@ -6,11 +6,9 @@ import requests
 from sqlalchemy import nullslast
 from .models import (
     db, User, Employee, Department, EmployeePermission, 
-    Product, OrderDelivery, SallaOrder, CustomOrder, OrderAssignment,
+    Product, OrderDelivery, SallaOrder, OrderAssignment,
     OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, CustomNoteStatus, OrderStatus
 )
-
-from werkzeug.utils import secure_filename
 from .config import Config
 from .utils import process_order_data, format_date, generate_barcode, humanize_time
 from .token_utils import exchange_code_for_token, get_store_info, set_token_cookies, refresh_salla_token
@@ -463,7 +461,6 @@ def index():
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
     search_query = request.args.get('search', '')
-    order_type_filter = request.args.get('order_type', 'all')  # فلتر جديد لنوع الطلب
     
     # التحقق من صحة معاملات الترحيل
     if page < 1: 
@@ -477,8 +474,7 @@ def index():
     
     if request.cookies.get('is_admin') == 'true':
         is_reviewer = True
-        # لا نطلب توكن سلة للمديرين إذا كانوا يعرضون الطلبات الخاصة فقط
-        if order_type_filter != 'custom' and not user.salla_access_token:
+        if not user.salla_access_token:
             flash('يجب ربط المتجر مع سلة أولاً', 'error')
             return redirect(url_for('auth.link_store'))
     else:
@@ -489,8 +485,7 @@ def index():
             response.set_cookie('is_admin', '', expires=0)
             return response
         
-        # لا نطلب توكن سلة للموظفين إذا كانوا يعرضون الطلبات الخاصة فقط
-        if order_type_filter != 'custom' and not user.salla_access_token:
+        if not user.salla_access_token:
             flash('المتجر غير مرتبط بسلة', 'error')
             return redirect(url_for('user_auth.logout'))
         
@@ -498,51 +493,33 @@ def index():
         is_reviewer = employee.role in ['reviewer', 'manager']
     
     try:
-        # جلب الطلبات من قاعدة البيانات المحلية (سلة + خاصة)
-        salla_orders_query = SallaOrder.query.filter_by(store_id=user.store_id).options(
+        # جلب الطلبات من قاعدة البيانات المحلية
+        query = SallaOrder.query.filter_by(store_id=user.store_id).options(
             db.joinedload(SallaOrder.status)
         )
         
-        custom_orders_query = CustomOrder.query.filter_by(store_id=user.store_id).options(
-            db.joinedload(CustomOrder.status)
-        )
-        
-        # تطبيق فلتر نوع الطلب
-        if order_type_filter == 'salla':
-            custom_orders_query = custom_orders_query.filter(False)  # لا تعرض الطلبات الخاصة
-        elif order_type_filter == 'custom':
-            salla_orders_query = salla_orders_query.filter(False)  # لا تعرض طلبات سلة
-        
-        # تطبيق الفلاتر المشتركة على طلبات سلة
-        # تطبيق الفلاتر المشتركة على طلبات سلة
+        # تطبيق الفلاتر المشتركة
         if status_filter:
-            salla_orders_query = salla_orders_query.join(OrderStatus).filter(OrderStatus.slug == status_filter)
+            query = query.filter_by(status_slug=status_filter)
         
         if search_query:
-            salla_orders_query = salla_orders_query.filter(
+            query = query.filter(
                 SallaOrder.customer_name.ilike(f'%{search_query}%') | 
                 SallaOrder.id.ilike(f'%{search_query}%')
-            )
-            
-            custom_orders_query = custom_orders_query.filter(
-                CustomOrder.customer_name.ilike(f'%{search_query}%') | 
-                CustomOrder.order_number.ilike(f'%{search_query}%')
             )
         
         # فلترة حسب التاريخ
         if date_from:
             try:
                 date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
-                salla_orders_query = salla_orders_query.filter(SallaOrder.created_at >= date_from_obj)
-                custom_orders_query = custom_orders_query.filter(CustomOrder.created_at >= date_from_obj)
+                query = query.filter(SallaOrder.created_at >= date_from_obj)
             except ValueError:
                 pass
         
         if date_to:
             try:
                 date_to_obj = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
-                salla_orders_query = salla_orders_query.filter(SallaOrder.created_at <= date_to_obj)
-                custom_orders_query = custom_orders_query.filter(CustomOrder.created_at <= date_to_obj)
+                query = query.filter(SallaOrder.created_at <= date_to_obj)
             except ValueError:
                 pass
         
@@ -550,122 +527,63 @@ def index():
         if is_reviewer:
             if employee_filter:
                 # جلب الطلبات المسندة لموظف معين
-                assigned_salla_ids = [a.order_id for a in 
+                assigned_order_ids = [a.order_id for a in 
                                     OrderAssignment.query.filter_by(employee_id=employee_filter).all()]
-                
-                # إصلاح بناء الجملة هنا - استخدام filter مع الشرط الصحيح
-                assigned_custom_assignments = OrderAssignment.query.filter(
-                    OrderAssignment.employee_id == employee_filter,
-                    OrderAssignment.custom_order_id.isnot(None)
-                ).all()
-                assigned_custom_ids = [a.custom_order_id for a in assigned_custom_assignments]
-                
-                salla_orders_query = salla_orders_query.filter(SallaOrder.id.in_(assigned_salla_ids))
-                custom_orders_query = custom_orders_query.filter(CustomOrder.id.in_(assigned_custom_ids))
+                query = query.filter(SallaOrder.id.in_(assigned_order_ids))
             
             if custom_status_filter:
                 # جلب الطلبات بحالة مخصصة معينة
-                salla_status_ids = [s.order_id for s in 
+                status_order_ids = [s.order_id for s in 
                                   OrderEmployeeStatus.query.filter_by(status_id=custom_status_filter).all()]
-                
-                # إصلاح بناء الجملة هنا
-                custom_status_assignments = OrderEmployeeStatus.query.filter(
-                    OrderEmployeeStatus.status_id == custom_status_filter,
-                    OrderEmployeeStatus.custom_order_id.isnot(None)
-                ).all()
-                custom_status_ids = [s.custom_order_id for s in custom_status_assignments]
-                
-                salla_orders_query = salla_orders_query.filter(SallaOrder.id.in_(salla_status_ids))
-                custom_orders_query = custom_orders_query.filter(CustomOrder.id.in_(custom_status_ids))
+                query = query.filter(SallaOrder.id.in_(status_order_ids))
         
         # فلترة خاصة بالموظفين العاديين
         elif is_general_employee:
             # جلب الطلبات المسندة لهذا الموظف فقط
-            assigned_salla_ids = [a.order_id for a in 
+            assigned_order_ids = [a.order_id for a in 
                                 OrderAssignment.query.filter_by(employee_id=employee.id).all()]
-            
-            # إصلاح بناء الجملة هنا
-            assigned_custom_assignments = OrderAssignment.query.filter(
-                OrderAssignment.employee_id == employee.id,
-                OrderAssignment.custom_order_id.isnot(None)
-            ).all()
-            assigned_custom_ids = [a.custom_order_id for a in assigned_custom_assignments]
-            
-            salla_orders_query = salla_orders_query.filter(SallaOrder.id.in_(assigned_salla_ids))
-            custom_orders_query = custom_orders_query.filter(CustomOrder.id.in_(assigned_custom_ids))
+            query = query.filter(SallaOrder.id.in_(assigned_order_ids))
             
             # فلترة حسب الحالات المخصصة التي أضافها الموظف
             if custom_status_filter:
-                salla_status_ids = [s.order_id for s in 
+                status_order_ids = [s.order_id for s in 
                                   OrderEmployeeStatus.query.filter_by(
-                                      status_id=custom_status_filter
-                                  ).filter(
-                                      OrderEmployeeStatus.order_id.isnot(None)
+                                      status_id=custom_status_filter,
+                                      order_id=SallaOrder.id
                                   ).all()]
-                
-                custom_status_assignments = OrderEmployeeStatus.query.filter(
-                    OrderEmployeeStatus.status_id == custom_status_filter,
-                    OrderEmployeeStatus.custom_order_id.isnot(None)
-                ).all()
-                custom_status_ids = [s.custom_order_id for s in custom_status_assignments]
-                
-                salla_orders_query = salla_orders_query.filter(SallaOrder.id.in_(salla_status_ids))
-                custom_orders_query = custom_orders_query.filter(CustomOrder.id.in_(custom_status_ids))
+                query = query.filter(SallaOrder.id.in_(status_order_ids))
             
             # فلترة حسب ملاحظات الحالة (متأخر، واصل ناقص، إلخ)
             if status_filter in ['late', 'missing', 'refunded', 'not_shipped']:
-                salla_note_ids = [n.order_id for n in 
-                                OrderStatusNote.query.filter_by(status_flag=status_filter).all()]
-                
-                custom_note_assignments = OrderStatusNote.query.filter(
+                query = query.join(OrderStatusNote).filter(
                     OrderStatusNote.status_flag == status_filter,
-                    OrderStatusNote.custom_order_id.isnot(None)
-                ).all()
-                custom_note_ids = [n.custom_order_id for n in custom_note_assignments]
-                
-                salla_orders_query = salla_orders_query.filter(SallaOrder.id.in_(salla_note_ids))
-                custom_orders_query = custom_orders_query.filter(CustomOrder.id.in_(custom_note_ids))
+                    OrderStatusNote.order_id == SallaOrder.id
+                )
         
-        # الترحيل - ندمج النتائج بعد جلبها
-        salla_pagination = salla_orders_query.order_by(
+        # الترحيل
+        # في قسم جلب الطلبات، أضف joinedload لتحميل العلاقة
+        pagination_obj = query.options(
+            db.joinedload(SallaOrder.status)
+        ).order_by(
             nullslast(SallaOrder.created_at.desc())
         ).paginate(page=page, per_page=per_page)
         
-        custom_pagination = custom_orders_query.order_by(
-            nullslast(CustomOrder.created_at.desc())
-        ).paginate(page=page, per_page=per_page)
-        
-        # دمج النتائج
-        all_orders = []
-        order_count = salla_pagination.total + custom_pagination.total
-        total_pages = ceil(order_count / per_page)
-        
-        # جمع معرفات الطلبات لاستخدامها في الاستعلامات اللاحقة
-        salla_order_ids = [order.id for order in salla_pagination.items]
-        custom_order_ids = [order.id for order in custom_pagination.items]
+        # جلب البيانات الإضافية
+        assigned_order_ids = [order.id for order in pagination_obj.items]
         
         # جلب جميع الإسنادات دفعة واحدة لتحسين الأداء
         assignments = OrderAssignment.query.filter(
-            db.or_(
-                OrderAssignment.order_id.in_(salla_order_ids),
-                OrderAssignment.custom_order_id.in_(custom_order_ids)
-            )
+            OrderAssignment.order_id.in_(assigned_order_ids)
         ).options(
             db.joinedload(OrderAssignment.employee)
         ).all()
         
-        # تجميع الإسنادات حسب order_id و custom_order_id
+        # تجميع الإسنادات حسب order_id
         assignments_dict = {}
         for assignment in assignments:
-            if assignment.order_id:
-                if assignment.order_id not in assignments_dict:
-                    assignments_dict[assignment.order_id] = []
-                assignments_dict[assignment.order_id].append(assignment)
-            elif assignment.custom_order_id:
-                key = f"custom_{assignment.custom_order_id}"
-                if key not in assignments_dict:
-                    assignments_dict[key] = []
-                assignments_dict[key].append(assignment)
+            if assignment.order_id not in assignments_dict:
+                assignments_dict[assignment.order_id] = []
+            assignments_dict[assignment.order_id].append(assignment)
         
         # جلب جميع الحالات المخصصة للطلبات
         employee_statuses = db.session.query(
@@ -679,57 +597,42 @@ def index():
             Employee,
             EmployeeCustomStatus.employee_id == Employee.id
         ).filter(
-            db.or_(
-                OrderEmployeeStatus.order_id.in_(salla_order_ids),
-                OrderEmployeeStatus.custom_order_id.in_(custom_order_ids)
-            )
+            OrderEmployeeStatus.order_id.in_(assigned_order_ids)
         ).all()
         
-        # تجميع الحالات المخصصة حسب order_id و custom_order_id
+        # تجميع الحالات المخصصة حسب order_id
         statuses_dict = {}
         for status in employee_statuses:
-            if status.OrderEmployeeStatus.order_id:
-                order_id = status.OrderEmployeeStatus.order_id
-            else:
-                order_id = f"custom_{status.OrderEmployeeStatus.custom_order_id}"
-                
-            if order_id not in statuses_dict:
-                statuses_dict[order_id] = []
-            statuses_dict[order_id].append(status)
+            if status.OrderEmployeeStatus.order_id not in statuses_dict:
+                statuses_dict[status.OrderEmployeeStatus.order_id] = []
+            statuses_dict[status.OrderEmployeeStatus.order_id].append(status)
         
         # جلب جميع ملاحظات الحالة
         status_notes = OrderStatusNote.query.filter(
-            db.or_(
-                OrderStatusNote.order_id.in_(salla_order_ids),
-                OrderStatusNote.custom_order_id.in_(custom_order_ids)
-            )
+            OrderStatusNote.order_id.in_(assigned_order_ids)
         ).options(
             db.joinedload(OrderStatusNote.admin),
             db.joinedload(OrderStatusNote.employee)
         ).all()
         
-        # تجميع ملاحظات الحالة حسب order_id و custom_order_id
+        # تجميع ملاحظات الحالة حسب order_id
         notes_dict = {}
         for note in status_notes:
-            if note.order_id:
-                order_id = note.order_id
-            else:
-                order_id = f"custom_{note.custom_order_id}"
-                
-            if order_id not in notes_dict:
-                notes_dict[order_id] = []
-            notes_dict[order_id].append(note)
+            if note.order_id not in notes_dict:
+                notes_dict[note.order_id] = []
+            notes_dict[note.order_id].append(note)
+      
         
-        # معالجة بيانات طلبات سلة للعرض
-        for order in salla_pagination.items:
+        # معالجة البيانات للعرض
+        processed_orders = []
+        for order in pagination_obj.items:
             raw_data = json.loads(order.raw_data) if order.raw_data else {}
             reference_id = raw_data.get('reference_id', order.id)
             status_name = order.status.name if order.status else 'غير محدد'
-            status_slug = order.status.slug if order.status else 'unknown'
-            
-            all_orders.append({
+
+            status_slug = order.status.slug if order.status else 'unknown' # يمكنك أيضاً توفير slug بديل
+            processed_orders.append({
                 'id': order.id,
-                'order_number': order.id,  # لاستخدام نفس الحقل في القالب
                 'reference_id': reference_id,
                 'customer_name': order.customer_name,
                 'created_at': humanize_time(order.created_at) if order.created_at else '',
@@ -737,50 +640,12 @@ def index():
                     'slug': status_slug,
                     'name': status_name
                 },
-                'status_obj': order.status,
+                'status': order.status,  # أضف هذا السطر
                 'status_notes': notes_dict.get(order.id, []),
                 'employee_statuses': statuses_dict.get(order.id, []),
                 'assignments': assignments_dict.get(order.id, []),
-                'raw_created_at': order.created_at,
-                'order_type': 'salla',  # للتمييز في القالب
-                'total_amount': order.total_amount,
-                'currency': order.currency
+                'raw_created_at': order.created_at
             })
-        
-        # معالجة بيانات الطلبات الخاصة للعرض
-        # في قسم معالجة الطلبات الخاصة في دالة index
-        for order in custom_pagination.items:
-            status_name = order.status.name if order.status else 'غير محدد'
-            status_slug = order.status.slug if order.status else 'unknown'
-            order_key = f"custom_{order.id}"  # هذا هو المفتاح الذي سيستخدم في الروابط
-            
-            # التأكد من وجود تاريخ الإنشاء
-            created_at = order.created_at or datetime.min
-            
-            all_orders.append({
-                'id': order_key,  # استخدام المفتاح مع البادئة
-                'order_number': order.order_number,
-                'reference_id': order.order_number,
-                'customer_name': order.customer_name,
-                'created_at': humanize_time(created_at),
-                'status': {
-                    'slug': status_slug,
-                    'name': status_name
-                },
-                'status_obj': order.status,
-                'status_notes': notes_dict.get(order_key, []),
-                'employee_statuses': statuses_dict.get(order_key, []),
-                'assignments': assignments_dict.get(order_key, []),
-                'raw_created_at': created_at,
-                'order_type': 'custom',
-                'total_amount': order.total_amount,
-                'currency': order.currency,
-                'has_image': bool(order.order_image)
-            })
-        
-
-        all_orders.sort(key=lambda x: x['raw_created_at'] if x['raw_created_at'] is not None else datetime.min, reverse=True)
-
         
         # جلب الموظفين للإسناد (للمديرين والمراجعين فقط)
         employees = []
@@ -800,16 +665,16 @@ def index():
         
         # إعداد بيانات الترحيل للقالب
         pagination = {
-            'page': page,
-            'per_page': per_page,
-            'total_items': order_count,
-            'total_pages': total_pages,
-            'has_prev': page > 1,
-            'has_next': page < total_pages,
-            'prev_page': page - 1 if page > 1 else None,
-            'next_page': page + 1 if page < total_pages else None,
-            'start_item': (page - 1) * per_page + 1,
-            'end_item': min(page * per_page, order_count)
+            'page': pagination_obj.page,
+            'per_page': pagination_obj.per_page,
+            'total_items': pagination_obj.total,
+            'total_pages': pagination_obj.pages,
+            'has_prev': pagination_obj.has_prev,
+            'has_next': pagination_obj.has_next,
+            'prev_page': pagination_obj.prev_num,
+            'next_page': pagination_obj.next_num,
+            'start_item': (pagination_obj.page - 1) * pagination_obj.per_page + 1,
+            'end_item': min(pagination_obj.page * pagination_obj.per_page, pagination_obj.total)
         }
         
         # إعداد بيانات الفلاتر للقالب
@@ -819,14 +684,13 @@ def index():
             'custom_status': custom_status_filter,
             'date_from': date_from,
             'date_to': date_to,
-            'search': search_query,
-            'order_type': order_type_filter
+            'search': search_query
         }
         
         # إذا كان الطلب AJAX، نرجع القالب الجزئي فقط
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return render_template('orders_partial.html', 
-                                orders=all_orders, 
+                                orders=processed_orders, 
                                 employees=employees,
                                 custom_statuses=custom_statuses,
                                 pagination=pagination,
@@ -835,7 +699,7 @@ def index():
                                 current_employee=employee)
         
         return render_template('orders.html', 
-                            orders=all_orders, 
+                            orders=processed_orders, 
                             employees=employees,
                             custom_statuses=custom_statuses,
                             pagination=pagination,
@@ -849,6 +713,7 @@ def index():
         flash(error_msg, 'error')
         logger.exception(error_msg)
         return redirect(url_for('orders.index'))
+
 @orders_bp.route('/assign', methods=['POST'])
 def assign_orders():
     """إسناد طلبات إلى موظف مع تحسينات للتحقق"""
@@ -897,18 +762,13 @@ def assign_orders():
         failed_assignments = []
         
         for order_id in order_ids:
-        # تحديد إذا كان الطلب من سلة أو طلب خاص
-            if str(order_id).startswith('C'):  # طلب خاص
-                order = CustomOrder.query.filter_by(order_number=order_id).first()
-                order_id_field = 'custom_order_id'
-            else:  # طلب سلة
-                order = SallaOrder.query.get(order_id_str)
-                order_id_field = 'order_id'
+            order_id_str = str(order_id)
             
+            # التحقق من وجود الطلب
+            order = SallaOrder.query.get(order_id_str)
             if not order:
                 failed_assignments.append({'order_id': order_id, 'reason': 'الطلب غير موجود'})
                 continue
-         
             
             # التحقق من عدم تكرار الإسناد
             existing_assignment = OrderAssignment.query.filter_by(
@@ -956,8 +816,9 @@ def assign_orders():
             'error': f'حدث خطأ أثناء الإسناد: {str(e)}',
             'code': 'ASSIGNMENT_ERROR'
         }), 500
-@orders_bp.route('/<order_id>')
+@orders_bp.route('/<int:order_id>')
 def order_details(order_id):
+    """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة"""
     user, current_employee = get_user_from_cookies()
     
     if not user:
@@ -967,36 +828,6 @@ def order_details(order_id):
         response.set_cookie('is_admin', '', expires=0)
         return response
 
-    # التحقق من وجود الطلب أولاً قبل التوجيه
-    if order_id.startswith('custom_'):
-        # طلب خاص
-        custom_order_id = order_id.replace('custom_', '')
-        custom_order = CustomOrder.query.get(custom_order_id)
-        if not custom_order:
-            flash('الطلب الخاص غير موجود', 'error')
-            return redirect(url_for('orders.index'))
-        return redirect(url_for('orders.custom_order_details', order_id=custom_order_id))
-    else:
-        # طلب سلة
-        salla_order = SallaOrder.query.get(order_id)
-        if not salla_order:
-            flash('طلب سلة غير موجود', 'error')
-            return redirect(url_for('orders.index'))
-        return redirect(url_for('orders.salla_order_details', order_id=order_id))
-@orders_bp.route('/salla/<order_id>')
-def salla_order_details(order_id):
-    # محتوى الدالة كما هو
-    # ...
-    
-    user, current_employee = get_user_from_cookies()
-    
-    if not user:
-        flash("الرجاء تسجيل الدخول أولاً", "error")
-        response = make_response(redirect(url_for('user_auth.login')))
-        response.set_cookie('user_id', '', expires=0)
-        response.set_cookie('is_admin', '', expires=0)
-        return response
-    
     try:
         # ========== [1] التحقق من صلاحية المستخدم ==========
         is_reviewer = False
@@ -1893,151 +1724,3 @@ def get_quick_list_data():
         'success': True,
         'orders': orders_data
     })
-# إضافة إلى orders.py
-
-
-# إعدادات تحميل الصور
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-UPLOAD_FOLDER = 'static/uploads/custom_orders'
-
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def get_next_order_number():
-    """إنشاء رقم طلب تلقائي يبدأ من 1000"""
-    last_order = CustomOrder.query.order_by(CustomOrder.id.desc()).first()
-    if last_order:
-        last_number = int(last_order.order_number)
-        return str(last_number + 1)
-    return "1000"
-
-@orders_bp.route('/custom/add', methods=['GET', 'POST'])
-def add_custom_order():
-    user, employee = get_user_from_cookies()
-    
-    if not user:
-        flash('الرجاء تسجيل الدخول أولاً', 'error')
-        return redirect(url_for('user_auth.login'))
-    
-    # التحقق من الصلاحيات (فقط المديرون والمراجعون يمكنهم إضافة طلبات خاصة)
-    is_reviewer = False
-    if request.cookies.get('is_admin') == 'true':
-        is_reviewer = True
-    else:
-        if employee and employee.role in ['reviewer', 'manager']:
-            is_reviewer = True
-    
-    if not is_reviewer:
-        flash('غير مصرح لك بهذا الإجراء', 'error')
-        return redirect(url_for('orders.index'))
-    
-    if request.method == 'POST':
-        try:
-            # معالجة البيانات المرسلة
-            customer_name = request.form.get('customer_name')
-            customer_phone = request.form.get('customer_phone')
-            customer_address = request.form.get('customer_address')
-            total_amount = request.form.get('total_amount', 0, type=float)
-            notes = request.form.get('notes', '')
-            
-            # معالجة تحميل الصورة
-            image_file = request.files.get('order_image')
-            image_filename = None
-            
-            if image_file and allowed_file(image_file.filename):
-                filename = secure_filename(image_file.filename)
-                # إنشاء اسم فريد للصورة
-                image_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
-                image_path = os.path.join(UPLOAD_FOLDER, image_filename)
-                
-                # إنشاء المجلد إذا لم يكن موجوداً
-                os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-                
-                # حفظ الصورة
-                image_file.save(image_path)
-            
-            # إنشاء رقم الطلب التلقائي
-            order_number = get_next_order_number()
-            
-            # إنشاء الطلب الخاص
-            custom_order = CustomOrder(
-                order_number=order_number,
-                customer_name=customer_name,
-                customer_phone=customer_phone,
-                customer_address=customer_address,
-                total_amount=total_amount,
-                order_image=image_filename,
-                notes=notes,
-                store_id=user.store_id
-            )
-            
-            db.session.add(custom_order)
-            db.session.commit()
-            
-            flash('تم إضافة الطلب الخاص بنجاح', 'success')
-            return redirect(url_for('orders.custom_order_details', order_id=custom_order.id))
-            
-        except Exception as e:
-            db.session.rollback()
-            flash(f'حدث خطأ أثناء إضافة الطلب: {str(e)}', 'error')
-            current_app.logger.error(f"Error adding custom order: {str(e)}", exc_info=True)
-    
-    return render_template('add_custom_order.html')
-
-@orders_bp.route('/custom/<int:order_id>')
-def custom_order_details(order_id):
-    user, employee = get_user_from_cookies()
-    
-    if not user:
-        flash('الرجاء تسجيل الدخول أولاً', 'error')
-        return redirect(url_for('user_auth.login'))
-    
-    # جلب بيانات الطلب الخاص
-    custom_order = CustomOrder.query.get_or_404(order_id)
-    
-    # التحقق من أن الطلب يخص المتجر الحالي
-    if custom_order.store_id != user.store_id:
-        flash('غير مصرح لك بالوصول إلى هذا الطلب', 'error')
-        return redirect(url_for('orders.index'))
-    
-    # جلب البيانات الإضافية (ملاحظات الحالة، الإسنادات، إلخ)
-    status_notes = OrderStatusNote.query.filter_by(custom_order_id=order_id).options(
-        db.joinedload(OrderStatusNote.admin),
-        db.joinedload(OrderStatusNote.employee),
-        db.joinedload(OrderStatusNote.custom_status)
-    ).order_by(OrderStatusNote.created_at.desc()).all()
-    
-    employee_statuses = db.session.query(
-        OrderEmployeeStatus,
-        EmployeeCustomStatus,
-        Employee
-    ).join(
-        EmployeeCustomStatus,
-        OrderEmployeeStatus.status_id == EmployeeCustomStatus.id
-    ).join(
-        Employee,
-        EmployeeCustomStatus.employee_id == Employee.id
-    ).filter(
-        OrderEmployeeStatus.custom_order_id == order_id
-    ).order_by(
-        OrderEmployeeStatus.created_at.desc()
-    ).all()
-    
-    # جلب الموظفين للإسناد (للمديرين والمراجعين فقط)
-    employees = []
-    is_reviewer = False
-    if request.cookies.get('is_admin') == 'true':
-        is_reviewer = True
-        employees = Employee.query.filter_by(store_id=user.store_id, is_active=True).all()
-    elif employee and employee.role in ['reviewer', 'manager']:
-        is_reviewer = True
-        employees = Employee.query.filter_by(store_id=user.store_id, is_active=True).all()
-    
-    return render_template('custom_order_details.html',
-                         order=custom_order,
-                         status_notes=status_notes,
-                         employee_statuses=employee_statuses,
-                         employees=employees,
-                         is_reviewer=is_reviewer,
-                         current_employee=employee)
