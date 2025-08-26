@@ -360,7 +360,7 @@ class SallaOrder(db.Model):
     status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'), nullable=True)
     
     # العلاقة الصحيحة مع OrderStatus
-    status = db.relationship('OrderStatus', backref='salla_orders', lazy=True)
+    status_rel = db.relationship('OrderStatus', backref='salla_orders', lazy=True)
 
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     raw_data = db.Column(db.JSON)
