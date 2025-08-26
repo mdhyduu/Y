@@ -971,13 +971,14 @@ def order_details(order_id):
     if order_id.startswith('custom_'):
         # طلب خاص
         custom_order_id = order_id.replace('custom_', '')
-        return custom_order_details(custom_order_id)
+        return redirect(url_for('orders.custom_order_details', order_id=custom_order_id))
     else:
         # طلب سلة
-        return salla_order_details(order_id)
-
-    """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة"""
+        return redirect(url_for('orders.salla_order_details', order_id=order_id))
+@orders_bp.route('/salla/<order_id>')
 def salla_order_details(order_id):
+    # محتوى الدالة كما هو
+    # ...
     
     user, current_employee = get_user_from_cookies()
     
