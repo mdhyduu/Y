@@ -232,12 +232,12 @@
                             <span class="fw-bold">#{{ order.reference_id }}</span>
                         </td>
 <td>
-    {% if order.status_rel %}
-        <span class="status-badge status-{{ order.status_rel.slug }}" 
+    {% if order.status %}
+        <span class="status-badge status-{{ order.status.slug }}" 
               data-bs-toggle="tooltip" 
-              title="{{ order.status_rel.name }} ({{ order.status_rel.type }})">
+              title="{{ order.status.name }} ({{ order.status.type }})">
             <i class="fas fa-circle me-1 small"></i>
-            {{ order.status_rel.name }}
+            {{ order.status.name }}
         </span>
     {% else %}
         <span class="status-badge status-unknown" data-bs-toggle="tooltip" title="حالة غير معروفة">
@@ -245,7 +245,7 @@
             غير محدد
         </span>
     {% endif %}
-</td>
+</td> 
                      <td>
     {% if order.employee_statuses %}
         {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}

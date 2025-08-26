@@ -495,7 +495,7 @@ def index():
     try:
         # جلب الطلبات من قاعدة البيانات المحلية
         query = SallaOrder.query.filter_by(store_id=user.store_id).options(
-            db.joinedload(SallaOrder.status_rel)
+            db.joinedload(SallaOrder.status)
         )
         
         # تطبيق الفلاتر المشتركة
@@ -563,7 +563,7 @@ def index():
         # الترحيل
         # في قسم جلب الطلبات، أضف joinedload لتحميل العلاقة
         pagination_obj = query.options(
-            db.joinedload(SallaOrder.status_rel)
+            db.joinedload(SallaOrder.status)
         ).order_by(
             nullslast(SallaOrder.created_at.desc())
         ).paginate(page=page, per_page=per_page)
@@ -628,9 +628,9 @@ def index():
         for order in pagination_obj.items:
             raw_data = json.loads(order.raw_data) if order.raw_data else {}
             reference_id = raw_data.get('reference_id', order.id)
-            status_name = order.status_rel.name if order.status_rel else 'غير محدد'
+            status_name = order.status.name if order.status else 'غير محدد'
 
-            status_slug = order.status_rel.slug if order.status_rel else 'unknown' # يمكنك أيضاً توفير slug بديل
+            status_slug = order.status.slug if order.status else 'unknown' # يمكنك أيضاً توفير slug بديل
             processed_orders.append({
                 'id': order.id,
                 'reference_id': reference_id,
@@ -640,7 +640,7 @@ def index():
                     'slug': status_slug,
                     'name': status_name
                 },
-                'status_rel': order.status_rel,  # أضف هذا السطر
+                'status': order.status,  # أضف هذا السطر
                 'status_notes': notes_dict.get(order.id, []),
                 'employee_statuses': statuses_dict.get(order.id, []),
                 'assignments': assignments_dict.get(order.id, []),
