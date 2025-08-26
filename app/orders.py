@@ -514,9 +514,10 @@ def index():
             salla_orders_query = salla_orders_query.filter(False)  # لا تعرض طلبات سلة
         
         # تطبيق الفلاتر المشتركة على طلبات سلة
+        # تطبيق الفلاتر المشتركة على طلبات سلة
         if status_filter:
-            query = query.join(OrderStatus).filter(OrderStatus.slug == status_filter)
-                
+            salla_orders_query = salla_orders_query.join(OrderStatus).filter(OrderStatus.slug == status_filter)
+        
         if search_query:
             salla_orders_query = salla_orders_query.filter(
                 SallaOrder.customer_name.ilike(f'%{search_query}%') | 
