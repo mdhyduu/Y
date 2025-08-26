@@ -91,11 +91,10 @@ def sync_order_statuses_internal(user, access_token, store_id):
                 
                 # إضافة تحقق من وجود slug
                 slug = status_data.get('slug')
-                if not slug:
-                    # إنشاء slug من الاسم إذا لم يكن موجوداً
-                    name = status_data.get('name', '')
-                    if name:
-                        slug = name.lower().replace(' ', '_')
+                if not slug and status_data.get('name'):
+                    slug = status_data['name'].lower().replace(' ', '_')
+                if slug:
+                    slug = slug.strip().lower().replace('-', '_')
                     else:
                         continue  # تخطي إذا لم يكن هناك اسم أيضاً
                 
@@ -364,13 +363,16 @@ def sync_orders():
                 status_info = order_data.get('status', {})
                 status_id_from_api = str(status_info.get('id')) if status_info.get('id') else None
                 status_slug_from_api = status_info.get('slug')
+                if status_slug_from_api:
+                    status_slug_from_api = status_slug_from_api.strip().lower().replace('-', '_')
                 
                 # البحث بالمعرف أولاً
                 found_status = OrderStatus.query.filter_by(id=status_id_from_api, store_id=store_id).first()
                 
                 # إذا لم يوجد، البحث بالـ slug
-                if not found_status and status_slug_from_api:
-                    found_status = OrderStatus.query.filter_by(slug=status_slug_from_api, store_id=store_id).first()
+                if not found_status and status_info.get('name'):
+                    normalized_name = status_info['name'].strip().lower().replace(' ', '_')
+                    found_status = OrderStatus.query.filter_by(slug=normalized_name, store_id=store_id).first()
                 
                 # إذا لم يوجد، البحث في الحالات العامة (بدون store_id) للمتاجر الأخرى
                 if not found_status and status_id_from_api:
