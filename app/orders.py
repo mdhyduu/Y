@@ -550,9 +550,9 @@ def index():
             if employee_filter:
                 # جلب الطلبات المسندة لموظف معين
                 assigned_salla_ids = [a.order_id for a in 
-                                    OrderAssignment.query.filter_by(employee_id=employee_filter).all()]
+                          OrderAssignment.query.filter_by(employee_id=employee_filter).all()]
                 assigned_custom_ids = [a.custom_order_id for a in 
-                         OrderAssignment.query.filter_by(employee_id=employee_filter, custom_order_id.isnot(None)).all()]
+                         OrderAssignment.query.filter(employee_id=employee_filter, custom_order_id.isnot(None)).all()]
                 
                 salla_orders_query = salla_orders_query.filter(SallaOrder.id.in_(assigned_salla_ids))
                 custom_orders_query = custom_orders_query.filter(CustomOrder.id.in_(assigned_custom_ids))
