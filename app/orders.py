@@ -773,8 +773,9 @@ def index():
                 'has_image': bool(order.order_image)  # للإشارة إلى وجود صورة
             })
         
-        # ترتيب الطلبات حسب التاريخ (الأحدث أولاً)
-        all_orders.sort(key=lambda x: x['raw_created_at'], reverse=True)
+
+        all_orders.sort(key=lambda x: x['raw_created_at'] if x['raw_created_at'] is not None else datetime.min, reverse=True)
+
         
         # جلب الموظفين للإسناد (للمديرين والمراجعين فقط)
         employees = []
