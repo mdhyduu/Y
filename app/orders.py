@@ -6,7 +6,8 @@ import requests
 from sqlalchemy import nullslast
 from .models import (
     db, User, Employee, Department, EmployeePermission, 
-    Product, OrderDelivery, SallaOrder, OrderAssignment,
+    Product, OrderDelivery, SallaOrder,
+    CustomOrder, OrderAssignment,
     OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, CustomNoteStatus, OrderStatus
 )
 from .config import Config
