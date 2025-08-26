@@ -45,19 +45,19 @@
         <a class="nav-link {% if request.path == url_for('orders.manage_note_status') %}active{% endif %}" href="{{ url_for('orders.manage_note_status') }}">
           <i class="fas fa-tags"></i>التنبيهات 
         </a>
-        <!-- في القائمة الرئيسية في base.html -->
+        
+      {% endif %}
+      
 
+
+<!-- في القائمة الرئيسية في base.html -->
+{% if is_reviewer %}
 <li class="nav-item">
     <a class="nav-link" href="{{ url_for('orders.add_custom_order') }}">
         <i class="fas fa-plus-circle"></i> إضافة طلب خاص
     </a>
 </li>
-
-      {% endif %}
-      
-
-
-
+{% endif %}
       
       {% if request.cookies.get('is_admin') == 'true' %}
         <a class="nav-link {% if request.path == url_for('employees.list_employees') %}active{% endif %}" href="{{ url_for('employees.list_employees') }}">
