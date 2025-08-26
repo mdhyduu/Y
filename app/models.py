@@ -430,8 +430,7 @@ class EmployeeCustomStatus(db.Model):
     is_default = db.Column(db.Boolean, default=False)
     employee = relationship('Employee', back_populates='custom_statuses')
     order_statuses = relationship('OrderEmployeeStatus', back_populates='status')
-    custom_order_id = db.Column(db.Integer, ForeignKey('custom_orders.id'), nullable=True)
-    custom_order = relationship('CustomOrder', back_populates='employee_statuses', foreign_keys=[custom_order_id])
+    
 
 # ... (الكود الحالي)
 
