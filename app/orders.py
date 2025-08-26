@@ -56,7 +56,6 @@ def sync_order_statuses_internal(user, access_token, store_id):
         
         current_app.logger.info(f"بدء مزامنة حالات الطلبات للمتجر {store_id}")
         
-        # جلب حالات الطلبات من Salla API
         response = requests.get(
             f"{Config.SALLA_API_BASE_URL}/orders/statuses",
             headers=headers,
@@ -69,7 +68,6 @@ def sync_order_statuses_internal(user, access_token, store_id):
             return False, f"فشل في جلب حالات الطلبات من سلة: {response.text[:200] if response.text else ''}"
         
         data = response.json()
-        
         if 'data' not in data:
             error_msg = "استجابة غير متوقعة من سلة: هيكل البيانات غير مطابق للمواصفات"
             current_app.logger.error(error_msg)
@@ -78,61 +76,49 @@ def sync_order_statuses_internal(user, access_token, store_id):
         statuses = data['data']
         current_app.logger.info(f"تم جلب {len(statuses)} حالة طلب للمزامنة")
         
-        # معالجة حالات الطلبات وتخزينها
-        new_count = 0
-        updated_count = 0
+        new_count, updated_count = 0, 0
         
-        # في دالة sync_order_statuses_internal
         for status_data in statuses:
             try:
                 status_id = str(status_data.get('id'))
                 if not status_id:
                     continue
                 
-                # إضافة تحقق من وجود slug
+                # --- Normalize slug ---
                 slug = status_data.get('slug')
                 if not slug and status_data.get('name'):
                     slug = status_data['name'].lower().replace(' ', '_')
                 if slug:
                     slug = slug.strip().lower().replace('-', '_')
-                    else:
-                        continue  # تخطي إذا لم يكن هناك اسم أيضاً
                 
-        # الباقي كما هو...
-                
-                # البحث عن الحالة في قاعدة البيانات
-                                # في sync_order_statuses_internal
+                # البحث عن الحالة
                 existing_status = OrderStatus.query.filter_by(id=status_id, store_id=store_id).first()
-                                
+                
                 if existing_status:
-                    # تحديث الحالة الموجودة
                     existing_status.name = status_data.get('name', '')
                     existing_status.type = status_data.get('type', '')
-                    existing_status.slug = status_data.get('slug', '')
+                    existing_status.slug = slug
                     existing_status.sort = status_data.get('sort', 0)
                     existing_status.message = status_data.get('message', '')
                     existing_status.icon = status_data.get('icon', '')
                     existing_status.is_active = status_data.get('is_active', True)
-                    existing_status.store_id = store_id  # ← أضف هذا السطر لتحديث store_id
+                    existing_status.store_id = store_id
                     
-                    # معالجة الحالة الأصلية (original)
                     original_data = status_data.get('original', {})
                     if original_data and 'id' in original_data:
                         existing_status.original_id = str(original_data['id'])
                     
-                    # معالجة الحالة الأب (parent)
                     parent_data = status_data.get('parent', {})
                     if parent_data and 'id' in parent_data:
                         existing_status.parent_id = str(parent_data['id'])
                     
                     updated_count += 1
                 else:
-                    # إنشاء حالة جديدة
                     new_status = OrderStatus(
                         id=status_id,
                         name=status_data.get('name', ''),
                         type=status_data.get('type', ''),
-                        slug=status_data.get('slug', ''),
+                        slug=slug,
                         sort=status_data.get('sort', 0),
                         message=status_data.get('message', ''),
                         icon=status_data.get('icon', ''),
@@ -140,12 +126,10 @@ def sync_order_statuses_internal(user, access_token, store_id):
                         store_id=store_id
                     )
                     
-                    # معالجة الحالة الأصلية (original)
                     original_data = status_data.get('original', {})
                     if original_data and 'id' in original_data:
                         new_status.original_id = str(original_data['id'])
                     
-                    # معالجة الحالة الأب (parent)
                     parent_data = status_data.get('parent', {})
                     if parent_data and 'id' in parent_data:
                         new_status.parent_id = str(parent_data['id'])
@@ -159,14 +143,12 @@ def sync_order_statuses_internal(user, access_token, store_id):
         db.session.commit()
         
         current_app.logger.info(f"تمت مزامنة حالات الطلبات بنجاح: {new_count} جديد، {updated_count} محدث")
-        
         return True, f'تمت مزامنة حالات الطلبات بنجاح: {new_count} حالة جديدة، {updated_count} حالة محدثة'
     
     except requests.exceptions.RequestException as e:
         error_msg = f"خطأ في الاتصال بسلة: {str(e)}"
         current_app.logger.error(error_msg, exc_info=True)
         return False, error_msg
-        
     except Exception as e:
         error_msg = f"خطأ غير متوقع: {str(e)}"
         current_app.logger.error(error_msg, exc_info=True)
@@ -358,33 +340,37 @@ def sync_orders():
                     skipped_count += 1
                     continue
                 
-                # --- بداية المنطق الجديد والمحسّن لربط الحالة ---
-# في sync_orders داخل loop معالجة الطلبات
                 status_info = order_data.get('status', {})
                 status_id_from_api = str(status_info.get('id')) if status_info.get('id') else None
                 status_slug_from_api = status_info.get('slug')
+                
+                # --- Normalize slug ---
                 if status_slug_from_api:
                     status_slug_from_api = status_slug_from_api.strip().lower().replace('-', '_')
                 
-                # البحث بالمعرف أولاً
-                found_status = OrderStatus.query.filter_by(id=status_id_from_api, store_id=store_id).first()
-                
-                # إذا لم يوجد، البحث بالـ slug
+                # البحث عن الحالة: id -> slug -> name
+                found_status = None
+                if status_id_from_api:
+                    found_status = OrderStatus.query.filter_by(id=status_id_from_api, store_id=store_id).first()
+                if not found_status and status_slug_from_api:
+                    found_status = OrderStatus.query.filter_by(slug=status_slug_from_api, store_id=store_id).first()
                 if not found_status and status_info.get('name'):
                     normalized_name = status_info['name'].strip().lower().replace(' ', '_')
                     found_status = OrderStatus.query.filter_by(slug=normalized_name, store_id=store_id).first()
-                
-                # إذا لم يوجد، البحث في الحالات العامة (بدون store_id) للمتاجر الأخرى
                 if not found_status and status_id_from_api:
                     found_status = OrderStatus.query.filter_by(id=status_id_from_api).first()
                 
                 final_status_id = found_status.id if found_status else None
                 
-                # --- نهاية المنطق الجديد ---
-        
+                # Debug log
+                current_app.logger.info(
+                    f"ربط حالة الطلب {order_id}: "
+                    f"id={status_id_from_api}, slug={status_slug_from_api}, "
+                    f"name={status_info.get('name')}, found={found_status}"
+                )
+                
                 existing_order = SallaOrder.query.get(order_id)
                 
-                # معالجة تاريخ الإنشاء
                 created_at = None
                 date_info = order_data.get('date', {})
                 if date_info and 'date' in date_info:
@@ -392,27 +378,24 @@ def sync_orders():
                         date_str = date_info['date'].split('.')[0]
                         created_at = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
                     except Exception:
-                        pass # تجاهل الخطأ إذا كان التنسيق غير صالح
+                        pass 
                 
                 total_info = order_data.get('total', {})
                 total_amount = float(total_info.get('amount', 0))
                 currency = total_info.get('currency', 'SAR')
                 
                 if existing_order:
-                    # تحديث الطلب الموجود
                     existing_order.total_amount = total_amount
                     existing_order.currency = currency
                     existing_order.payment_method = order_data.get('payment_method', '')
                     existing_order.raw_data = json.dumps(order_data, ensure_ascii=False)
                     existing_order.updated_at = datetime.utcnow()
-                    existing_order.status_id = final_status_id # <-- استخدام المعرف النهائي
-                    
+                    existing_order.status_id = final_status_id
                     updated_count += 1
                 else:
-                    # إنشاء طلب جديد
                     customer = order_data.get('customer', {})
                     customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip() or order_data.get('customer', '')
-        
+                    
                     new_order = SallaOrder(
                         id=order_id,
                         store_id=store_id,
@@ -422,7 +405,7 @@ def sync_orders():
                         currency=currency,
                         payment_method=order_data.get('payment_method', ''),
                         raw_data=json.dumps(order_data, ensure_ascii=False),
-                        status_id=final_status_id # <-- استخدام المعرف النهائي
+                        status_id=final_status_id
                     )
                     db.session.add(new_order)
                     new_count += 1
