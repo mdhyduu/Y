@@ -355,11 +355,17 @@ class SallaOrder(db.Model):
     total_amount = db.Column(db.Float)
     currency = db.Column(db.String(10), default='SAR')
     payment_method = db.Column(db.String(100))
-    status = db.relationship('OrderStatus', backref='orders', lazy=True)
+
+    # العمود الأساسي للربط
+    status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'), nullable=True)
+    
+    # العلاقة الصحيحة مع OrderStatus
+    status = db.relationship('OrderStatus', backref='salla_orders', lazy=True)
+
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     raw_data = db.Column(db.JSON)
-    status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'),nullable=True)
-    status_rel = db.relationship('OrderStatus', backref='orders')
+
+    # العلاقات الأخرى
     status_notes = relationship('OrderStatusNote', back_populates='order')
     employee_statuses = relationship('OrderEmployeeStatus', back_populates='order')
     assignments = relationship('OrderAssignment', back_populates='order')

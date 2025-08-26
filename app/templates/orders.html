@@ -245,7 +245,7 @@
             غير محدد
         </span>
     {% endif %}
-</td>
+</td> 
                      <td>
     {% if order.employee_statuses %}
         {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
