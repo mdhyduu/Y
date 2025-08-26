@@ -45,6 +45,14 @@
         <a class="nav-link {% if request.path == url_for('orders.manage_note_status') %}active{% endif %}" href="{{ url_for('orders.manage_note_status') }}">
           <i class="fas fa-tags"></i>التنبيهات 
         </a>
+        <!-- في القائمة الرئيسية في base.html -->
+
+<li class="nav-item">
+    <a class="nav-link" href="{{ url_for('orders.add_custom_order') }}">
+        <i class="fas fa-plus-circle"></i> إضافة طلب خاص
+    </a>
+</li>
+
       {% endif %}
       
 
@@ -57,14 +65,7 @@
         </a>
         
 
-        <!-- في القائمة الرئيسية في base.html -->
-{% if is_reviewer %}
-<li class="nav-item">
-    <a class="nav-link" href="{{ url_for('orders.add_custom_order') }}">
-        <i class="fas fa-plus-circle"></i> إضافة طلب خاص
-    </a>
-</li>
-{% endif %}
+        
         <a class="nav-link {% if request.path == url_for('auth.link_store') %}active{% endif %}" href="{{ url_for('auth.link_store') }}">
           <i class="fas fa-link"></i> ربط المتجر
         </a>
