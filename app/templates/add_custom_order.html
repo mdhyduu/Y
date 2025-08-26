@@ -5,6 +5,9 @@
     <h2>إضافة طلب خاص</h2>
     
     <form method="post" enctype="multipart/form-data">
+        <!-- إضافة حقل CSRF للحماية -->
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        
         <div class="row">
             <div class="col-md-6">
                 <div class="form-group">
