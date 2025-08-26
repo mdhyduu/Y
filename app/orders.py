@@ -764,13 +764,18 @@ def assign_orders():
         failed_assignments = []
         
         for order_id in order_ids:
-            order_id_str = str(order_id)
+        # تحديد إذا كان الطلب من سلة أو طلب خاص
+            if str(order_id).startswith('C'):  # طلب خاص
+                order = CustomOrder.query.filter_by(order_number=order_id).first()
+                order_id_field = 'custom_order_id'
+            else:  # طلب سلة
+                order = SallaOrder.query.get(order_id_str)
+                order_id_field = 'order_id'
             
-            # التحقق من وجود الطلب
-            order = SallaOrder.query.get(order_id_str)
             if not order:
                 failed_assignments.append({'order_id': order_id, 'reason': 'الطلب غير موجود'})
                 continue
+        
             
             # التحقق من عدم تكرار الإسناد
             existing_assignment = OrderAssignment.query.filter_by(
