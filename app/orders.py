@@ -954,6 +954,10 @@ def assign_orders():
 @orders_bp.route('/<int:order_id>')
 def order_details(order_id):
     """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة"""
+    if str(order_id).startswith('custom_'):
+        # Extract the actual ID and redirect to custom order route
+        actual_id = order_id.replace('custom_', '')
+        return redirect(url_for('orders.custom_order_details', order_id=actual_id))
     user, current_employee = get_user_from_cookies()
     
     if not user:
@@ -962,7 +966,7 @@ def order_details(order_id):
         response.set_cookie('user_id', '', expires=0)
         response.set_cookie('is_admin', '', expires=0)
         return response
-
+    
     try:
         # ========== [1] التحقق من صلاحية المستخدم ==========
         is_reviewer = False
