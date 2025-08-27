@@ -527,7 +527,7 @@ class Product(db.Model):
 class OrderAssignment(db.Model):
     __tablename__ = 'order_assignment'
     id = db.Column(db.Integer, primary_key=True)
-    order_id = db.Column(db.String(50), db.ForeignKey('salla_orders.id'), nullable=False)
+    order_id = db.Column(db.String(50), db.ForeignKey('salla_orders.id'), nullable=True)
     employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
     assigned_by = db.Column(db.Integer, nullable=False, default=0)
     assigned_at = db.Column(db.DateTime, default=db.func.current_timestamp())
