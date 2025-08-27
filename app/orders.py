@@ -1753,10 +1753,14 @@ def allowed_file(filename):
 def get_next_order_number():
     """إنشاء رقم طلب تلقائي يبدأ من 1000"""
     last_order = CustomOrder.query.order_by(CustomOrder.id.desc()).first()
-    if last_order:
-        last_number = int(last_order.order_number)
-        return str(last_number + 1)
-    return "100" 
+    if last_order and last_order.order_number:
+        try:
+            last_number = int(last_order.order_number)
+            return str(last_number + 1)
+        except ValueError:
+            # إذا كان order_number ليس رقماً، نعود لاستخدام ID
+            return str(last_order.id + 1000)
+    return "1000"
 
 @orders_bp.route('/custom/add', methods=['GET', 'POST'])
 def add_custom_order():
