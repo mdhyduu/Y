@@ -68,8 +68,8 @@
                     <label for="filter-custom-status" class="form-label small text-muted mb-1">حالة مخصصة</label>
                     <select id="filter-custom-status" class="form-select">
                         <option value="">الكل</option>
-                        {% for status in custom_statuses %}
-                            <option value="{{ status.id }}" {% if filters.custom_status == status.id|string %}selected{% endif %}>{{ status.name|truncate(15) }}</option>
+                        {% for status in statuses %}
+                            <option value="{{ status.id }}" {% if filters.status == status.id|string %}selected{% endif %}>{{ status.name|truncate(15) }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -197,9 +197,9 @@
                         </td>
                         <td>
                             {% if order.employee_statuses %}
-                                {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
-                                <span class="badge rounded-pill" style="background-color: {{ last_custom_status.custom_status.color }}; color: white">
-                                    {{ last_custom_status.custom_status.name }}
+                                {% set last_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
+                                <span class="badge rounded-pill" style="background-color: {{ last_status.status.color }}; color: white">
+                                    {{ last_status.status.name }}
                                 </span>
                             {% else %}
                                 <span class="text-muted small">-</span>
@@ -209,11 +209,11 @@
                             {% set last_note = order.status_notes | sort(attribute='created_at', reverse=true) | first %}
                             {% if last_note %}
                                 <div class="d-flex align-items-center">
-                                    {% if last_note.custom_status %}
+                                    {% if last_note.status %}
                                         <!-- حالة مخصصة مع لون مخصص -->
                                         <span class="badge rounded-pill me-1" 
-                                              style="background-color: {{ last_note.custom_status.color }}; color: white">
-                                            {{ last_note.custom_status.name }}
+                                              style="background-color: {{ last_note.status.color }}; color: white">
+                                            {{ last_note.status.name }}
                                         </span>
                                     {% elif last_note.status_flag %}
                                         <!-- حالة خاصة (status_flag) -->
@@ -375,7 +375,7 @@
                     <label for="status-select" class="form-label">اختر الحالة:</label>
                     <select class="form-select" id="status-select">
                         <option value="">اختر حالة...</option>
-                        {% for status in custom_statuses %}
+                        {% for status in statuses %}
                         <option value="{{ status.id }}" style="color: {{ status.color }}">{{ status.name }}</option>
                         {% endfor %}
                     </select>
@@ -840,7 +840,7 @@ $(document).ready(function () {
         {% endif %}
         
         const customStatus = $('#filter-custom-status').val();
-        if (customStatus) params.set('custom_status', customStatus);
+        if (customStatus) params.set('status', customStatus);
         
         {% if not is_reviewer %}
         const specialStatus = $('#filter-special-status').val();
