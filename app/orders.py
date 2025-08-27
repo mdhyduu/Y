@@ -557,15 +557,17 @@ def index():
         
         # جلب الحالات المخصصة بشكل صحيح
         # جلب الحالات المخصصة (للعرض في الفلاتر)
+        # جلب الحالات المخصصة بشكل صحيح
         custom_statuses = []
         if is_reviewer:
-            # للمديرين/المراجعين: جميع الحالات في المتجر
+            # للمديرين/المراجعين: جميع الحالات النشطة في المتجر
             custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(
-                Employee.store_id == user.store_id
+                Employee.store_id == user.store_id,
+                EmployeeCustomStatus.is_active == True
             ).all()
-        elif employee and hasattr(employee, 'custom_statuses'):  # إضافة التحقق من وجود employee
-            # للموظفين العاديين: حالاتهم الخاصة فقط
-            custom_statuses = employee.custom_statuses.all() if hasattr(employee.custom_statuses, 'all') else employee.custom_statuses
+        elif employee:
+            # للموظفين العاديين: حالاتهم النشطة فقط
+            custom_statuses = [status for status in employee.custom_statuses if status.is_active]
         
         # جلب الطلبات بناءً على النوع المحدد
         if order_type == 'salla':
