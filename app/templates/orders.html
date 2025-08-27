@@ -1444,5 +1444,61 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleQuickListButton();
 });
 </script>
+<style>
+/* تحسينات إضافية */
+#quickListContent .row {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0 -5px;
+}
+
+#quickListContent .row > [class*="col-"] {
+    padding: 0 5px;
+    margin-bottom: 10px;
+}
+
+#quickListContent .card {
+    overflow: hidden;
+}
+
+#quickListContent img {
+    transition: transform 0.3s ease;
+}
+
+#quickListContent img:hover {
+    transform: scale(1.05);
+}
+
+/* تحسينات للتأكد من ظهور الرسائل */
+.swal2-popup {
+    font-family: 'Cairo', sans-serif;
+    direction: rtl;
+}
+
+.swal2-title {
+    font-weight: 700;
+}
+
+/* تحسينات للخانات */
+#selectAllQuickList:indeterminate {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.quick-list-order {
+    transform: scale(1.2);
+    margin-right: 8px;
+}
+
+#selectedOrdersCountQuick {
+    font-size: 0.9rem;
+}
+
+/* تحسينات للزر المعطل */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+</style>
 {% endblock %}
 {% endblock %}
