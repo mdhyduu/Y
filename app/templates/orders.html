@@ -207,13 +207,13 @@
             </div>
         </th>
         <th>رقم الطلب</th>
-        <th>النوع</th>  <!-- عمود جديد -->
+        <th class="d-none d-md-table-cell">النوع</th>  <!-- مخفي في الشاشات الصغيرة -->
         <th>الحالة</th>
-        <th>الحالة المخصصة</th>
-        <th>العلامات</th>
-        <th>التاريخ</th>
+        <th class="d-none d-md-table-cell">الحالة المخصصة</th>  <!-- مخفي في الشاشات الصغيرة -->
+        <th class="d-none d-md-table-cell">العلامات</th>  <!-- مخفي في الشاشات الصغيرة -->
+        <th class="d-none d-md-table-cell">التاريخ</th>  <!-- مخفي في الشاشات الصغيرة -->
         {% if is_reviewer %}
-        <th>المسند إليه</th>
+        <th class="d-none d-md-table-cell">المسند إليه</th>  <!-- مخفي في الشاشات الصغيرة -->
         {% endif %}
         <th width="10%" class="text-end pe-4">الإجراءات</th>
     </tr>
@@ -230,7 +230,7 @@
         <td>
             <span class="fw-bold">#{{ order.reference_id }}</span>
         </td>
-        <td>
+        <td class="d-none d-md-table-cell">
             {% if order.type == 'custom' %}
                 <span class="badge bg-info">مخصص</span>
             {% else %}
@@ -253,7 +253,7 @@
             {% endif %}
         </td>
         <!-- باقي الأعمدة تبقى كما هي -->
-                     <td>
+                     <td class="d-none d-md-table-cell">
     {% if order.employee_statuses %}
         {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
   <span class="badge rounded-pill" style="background-color: {{ last_custom_status.custom_status.color }}; color: white">
@@ -264,9 +264,9 @@
     {% endif %}
 </td>
 
-<td>
-    {% if order.status_notes %}
-        {% set last_note = order.status_notes | sort(attribute='created_at', reverse=true) | first %}
+<td class="d-none d-md-table-cell">
+    {% set last_note = order.status_notes | sort(attribute='created_at', reverse=true) | first %}
+    {% if last_note %}
         <div class="d-flex align-items-center">
             {% if last_note.custom_status %}
                 <!-- حالة مخصصة مع لون مخصص -->
@@ -284,21 +284,19 @@
                     'not_shipped': 'لم يشحن'
                 }.get(last_note.status_flag, last_note.status_flag) %}
                 <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
-            {% else %}
-                <span class="text-muted small">-</span>
             {% endif %} 
         </div>
     {% else %}
         <span class="text-muted small">-</span>
     {% endif %}
 </td>
-<td>
+<td class="d-none d-md-table-cell">
                             <span class="time-ago small" data-bs-toggle="tooltip" title="{{ order.raw_created_at|format_date }}">
                                 {{ order.created_at }}
                             </span>
                         </td>
                         {% if is_reviewer %}
-                      <td>
+                      <td class="d-none d-md-table-cell">
     {% if order.assignments %} 
         <div class="avatar-group">
             {% for assignment in order.assignments[:3] %}
@@ -507,13 +505,23 @@
         .table td, .table th { white-space: nowrap; }
         
         /* إخفاء بعض الأعمدة في الشاشات الصغيرة */
-        .table th:nth-child(4),
-        .table td:nth-child(4),
+        .table th:nth-child(3),
+        .table td:nth-child(3),
         .table th:nth-child(5),
-        .table td:nth-child(5) {
+        .table td:nth-child(5),
+        .table th:nth-child(6),
+        .table td:nth-child(6),
+        .table th:nth-child(7),
+        .table td:nth-child(7) {
             display: none;
         }
         
+        {% if is_reviewer %}
+        .table th:nth-child(8),
+        .table td:nth-child(8) {
+            display: none;
+        }
+        {% endif %}
         
         /* تحسين شريط الإجراءات السريعة */
         #quick-actions {
@@ -537,6 +545,12 @@
         #advanced-filters .col-md-2 {
             margin-bottom: 15px;
         }
+        
+        /* تحسين عرض الأعمدة في الشاشات الصغيرة */
+        .table th:nth-child(1) { width: 10%; } /* عمود التحديد */
+        .table th:nth-child(2) { width: 20%; } /* رقم الطلب */
+        .table th:nth-child(4) { width: 30%; } /* الحالة */
+        .table th:last-child { width: 20%; } /* الإجراءات */
     }
     
     /* تحسينات للشاشات المتوسطة */
@@ -546,17 +560,6 @@
             display: none;
         }
     }
-    /* إخفاء عمود النوع (العمود الثالث) */
-.table th:nth-child(3),
-.table td:nth-child(3) {
-    display: none;
-}
-
-/* إخفاء عمود التاريخ (العمود السابع) */
-.table th:nth-child(7),
-.table td:nth-child(7) {
-    display: none;
-}
     
     /* =================================== */
     /* Dark Mode Styles          */
