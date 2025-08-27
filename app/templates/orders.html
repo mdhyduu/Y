@@ -296,7 +296,8 @@
                             </span>
                         </td>
                         {% if is_reviewer %}
-                      <td>
+               <td>
+  {% if order.type == 'salla' %}
     {% if order.assignments %} 
         <div class="avatar-group">
             {% for assignment in order.assignments[:3] %}
@@ -325,9 +326,30 @@
                 </div>
             {% endif %}
         </div>
+        <!-- عرض البريد الإلكتروني للموظف الأول -->
+        <small class="text-muted d-block mt-1">
+            {{ order.assignments[0].employee.email }}
+        </small>
     {% else %}
         <span class="badge bg-light text-muted">غير مسند</span>
     {% endif %}
+  {% elif order.type == 'custom' %}
+    {% if order.assignments %}
+        <!-- للطلبات المخصصة، نعرض البريد الإلكتروني مباشرة -->
+        <div class="d-flex align-items-center">
+            <div class="avatar avatar-xs me-2">
+                <span class="avatar-text bg-info text-white">
+                    {{ order.assignments[0].employee.email|first|upper }}
+                </span>
+            </div>
+            <div>
+                {{ order.assignments[0].employee.email }}
+            </div>
+        </div>
+    {% else %}
+        <span class="badge bg-light text-muted">غير مسند</span>
+    {% endif %}
+  {% endif %}
 </td>
                         {% endif %}
 <td class="text-end pe-4 actions-cell">
