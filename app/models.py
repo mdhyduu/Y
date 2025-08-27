@@ -551,11 +551,12 @@ class OrderEmployeeStatus(db.Model):
     note = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    status = relationship('EmployeeCustomStatus', back_populates='order_statuses')
+    # Add this relationship
+    status = relationship('EmployeeCustomStatus', backref='order_statuses')
+    
     order = relationship('SallaOrder', back_populates='employee_statuses')
     custom_order_id = db.Column(db.Integer, ForeignKey('custom_orders.id'), nullable=True)
     custom_order = relationship('CustomOrder', back_populates='employee_statuses', foreign_keys=[custom_order_id])
-
 
 class OrderStatus(db.Model):
     __tablename__ = 'order_statuses'
