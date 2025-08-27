@@ -344,7 +344,7 @@ class EmployeePermission(db.Model):
     
     employee = relationship('Employee', back_populates='permissions')
     department = relationship('Department', back_populates='permissions')
-
+    status_assignments = relationship('OrderEmployeeStatus', back_populates='status')
 class SallaOrder(db.Model):
     __tablename__ = 'salla_orders'
     
@@ -543,6 +543,7 @@ class OrderDelivery(db.Model):
     employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
     delivered_at = db.Column(db.DateTime, default=db.func.current_timestamp())
 
+
 class OrderEmployeeStatus(db.Model):
     __tablename__ = 'order_employee_status'
     id = db.Column(db.Integer, primary_key=True)
@@ -551,8 +552,8 @@ class OrderEmployeeStatus(db.Model):
     note = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Add this relationship
-    status = relationship('EmployeeCustomStatus', backref='order_statuses')
+    # Update this relationship to match
+    status = relationship('EmployeeCustomStatus', back_populates='status_assignments')
     
     order = relationship('SallaOrder', back_populates='employee_statuses')
     custom_order_id = db.Column(db.Integer, ForeignKey('custom_orders.id'), nullable=True)
