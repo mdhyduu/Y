@@ -296,8 +296,7 @@
                             </span>
                         </td>
                         {% if is_reviewer %}
-               <td>
-  {% if order.type == 'salla' %}
+                      <td>
     {% if order.assignments %} 
         <div class="avatar-group">
             {% for assignment in order.assignments[:3] %}
@@ -326,30 +325,9 @@
                 </div>
             {% endif %}
         </div>
-        <!-- عرض البريد الإلكتروني للموظف الأول -->
-        <small class="text-muted d-block mt-1">
-            {{ order.assignments[0].employee.email }}
-        </small>
     {% else %}
         <span class="badge bg-light text-muted">غير مسند</span>
     {% endif %}
-  {% elif order.type == 'custom' %}
-    {% if order.assignments %}
-        <!-- للطلبات المخصصة، نعرض البريد الإلكتروني مباشرة -->
-        <div class="d-flex align-items-center">
-            <div class="avatar avatar-xs me-2">
-                <span class="avatar-text bg-info text-white">
-                    {{ order.assignments[0].employee.email|first|upper }}
-                </span>
-            </div>
-            <div>
-                {{ order.assignments[0].employee.email }}
-            </div>
-        </div>
-    {% else %}
-        <span class="badge bg-light text-muted">غير مسند</span>
-    {% endif %}
-  {% endif %}
 </td>
                         {% endif %}
 <td class="text-end pe-4 actions-cell">
@@ -566,6 +544,17 @@
             display: none;
         }
     }
+    /* إخفاء عمود النوع (العمود الثالث) */
+.table th:nth-child(3),
+.table td:nth-child(3) {
+    display: none;
+}
+
+/* إخفاء عمود التاريخ (العمود السابع) */
+.table th:nth-child(7),
+.table td:nth-child(7) {
+    display: none;
+}
     
     /* =================================== */
     /* Dark Mode Styles          */
@@ -771,23 +760,24 @@ $(document).ready(function () {
     }
     
     // تحديث دالة updateAssignButtonState
+// تحديث دالة updateAssignButtonState لتشمل زر الطباعة
 function updateAssignButtonState() {
     const checkedCount = $('.order-checkbox:checked').length;
     $('#selected-orders-count').text(checkedCount);
     $('#selected-orders-count-2').text(checkedCount);
-    $('#selected-orders-count-print').text(checkedCount); // إضافة هذا السطر
+    $('#selected-orders-count-print').text(checkedCount);
     $('#assign-orders-btn').prop('disabled', checkedCount === 0);
     $('#change-status-btn').prop('disabled', checkedCount === 0);
-    $('#print-orders-btn').prop('disabled', checkedCount === 0); // وإضافة هذا السطر
+    $('#print-orders-btn').prop('disabled', checkedCount === 0);
+    $('#quickListViewBtn').prop('disabled', checkedCount === 0);
 
     if (checkedCount > 0) {
-        $('#assign-orders-btn, #change-status-btn, #print-orders-btn').addClass('pulse-effect');
+        $('#assign-orders-btn, #change-status-btn, #print-orders-btn, #quickListViewBtn').addClass('pulse-effect');
         setTimeout(() => {
-            $('#assign-orders-btn, #change-status-btn, #print-orders-btn').removeClass('pulse-effect');
+            $('#assign-orders-btn, #change-status-btn, #print-orders-btn, #quickListViewBtn').removeClass('pulse-effect');
         }, 1000);
     }
 }
-
 // إضافة معالج الحدث للزر الجديد
 $(document).on('click', '#print-orders-btn', function() {
     const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
