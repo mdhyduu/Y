@@ -527,14 +527,15 @@ class Product(db.Model):
 class OrderAssignment(db.Model):
     __tablename__ = 'order_assignment'
     id = db.Column(db.Integer, primary_key=True)
-    order_id = db.Column(db.String(50), db.ForeignKey('salla_orders.id'), nullable=True)
+    order_id = db.Column(db.String(50), db.ForeignKey('salla_orders.id'), nullable=True)   # ✅ صار nullable
     employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
     assigned_by = db.Column(db.Integer, nullable=False, default=0)
     assigned_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     
     employee = relationship('Employee', back_populates='assignments')
     order = relationship('SallaOrder', back_populates='assignments')
-    custom_order_id = db.Column(db.Integer, ForeignKey('custom_orders.id'), nullable=True)
+
+    custom_order_id = db.Column(db.Integer, db.ForeignKey('custom_orders.id'), nullable=True)  # ✅ لازم nullable
     custom_order = relationship('CustomOrder', back_populates='assignments', foreign_keys=[custom_order_id])
 class OrderDelivery(db.Model):
     __tablename__ = 'order_delivery'
