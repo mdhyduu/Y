@@ -45,14 +45,17 @@
         <a class="nav-link {% if request.path == url_for('orders.manage_note_status') %}active{% endif %}" href="{{ url_for('orders.manage_note_status') }}">
           <i class="fas fa-tags"></i>التنبيهات 
         </a>
-
-<a href="{{ url_for('orders.add_custom_order') }}" class="btn btn-success mb-3">
-    <i class="fas fa-plus"></i> إضافة طلب خاص
-</a>
-
+        
       {% endif %}
       
+<!-- في القائمة الرئيسية في base.html -->
+{% if is_reviewer %}
 
+    <a class="nav-link" href="{{ url_for('orders.add_custom_order') }}">
+        <i class="fas fa-plus-circle"></i> إضافة طلب خاص
+    </a>
+
+{% endif %}
 
 
       
