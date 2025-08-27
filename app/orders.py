@@ -627,13 +627,12 @@ def index():
                     },
                     'status_obj': order.status,
                     'raw_created_at': order.created_at,
-                    
                     'type': 'salla',
-                    'assignments': order.assignments  # إضافة معلومات الإسناد
+                    'assignments': order.assignments,
+                    'employee_statuses': order.employee_statuses,  # <<< أضف هذا
+                    'status_notes': order.status_notes             # <<< وأيضًا هذا لو عايز تعرض الملاحظات
                 }
-                
             else:  # CustomOrder
-                # معالجة الطلبات المخصصة
                 processed_order = {
                     'id': order.id,
                     'reference_id': order.order_number,
@@ -645,10 +644,11 @@ def index():
                     },
                     'status_obj': order.status,
                     'raw_created_at': order.created_at,
-                    'employee_statuses': order.employee_statuses,
                     'type': 'custom',
                     'total_amount': order.total_amount,
-                    'currency': order.currency
+                    'currency': order.currency,
+                    'employee_statuses': order.employee_statuses,  # <<< نفس الشيء هنا
+                    'status_notes': order.status_notes
                 }
             
             processed_orders.append(processed_order)
