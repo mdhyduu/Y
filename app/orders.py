@@ -551,8 +551,9 @@ def index():
             custom_orders = custom_query.all()
             
             # دمج القائمتين وترتيبهم حسب تاريخ الإنشاء
+        
             all_orders = salla_orders + custom_orders
-            all_orders.sort(key=lambda x: x.created_at, reverse=True)
+            all_orders.sort(key=lambda x: x.created_at or datetime.min, reverse=True)
             
             # تطبيق الترحيل يدوياً
             total_orders = len(all_orders)
