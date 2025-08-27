@@ -265,8 +265,8 @@
 </td>
 
 <td>
-    {% set last_note = order.status_notes | sort(attribute='created_at', reverse=true) | first %}
-    {% if last_note %}
+    {% if order.status_notes %}
+        {% set last_note = order.status_notes | sort(attribute='created_at', reverse=true) | first %}
         <div class="d-flex align-items-center">
             {% if last_note.custom_status %}
                 <!-- حالة مخصصة مع لون مخصص -->
@@ -284,6 +284,8 @@
                     'not_shipped': 'لم يشحن'
                 }.get(last_note.status_flag, last_note.status_flag) %}
                 <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
+            {% else %}
+                <span class="text-muted small">-</span>
             {% endif %} 
         </div>
     {% else %}
