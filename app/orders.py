@@ -462,7 +462,7 @@ def index():
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
     search_query = request.args.get('search', '')
-    order_type = request.args.get('order_type', 'all')  # جديد: all, salla, custom
+    order_type = request.args.get('order_type', 'all')
     
     # التحقق من صحة معاملات الترحيل
     if page < 1: 
@@ -497,14 +497,23 @@ def index():
     try:
         # جلب الطلبات من قاعدة البيانات المحلية (سلة + مخصصة)
         salla_query = SallaOrder.query.filter_by(store_id=user.store_id).options(
-            db.joinedload(SallaOrder.status)
+            db.joinedload(SallaOrder.status),
+            db.joinedload(SallaOrder.assignments).joinedload(OrderAssignment.employee)
         )
         
         custom_query = CustomOrder.query.filter_by(store_id=user.store_id)
         
+        # للموظفين العاديين: عرض فقط الطلبات المسندة لهم
+        if not is_reviewer and employee:
+            salla_query = salla_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee.id)
+        
         # تطبيق الفلاتر المشتركة
         if status_filter and order_type in ['all', 'salla']:
-            salla_query = salla_query.filter_by(status_slug=status_filter)
+            salla_query = salla_query.join(SallaOrder.status).filter(OrderStatus.slug == status_filter)
+        
+        # تطبيق فلتر الموظف
+        if employee_filter and order_type in ['all', 'salla']:
+            salla_query = salla_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
         
         if search_query:
             if order_type in ['all', 'salla']:
@@ -540,18 +549,32 @@ def index():
             except ValueError:
                 pass
         
+        # جلب الحالات المخصصة بشكل صحيح
+        custom_statuses = []
+        if is_reviewer:
+            # للمديرين/المراجعين: جميع الحالات في المتجر
+            custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(
+                Employee.store_id == user.store_id
+            ).all()
+        elif employee:
+            # للموظفين العاديين: حالاتهم الخاصة فقط
+            custom_statuses = EmployeeCustomStatus.query.filter_by(employee_id=employee.id).all()
+        
         # جلب الطلبات بناءً على النوع المحدد
         if order_type == 'salla':
-            orders_query = salla_query
+            orders_query = salla_query.order_by(nullslast(db.desc('created_at')))
+            pagination_obj = orders_query.paginate(page=page, per_page=per_page)
+            orders = pagination_obj.items
         elif order_type == 'custom':
-            orders_query = custom_query
+            orders_query = custom_query.order_by(nullslast(db.desc('created_at')))
+            pagination_obj = orders_query.paginate(page=page, per_page=per_page)
+            orders = pagination_obj.items
         else:  # all - دمج النتيجتين
             # جلب طلبات سلة
             salla_orders = salla_query.all()
             custom_orders = custom_query.all()
             
             # دمج القائمتين وترتيبهم حسب تاريخ الإنشاء
-        
             all_orders = salla_orders + custom_orders
             all_orders.sort(key=lambda x: x.created_at or datetime.min, reverse=True)
             
@@ -576,17 +599,8 @@ def index():
             
             orders = pagination_obj.items
         
-        # إذا لم يكن النوع "all"، نتعامل مع الاستعلام بشكل طبيعي
-        if order_type != 'all':
-            orders_query = orders_query.order_by(nullslast(db.desc('created_at')))
-            pagination_obj = orders_query.paginate(page=page, per_page=per_page)
-            orders = pagination_obj.items
-        
         # معالجة البيانات للعرض
         processed_orders = []
-        assigned_order_ids = []
-        salla_order_ids = []
-        custom_order_ids = []
         
         for order in orders:
             if isinstance(order, SallaOrder):
@@ -607,11 +621,9 @@ def index():
                     },
                     'status_obj': order.status,
                     'raw_created_at': order.created_at,
-                    'type': 'salla'
+                    'type': 'salla',
+                    'assignments': order.assignments  # إضافة معلومات الإسناد
                 }
-                
-                salla_order_ids.append(order.id)
-                assigned_order_ids.append(order.id)
                 
             else:  # CustomOrder
                 # معالجة الطلبات المخصصة
@@ -630,27 +642,12 @@ def index():
                     'total_amount': order.total_amount,
                     'currency': order.currency
                 }
-                
-                custom_order_ids.append(order.id)
-                assigned_order_ids.append(f"custom_{order.id}")
             
             processed_orders.append(processed_order)
+        
         employees = []
         if is_reviewer:
             employees = Employee.query.filter_by(store_id=user.store_id, is_active=True).all()
-        
-        # جلب الحالات المخصصة (للعرض في الفلاتر)
-        custom_statuses = []
-        if is_reviewer:
-            # للمديرين/المراجعين: جميع الحالات في المتجر
-            custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(
-                Employee.store_id == user.store_id
-            ).all()
-        elif employee:
-            # للموظفين العاديين: حالاتهم الخاصة فقط
-            custom_statuses = employee.custom_statuses
-        # جلب البيانات الإضافية للطلبات
-        # ... (الكود الحالي لجلب الإسنادات والحالات والملاحظات)
         
         # إعداد بيانات الترحيل للقالب
         pagination = {
@@ -674,7 +671,7 @@ def index():
             'date_from': date_from,
             'date_to': date_to,
             'search': search_query,
-            'order_type': order_type  # جديد
+            'order_type': order_type
         }
         
         # إذا كان الطلب AJAX، نرجع القالب الجزئي فقط
@@ -697,14 +694,13 @@ def index():
                             order_statuses=order_statuses,  
                             is_reviewer=is_reviewer,
                             current_employee=employee,
-                            order_type=order_type)  # جديد
+                            order_type=order_type)
     
     except Exception as e:
         error_msg = f'حدث خطأ غير متوقع: {str(e)}'
         flash(error_msg, 'error')
         logger.exception(error_msg)
         return redirect(url_for('orders.index'))
-
 @orders_bp.route('/assign', methods=['POST'])
 def assign_orders():
     """إسناد طلبات إلى موظف مع تحسينات للتحقق"""
