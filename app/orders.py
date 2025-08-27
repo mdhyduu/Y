@@ -1719,7 +1719,7 @@ def get_next_order_number():
     if last_order:
         last_number = int(last_order.order_number)
         return str(last_number + 1)
-    return "100"
+    return "100" 
 
 @orders_bp.route('/custom/add', methods=['GET', 'POST'])
 def add_custom_order():
