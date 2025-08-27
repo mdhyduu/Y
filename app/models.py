@@ -428,10 +428,14 @@ class EmployeeCustomStatus(db.Model):
     employee_id = db.Column(db.Integer, ForeignKey('employees.id'), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     is_default = db.Column(db.Boolean, default=False)
-    employee = relationship('Employee', back_populates='custom_statuses')
-    order_statuses = relationship('OrderEmployeeStatus', back_populates='status')
     
-
+    employee = db.relationship('Employee', back_populates='custom_statuses')
+    
+    # إصلاح العلاقة مع back_populates
+    order_statuses = db.relationship('OrderEmployeeStatus', 
+                                   back_populates='status',
+                                   foreign_keys='OrderEmployeeStatus.status_id',
+                                   overlaps="custom_status")
 # ... (الكود الحالي)
 
 # بعد تعريف نموذج EmployeeCustomStatus مباشرة، أضف القائمة الثابتة للحالات الافتراضية
@@ -544,6 +548,7 @@ class OrderDelivery(db.Model):
     employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
     delivered_at = db.Column(db.DateTime, default=db.func.current_timestamp())
 
+# في نموذج OrderEmployeeStatus
 class OrderEmployeeStatus(db.Model):
     __tablename__ = 'order_employee_status'
     id = db.Column(db.Integer, primary_key=True)
@@ -551,13 +556,18 @@ class OrderEmployeeStatus(db.Model):
     status_id = db.Column(db.Integer, db.ForeignKey('employee_custom_statuses.id'), nullable=False)
     note = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    status = relationship('EmployeeCustomStatus', back_populates='order_statuses')
-    order = relationship('SallaOrder', back_populates='employee_statuses')
     custom_order_id = db.Column(db.Integer, ForeignKey('custom_orders.id'), nullable=True)
-    custom_status = relationship('EmployeeCustomStatus')   # <<< هذا هو الصح
-    custom_order = relationship('CustomOrder', back_populates='employee_statuses', foreign_keys=[custom_order_id])
-
+    
+    # إصلاح العلاقات - إزالة التكرار وإضافة back_populates
+    status = db.relationship('EmployeeCustomStatus', 
+                           back_populates='order_statuses',
+                           foreign_keys=[status_id],
+                           overlaps="custom_status")
+    
+    order = db.relationship('SallaOrder', back_populates='employee_statuses')
+    custom_order = db.relationship('CustomOrder', 
+                                 back_populates='employee_statuses', 
+                                 foreign_keys=[custom_order_id])
 
 class OrderStatus(db.Model):
     __tablename__ = 'order_statuses'
