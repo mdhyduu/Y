@@ -27,9 +27,15 @@
                 <div class="card-body">
                     <p><strong>رقم الطلب:</strong> {{ order.order_number }}</p>
                     <p><strong>التاريخ:</strong> {{ order.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
-                    <p><strong>المبلغ الإجمالي:</strong> {{ order.total_amount }} {{ order.currency }}</p>
+                    <p><strong>المبلغ الإجمالي:</strong> {{ order.total_amount }} {{ order.currency or 'SAR' }}</p>
                     <p><strong>الحالة:</strong> 
-                        <span class="badge badge-secondary">{{ order.status.name if order.status else 'غير محدد' }}</span>
+                        <span class="badge badge-secondary">
+                            {% if order.status %}
+                                {{ order.status.name }}
+                            {% else %}
+                                غير محدد
+                            {% endif %}
+                        </span>
                     </p>
                     {% if order.notes %}
                     <p><strong>ملاحظات:</strong> {{ order.notes }}</p>
