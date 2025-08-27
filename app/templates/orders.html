@@ -198,8 +198,8 @@
                         <td>
                             {% if order.employee_statuses %}
                                 {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
-                                <span class="badge rounded-pill" style="background-color: {{ last_custom_status.status.color }}; color: white">
-                                    {{ last_custom_status.status.name }}
+                                <span class="badge rounded-pill" style="background-color: {{ last_custom_status.custom_status.color }}; color: white">
+                                    {{ last_custom_status.custom_status.name }}
                                 </span>
                             {% else %}
                                 <span class="text-muted small">-</span>
@@ -1499,6 +1499,6 @@ document.addEventListener('DOMContentLoaded', function() {
     opacity: 0.6;
     cursor: not-allowed;
 }
-</style
+</style>
 {% endblock %}
 {% endblock %}
