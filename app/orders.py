@@ -498,31 +498,31 @@ def index():
         # جلب الطلبات من قاعدة البيانات المحلية (سلة + مخصصة)
         salla_query = SallaOrder.query.filter_by(store_id=user.store_id).options(
             db.joinedload(SallaOrder.status),
-            db.joinedload(SallaOrder.assignments).joinedload(OrderAssignment.employee),
-            db.joinedload(SallaOrder.employee_statuses).joinedload(OrderEmployeeStatus.status)  # إضافة هذا
-                    
+            db.joinedload(SallaOrder.assignments).joinedload(OrderAssignment.employee)
         )
         
-        custom_query = CustomOrder.query.filter_by(store_id=user.store_id)
-        
+        custom_query = CustomOrder.query.filter_by(store_id=user.store_id).options(
+            db.joinedload(CustomOrder.status)
+        )
         
         # للموظفين العاديين: عرض فقط الطلبات المسندة لهم
         if not is_reviewer and employee:
             salla_query = salla_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee.id)
+            custom_query = custom_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee.id)
         
-        # تطبيق الفلاتر المشتركة
         # تطبيق الفلاتر المشتركة
         if status_filter:
             if order_type in ['all', 'salla']:
-                # استخدام join للتصفية حسب slug من جدول OrderStatus
                 salla_query = salla_query.join(SallaOrder.status).filter(OrderStatus.slug == status_filter)
             if order_type in ['all', 'custom']:
-                # إذا كان لديك حقل حالة للطلبات المخصصة، أضف التصفية المناسبة هنا
-                pass
+                custom_query = custom_query.join(CustomOrder.status).filter(OrderStatus.slug == status_filter)
         
         # تطبيق فلتر الموظف
-        if employee_filter and order_type in ['all', 'salla']:
-            salla_query = salla_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
+        if employee_filter:
+            if order_type in ['all', 'salla']:
+                salla_query = salla_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
+            if order_type in ['all', 'custom']:
+                custom_query = custom_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
         
         if search_query:
             if order_type in ['all', 'salla']:
@@ -571,13 +571,45 @@ def index():
         
         # جلب الطلبات بناءً على النوع المحدد
         if order_type == 'salla':
-            orders_query = salla_query.order_by(nullslast(db.desc('created_at')))
+            orders_query = salla_query.order_by(db.desc(SallaOrder.created_at))
             pagination_obj = orders_query.paginate(page=page, per_page=per_page)
             orders = pagination_obj.items
+            
+            # جلب الحالات المخصصة لطلبات سلة
+            order_ids = [order.id for order in orders]
+            employee_statuses = OrderEmployeeStatus.query.filter(
+                OrderEmployeeStatus.order_id.in_(order_ids)
+            ).options(
+                db.joinedload(OrderEmployeeStatus.status)
+            ).all()
+            
+            # تجميع الحالات المخصصة حسب order_id
+            employee_statuses_dict = {}
+            for status in employee_statuses:
+                if status.order_id not in employee_statuses_dict:
+                    employee_statuses_dict[status.order_id] = []
+                employee_statuses_dict[status.order_id].append(status)
+            
         elif order_type == 'custom':
-            orders_query = custom_query.order_by(nullslast(db.desc('created_at')))
+            orders_query = custom_query.order_by(db.desc(CustomOrder.created_at))
             pagination_obj = orders_query.paginate(page=page, per_page=per_page)
             orders = pagination_obj.items
+            
+            # جلب الحالات المخصصة للطلبات المخصصة
+            order_ids = [order.id for order in orders]
+            employee_statuses = OrderEmployeeStatus.query.filter(
+                OrderEmployeeStatus.custom_order_id.in_(order_ids)
+            ).options(
+                db.joinedload(OrderEmployeeStatus.status)
+            ).all()
+            
+            # تجميع الحالات المخصصة حسب custom_order_id
+            employee_statuses_dict = {}
+            for status in employee_statuses:
+                if status.custom_order_id not in employee_statuses_dict:
+                    employee_statuses_dict[status.custom_order_id] = []
+                employee_statuses_dict[status.custom_order_id].append(status)
+            
         else:  # all - دمج النتيجتين
             # جلب طلبات سلة
             salla_orders = salla_query.all()
@@ -607,6 +639,31 @@ def index():
             })()
             
             orders = pagination_obj.items
+            
+            # جلب الحالات المخصصة لجميع الطلبات
+            salla_order_ids = [order.id for order in all_orders if isinstance(order, SallaOrder)]
+            custom_order_ids = [order.id for order in all_orders if isinstance(order, CustomOrder)]
+            
+            employee_statuses = OrderEmployeeStatus.query.filter(
+                db.or_(
+                    OrderEmployeeStatus.order_id.in_(salla_order_ids),
+                    OrderEmployeeStatus.custom_order_id.in_(custom_order_ids)
+                )
+            ).options(
+                db.joinedload(OrderEmployeeStatus.status)
+            ).all()
+            
+            # تجميع الحالات المخصصة
+            employee_statuses_dict = {}
+            for status in employee_statuses:
+                if status.order_id:
+                    if status.order_id not in employee_statuses_dict:
+                        employee_statuses_dict[status.order_id] = []
+                    employee_statuses_dict[status.order_id].append(status)
+                elif status.custom_order_id:
+                    if status.custom_order_id not in employee_statuses_dict:
+                        employee_statuses_dict[status.custom_order_id] = []
+                    employee_statuses_dict[status.custom_order_id].append(status)
         
         # معالجة البيانات للعرض
         processed_orders = []
@@ -619,6 +676,9 @@ def index():
                 status_name = order.status.name if order.status else 'غير محدد'
                 status_slug = order.status.slug if order.status else 'unknown'
                 
+                # الحصول على الحالات المخصصة للطلب
+                order_employee_statuses = employee_statuses_dict.get(order.id, [])
+                
                 processed_order = {
                     'id': order.id,
                     'reference_id': reference_id,
@@ -630,13 +690,16 @@ def index():
                     },
                     'status_obj': order.status,
                     'raw_created_at': order.created_at,
-                    'employee_statuses': order.employee_statuses,
+                    'employee_statuses': order_employee_statuses,
                     'type': 'salla',
-                    'assignments': order.assignments  # إضافة معلومات الإسناد
+                    'assignments': order.assignments
                 }
                 
             else:  # CustomOrder
                 # معالجة الطلبات المخصصة
+                # الحصول على الحالات المخصصة للطلب
+                order_employee_statuses = employee_statuses_dict.get(order.id, [])
+                
                 processed_order = {
                     'id': order.id,
                     'reference_id': order.order_number,
@@ -648,7 +711,7 @@ def index():
                     },
                     'status_obj': order.status,
                     'raw_created_at': order.created_at,
-
+                    'employee_statuses': order_employee_statuses,
                     'type': 'custom',
                     'total_amount': order.total_amount,
                     'currency': order.currency
