@@ -498,10 +498,14 @@ def index():
         # جلب الطلبات من قاعدة البيانات المحلية (سلة + مخصصة)
         salla_query = SallaOrder.query.filter_by(store_id=user.store_id).options(
             db.joinedload(SallaOrder.status),
-            db.joinedload(SallaOrder.assignments).joinedload(OrderAssignment.employee)
+            db.joinedload(SallaOrder.assignments).joinedload(OrderAssignment.employee),
+            db.joinedload(SallaOrder.employee_statuses).joinedload(OrderEmployeeStatus.status)  # إضافة هذا
+                    
         )
         
-        custom_query = CustomOrder.query.filter_by(store_id=user.store_id)
+        custom_query = CustomOrder.query.filter_by(store_id=user.store_id).options(
+        db.joinedload(CustomOrder.employee_statuses).joinedload(OrderEmployeeStatus.status)  # إضافة هذا
+            )
         
         # للموظفين العاديين: عرض فقط الطلبات المسندة لهم
         if not is_reviewer and employee:
