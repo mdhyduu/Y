@@ -258,7 +258,6 @@
         {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
         <span class="badge rounded-pill" style="background-color: {{ last_custom_status.EmployeeCustomStatus.color }}; color: white">
 {{ last_custom_status.custom_status.name }}
-{{ last_custom_status.custom_status.color }}
         </span>
     {% else %}
         <span class="text-muted small">-</span>
