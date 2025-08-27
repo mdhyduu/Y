@@ -344,7 +344,7 @@ class EmployeePermission(db.Model):
     
     employee = relationship('Employee', back_populates='permissions')
     department = relationship('Department', back_populates='permissions')
-    status_assignments = relationship('OrderEmployeeStatus', back_populates='status')
+
 class SallaOrder(db.Model):
     __tablename__ = 'salla_orders'
     
@@ -429,8 +429,10 @@ class EmployeeCustomStatus(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     is_default = db.Column(db.Boolean, default=False)
     employee = relationship('Employee', back_populates='custom_statuses')
-    order_statuses = relationship('OrderEmployeeStatus', back_populates='status')
     
+    # Change this relationship to avoid conflict
+    status_assignments = relationship('OrderEmployeeStatus', back_populates='status')
+
 
 # ... (الكود الحالي)
 
