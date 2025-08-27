@@ -8,7 +8,9 @@ from .models import (
     db, User, Employee, Department, EmployeePermission, 
     Product, OrderDelivery, SallaOrder, CustomOrder, OrderAssignment,
     OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, CustomNoteStatus, OrderStatus
+
 )
+from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
 from .config import Config
 from .utils import process_order_data, format_date, generate_barcode, humanize_time
