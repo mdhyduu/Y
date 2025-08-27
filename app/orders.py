@@ -556,15 +556,7 @@ def index():
                 pass
         
         # جلب الحالات المخصصة بشكل صحيح
-        custom_statuses = []
-        if is_reviewer:
-            # للمديرين/المراجعين: جميع الحالات في المتجر
-            custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(
-                Employee.store_id == user.store_id
-            ).all()
-        elif employee:
-            # للموظفين العاديين: حالاتهم الخاصة فقط
-            custom_statuses = EmployeeCustomStatus.query.filter_by(employee_id=employee.id).all()
+        custom_statuses = employee.custom_statuses.all()
         
         # جلب الطلبات بناءً على النوع المحدد
         if order_type == 'salla':
