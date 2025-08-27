@@ -507,22 +507,27 @@
         /* إخفاء بعض الأعمدة في الشاشات الصغيرة */
         .table th:nth-child(3),
         .table td:nth-child(3),
-        .table th:nth-child(5),
-        .table td:nth-child(5),
-        .table th:nth-child(6),
-        .table td:nth-child(6),
+
+     
         .table th:nth-child(7),
         .table td:nth-child(7) {
             display: none;
         }
         
-        {% if is_reviewer %}
-        .table th:nth-child(8),
-        .table td:nth-child(8) {
+        {% if not  is_reviewer %}
+        .table th:nth-child(4),
+        .table td:nth-child(4) {
             display: none;
         }
         {% endif %}
-        
+                {% if is_reviewer %}
+        .table th:nth-child(7),
+        .table td:nth-child(7),
+         .table th:nth-child(6),
+        .table td:nth-child(6),{
+            display: none;
+        }
+        {% endif %}
         /* تحسين شريط الإجراءات السريعة */
         #quick-actions {
             flex-wrap: wrap;
