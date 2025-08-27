@@ -503,9 +503,8 @@ def index():
                     
         )
         
-        custom_query = CustomOrder.query.filter_by(store_id=user.store_id).options(
-        db.joinedload(CustomOrder.employee_statuses).joinedload(OrderEmployeeStatus.status)  # إضافة هذا
-            )
+        custom_query = CustomOrder.query.filter_by(store_id=user.store_id)
+        
         
         # للموظفين العاديين: عرض فقط الطلبات المسندة لهم
         if not is_reviewer and employee:
@@ -649,7 +648,7 @@ def index():
                     },
                     'status_obj': order.status,
                     'raw_created_at': order.created_at,
-                    'employee_statuses': order.employee_statuses,
+
                     'type': 'custom',
                     'total_amount': order.total_amount,
                     'currency': order.currency
