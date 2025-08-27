@@ -635,20 +635,20 @@ def index():
                 assigned_order_ids.append(f"custom_{order.id}")
             
             processed_orders.append(processed_order)
-            employees = []
-                    if is_reviewer:
-                        employees = Employee.query.filter_by(store_id=user.store_id, is_active=True).all()
-                    
-                    # جلب الحالات المخصصة (للعرض في الفلاتر)
-                    custom_statuses = []
-                    if is_reviewer:
-                        # للمديرين/المراجعين: جميع الحالات في المتجر
-                        custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(
-                            Employee.store_id == user.store_id
-                        ).all()
-                    elif employee:
-                        # للموظفين العاديين: حالاتهم الخاصة فقط
-                        custom_statuses = employee.custom_statuses
+        employees = []
+                if is_reviewer:
+                    employees = Employee.query.filter_by(store_id=user.store_id, is_active=True).all()
+                
+                # جلب الحالات المخصصة (للعرض في الفلاتر)
+                custom_statuses = []
+                if is_reviewer:
+                    # للمديرين/المراجعين: جميع الحالات في المتجر
+                    custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(
+                        Employee.store_id == user.store_id
+                    ).all()
+                elif employee:
+                    # للموظفين العاديين: حالاتهم الخاصة فقط
+                    custom_statuses = employee.custom_statuses
         # جلب البيانات الإضافية للطلبات
         # ... (الكود الحالي لجلب الإسنادات والحالات والملاحظات)
         
