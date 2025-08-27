@@ -627,6 +627,7 @@ def index():
                     },
                     'status_obj': order.status,
                     'raw_created_at': order.created_at,
+                    'employee_statuses': order.employee_statuses,
                     'type': 'salla',
                     'assignments': order.assignments  # إضافة معلومات الإسناد
                 }
@@ -644,6 +645,7 @@ def index():
                     },
                     'status_obj': order.status,
                     'raw_created_at': order.created_at,
+                    'employee_statuses': order.employee_statuses,
                     'type': 'custom',
                     'total_amount': order.total_amount,
                     'currency': order.currency
