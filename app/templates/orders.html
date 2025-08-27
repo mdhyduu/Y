@@ -954,123 +954,129 @@ $(document).on('click', '#print-orders-btn', function() {
 
     // 3. إسناد الطلبات المحددة
     $(document).on('click', '#assign-orders-btn', function() {
-        const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
-        
-        const employeeOptions = {
-            '': 'اختر موظفًا...'
-            {% for employee in employees %}
-                {% if employee.role == 'general' %}
-                    ,"{{ employee.id }}": "{{ employee.email }}"
-                {% endif %}
-            {% endfor %}
+    const selectedOrders = $('.order-checkbox:checked').map((_, el) => {
+        const row = $(el).closest('tr');
+        return {
+            id: row.data('order-id'),
+            type: row.data('order-type')   // ← النوع (salla/custom)
         };
-        
-        Swal.fire({
-            title: 'إسناد الطلبات المحددة',
-            html: `سيتم إسناد <span class="fw-bold text-primary">${orderIds.length}</span> طلب إلى الموظف المحدد.`,
-            input: 'select',
-            inputOptions: employeeOptions,
-            inputPlaceholder: 'اختر موظفًا...',
-            showCancelButton: true,
-            confirmButtonText: 'تأكيد الإسناد',
-            cancelButtonText: 'إلغاء',
-            showLoaderOnConfirm: true,
-            customClass: {
-                confirmButton: 'btn btn-primary',
-                cancelButton: 'btn btn-outline-secondary ms-2'
-            },
-            buttonsStyling: false,
-            inputValidator: (value) => {
-                if (!value) return 'يجب اختيار موظف للإسناد';
-            },
-            preConfirm: (employeeId) => {
-                return $.ajax({
-                    url: "{{ url_for('orders.assign_orders') }}",
-                    type: "POST",
-                    contentType: "application/json",
-                    headers: { 'X-CSRFToken': csrfToken },
-                    data: JSON.stringify({
-                        employee_id: employeeId,
-                        order_ids: orderIds,
-                        current_user_id: "{{ session.get('user_id') }}"
-                    }),
-                }).fail((xhr) => {
-                    const errorMsg = xhr.responseJSON?.error || 'فشل الإسناد لسبب غير معروف.';
-                    Swal.showValidationMessage(`فشل الطلب: ${errorMsg}`);
-                });
-            },
-            allowOutsideClick: () => !Swal.isLoading()
-        }).then((result) => {
-            if (result.isConfirmed) {
-                if (result.value.success) {
-                    showSweetAlert('success', 'تم الإسناد بنجاح!', result.value.message);
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    showSweetAlert('error', 'فشل الإسناد', result.value.error, 4000);
-                }
-            }
-        });
-    });
+    }).get();
     
-    // 4. إسناد سريع لطلب واحد
-    $(document).on('click', '.assign-single-btn', function(e) {
-        e.stopPropagation(); // منع انتشار الحدث إلى الصف
-        const orderId = $(this).data('order-id');
-        
-        const employeeOptions = {
-            '': 'اختر موظفًا...'
-            {% for employee in employees %}
-                {% if employee.role == 'general' %}
-                    ,"{{ employee.id }}": "{{ employee.email }}"
-                {% endif %}
-            {% endfor %}
-        };
-        
-        Swal.fire({
-            title: 'إسناد الطلب #' + orderId,
-            input: 'select',
-            inputOptions: employeeOptions,
-            inputPlaceholder: 'اختر موظفًا...',
-            showCancelButton: true,
-            confirmButtonText: 'تأكيد الإسناد',
-            cancelButtonText: 'إلغاء',
-            showLoaderOnConfirm: true,
-            customClass: {
-                confirmButton: 'btn btn-primary',
-                cancelButton: 'btn btn-outline-secondary ms-2'
-            },
-            buttonsStyling: false,
-            inputValidator: (value) => {
-                if (!value) return 'يجب اختيار موظف للإسناد';
-            },
-            preConfirm: (employeeId) => {
-                return $.ajax({
-                    url: "{{ url_for('orders.assign_orders') }}",
-                    type: "POST",
-                    contentType: "application/json",
-                    headers: { 'X-CSRFToken': csrfToken },
-                    data: JSON.stringify({
-                        employee_id: employeeId,
-                        order_ids: [orderId],
-                        current_user_id: "{{ session.get('user_id') }}"
-                    }),
-                }).fail((xhr) => {
-                    const errorMsg = xhr.responseJSON?.error || 'فشل الإسناد لسبب غير معروف.';
-                    Swal.showValidationMessage(`فشل الطلب: ${errorMsg}`);
-                });
-            },
-            allowOutsideClick: () => !Swal.isLoading()
-        }).then((result) => {
-            if (result.isConfirmed) {
-                if (result.value.success) {
-                    showSweetAlert('success', 'تم الإسناد بنجاح!', result.value.message);
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    showSweetAlert('error', 'فشل الإسناد', result.value.error, 4000);
-                }
+    const employeeOptions = {
+        '': 'اختر موظفًا...'
+        {% for employee in employees %}
+            {% if employee.role == 'general' %}
+                ,"{{ employee.id }}": "{{ employee.email }}"
+            {% endif %}
+        {% endfor %}
+    };
+    
+    Swal.fire({
+        title: 'إسناد الطلبات المحددة',
+        html: `سيتم إسناد <span class="fw-bold text-primary">${selectedOrders.length}</span> طلب إلى الموظف المحدد.`,
+        input: 'select',
+        inputOptions: employeeOptions,
+        inputPlaceholder: 'اختر موظفًا...',
+        showCancelButton: true,
+        confirmButtonText: 'تأكيد الإسناد',
+        cancelButtonText: 'إلغاء',
+        showLoaderOnConfirm: true,
+        customClass: {
+            confirmButton: 'btn btn-primary',
+            cancelButton: 'btn btn-outline-secondary ms-2'
+        },
+        buttonsStyling: false,
+        inputValidator: (value) => {
+            if (!value) return 'يجب اختيار موظف للإسناد';
+        },
+        preConfirm: (employeeId) => {
+            return $.ajax({
+                url: "{{ url_for('orders.assign_orders') }}",
+                type: "POST",
+                contentType: "application/json",
+                headers: { 'X-CSRFToken': csrfToken },
+                data: JSON.stringify({
+                    employee_id: employeeId,
+                    orders: selectedOrders,   // ← هنا الفرق
+                    current_user_id: "{{ session.get('user_id') }}"
+                }),
+            }).fail((xhr) => {
+                const errorMsg = xhr.responseJSON?.error || 'فشل الإسناد لسبب غير معروف.';
+                Swal.showValidationMessage(`فشل الطلب: ${errorMsg}`);
+            });
+        },
+        allowOutsideClick: () => !Swal.isLoading()
+    }).then((result) => {
+        if (result.isConfirmed) {
+            if (result.value.success) {
+                showSweetAlert('success', 'تم الإسناد بنجاح!', result.value.message);
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showSweetAlert('error', 'فشل الإسناد', result.value.error, 4000);
             }
-        });
+        }
     });
+});
+    
+$(document).on('click', '.assign-single-btn', function(e) {
+    e.stopPropagation(); // منع انتشار الحدث إلى الصف
+    const orderId = $(this).data('order-id');
+    const orderType = $(this).data('order-type');
+    
+    const employeeOptions = {
+        '': 'اختر موظفًا...'
+        {% for employee in employees %}
+            {% if employee.role == 'general' %}
+                ,"{{ employee.id }}": "{{ employee.email }}"
+            {% endif %}
+        {% endfor %}
+    };
+    
+    Swal.fire({
+        title: 'إسناد الطلب #' + orderId,
+        input: 'select',
+        inputOptions: employeeOptions,
+        inputPlaceholder: 'اختر موظفًا...',
+        showCancelButton: true,
+        confirmButtonText: 'تأكيد الإسناد',
+        cancelButtonText: 'إلغاء',
+        showLoaderOnConfirm: true,
+        customClass: {
+            confirmButton: 'btn btn-primary',
+            cancelButton: 'btn btn-outline-secondary ms-2'
+        },
+        buttonsStyling: false,
+        inputValidator: (value) => {
+            if (!value) return 'يجب اختيار موظف للإسناد';
+        },
+        preConfirm: (employeeId) => {
+            return $.ajax({
+                url: "{{ url_for('orders.assign_orders') }}",
+                type: "POST",
+                contentType: "application/json",
+                headers: { 'X-CSRFToken': csrfToken },
+                data: JSON.stringify({
+                    employee_id: employeeId,
+                    orders: [{ id: orderId, type: orderType }],   // ← الشكل الجديد
+                    current_user_id: "{{ session.get('user_id') }}"
+                }),
+            }).fail((xhr) => {
+                const errorMsg = xhr.responseJSON?.error || 'فشل الإسناد لسبب غير معروف.';
+                Swal.showValidationMessage(`فشل الطلب: ${errorMsg}`);
+            });
+        },
+        allowOutsideClick: () => !Swal.isLoading()
+    }).then((result) => {
+        if (result.isConfirmed) {
+            if (result.value.success) {
+                showSweetAlert('success', 'تم الإسناد بنجاح!', result.value.message);
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showSweetAlert('error', 'فشل الإسناد', result.value.error, 4000);
+            }
+        }
+    });
+});
     
     // 5. تغيير حالة الطلبات
     $(document).on('click', '#change-status-btn', function() {
