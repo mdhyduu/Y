@@ -551,13 +551,12 @@ class OrderEmployeeStatus(db.Model):
     status_id = db.Column(db.Integer, db.ForeignKey('employee_custom_statuses.id'), nullable=False)
     note = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    status = relationship('EmployeeCustomStatus', back_populates='order_statuses')
-    order = relationship('SallaOrder', back_populates='employee_statuses')
     custom_order_id = db.Column(db.Integer, ForeignKey('custom_orders.id'), nullable=True)
-    custom_status = relationship('EmployeeCustomStatus')   # <<< هذا هو الصح
+    
+    # إصلاح العلاقات
+    status = relationship('EmployeeCustomStatus', back_populates='order_statuses', overlaps="custom_status")
+    order = relationship('SallaOrder', back_populates='employee_statuses')
     custom_order = relationship('CustomOrder', back_populates='employee_statuses', foreign_keys=[custom_order_id])
-
 
 class OrderStatus(db.Model):
     __tablename__ = 'order_statuses'
