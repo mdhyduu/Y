@@ -751,14 +751,10 @@ function updateAssignButtonState() {
     const checkedCount = $('.order-checkbox:checked').length;
     $('#selected-orders-count').text(checkedCount);
     $('#selected-orders-count-2').text(checkedCount);
-    $('#selected-orders-count-print').text(checkedCount);
-    
-    // تعطيل زر الإسناد إذا كانت هناك طلبات مخصصة محددة
-    const hasCustomOrders = $('.order-checkbox:checked[data-type="custom"]').length > 0;
-    $('#assign-orders-btn').prop('disabled', checkedCount === 0 || hasCustomOrders);
-    
+    $('#selected-orders-count-print').text(checkedCount); // إضافة هذا السطر
+    $('#assign-orders-btn').prop('disabled', checkedCount === 0);
     $('#change-status-btn').prop('disabled', checkedCount === 0);
-    $('#print-orders-btn').prop('disabled', checkedCount === 0);
+    $('#print-orders-btn').prop('disabled', checkedCount === 0); // وإضافة هذا السطر
 
     if (checkedCount > 0) {
         $('#assign-orders-btn, #change-status-btn, #print-orders-btn').addClass('pulse-effect');
