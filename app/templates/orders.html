@@ -199,53 +199,60 @@
             </div>
             
             <table class="table table-hover mb-0" id="orders-table">
-                <thead class="table-light">
-                    <tr>
+<thead class="table-light">
+    <tr>
+        <th width="5%" class="ps-4">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="select-all-header">
+            </div>
+        </th>
+        <th>رقم الطلب</th>
+        <th>النوع</th>  <!-- عمود جديد -->
+        <th>الحالة</th>
+        <th>الحالة المخصصة</th>
+        <th>العلامات</th>
+        <th>التاريخ</th>
+        {% if is_reviewer %}
+        <th>المسند إليه</th>
+        {% endif %}
+        <th width="10%" class="text-end pe-4">الإجراءات</th>
+    </tr>
+</thead>
 
-                        <th width="5%" class="ps-4">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="select-all-header">
-                            </div>
-                        </th>
-
-                        <th>رقم الطلب</th>
-                        <th>الحالة</th>
-                        <th>الحالة المخصصة</th>
-                        <th>العلامات</th>
-                        <th>التاريخ</th>
-                        {% if is_reviewer %}
-                        <th>المسند إليه</th>
-                        {% endif %}
-                        <th width="10%" class="text-end pe-4">الإجراءات</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for order in orders %}
-                    <tr data-order-id="{{ order.id }}" data-order-status="{{ order.status.slug }}" class="align-middle clickable-row">
-
-                        <td class="ps-4">
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}">
-                            </div>
-                        </td>
-                                          <td>
-                            <span class="fw-bold">#{{ order.reference_id }}</span>
-                        </td>
-<td>
-    {% if order.status %}
-        <span class="status-badge status-{{ order.status.slug }}" 
-              data-bs-toggle="tooltip" 
-              title="{{ order.status.name }} ({{ order.status.type }})">
-            <i class="fas fa-circle me-1 small"></i>
-            {{ order.status.name }}
-        </span>
-    {% else %}
-        <span class="status-badge status-unknown" data-bs-toggle="tooltip" title="حالة غير معروفة">
-            <i class="fas fa-circle me-1 small"></i>
-            غير محدد
-        </span>
-    {% endif %}
-</td> 
+<tbody>
+    {% for order in orders %}
+    <tr data-order-id="{{ order.id }}" data-order-type="{{ order.type }}" data-order-status="{{ order.status.slug }}" class="align-middle clickable-row">
+        <td class="ps-4">
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}" data-type="{{ order.type }}">
+            </div>
+        </td>
+        <td>
+            <span class="fw-bold">#{{ order.reference_id }}</span>
+        </td>
+        <td>
+            {% if order.type == 'custom' %}
+                <span class="badge bg-info">مخصص</span>
+            {% else %}
+                <span class="badge bg-primary">سلة</span>
+            {% endif %}
+        </td>
+        <td>
+            {% if order.status %}
+                <span class="status-badge status-{{ order.status.slug }}" 
+                      data-bs-toggle="tooltip" 
+                      title="{{ order.status.name }} ({{ order.status.type }})">
+                    <i class="fas fa-circle me-1 small"></i>
+                    {{ order.status.name }}
+                </span>
+            {% else %}
+                <span class="status-badge status-unknown" data-bs-toggle="tooltip" title="حالة غير معروفة">
+                    <i class="fas fa-circle me-1 small"></i>
+                    غير محدد
+                </span>
+            {% endif %}
+        </td>
+        <!-- باقي الأعمدة تبقى كما هي -->
                      <td>
     {% if order.employee_statuses %}
         {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
@@ -1180,14 +1187,23 @@ $(document).on('click', '#print-orders-btn', function() {
 
     // 8. النقر على صف الجدول للانتقال إلى التفاصيل
     $(document).on('click', '.clickable-row', function(e) {
-        // تجاهل النقر على عناصر الإدخال أو الأزرار
-        if ($(e.target).is('input, button, a, i') || $(e.target).closest('button, a, .actions-cell').length) {
-            return;
-        }
-        
-        const orderId = $(this).data('order-id');
-        window.location.href = "{{ url_for('orders.order_details', order_id=0) }}".replace('0', orderId);
-    });
+    // تجاهل النقر على عناصر الإدخال أو الأزرار
+    if ($(e.target).is('input, button, a, i') || $(e.target).closest('button, a, .actions-cell').length) {
+        return;
+    }
+    
+    const orderId = $(this).data('order-id');
+    const orderType = $(this).data('order-type');
+    
+    let url;
+    if (orderType === 'custom') {
+        url = "{{ url_for('orders.custom_order_details', order_id=0) }}".replace('0', orderId);
+    } else {
+        url = "{{ url_for('orders.order_details', order_id=0) }}".replace('0', orderId);
+    }
+    
+    window.location.href = url;
+});
 
     // --- التشغيل عند تحميل الصفحة ---
     updateTimestamps();
