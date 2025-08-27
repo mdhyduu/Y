@@ -558,15 +558,20 @@ def index():
         # جلب الحالات المخصصة بشكل صحيح
         # جلب الحالات المخصصة (للعرض في الفلاتر)
         # جلب الحالات المخصصة بشكل صحيح
+        # في جزء جلب الحالات المخصصة
         custom_statuses = []
         if is_reviewer:
-            # للمديرين/المراجعين: جميع الحالات النشطة في المتجر
+            # للمديرين/المراجعين: جميع الحالات في المتجر
             custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(
                 Employee.store_id == user.store_id,
-                EmployeeCustomStatus.is_active == True
+                EmployeeCustomStatus.is_active == True  # تأكد من إضافة هذا الشرط
             ).all()
         elif employee:
-            # للموظفين العاديين: حالاتهم النشطة فقط
+            # للموظفين العاديين: حالاتهم الخاصة فقط
+            # تأكد من تحميل العلاقة إذا لم تكن محملة مسبقاً
+            if not hasattr(employee, 'custom_statuses') or employee.custom_statuses is None:
+                employee = Employee.query.options(joinedload(Employee.custom_statuses)).get(employee.id)
+            
             custom_statuses = [status for status in employee.custom_statuses if status.is_active]
         
         # جلب الطلبات بناءً على النوع المحدد
@@ -655,9 +660,15 @@ def index():
             processed_orders.append(processed_order)
         
         employees = []
-        if is_reviewer:
-            employees = Employee.query.filter_by(store_id=user.store_id, is_active=True).all()
         
+        # في جزء جلب الموظفين، أضف joinedload لتحميل العلاقة
+
+# في جزء جلب الموظفين للمراجعين
+        if is_reviewer:
+            employees = Employee.query.filter_by(
+                store_id=user.store_id, 
+                is_active=True
+            ).options(joinedload(Employee.custom_statuses)).all()
         # إعداد بيانات الترحيل للقالب
         pagination = {
             'page': pagination_obj.page,
