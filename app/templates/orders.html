@@ -346,9 +346,11 @@
             </a>
         {% endif %}
         
-        {% if is_reviewer and order.type != 'custom' %}
-        <button class="btn btn-sm btn-icon btn-outline-success rounded-circle assign-single-btn" 
-                data-order-id="{{ order.id }}" title="إسناد سريع">
+        {% if is_reviewer }
+<button class="btn btn-sm btn-icon btn-outline-success rounded-circle assign-single-btn" 
+                data-order-id="{{ order.id }}" 
+                data-order-type="{{ order.type }}" 
+                title="إسناد سريع">
             <i class="fas fa-user-plus"></i>
         </button>
         {% endif %}
