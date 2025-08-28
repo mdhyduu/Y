@@ -77,7 +77,7 @@ def index():
             selected_employee = None
             
             # جلب جميع الطلبات للمتجر
-            all_orders = SallaOrder.query.filter_by(store_id=user.store_id).all()
+            all_orders = SallaOrder.query.options(joinedload(SallaOrder.status)).filter_by(store_id=user.store_id).all()
             
             # حساب الإحصائيات الشاملة
             stats = {
