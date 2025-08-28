@@ -513,9 +513,11 @@ def index():
             if order_type in ['all', 'salla']:
                 # استخدام join للتصفية حسب slug من جدول OrderStatus
                 salla_query = salla_query.join(SallaOrder.status).filter(OrderStatus.slug == status_filter)
+            
             if order_type in ['all', 'custom']:
-                custom_query = custom_query.filter(CustomOrder.status == status_filter)
-                    
+                custom_query = custom_query.filter(
+                    CustomOrder.status.has(EmployeeCustomStatus.slug == status_filter)
+    )                    
         # تطبيق فلتر الموظف
         if employee_filter:
             if order_type in ['all', 'salla']:
