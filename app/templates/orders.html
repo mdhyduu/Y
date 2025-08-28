@@ -1221,13 +1221,13 @@ function toggleQuickListButton() {
 function updateQuickListSelectionCount() {
     const selectedCount = document.querySelectorAll('#quickListContent input.quick-list-order:checked').length;
     document.getElementById('selectedOrdersCountQuick').textContent = `${selectedCount} طلب محدد`;
-    
+
     // تحديث زر الإسناد
     const assignBtn = document.getElementById('quickListAssignBtn');
     if (assignBtn) {
         assignBtn.disabled = selectedCount === 0;
     }
-    
+
     // تحديث خانة تحديد الكل
     const totalOrders = document.querySelectorAll('#quickListContent input.quick-list-order').length;
     const selectAll = document.getElementById('selectAllQuickList');
@@ -1236,7 +1236,6 @@ function updateQuickListSelectionCount() {
         selectAll.indeterminate = selectedCount > 0 && selectedCount < totalOrders;
     }
 }
-
 // معالج حدث تحديد/إلغاء تحديد الكل في القائمة السريعة
 document.addEventListener('click', function(e) {
     if (e.target && e.target.id === 'selectAllQuickList') {
