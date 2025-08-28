@@ -48,7 +48,8 @@ def create_app():
     with app.app_context():
         from . import models
         db.create_all()
-
+        custom_orders_upload_folder = os.path.join(app.root_path, 'static', 'uploads', 'custom_orders')
+        os.makedirs(custom_orders_upload_folder, exist_ok=True)            
     # استيراد الوظائف المطلوبة
     from .token_utils import refresh_salla_token
     from .models import User
