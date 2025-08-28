@@ -495,47 +495,69 @@ def index():
         is_reviewer = employee.role in ['reviewer', 'manager']
     
     try:
-        # جلب الطلبات من قاعدة البيانات المحلية (سلة + مخصصة)
+  
         salla_query = SallaOrder.query.filter_by(store_id=user.store_id).options(
             db.joinedload(SallaOrder.status),
-            db.joinedload(SallaOrder.assignments).joinedload(OrderAssignment.employee)
+            db.joinedload(SallaOrder.assignments).joinedload(OrderAssignment.employee),
+            db.joinedload(SallaOrder.status_notes)  # إضافة joinedload للملاحظات
         )
         
-        custom_query = CustomOrder.query.filter_by(store_id=user.store_id)
+        custom_query = CustomOrder.query.filter_by(store_id=user.store_id).options(
+            db.joinedload(CustomOrder.status),
+            db.joinedload(CustomOrder.assignments).joinedload(OrderAssignment.employee),
+            db.joinedload(CustomOrder.status_notes)  # إضافة joinedload للملاحظات
+        )
         
         # للموظفين العاديين: عرض فقط الطلبات المسندة لهم
         if not is_reviewer and employee:
             salla_query = salla_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee.id)
             custom_query = custom_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee.id)
+        
         # تطبيق الفلاتر المشتركة
-        # تطبيق الفلاتر المشتركة
-        if status_filter:
+        # تطبيق فلتر الحالة الخاصة (late, missing, etc.)
+        if status_filter in ['late', 'missing', 'not_shipped', 'refunded']:
             if order_type in ['all', 'salla']:
-                # استخدام join للتصفية حسب slug من جدول OrderStatus
-                salla_query = salla_query.join(SallaOrder.status).filter(OrderStatus.slug == status_filter)
-
+                salla_query = salla_query.join(SallaOrder.status_notes).filter(
+                    OrderStatusNote.status_flag == status_filter
+                )
             if order_type in ['all', 'custom']:
-                # لو الفلتر يرسل ID
-                
-            
-                # أو لو الفلتر يرسل الاسم
-                custom_query = custom_query.filter(
-                    CustomOrder.status.has(EmployeeCustomStatus.name == status_filter)
-                 )                   
-                    # تطبيق فلتر الموظف
+                custom_query = custom_query.join(CustomOrder.status_notes).filter(
+                    OrderStatusNote.status_flag == status_filter
+                )
+        elif status_filter:  # فلتر الحالة العادية
+            if order_type in ['all', 'salla']:
+                salla_query = salla_query.join(SallaOrder.status).filter(OrderStatus.slug == status_filter)
+            if order_type in ['all', 'custom']:
+                custom_query = custom_query.join(CustomOrder.status).filter(
+                    OrderStatus.slug == status_filter
+                )
+        
+        # تطبيق فلتر الموظف
         if employee_filter:
             if order_type in ['all', 'salla']:
                 salla_query = salla_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
             if order_type in ['all', 'custom']:
                 custom_query = custom_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
         
+        # تطبيق فلتر الحالة المخصصة
+        if custom_status_filter:
+            custom_status_id = int(custom_status_filter)
+            if order_type in ['all', 'salla']:
+                salla_query = salla_query.join(SallaOrder.status_notes).filter(
+                    OrderStatusNote.custom_status_id == custom_status_id
+                )
+            if order_type in ['all', 'custom']:
+                custom_query = custom_query.join(CustomOrder.status_notes).filter(
+                    OrderStatusNote.custom_status_id == custom_status_id
+                )
+        
+        # تطبيق فلتر البحث
         if search_query:
             if order_type in ['all', 'salla']:
                 salla_query = salla_query.filter(
                     SallaOrder.customer_name.ilike(f'%{search_query}%') | 
                     SallaOrder.id.ilike(f'%{search_query}%')
                 )
-            
             if order_type in ['all', 'custom']:
                 custom_query = custom_query.filter(
                     CustomOrder.customer_name.ilike(f'%{search_query}%') | 
@@ -562,6 +584,8 @@ def index():
                     custom_query = custom_query.filter(CustomOrder.created_at <= date_to_obj)
             except ValueError:
                 pass
+        
+        # ... [بقية الكود دون تغيير] ...
         
         # جلب الحالات المخصصة بشكل صحيح
         custom_statuses = []
