@@ -251,7 +251,7 @@ def index():
                 
                 # حساب الإحصائيات بناءً على الطلبات المسندة فقط
                 stats = {
-                    'new_orders': len([o for o in assigned_orders if o.status.slug == 'new']),
+                    'new_orders': len([o for o in assigned_orders if o.status_flag == 'new']),
                     'late_orders': len([o for o in assigned_orders if any(
                         note.status_flag == 'late' for note in o.status_notes
                     )]),
