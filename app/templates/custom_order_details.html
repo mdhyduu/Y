@@ -32,8 +32,6 @@
                         <span class="badge badge-secondary">
                             {% if order.status %}
                                 {{ order.status.name }}
-                            {% elif order.status_id %}
-                                {{ order.status_id }}
                             {% else %}
                                 غير محدد
                             {% endif %}
@@ -53,29 +51,68 @@
                     <h5>صورة الطلب</h5>
                 </div>
                 <div class="card-body text-center">
-                    <img src="{{ url_for('static', filename='uploads/custom_orders/' + order.order_image) }}" 
-                         alt="صورة الطلب" class="img-fluid" style="max-height: 300px;">
+                    <img src="{{ url_for('orders.serve_custom_order_image', filename=order.order_image) }}" 
+                         alt="صورة الطلب" class="img-fluid" style="max-height: 300px;"
+                         onerror="this.onerror=null; this.src='{{ url_for('static', filename='images/placeholder.jpg') }}';">
                 </div>
             </div>
             {% endif %}
             
             <!-- أقسام الحالات والإسنادات -->
+            {% if order.assignments %}
             <div class="card mb-4">
                 <div class="card-header">
                     <h5>الإسنادات</h5>
                 </div>
                 <div class="card-body">
-                    {% if order.assignments %}
-                        {% for assignment in order.assignments %}
-                            <p>{{ assignment.employee.name }} - {{ assignment.assigned_at.strftime('%Y-%m-%d %H:%M') }}</p>
-                        {% endfor %}
-                    {% else %}
-                        <p>لا توجد إسنادات</p>
-                    {% endif %}
+                    {% for assignment in order.assignments %}
+                        <p>{{ assignment.employee.name }} - {{ assignment.assigned_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                    {% endfor %}
                 </div>
             </div>
+            {% endif %}
             
-            <!-- يمكنك إضافة الأقسام الأخرى هنا -->
+            {% if status_notes %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>ملاحظات الحالة</h5>
+                </div>
+                <div class="card-body">
+                    {% for note in status_notes %}
+                        <div class="mb-3 p-2 border rounded">
+                            <strong>{{ note.admin.name if note.admin else note.employee.name }}</strong>
+                            <small class="text-muted">{{ note.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                            <p class="mb-0">{{ note.note }}</p>
+                            {% if note.custom_status %}
+                            <span class="badge" style="background-color: {{ note.custom_status.color }};">
+                                {{ note.custom_status.name }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if employee_statuses %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>حالات الموظفين</h5>
+                </div>
+                <div class="card-body">
+                    {% for status, custom_status, employee in employee_statuses %}
+                        <div class="mb-3 p-2 border rounded">
+                            <strong>{{ employee.name }}</strong>
+                            <small class="text-muted">{{ status.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                            <p class="mb-0">{{ status.note }}</p>
+                            <span class="badge" style="background-color: {{ custom_status.color }};">
+                                {{ custom_status.name }}
+                            </span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

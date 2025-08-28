@@ -1761,6 +1761,11 @@ def get_next_order_number():
             # إذا كان order_number ليس رقماً، نعود لاستخدام ID
             return str(last_order.id + 1000)
     return "1000"
+@orders_bp.route('/uploads/custom_orders/<filename>')
+def serve_custom_order_image(filename):
+    """خدمة صور الطلبات الخاصة"""
+    upload_folder = os.path.join(current_app.root_path, 'static', 'uploads', 'custom_orders')
+    return send_from_directory(upload_folder, filename)
 
 @orders_bp.route('/custom/add', methods=['GET', 'POST'])
 def add_custom_order():
@@ -1805,10 +1810,11 @@ def add_custom_order():
                     filename = secure_filename(image_file.filename)
                     # إنشاء اسم فريد للصورة
                     image_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
-                    image_path = os.path.join(UPLOAD_FOLDER, image_filename)
                     
-                    # إنشاء المجلد إذا لم يكن موجوداً
-                    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+                    # إنشاء المسار الكامل للملف
+                    upload_folder = os.path.join(current_app.root_path, 'static', 'uploads', 'custom_orders')
+                    os.makedirs(upload_folder, exist_ok=True)
+                    image_path = os.path.join(upload_folder, image_filename)
                     
                     # حفظ الصورة
                     image_file.save(image_path)
@@ -1859,7 +1865,7 @@ def custom_order_details(order_id):
         flash('الرجاء تسجيل الدخول أولاً', 'error')
         return redirect(url_for('user_auth.login'))
     
-    # جلب بيانات الطلب الخاص مع تضمين العلاقات ذات الصلة
+    # جلب بيانات الطلب الخاص مع العلاقات
     custom_order = CustomOrder.query.options(
         db.joinedload(CustomOrder.status),
         db.joinedload(CustomOrder.assignments).joinedload(OrderAssignment.employee),
@@ -1872,7 +1878,7 @@ def custom_order_details(order_id):
         flash('غير مصرح لك بالوصول إلى هذا الطلب', 'error')
         return redirect(url_for('orders.index'))
     
-    # جلب البيانات الإضافية (ملاحظات الحالة، الإسنادات، إلخ)
+    # جلب البيانات الإضافية
     status_notes = OrderStatusNote.query.filter_by(custom_order_id=order_id).options(
         db.joinedload(OrderStatusNote.admin),
         db.joinedload(OrderStatusNote.employee),
