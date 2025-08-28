@@ -1791,21 +1791,36 @@ def add_custom_order():
             total_amount = request.form.get('total_amount', 0, type=float)
             notes = request.form.get('notes', '')
             
+            # التحقق من الحقول المطلوبة
+            if not customer_name or not total_amount:
+                flash('اسم العميل والمبلغ الإجمالي حقلان مطلوبان', 'error')
+                return render_template('add_custom_order.html')
+            
             # معالجة تحميل الصورة
             image_file = request.files.get('order_image')
             image_filename = None
             
-            if image_file and allowed_file(image_file.filename):
-                filename = secure_filename(image_file.filename)
-                # إنشاء اسم فريد للصورة
-                image_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
-                image_path = os.path.join(UPLOAD_FOLDER, image_filename)
-                
-                # إنشاء المجلد إذا لم يكن موجوداً
-                os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-                
-                # حفظ الصورة
-                image_file.save(image_path)
+            if image_file and image_file.filename != '':
+                if allowed_file(image_file.filename):
+                    filename = secure_filename(image_file.filename)
+                    # إنشاء اسم فريد للصورة
+                    image_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+                    image_path = os.path.join(UPLOAD_FOLDER, image_filename)
+                    
+                    # إنشاء المجلد إذا لم يكن موجوداً
+                    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+                    
+                    # حفظ الصورة
+                    image_file.save(image_path)
+                    
+                    # التحقق من أن الصورة حفظت بنجاح
+                    if not os.path.exists(image_path):
+                        current_app.logger.error(f"فشل في حفظ الصورة: {image_path}")
+                        flash('حدث خطأ أثناء حفظ الصورة', 'error')
+                        return render_template('add_custom_order.html')
+                else:
+                    flash('صيغة الملف غير مدعومة', 'error')
+                    return render_template('add_custom_order.html')
             
             # إنشاء رقم الطلب التلقائي
             order_number = get_next_order_number()
@@ -1819,7 +1834,8 @@ def add_custom_order():
                 total_amount=total_amount,
                 order_image=image_filename,
                 notes=notes,
-                store_id=user.store_id
+                store_id=user.store_id,
+                currency='SAR'  # إضافة عملة افتراضية
             )
             
             db.session.add(custom_order)
@@ -1832,9 +1848,9 @@ def add_custom_order():
             db.session.rollback()
             flash(f'حدث خطأ أثناء إضافة الطلب: {str(e)}', 'error')
             current_app.logger.error(f"Error adding custom order: {str(e)}", exc_info=True)
+            return render_template('add_custom_order.html')
     
     return render_template('add_custom_order.html')
-
 @orders_bp.route('/custom/<int:order_id>')
 def custom_order_details(order_id):
     user, employee = get_user_from_cookies()
