@@ -82,7 +82,7 @@ def index():
             # حساب الإحصائيات الشاملة
             stats = {
                 'total_orders': len(all_orders),
-                'new_orders': len([o for o in all_orders if o.status_slug == 'new']),
+                'new_orders': len([o for o in all_orders if o.status_flag == 'new']),
                 'late_orders': db.session.query(OrderStatusNote).join(SallaOrder).filter(
                     OrderStatusNote.status_flag == 'late',
                     SallaOrder.store_id == user.store_id
@@ -251,7 +251,7 @@ def index():
                 
                 # حساب الإحصائيات بناءً على الطلبات المسندة فقط
                 stats = {
-                    'new_orders': len([o for o in assigned_orders if o.status_slug == 'new']),
+                    'new_orders': len([o for o in assigned_orders if o.status_flag == 'new']),
                     'late_orders': len([o for o in assigned_orders if any(
                         note.status_flag == 'late' for note in o.status_notes
                     )]),
