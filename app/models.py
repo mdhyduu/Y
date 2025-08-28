@@ -390,7 +390,8 @@ class CustomOrder(db.Model):
     # العلاقات
     status = db.relationship('OrderStatus', backref='custom_orders', lazy=True)
     status_notes = relationship('OrderStatusNote', back_populates='custom_order', 
-                              foreign_keys='OrderStatusNote.custom_order_id')
+                              foreign_keys='OrderStatusNote.custom_order_id',
+                              cascade='all, delete-orphan')
     employee_statuses = relationship('OrderEmployeeStatus', back_populates='custom_order',
                                    foreign_keys='OrderEmployeeStatus.custom_order_id')
     assignments = relationship('OrderAssignment', back_populates='custom_order',
