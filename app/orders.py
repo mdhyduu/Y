@@ -1843,8 +1843,13 @@ def custom_order_details(order_id):
         flash('الرجاء تسجيل الدخول أولاً', 'error')
         return redirect(url_for('user_auth.login'))
     
-    # جلب بيانات الطلب الخاص
-    custom_order = CustomOrder.query.get_or_404(order_id)
+    # جلب بيانات الطلب الخاص مع تضمين العلاقات ذات الصلة
+    custom_order = CustomOrder.query.options(
+        db.joinedload(CustomOrder.status),
+        db.joinedload(CustomOrder.assignments).joinedload(OrderAssignment.employee),
+        db.joinedload(CustomOrder.status_notes),
+        db.joinedload(CustomOrder.employee_statuses)
+    ).get_or_404(order_id)
     
     # التحقق من أن الطلب يخص المتجر الحالي
     if custom_order.store_id != user.store_id:

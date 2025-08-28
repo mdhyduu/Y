@@ -32,6 +32,8 @@
                         <span class="badge badge-secondary">
                             {% if order.status %}
                                 {{ order.status.name }}
+                            {% elif order.status_id %}
+                                {{ order.status_id }}
                             {% else %}
                                 غير محدد
                             {% endif %}
@@ -57,10 +59,23 @@
             </div>
             {% endif %}
             
-            <!-- أقسام الحالات والإسنادات (مشابهة لتفاصيل طلب سلة) -->
-            {% include 'partials/order_assignments.html' %}
-            {% include 'partials/order_status_notes.html' %}
-            {% include 'partials/employee_statuses.html' %}
+            <!-- أقسام الحالات والإسنادات -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>الإسنادات</h5>
+                </div>
+                <div class="card-body">
+                    {% if order.assignments %}
+                        {% for assignment in order.assignments %}
+                            <p>{{ assignment.employee.name }} - {{ assignment.assigned_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                        {% endfor %}
+                    {% else %}
+                        <p>لا توجد إسنادات</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- يمكنك إضافة الأقسام الأخرى هنا -->
         </div>
     </div>
 </div>
