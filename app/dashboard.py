@@ -82,21 +82,21 @@ def index():
             # حساب الإحصائيات الشاملة
             stats = {
                 'total_orders': len(all_orders),
-                'new_orders': len([o for o in all_orders if o.status_flag == 'new']),
+                'new_orders': len([o for o in all_orders if o.status == 'new']),
                 'late_orders': db.session.query(OrderStatusNote).join(SallaOrder).filter(
-                    OrderStatusNote.status_flag == 'late',
+                    OrderStatusNote.status == 'late',
                     SallaOrder.store_id == user.store_id
                 ).count(),
                 'missing_orders': db.session.query(OrderStatusNote).join(SallaOrder).filter(
-                    OrderStatusNote.status_flag == 'missing',
+                    OrderStatusNote.status == 'missing',
                     SallaOrder.store_id == user.store_id
                 ).count(),
                 'refunded_orders': db.session.query(OrderStatusNote).join(SallaOrder).filter(
-                    OrderStatusNote.status_flag == 'refunded',
+                    OrderStatusNote.status == 'refunded',
                     SallaOrder.store_id == user.store_id
                 ).count(),
                 'not_shipped_orders': db.session.query(OrderStatusNote).join(SallaOrder).filter(
-                    OrderStatusNote.status_flag == 'not_shipped',
+                    OrderStatusNote.status == 'not_shipped',
                     SallaOrder.store_id == user.store_id
                 ).count()
             }
@@ -251,18 +251,18 @@ def index():
                 
                 # حساب الإحصائيات بناءً على الطلبات المسندة فقط
                 stats = {
-                    'new_orders': len([o for o in assigned_orders if o.status_flag == 'new']),
+                    'new_orders': len([o for o in assigned_orders if o.status == 'new']),
                     'late_orders': len([o for o in assigned_orders if any(
-                        note.status_flag == 'late' for note in o.status_notes
+                        note.status== 'late' for note in o.status_notes
                     )]),
                     'missing_orders': len([o for o in assigned_orders if any(
-                        note.status_flag == 'missing' for note in o.status_notes
+                        note.status== 'missing' for note in o.status_notes
                     )]),
                     'refunded_orders': len([o for o in assigned_orders if any(
-                        note.status_flag == 'refunded' for note in o.status_notes
+                        note.status== 'refunded' for note in o.status_notes
                     )]),
                     'not_shipped_orders': len([o for o in assigned_orders if any(
-                        note.status_flag == 'not_shipped' for note in o.status_notes
+                        note.status == 'not_shipped' for note in o.status_notes
                     )])
                 }
                 

@@ -1298,20 +1298,20 @@ document.getElementById('quickListViewBtn').addEventListener('click', function()
             let html = '';
             data.orders.forEach(order => {
                 html += `
-                <div class="card mb-3">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <div class="form-check">
-                            <input class="form-check-input quick-list-order" type="checkbox" 
-                                   value="${order.id}" id="quick-order-${order.id}" checked>
-                            <label class="form-check-label fw-bold" for="quick-order-${order.id}">
-                                الطلب #${order.reference_id}
-                            </label>
-                        </div>
-                        <span class="badge bg-${order.status_class || 'secondary'}">${order.status_text || 'غير معروف'}</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                `;
+<div class="card mb-3" data-order-id="${order.id}" data-order-type="${order.type}">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="form-check">
+            <input class="form-check-input quick-list-order" type="checkbox" 
+                   value="${order.id}" id="quick-order-${order.id}" checked>
+            <label class="form-check-label fw-bold" for="quick-order-${order.id}">
+                الطلب #${order.reference_id}
+            </label>
+        </div>
+        <span class="badge bg-${order.status_class || 'secondary'}">${order.status_text || 'غير معروف'}</span>
+    </div>
+    ...
+</div>
+`;
                 
                 if (order.items && order.items.length > 0) {
                     order.items.forEach((item, index) => {
@@ -1357,29 +1357,33 @@ document.getElementById('quickListViewBtn').addEventListener('click', function()
 // معالج حدث إسناد الطلبات من القائمة السريعة
 document.getElementById('quickListAssignBtn').addEventListener('click', function() {
     const employeeId = document.getElementById('quickListAssignSelect').value;
-    
-    // الحصول على الطلبات المحددة في القائمة السريعة
-    const selectedOrderIds = [];
+
+    // الحصول على الطلبات المحددة في القائمة السريعة مع النوع
+    const selectedOrders = [];
     document.querySelectorAll('#quickListContent input.quick-list-order:checked').forEach(checkbox => {
-        selectedOrderIds.push(checkbox.value);
+        const row = checkbox.closest('tr');
+        selectedOrders.push({
+            id: row.dataset.orderId,
+            type: row.dataset.orderType   // <-- مهم جداً (salla/custom)
+        });
     });
-    
+
     if (!employeeId) {
         showSweetAlert('warning', 'تحذير', 'يرجى اختيار موظف للإسناد');
         return;
     }
-    
-    if (selectedOrderIds.length === 0) {
+
+    if (selectedOrders.length === 0) {
         showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للإسناد');
         return;
     }
-    
+
     // تعطيل الزر أثناء المعالجة
     const assignBtn = document.getElementById('quickListAssignBtn');
     const originalText = assignBtn.innerHTML;
     assignBtn.disabled = true;
     assignBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> جاري الإسناد';
-    
+
     // إرسال طلب الإسناد
     fetch("{{ url_for('orders.assign_orders') }}", {
         method: 'POST',
@@ -1389,7 +1393,7 @@ document.getElementById('quickListAssignBtn').addEventListener('click', function
         },
         body: JSON.stringify({
             employee_id: employeeId,
-            order_ids: selectedOrderIds,
+            orders: selectedOrders,   // ✅ الشكل الجديد
             current_user_id: "{{ session.get('user_id') }}"
         })
     })
@@ -1420,7 +1424,7 @@ document.getElementById('quickListAssignBtn').addEventListener('click', function
     .catch(error => {
         assignBtn.disabled = false;
         assignBtn.innerHTML = originalText;
-        
+
         Swal.fire({
             icon: 'error',
             title: 'فشل الإسناد',
@@ -1432,7 +1436,6 @@ document.getElementById('quickListAssignBtn').addEventListener('click', function
         });
     });
 });
-
 // إضافة event listeners لتفعيل الزر عند تحديد الطلبات
 document.addEventListener('DOMContentLoaded', function() {
     const checkboxes = document.querySelectorAll('input.order-checkbox');
