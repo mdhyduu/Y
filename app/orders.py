@@ -514,12 +514,14 @@ def index():
                 # استخدام join للتصفية حسب slug من جدول OrderStatus
                 salla_query = salla_query.join(SallaOrder.status).filter(OrderStatus.slug == status_filter)
             if order_type in ['all', 'custom']:
-                # إذا كان لديك حقل حالة للطلبات المخصصة، أضف التصفية المناسبة هنا
-                pass
-        
+                custom_query = custom_query.filter(CustomOrder.status == status_filter)
+                    
         # تطبيق فلتر الموظف
-        if employee_filter and order_type in ['all', 'salla']:
-            salla_query = salla_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
+        if employee_filter:
+            if order_type in ['all', 'salla']:
+                salla_query = salla_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
+            if order_type in ['all', 'custom']:
+                custom_query = custom_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
         
         if search_query:
             if order_type in ['all', 'salla']:
