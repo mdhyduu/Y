@@ -657,16 +657,6 @@ def index():
                 status_name = order.status.name if order.status else 'غير محدد'
                 status_slug = order.status.slug if order.status else 'unknown'
                 
-                # معالجة الحالات الخاصة من الملاحظات
-                special_statuses = []
-                for note in order.status_notes:
-                    if note.status_flag and note.status_flag in ['late', 'missing', 'not_shipped', 'refunded']:
-                        special_statuses.append({
-                            'flag': note.status_flag,
-                            'created_at': note.created_at,
-                            'note': note.note or ''
-                        })
-                
                 processed_order = {
                     'id': order.id,
                     'reference_id': reference_id,
@@ -680,22 +670,11 @@ def index():
                     'raw_created_at': order.created_at,
                     'type': 'salla',
                     'assignments': order.assignments,
-                    'employee_statuses': order.employee_statuses,
-                    'status_notes': order.status_notes,
-                    'special_statuses': special_statuses,  # إضافة الحالات الخاصة
-                    'has_special_status': len(special_statuses) > 0  # علامة إذا كان هناك حالات خاصة
-                }
-            else:  # CustomOrder
-                # معالجة الحالات الخاصة من الملاحظات للطلبات المخصصة
-                special_statuses = []
-                for note in order.status_notes:
-                    if note.status_flag and note.status_flag in ['late', 'missing', 'not_shipped', 'refunded']:
-                        special_statuses.append({
-                            'flag': note.status_flag,
-                            'created_at': note.created_at,
-                            'note': note.note or ''
-                        })
+                    'employee_statuses': order.employee_statuses,  # <<< أضف هذا
+                    'status_notes': order.status_notes             # <<< وأيضًا هذا لو عايز تعرض الملاحظات
+                } 
                 
+            else:  # CustomOrder
                 processed_order = {
                     'id': order.id,
                     'reference_id': order.order_number,
@@ -710,13 +689,10 @@ def index():
                     'type': 'custom',
                     'total_amount': order.total_amount,
                     'currency': order.currency,
-                    'employee_statuses': order.employee_statuses,
-                    'status_notes': order.status_notes,
-                    'special_statuses': special_statuses,  # إضافة الحالات الخاصة
-                    'has_special_status': len(special_statuses) > 0  # علامة إذا كان هناك حالات خاصة
+                    'employee_statuses': order.employee_statuses,  # <<< نفس الشيء هنا
+                    'status_notes': order.status_notes
                 }
-            
-            processed_orders.append(processed_order)                 
+                    
             processed_orders.append(processed_order)
         
         employees = []
