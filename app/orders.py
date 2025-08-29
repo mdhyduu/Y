@@ -515,13 +515,22 @@ def index():
         
         # تطبيق الفلاتر المشتركة
         # تطبيق فلتر الحالة الخاصة (late, missing, etc.)
+        # تطبيق فلتر الحالة الخاصة (late, missing, etc.)
         if status_filter in ['late', 'missing', 'not_shipped', 'refunded']:
             if order_type in ['all', 'salla']:
-                salla_query = salla_query.join(SallaOrder.status_notes).filter(
+                # للطلبات السلة: استخدام status_notes المرتبطة بـ SallaOrder
+                salla_query = salla_query.join(
+                    OrderStatusNote, 
+                    OrderStatusNote.order_id == SallaOrder.id
+                ).filter(
                     OrderStatusNote.status_flag == status_filter
                 )
             if order_type in ['all', 'custom']:
-                custom_query = custom_query.join(CustomOrder.status_notes).filter(
+                # للطلبات المخصصة: استخدام status_notes المرتبطة بـ CustomOrder
+                custom_query = custom_query.join(
+                    OrderStatusNote, 
+                    OrderStatusNote.custom_order_id == CustomOrder.id
+                ).filter(
                     OrderStatusNote.status_flag == status_filter
                 )
         elif status_filter:  # فلتر الحالة العادية
