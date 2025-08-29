@@ -506,16 +506,16 @@
         
         /* إخفاء بعض الأعمدة في الشاشات الصغيرة */
 
-        .table th:nth-child(4),
-        .table td:nth-child(4),
+        .table th:nth-child(3),
+        .table td:nth-child(3),
         .table th:nth-child(7),
         .table td:nth-child(7) {
             display: none;
         }
         
-        {% if not  is_reviewer %}
-        .table th:nth-child(3),
-        .table td:nth-child(3) {
+        {% if not is_reviewer %}
+        .table th:nth-child(4),
+        .table td:nth-child(4) {
             display: none;
         }
         {% endif %}
@@ -524,7 +524,7 @@
         /* تحسين عرض الأعمدة في الشاشات الصغيرة */
         .table th:nth-child(1) { width: 8%; } /* عمود التحديد */
         .table th:nth-child(2) { width: 17%; } /* رقم الطلب */
-        .table th:nth-child(3) { width: 17%; } 
+        .table th:nth-child(4) { width: 17%; } 
         .table th:nth-child(5) { width: 17%; }  
         .table th:nth-child(6) { width: 16%; } /* العلامات */
         .table th:last-child { width: 25%; } /* الإجراءات */
