@@ -673,18 +673,18 @@ def index():
                     'employee_statuses': order.employee_statuses,  # <<< أضف هذا
                     'status_notes': order.status_notes             # <<< وأيضًا هذا لو عايز تعرض الملاحظات
                 } 
-                special_statuses = []
-                        for note in order.status_notes:
-                            if note.status_flag and note.status_flag in ['late', 'missing', 'not_shipped', 'refunded']:
-                                special_statuses.append({
-                                    'flag': note.status_flag,
-                                    'created_at': note.created_at,
-                                    'note': note.note or ''
-                                })
-                        
-                        # إضافة الحالات الخاصة إلى الطلب المعالج
-                        processed_order['special_statuses'] = special_statuses
-                        processed_order['has_special_status'] = len(special_statuses) > 0
+                    special_statuses = []
+                            for note in order.status_notes:
+                                if note.status_flag and note.status_flag in ['late', 'missing', 'not_shipped', 'refunded']:
+                                    special_statuses.append({
+                                        'flag': note.status_flag,
+                                        'created_at': note.created_at,
+                                        'note': note.note or ''
+                                    })
+                            
+                            # إضافة الحالات الخاصة إلى الطلب المعالج
+                            processed_order['special_statuses'] = special_statuses
+                            processed_order['has_special_status'] = len(special_statuses) > 0
         
             else:  # CustomOrder
                 processed_order = {
@@ -704,17 +704,17 @@ def index():
                     'employee_statuses': order.employee_statuses,  # <<< نفس الشيء هنا
                     'status_notes': order.status_notes
                 }
-                special_statuses = []
-                        for note in order.status_notes:
-                            if note.status_flag and note.status_flag in ['late', 'missing', 'not_shipped', 'refunded']:
-                                special_statuses.append({
-                                    'flag': note.status_flag,
-                                    'created_at': note.created_at,
-                                    'note': note.note or ''
-                                })
-                        
-                        processed_order['special_statuses'] = special_statuses
-                        processed_order['has_special_status'] = len(special_statuses) > 0
+                    special_statuses = []
+                            for note in order.status_notes:
+                                if note.status_flag and note.status_flag in ['late', 'missing', 'not_shipped', 'refunded']:
+                                    special_statuses.append({
+                                        'flag': note.status_flag,
+                                        'created_at': note.created_at,
+                                        'note': note.note or ''
+                                    })
+                            
+                            processed_order['special_statuses'] = special_statuses
+                            processed_order['has_special_status'] = len(special_statuses) > 0
     
     processed_orders.append(processed_order)                    
             processed_orders.append(processed_order)
