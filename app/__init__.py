@@ -41,15 +41,13 @@ def create_app():
     
     # تهيئة الإضافات مع التطبيق
     db.init_app(app)
-    migrate.init_app(app, db)
     csrf.init_app(app)
 
     # تسجيل النماذج مع سياق التطبيق
     with app.app_context():
         from . import models
         db.create_all()
-        custom_orders_upload_folder = os.path.join(app.root_path, 'static', 'uploads', 'custom_orders')
-        os.makedirs(custom_orders_upload_folder, exist_ok=True)            
+   
     # استيراد الوظائف المطلوبة
     from .token_utils import refresh_salla_token
     from .models import User
