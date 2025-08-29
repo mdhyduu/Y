@@ -4,7 +4,7 @@ const urlsToCache = [
   "/static/css/main.css",
   "/static/icons/icon-192x192.png",
   "/static/icons/s.png",
-  "/static/manifest.json",
+  
   "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css",
   "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css",
   "https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap",

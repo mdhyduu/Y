@@ -169,7 +169,7 @@ def create_app():
     app.jinja_env.filters['get_status_badge'] = get_status_badge
     app.jinja_env.filters['hex_to_rgb'] = hex_to_rgb # <-- أضف هذا السطر
 
-
+ 
     def generate_pwa_icons(base_icon_path):
         """
         إنشاء أيقونات PWA بأحجام مختلفة من أيقونة أساسية
@@ -210,7 +210,7 @@ def create_app():
         manifest_json = '''
         {
           "short_name": "سلطانة",
-          "name": "نظام إدارة الطلبات - لوحة التحكم",
+          "name": "مرحبا بكم ",
           "description": "نظام متكامل لإدارة الطلبات والمبيعات",
           "lang": "ar",
           "dir": "rtl",
