@@ -672,7 +672,13 @@ def index():
                     'assignments': order.assignments,
                     'employee_statuses': order.employee_statuses,  # <<< أضف هذا
                     'status_notes': order.status_notes             # <<< وأيضًا هذا لو عايز تعرض الملاحظات
-                }
+                } 
+                special_statuses = []
+                        for note in order.status_notes:
+                            if note.status_flag and note.status_flag in ['late', 'missing', 'not_shipped', 'refunded']:
+                                special_statuses.append(note.status_flag)
+                        
+                        processed_order['special_statuses'] = special_statuses
             else:  # CustomOrder
                 processed_order = {
                     'id': order.id,
