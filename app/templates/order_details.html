@@ -82,30 +82,40 @@
 {% endif %}
   </td>
   
-  <td style="width: 150px; min-width: 150px;">
+<td style="width: 150px; min-width: 150px;">
     <div class="product-status-container text-center">
         {% set product_status = product_statuses.get(item.id|string, {}) %}
+        {% set is_completed = product_status.status == 'تم التنفيذ' %}
         
         <!-- حالة المنتج الحالية -->
         <div class="mb-2">
-            <span class="badge bg-{{ 'success' if product_status.status == 'تم التنفيذ' else 'secondary' }} status-badge">
-                {{ product_status.status if product_status.status else 'قيد التنفيذ' }}
-            </span>
+            {% if is_completed %}
+                <span class="badge bg-success status-badge">تم التنفيذ</span>
+            {% else %}
+                <!-- إذا لم تكن مكتملة، لا نعرض أي شيء أو نعرض حالة أخرى إذا أردت -->
+                <!-- <span class="badge bg-secondary status-badge">قيد التنفيذ</span> -->
+            {% endif %}
         </div>
         
         <!-- زر تحديث الحالة -->
-        {% if current_employee %}
+        {% if current_employee and not is_reviewer %}
             <form class="update-product-status-form" data-order-id="{{ order.id }}" data-product-id="{{ item.id }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 
-                {% if product_status.status != 'تم التنفيذ' %}
-                    <button type="button" class="btn btn-success btn-sm mark-completed-btn" title="تم التنفيذ">
-                        <i class="fas fa-check"></i>
-                    </button>
+                {% if not is_completed %}
+                    <div class="form-check form-switch d-inline-block">
+                        <input class="form-check-input mark-completed-checkbox" type="checkbox" 
+                               id="product-{{ item.id }}-status" 
+                               data-order-id="{{ order.id }}" 
+                               data-product-id="{{ item.id }}">
+                        <label class="form-check-label small" for="product-{{ item.id }}-status">
+                            تم
+                        </label>
+                    </div>
                 {% else %}
-                    <button type="button" class="btn btn-outline-success btn-sm" disabled title="مكتمل">
-                        <i class="fas fa-check-double"></i>
-                    </button>
+                    <div class="text-success">
+                        <i class="fas fa-check-circle fa-lg"></i>
+                    </div>
                 {% endif %}
             </form>
         {% endif %}
@@ -118,8 +128,6 @@
         {% endif %}
     </div>
 </td>
-  
-  
 </tr>
                 {% endfor %}
               </tbody>
@@ -748,5 +756,86 @@
     timer: 3000
   });
   {% endif %}
+  
+ document.addEventListener('DOMContentLoaded', function() {
+    // معالجة تحديث حالة المنتج باستخدام الـ checkbox
+    document.querySelectorAll('.mark-completed-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                const orderId = this.dataset.orderId;
+                const productId = this.dataset.productId;
+                const form = this.closest('.update-product-status-form');
+                
+                // عرض تحذير تأكيد
+                Swal.fire({
+                    title: 'تأكيد التحديث',
+                    text: 'هل تريد وضع علامة "تم التنفيذ" على هذا المنتج؟',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'نعم، تم التنفيذ',
+                    cancelButtonText: 'إلغاء',
+                    reverseButtons: true
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // إرسال طلب AJAX لتحديث الحالة
+                        fetch(`/orders/${orderId}/update_product_status`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': form.querySelector('input[name="csrf_token"]').value
+                            },
+                            body: JSON.stringify({
+                                product_id: productId,
+                                status: 'تم التنفيذ'
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                // تحديث الواجهة دون إعادة تحميل الصفحة
+                                const statusContainer = form.closest('.product-status-container');
+                                statusContainer.querySelector('.status-badge').textContent = 'تم التنفيذ';
+                                statusContainer.querySelector('.status-badge').className = 'badge bg-success status-badge';
+                                
+                                // استبدال الـ checkbox بعلامة صح
+                                form.innerHTML = `
+                                    <div class="text-success">
+                                        <i class="fas fa-check-circle fa-lg"></i>
+                                    </div>
+                                    <div class="text-muted small mt-1">
+                                        ${new Date().toLocaleTimeString('ar-SA')} ${new Date().toLocaleDateString('ar-SA')}
+                                    </div>
+                                `;
+                                
+                                Swal.fire({
+                                    title: 'تم التحديث!',
+                                    text: 'تم تحديث حالة المنتج بنجاح',
+                                    icon: 'success',
+                                    timer: 2000,
+                                    showConfirmButton: false
+                                });
+                            } else {
+                                throw new Error(data.error || 'حدث خطأ غير متوقع');
+                            }
+                        })
+                        .catch(error => {
+                            Swal.fire({
+                                title: 'خطأ!',
+                                text: error.message,
+                                icon: 'error',
+                                confirmButtonText: 'حسناً'
+                            });
+                            // إعادة تعيين الـ checkbox في حالة الخطأ
+                            this.checked = false;
+                        });
+                    } else {
+                        // إلغاء التحديث، إعادة تعيين الـ checkbox
+                        this.checked = false;
+                    }
+                });
+            }
+        });
+    });
+});
 </script>
 {% endblock %}
