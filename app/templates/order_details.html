@@ -82,47 +82,44 @@
 {% endif %}
   </td>
   
+            <td style="width: 150px; min-width: 150px;">
+                    <div class="product-status-container text-center">
+                      {% set product_status = product_statuses.get(item.id|string, {}) %}
+                      
+                      <!-- حالة المنتج الحالية -->
+                      <div class="mb-2">
+                        <span class="badge bg-{{ 'success' if product_status.status == 'تم التنفيذ' else 'secondary' }} status-badge">
+                          {{ product_status.status if product_status.status else 'قيد التنفيذ' }}
+                        </span>
+                      </div>
+                      
+                      <!-- زر تحديث الحالة -->
+                      {% if current_employee and not is_reviewer %}
+                        <form class="update-product-status-form" data-order-id="{{ order.id }}" data-product-id="{{ item.id }}">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                          
+                          {% if product_status.status != 'تم التنفيذ' %}
+                            <button type="button" class="btn btn-success btn-sm mark-completed-btn">
+                              <i class="fas fa-check"></i> تم التنفيذ
+                            </button>
+                          {% else %}
+                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
+                              <i class="fas fa-check-double"></i> مكتمل
+                            </button>
+                          {% endif %}
+                        </form>
+                      {% endif %}
+                      
+                      <!-- وقت التحديث -->
+                      {% if product_status.updated_at %}
+                        <div class="text-muted small mt-1">
+                          {{ product_status.updated_at.strftime('%H:%M %Y-%m-%d') }}
+                        </div>
+                      {% endif %}
+                    </div>
+                  </td>
   
   
-  <!-- في قسم عرض المنتجات، أضف هذا العمود الجديد بعد عمود الخيارات
- 
-  <!-- العمود الجديد: حالة المنتج -->
-  <td style="width: 150px; min-width: 150px;">
-    <div class="product-status-container text-center">
-      {% set product_status = product_statuses.get(item.id|string, {}) %}
-      
-      <!-- حالة المنتج الحالية -->
-      <div class="mb-2">
-        <span class="badge bg-{{ 'success' if product_status.status == 'تم التنفيذ' else 'secondary' }} status-badge">
-          {{ product_status.status if product_status else 'قيد التنفيذ' }}
-        </span>
-      </div>
-      
-      <!-- زر تحديث الحالة -->
-      {% if current_employee and not is_reviewer %}
-        <form class="update-product-status-form" data-order-id="{{ order.id }}" data-product-id="{{ item.id }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          
-          {% if product_status.status != 'تم التنفيذ' %}
-            <button type="button" class="btn btn-success btn-sm mark-completed-btn">
-              <i class="fas fa-check"></i> تم التنفيذ
-            </button>
-          {% else %}
-            <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
-              <i class="fas fa-check-double"></i> مكتمل
-            </button>
-          {% endif %}
-        </form>
-      {% endif %}
-      
-      <!-- وقت التحديث -->
-      {% if product_status.updated_at %}
-        <div class="text-muted small mt-1">
-          {{ product_status.updated_at.strftime('%H:%M %Y-%m-%d') }}
-        </div>
-      {% endif %}
-    </div>
-  </td>
 </tr>
                 {% endfor %}
               </tbody>
@@ -750,9 +747,8 @@
     confirmButtonText: 'حسناً',
     timer: 3000
   });
-  
-
-document.addEventListener('DOMContentLoaded', function() {
+  {% endif %}
+ document.addEventListener('DOMContentLoaded', function() {
   // معالجة تحديث حالة المنتج
   document.querySelectorAll('.mark-completed-btn').forEach(button => {
     button.addEventListener('click', function() {
@@ -825,6 +821,5 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
-
 </script>
 {% endblock %}
