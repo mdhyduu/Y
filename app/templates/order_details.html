@@ -55,7 +55,11 @@
       الكمية: {{ item.quantity }}
     </div>
   </td>
-  
+  <div class="text-muted small mt-1 update-time">
+    {% if product_status.updated_at %}
+        {{ product_status.updated_at.strftime('%H:%M %Y-%m-%d') }}
+    {% endif %}
+</div>
   <!-- خيارات المنتج -->
   <td style="min-width: 150px;">
 {% if item.options %}
@@ -100,21 +104,21 @@
         
         <!-- تحديث الحالة -->
         {% if current_employee and not is_reviewer %}
-            <form class="update-product-status-form" data-order-id="{{ order.id }}" data-product-id="{{ item.id }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                 <input type="hidden" name="product_id" value="{{ item.id }}">
-                <div class="d-flex align-items-center justify-content-center">
-                    <select class="form-select form-select-sm me-1" name="status" required>
-                        <option value="قيد التنفيذ" {% if current_status == 'قيد التنفيذ' %}selected{% endif %}>قيد التنفيذ</option>
-                        <option value="تم التنفيذ" {% if current_status == 'تم التنفيذ' %}selected{% endif %}>تم التنفيذ</option>
-                        <option value="معلق" {% if current_status == 'معلق' %}selected{% endif %}>معلق</option>
-                        <option value="ملغي" {% if current_status == 'ملغي' %}selected{% endif %}>ملغي</option>
-                    </select>
-                    <button type="submit" class="btn btn-sm btn-primary">
-                        <i class="fas fa-save"></i>
-                    </button>
-                </div>
-            </form>
+<form class="update-product-status-form" data-order-id="{{ order.id }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="product_id" value="{{ item.id }}">
+    <div class="d-flex align-items-center justify-content-center">
+        <select class="form-select form-select-sm me-1" name="status" required>
+            <option value="قيد التنفيذ" {% if current_status == 'قيد التنفيذ' %}selected{% endif %}>قيد التنفيذ</option>
+            <option value="تم التنفيذ" {% if current_status == 'تم التنفيذ' %}selected{% endif %}>تم التنفيذ</option>
+            <option value="معلق" {% if current_status == 'معلق' %}selected{% endif %}>معلق</option>
+            <option value="ملغي" {% if current_status == 'ملغي' %}selected{% endif %}>ملغي</option>
+        </select>
+        <button type="submit" class="btn btn-sm btn-primary">
+            <i class="fas fa-save"></i>
+        </button>
+    </div>
+</form>
         {% endif %}
         
         <!-- وقت التحديث -->
@@ -758,11 +762,17 @@ document.querySelectorAll('.update-product-status-form').forEach(form => {
         e.preventDefault();
         
         const orderId = this.dataset.orderId;
+        const productId = this.dataset.productId;
         const formData = new FormData(this);
         
-        // إضافة product_id يدويًا إلى FormData
-        const productId = this.dataset.productId;
+        // إضافة product_id إلى FormData للتأكد من وجوده
         formData.append('product_id', productId);
+        
+        console.log('إرسال بيانات:', {
+            orderId: orderId,
+            productId: productId,
+            status: formData.get('status')
+        });
         
         // عرض تحذير تأكيد
         Swal.fire({
@@ -775,41 +785,39 @@ document.querySelectorAll('.update-product-status-form').forEach(form => {
             reverseButtons: true
         }).then((result) => {
             if (result.isConfirmed) {
-                // إرسال طلب AJAX لتحديث الحالة باستخدام FormData
+                // إرسال طلب AJAX لتحديث الحالة
                 fetch(`/orders/${orderId}/update_product_status`, {
                     method: 'POST',
                     body: formData,
                     headers: {
-                        'X-CSRFToken': this.querySelector('input[name="csrf_token"]').value
+                        'X-CSRFToken': formData.get('csrf_token')
                     }
                 })
-                .then(response => response.json())
+                .then(response => {
+                    console.log('استجابة الخادم:', response);
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('بيانات الاستجابة:', data);
                     if (data.success) {
                         // تحديث الواجهة بنجاح
                         const statusContainer = this.closest('.product-status-container');
                         const statusBadge = statusContainer.querySelector('.status-badge');
                         
                         if (statusBadge) {
-                            statusBadge.textContent = data.status;
+                            statusBadge.textContent = data.status || formData.get('status');
                             // تحديث لون البادج بناءً على الحالة
                             statusBadge.className = 'badge status-badge ' + 
-                                (data.status === 'تم التنفيذ' ? 'bg-success' :
-                                 data.status === 'قيد التنفيذ' ? 'bg-primary' :
-                                 data.status === 'معلق' ? 'bg-warning' :
-                                 data.status === 'ملغي' ? 'bg-danger' : 'bg-secondary');
-                        }
-                        
-                        // تحديث وقت التحديث
-                        const updateTimeElement = statusContainer.querySelector('.update-time');
-                        if (updateTimeElement) {
-                            updateTimeElement.textContent = data.updated_at;
+                                (data.status === 'تم التنفيذ' || formData.get('status') === 'تم التنفيذ' ? 'bg-success' :
+                                 data.status === 'قيد التنفيذ' || formData.get('status') === 'قيد التنفيذ' ? 'bg-primary' :
+                                 data.status === 'معلق' || formData.get('status') === 'معلق' ? 'bg-warning' :
+                                 data.status === 'ملغي' || formData.get('status') === 'ملغي' ? 'bg-danger' : 'bg-secondary');
                         }
                         
                         // عرض رسالة النجاح
                         Swal.fire({
                             title: 'تم التحديث!',
-                            text: 'تم تحديث حالة المنتج بنجاح',
+                            text: data.message || 'تم تحديث حالة المنتج بنجاح',
                             icon: 'success',
                             timer: 2000,
                             showConfirmButton: false
@@ -819,6 +827,7 @@ document.querySelectorAll('.update-product-status-form').forEach(form => {
                     }
                 })
                 .catch(error => {
+                    console.error('خطأ:', error);
                     Swal.fire({
                         title: 'خطأ!',
                         text: error.message,

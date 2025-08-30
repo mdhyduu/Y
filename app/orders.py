@@ -1991,20 +1991,24 @@ def update_product_status(order_id):
     if not employee:
         return jsonify({'success': False, 'error': 'غير مصرح لك بهذا الإجراء'}), 403
     
-    # استخدام request.form بدلاً من request.get_json
+    # استخدام request.form
     product_id = request.form.get('product_id')
     status = request.form.get('status')
     notes = request.form.get('notes', '')
     
+    current_app.logger.info(f"طلب تحديث حالة المنتج: order_id={order_id}, product_id={product_id}, status={status}")
+    
     if not product_id or not status:
-        current_app.logger.error(f"بيانات ناقصة: product_id={product_id}, status={status}")
-        return jsonify({'success': False, 'error': 'بيانات ناقصة'}), 400
+        error_msg = f"بيانات ناقصة: product_id={product_id}, status={status}"
+        current_app.logger.error(error_msg)
+        return jsonify({'success': False, 'error': error_msg}), 400
     
     # التحقق من أن القيمة المرسلة صحيحة
     valid_statuses = ['قيد التنفيذ', 'تم التنفيذ', 'معلق', 'ملغي']
     if status not in valid_statuses:
-        current_app.logger.error(f"حالة غير صالحة: {status}")
-        return jsonify({'success': False, 'error': 'حالة غير صالحة'}), 400
+        error_msg = f"حالة غير صالحة: {status}"
+        current_app.logger.error(error_msg)
+        return jsonify({'success': False, 'error': error_msg}), 400
     
     try:
         # التحقق من أن الطلب مسند للموظف
@@ -2014,7 +2018,8 @@ def update_product_status(order_id):
         ).first()
         
         if not assignment:
-            current_app.logger.error(f"الطلب {order_id} غير مسند للموظف {employee.id}")
+            error_msg = f"الطلب {order_id} غير مسند للموظف {employee.id}"
+            current_app.logger.error(error_msg)
             return jsonify({'success': False, 'error': 'الطلب غير مسند لك'}), 403
         
         # البحث عن حالة المنتج الحالية أو إنشاء جديدة
@@ -2048,10 +2053,12 @@ def update_product_status(order_id):
             'success': True,
             'message': 'تم تحديث حالة المنتج بنجاح',
             'status': status,
+            'product_id': product_id,
             'updated_at': product_status.updated_at.strftime('%Y-%m-%d %H:%M:%S')
         })
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"خطأ في تحديث حالة المنتج: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'error': f'حدث خطأ: {str(e)}'}), 500
+        error_msg = f"خطأ في تحديث حالة المنتج: {str(e)}"
+        current_app.logger.error(error_msg, exc_info=True)
+        return jsonify({'success': False, 'error': error_msg}), 500
