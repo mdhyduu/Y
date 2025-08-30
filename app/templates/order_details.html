@@ -753,15 +753,16 @@
     timer: 3000
   });
   {% endif %}
-  
-
->
 document.querySelectorAll('.update-product-status-form').forEach(form => {
     form.addEventListener('submit', function(e) {
         e.preventDefault();
         
         const orderId = this.dataset.orderId;
         const formData = new FormData(this);
+        
+        // إضافة product_id يدويًا إلى FormData
+        const productId = this.dataset.productId;
+        formData.append('product_id', productId);
         
         // عرض تحذير تأكيد
         Swal.fire({
@@ -790,13 +791,19 @@ document.querySelectorAll('.update-product-status-form').forEach(form => {
                         const statusBadge = statusContainer.querySelector('.status-badge');
                         
                         if (statusBadge) {
-                            statusBadge.textContent = formData.get('status');
+                            statusBadge.textContent = data.status;
                             // تحديث لون البادج بناءً على الحالة
                             statusBadge.className = 'badge status-badge ' + 
-                                (formData.get('status') === 'تم التنفيذ' ? 'bg-success' :
-                                 formData.get('status') === 'قيد التنفيذ' ? 'bg-primary' :
-                                 formData.get('status') === 'معلق' ? 'bg-warning' :
-                                 formData.get('status') === 'ملغي' ? 'bg-danger' : 'bg-secondary');
+                                (data.status === 'تم التنفيذ' ? 'bg-success' :
+                                 data.status === 'قيد التنفيذ' ? 'bg-primary' :
+                                 data.status === 'معلق' ? 'bg-warning' :
+                                 data.status === 'ملغي' ? 'bg-danger' : 'bg-secondary');
+                        }
+                        
+                        // تحديث وقت التحديث
+                        const updateTimeElement = statusContainer.querySelector('.update-time');
+                        if (updateTimeElement) {
+                            updateTimeElement.textContent = data.updated_at;
                         }
                         
                         // عرض رسالة النجاح
@@ -823,6 +830,5 @@ document.querySelectorAll('.update-product-status-form').forEach(form => {
         });
     });
 });
-
 </script>
 {% endblock %}
