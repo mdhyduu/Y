@@ -2008,15 +2008,12 @@ def update_product_status(order_id, product_id):
         }), 403
     
     try:
-        # التحقق من أن الطلب هو JSON
-        if not request.is_json:
-            return jsonify({
-                'success': False,
-                'error': 'طلب غير صحيح - يجب أن يكون JSON'
-            }), 400
-            
-        data = request.get_json()
-        new_status = data.get('status', 'تم التنفيذ')
+        # التحقق من نوع المحتوى وقبول كلا النوعين (JSON و form-data)
+        if request.is_json:
+            data = request.get_json()
+            new_status = data.get('status', 'تم التنفيذ')
+        else:
+            new_status = request.form.get('status', 'تم التنفيذ')
         
         # البحث عن حالة المنتج الحالية
         product_status = OrderProductStatus.query.filter_by(
@@ -2043,12 +2040,13 @@ def update_product_status(order_id, product_id):
         
         return jsonify({
             'success': True,
-            'message': 'تم تحديث حالة المنتج بنجاح'
+            'message': 'تم تحديث حالة المنتج بنجاح',
+            'status': new_status
         })
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"Error updating product status: {str(e)}")
+        current_app.logger.error(f"Error updating product status: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
             'error': f'حدث خطأ أثناء تحديث حالة المنتج: {str(e)}'
