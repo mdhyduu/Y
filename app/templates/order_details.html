@@ -55,9 +55,7 @@
       الكمية: {{ item.quantity }}
     </div>
   </td>
-  {% if product_statuses.get(item.id|string) and product_statuses[item.id|string].updated_at %}
-    {{ product_statuses[item.id|string].updated_at.strftime('%H:%M %Y-%m-%d') }}
-{% endif %} 
+  
   <!-- خيارات المنتج -->
   <td style="min-width: 150px;">
 {% if item.options %}
@@ -83,49 +81,18 @@
 </div>
 {% endif %}
   </td>
-<td style="width: 200px; min-width: 200px;">
-    <div class="product-status-container text-center">
-        {% set product_status = product_statuses.get(item.id|string, {}) %}
-        {% set current_status = product_status.status | default('قيد التنفيذ') %}
-        
-        <!-- حالة المنتج الحالية -->
-        <div class="mb-2">
-            <span class="badge 
-                {% if current_status == 'تم التنفيذ' %}bg-success
-                {% elif current_status == 'قيد التنفيذ' %}bg-primary
-                {% elif current_status == 'معلق' %}bg-warning
-                {% elif current_status == 'ملغي' %}bg-danger
-                {% else %}bg-secondary{% endif %} status-badge">
-                {{ current_status }}
-            </span>
-        </div>
-        
-        <!-- تحديث الحالة -->
-        {% if current_employee and not is_reviewer %}
-<form class="update-product-status-form" data-order-id="{{ order.id }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="product_id" value="{{ item.id }}">
-    <div class="d-flex align-items-center justify-content-center">
-        <select class="form-select form-select-sm me-1" name="status" required>
-            <option value="قيد التنفيذ" {% if current_status == 'قيد التنفيذ' %}selected{% endif %}>قيد التنفيذ</option>
-            <option value="تم التنفيذ" {% if current_status == 'تم التنفيذ' %}selected{% endif %}>تم التنفيذ</option>
-            <option value="معلق" {% if current_status == 'معلق' %}selected{% endif %}>معلق</option>
-            <option value="ملغي" {% if current_status == 'ملغي' %}selected{% endif %}>ملغي</option>
-        </select>
-        <button type="submit" class="btn btn-sm btn-primary">
-            <i class="fas fa-save"></i>
-        </button>
+<td class="text-center align-middle">
+  <button class="btn btn-sm btn-success mark-completed-btn" 
+          data-order-id="{{ order.id }}"
+          data-product-id="{{ item.id }}"
+          {% if product_statuses.get(item.id|string) and product_statuses[item.id|string].status == 'تم التنفيذ' %}disabled{% endif %}>
+    <i class="fas fa-check"></i> تم التنفيذ
+  </button>
+  {% if product_statuses.get(item.id|string) %}
+    <div class="text-muted small mt-1">
+      {{ product_statuses[item.id|string].status }}
     </div>
-</form>
-        {% endif %}
-        
-        <!-- وقت التحديث -->
-        {% if product_status.updated_at %}
-            <div class="text-muted small mt-1">
-                {{ product_status.updated_at.strftime('%H:%M %Y-%m-%d') }}
-            </div>
-        {% endif %}
-    </div>
+  {% endif %}
 </td>
 </tr>
                 {% endfor %}
@@ -755,87 +722,63 @@
     timer: 3000
   });
   {% endif %}
-document.querySelectorAll('.update-product-status-form').forEach(form => {
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
+
+document.addEventListener('DOMContentLoaded', function() {
+  // معالجة النقر على زر "تم التنفيذ"
+  document.querySelectorAll('.mark-completed-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const orderId = this.dataset.orderId;
+      const productId = this.dataset.productId;
+      
+      // إظهار تحميل
+      const originalText = this.innerHTML;
+      this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+      this.disabled = true;
+      
+      // إرسال طلب AJAX
+      fetch(`/orders/${orderId}/product/${productId}/update_status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({ status: 'تم التنفيذ' })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // تحديث الزر والعرض
+          this.innerHTML = '<i class="fas fa-check"></i> تم التنفيذ';
+          this.disabled = true;
+          
+          // إظهار رسالة نجاح
+          Swal.fire({
+            title: 'تم!',
+            text: 'تم تحديث حالة المنتج بنجاح',
+            icon: 'success',
+            confirmButtonText: 'حسناً',
+            timer: 2000
+          });
+        } else {
+          throw new Error(data.error || 'حدث خطأ غير متوقع');
+        }
+      })
+      .catch(error => {
+        // إعادة تعيين الزر
+        this.innerHTML = originalText;
+        this.disabled = false;
         
-        const orderId = this.dataset.orderId;
-        const productId = this.dataset.productId;
-        const formData = new FormData(this);
-        
-        // إضافة product_id إلى FormData للتأكد من وجوده
-        formData.append('product_id', productId);
-        
-        console.log('إرسال بيانات:', {
-            orderId: orderId,
-            productId: productId,
-            status: formData.get('status')
-        });
-        
-        // عرض تحذير تأكيد
+        // إظهار رسالة خطأ
         Swal.fire({
-            title: 'تأكيد التحديث',
-            text: `هل تريد تغيير حالة المنتج؟`,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'نعم، حفظ',
-            cancelButtonText: 'إلغاء',
-            reverseButtons: true
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // إرسال طلب AJAX لتحديث الحالة
-                fetch(`/orders/${orderId}/update_product_status`, {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRFToken': formData.get('csrf_token')
-                    }
-                })
-                .then(response => {
-                    console.log('استجابة الخادم:', response);
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('بيانات الاستجابة:', data);
-                    if (data.success) {
-                        // تحديث الواجهة بنجاح
-                        const statusContainer = this.closest('.product-status-container');
-                        const statusBadge = statusContainer.querySelector('.status-badge');
-                        
-                        if (statusBadge) {
-                            statusBadge.textContent = data.status || formData.get('status');
-                            // تحديث لون البادج بناءً على الحالة
-                            statusBadge.className = 'badge status-badge ' + 
-                                (data.status === 'تم التنفيذ' || formData.get('status') === 'تم التنفيذ' ? 'bg-success' :
-                                 data.status === 'قيد التنفيذ' || formData.get('status') === 'قيد التنفيذ' ? 'bg-primary' :
-                                 data.status === 'معلق' || formData.get('status') === 'معلق' ? 'bg-warning' :
-                                 data.status === 'ملغي' || formData.get('status') === 'ملغي' ? 'bg-danger' : 'bg-secondary');
-                        }
-                        
-                        // عرض رسالة النجاح
-                        Swal.fire({
-                            title: 'تم التحديث!',
-                            text: data.message || 'تم تحديث حالة المنتج بنجاح',
-                            icon: 'success',
-                            timer: 2000,
-                            showConfirmButton: false
-                        });
-                    } else {
-                        throw new Error(data.error || 'حدث خطأ غير متوقع');
-                    }
-                })
-                .catch(error => {
-                    console.error('خطأ:', error);
-                    Swal.fire({
-                        title: 'خطأ!',
-                        text: error.message,
-                        icon: 'error',
-                        confirmButtonText: 'حسناً'
-                    });
-                });
-            }
+          title: 'خطأ!',
+          text: error.message,
+          icon: 'error',
+          confirmButtonText: 'حسناً'
         });
+      });
     });
+  });
 });
+
 </script>
 {% endblock %}
