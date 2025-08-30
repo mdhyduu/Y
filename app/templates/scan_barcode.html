@@ -198,38 +198,36 @@ class ModernBarcodeScanner {
     }
 
     processScannedCode(code) {
-        // انتظر ثانيتين ليرى المستخدم رسالة النجاح قبل إعادة التوجيه
-        setTimeout(() => {
-            const cleanCode = code.split('.')[0];
-            let url = '';
+    // انتظر ثانيتين ليرى المستخدم رسالة النجاح قبل إعادة التوجيه
+    setTimeout(() => {
+        const cleanCode = code.split('.')[0];
+        let url = '';
 
-            if (cleanCode.startsWith('order_')) {
-                const orderId = cleanCode.replace('order_', '');
-                url = `${orderId}`;
-            } else if (cleanCode.startsWith('item_')) {
-                const parts = cleanCode.replace('item_', '').split('-');
-                if (parts.length >= 2) {
-                    const orderId = parts[0];
-                    const itemId = parts[1];
-                    url = `${orderId}#item-${itemId}`;
-                }
-            } else if (/^\d+$/.test(cleanCode)) {
-                // يفترض أن الأرقام الصافية هي رقم طلب
-                url = `${cleanCode}`;
+        if (cleanCode.startsWith('order_')) {
+            const orderId = cleanCode.replace('order_', '');
+            url = `${orderId}`;
+        } else if (cleanCode.startsWith('item_')) {
+            const parts = cleanCode.replace('item_', '').split('-');
+            if (parts.length >= 2) {
+                const orderId = parts[0];
+                const itemId = parts[1];
+                // التوجيه إلى صفحة المنتج فقط
+                url = `${orderId}/item/${itemId}`;
             }
+        } else if (/^\d+$/.test(cleanCode)) {
+            // يفترض أن الأرقام الصافية هي رقم طلب
+            url = `${cleanCode}`;
+        }
 
-            if (url) {
-                // في المثال هنا، سنقوم بإعادة التوجيه إلى رابط داخل الموقع
-                // مثال: /orders/12345
-                // window.location.href = `/orders/${url}`; 
-                // للتجربة، سنعرض الرابط الذي سيتم التوجيه إليه
-                window.location.href = `/${url}`;
-            } else {
-                this.updateStatus('الكود الممسوح غير معروف أو بصيغة غير صحيحة.', 'warning', false);
-                setTimeout(() => this.stop(), 3000); // العودة للواجهة الرئيسية بعد 3 ثوان
-            }
-        }, 2000);
-    }
+        if (url) {
+            window.location.href = `/${url}`;
+        } else {
+            this.updateStatus('الكود الممسوح غير معروف أو بصيغة غير صحيحة.', 'warning', false);
+            setTimeout(() => this.stop(), 3000);
+        }
+    }, 2000);
+}   
+    
 }
 
 document.addEventListener('DOMContentLoaded', () => {
