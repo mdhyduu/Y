@@ -94,7 +94,7 @@
                       </div>
                       
                       <!-- زر تحديث الحالة -->
-                      {% if current_employee and not is_reviewer %}
+                      {% if current_employee %}
                         <form class="update-product-status-form" data-order-id="{{ order.id }}" data-product-id="{{ item.id }}">
                           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                           
