@@ -579,7 +579,24 @@ class OrderStatus(db.Model):
     
     def __repr__(self):
         return f'<OrderStatus {self.name} ({self.type})>'
+class OrderProductStatus(db.Model):
+    __tablename__ = 'order_product_status'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.String(50), db.ForeignKey('salla_orders.id'), nullable=False)
+    product_id = db.Column(db.String(50), nullable=False)  # Salla product ID
+    status = db.Column(db.String(50), default='قيد التنفيذ')
+    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    order = relationship('SallaOrder', backref=backref('product_statuses', lazy='dynamic'))
+    employee = relationship('Employee')
 
+    def __repr__(self):
+        return f'<OrderProductStatus {self.product_id}: {self.status}>'
 # ... (بقية الكود)
 # تبقى أحداث SQLAlchemy كما هي
 @event.listens_for(User, 'before_insert')
