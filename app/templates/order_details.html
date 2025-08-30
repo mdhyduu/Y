@@ -81,7 +81,6 @@
 </div>
 {% endif %}
   </td>
-  
 <td style="width: 150px; min-width: 150px;">
     <div class="product-status-container text-center">
         {% set product_status = product_statuses.get(item.id|string, {}) %}
@@ -92,8 +91,7 @@
             {% if is_completed %}
                 <span class="badge bg-success status-badge">تم التنفيذ</span>
             {% else %}
-                <!-- إذا لم تكن مكتملة، لا نعرض أي شيء أو نعرض حالة أخرى إذا أردت -->
-                <!-- <span class="badge bg-secondary status-badge">قيد التنفيذ</span> -->
+                <span class="badge bg-secondary status-badge">قيد التنفيذ</span>
             {% endif %}
         </div>
         
@@ -757,7 +755,8 @@
   });
   {% endif %}
   
- document.addEventListener('DOMContentLoaded', function() {
+
+document.addEventListener('DOMContentLoaded', function() {
     // معالجة تحديث حالة المنتج باستخدام الـ checkbox
     document.querySelectorAll('.mark-completed-checkbox').forEach(checkbox => {
         checkbox.addEventListener('change', function() {
@@ -794,8 +793,13 @@
                             if (data.success) {
                                 // تحديث الواجهة دون إعادة تحميل الصفحة
                                 const statusContainer = form.closest('.product-status-container');
-                                statusContainer.querySelector('.status-badge').textContent = 'تم التنفيذ';
-                                statusContainer.querySelector('.status-badge').className = 'badge bg-success status-badge';
+                                
+                                // تحديث البادج
+                                const statusBadge = statusContainer.querySelector('.status-badge');
+                                if (statusBadge) {
+                                    statusBadge.textContent = 'تم التنفيذ';
+                                    statusBadge.className = 'badge bg-success status-badge';
+                                }
                                 
                                 // استبدال الـ checkbox بعلامة صح
                                 form.innerHTML = `
@@ -837,5 +841,6 @@
         });
     });
 });
+
 </script>
 {% endblock %}

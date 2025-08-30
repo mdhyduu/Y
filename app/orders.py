@@ -2012,20 +2012,22 @@ def update_product_status(order_id):
         # البحث عن حالة المنتج الحالية أو إنشاء جديدة
         product_status = OrderProductStatus.query.filter_by(
             order_id=str(order_id),
-            product_id=product_id
+            product_id=str(product_id)
         ).first()
         
         if product_status:
             product_status.status = status
             product_status.notes = notes
             product_status.employee_id = employee.id
+            product_status.updated_at = datetime.utcnow()
         else:
             product_status = OrderProductStatus(
                 order_id=str(order_id),
-                product_id=product_id,
+                product_id=str(product_id),
                 status=status,
                 notes=notes,
-                employee_id=employee.id
+                employee_id=employee.id,
+                updated_at=datetime.utcnow()
             )
             db.session.add(product_status)
         
@@ -2033,7 +2035,8 @@ def update_product_status(order_id):
         
         return jsonify({
             'success': True,
-            'message': 'تم تحديث حالة المنتج بنجاح'
+            'message': 'تم تحديث حالة المنتج بنجاح',
+            'updated_at': product_status.updated_at.strftime('%Y-%m-%d %H:%M:%S')
         })
         
     except Exception as e:
