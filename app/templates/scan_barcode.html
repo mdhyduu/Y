@@ -8,7 +8,7 @@
             <div id="initial-view">
                 <i class="fas fa-qrcode fa-4x text-primary mb-3"></i>
                 <h3 class="card-title mb-3">مسح باركود/QR كود</h3>
-                <p class="text-muted mb-4">اضغط على الزر لبدء تشغيل الكاميرا ومسح كود المنتج أو الطلب.</p>
+                <p class="text-muted mb-4">اضغط على الزر لبدء تشغيل الكاميرا ومسح كود الطلب.</p>
                 <button id="startButton" class="btn btn-primary btn-lg px-5 shadow">
                     <i class="fas fa-camera me-2"></i>ابدأ المسح
                 </button>
@@ -150,7 +150,7 @@ class ModernBarcodeScanner {
                 (errorMessage) => { /* تجاهل أخطاء عدم العثور على كود */ }
             );
             this.isScanning = true;
-            this.updateStatus('وجه الكاميرا نحو الباركود', 'info', false);
+            this.updateStatus('وجه الكاميرا نحو باركود الطلب', 'info', false);
         } catch (error) {
             this.handleScanError(error);
         }
@@ -188,7 +188,7 @@ class ModernBarcodeScanner {
         if (typeof error === 'string') {
             if (error.includes('Permission denied') || error.includes('NotAllowedError')) {
                 message = 'تم رفض الوصول للكاميرا. يرجى تفعيلها من إعدادات المتصفح.';
-            } else if (error.includes('NotFoundError')) {
+            } else if (error.includes('NotFoundError') || error.includes('OverconstrainedError')) {
                 message = 'لم يتم العثور على كاميرا خلفية مناسبة.';
             }
         }
@@ -201,31 +201,21 @@ class ModernBarcodeScanner {
         // انتظر ثانيتين ليرى المستخدم رسالة النجاح قبل إعادة التوجيه
         setTimeout(() => {
             const cleanCode = code.split('.')[0];
-            let url = '';
+            let orderId = '';
 
+            // التعامل مع باركود الطلب فقط
             if (cleanCode.startsWith('order_')) {
-                const orderId = cleanCode.replace('order_', '');
-                url = `${orderId}`;
-            } else if (cleanCode.startsWith('item_')) {
-                const parts = cleanCode.replace('item_', '').split('-');
-                if (parts.length >= 2) {
-                    const orderId = parts[0];
-                    const itemId = parts[1];
-                    url = `${orderId}#item-${itemId}`;
-                }
+                orderId = cleanCode.replace('order_', '');
             } else if (/^\d+$/.test(cleanCode)) {
                 // يفترض أن الأرقام الصافية هي رقم طلب
-                url = `${cleanCode}`;
+                orderId = cleanCode;
             }
 
-            if (url) {
-                // في المثال هنا، سنقوم بإعادة التوجيه إلى رابط داخل الموقع
-                // مثال: /orders/12345
-                // window.location.href = `/orders/${url}`; 
-                // للتجربة، سنعرض الرابط الذي سيتم التوجيه إليه
-                window.location.href = `/${url}`;
+            if (orderId) {
+                // توجيه إلى صفحة تفاصيل الطلب
+                window.location.href = `/${orderId}`;
             } else {
-                this.updateStatus('الكود الممسوح غير معروف أو بصيغة غير صحيحة.', 'warning', false);
+                this.updateStatus('باركود الطلب غير معروف أو بصيغة غير صحيحة.', 'warning', false);
                 setTimeout(() => this.stop(), 3000); // العودة للواجهة الرئيسية بعد 3 ثوان
             }
         }, 2000);

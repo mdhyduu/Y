@@ -52,6 +52,7 @@ def format_date(date_str):
         return dt.strftime('%Y-%m-%d %H:%M')
     except:
         return date_str if date_str else 'غير معروف'
+    
 def process_order_data(order_id, items_data):
     """معالجة بيانات الطلب لتتناسب مع القالب مع إضافة الباركود لكل منتج"""
     items = []
@@ -90,10 +91,6 @@ def process_order_data(order_id, items_data):
                     logger.info(f"Using backup field {field}: {main_image}")
                     break
         
-        # ... بقية الكود كما هو ...
-                logger.info(f"Item images data: {item.get('images')}")
-        logger.info(f"Processed image URL: {main_image}")
-        # معالجة الخيارات
         # معالجة الخيارات
         options = []
         item_options = item.get('options', [])
@@ -159,9 +156,8 @@ def process_order_data(order_id, items_data):
                     'date': reservation.get('date', '')
                 })
         
-        # إنشاء باركود للعنصر
+        # إزالة توليد الباركود للعنصر
         item_id = item.get('id')
-        item_barcode = generate_item_barcode(order_id, item_id) if item_id else None
         
         product_info = {
             'id': item.get('id'),
@@ -187,7 +183,7 @@ def process_order_data(order_id, items_data):
             'notes': item.get('notes', ''),
             'options': options,
             'main_image': main_image,
-            'barcode': item_barcode,  # الباركود الخاص بالمنتج
+            # إزالة حقل الباركود للعنصر
             'codes': digital_codes,
             'files': digital_files,
             'reservations': reservations,
@@ -195,17 +191,22 @@ def process_order_data(order_id, items_data):
         }
         
         items.append(item_data)
-        logger.info(f"Processed item: {item_data['name']} with barcode: {item_barcode or 'None'}")
+        # تحديث رسالة السجل لعدم تضمين الباركود
+        logger.info(f"Processed item: {item_data['name']}")
 
     processed_order = {
         'id': order_id,
         'order_items': items,
-        'barcode': generate_order_barcode(order_id)  # الباركود الرئيسي للطلب
+        'barcode': generate_order_barcode(order_id)  # الباركود الرئيسي للطلب (يبقى كما هو)
     }
     
     logger.info(f"Processed order with {len(items)} items and barcode: {processed_order['barcode']}")
     return processed_order
+
 def get_salla_categories(access_token):
+    import requests
+    from .config import Config
+    
     headers = {
         'Authorization': f'Bearer {access_token}',
         'Accept': 'application/json'
@@ -215,11 +216,9 @@ def get_salla_categories(access_token):
         response.raise_for_status()
         return response.json().get('data', [])
     except requests.exceptions.RequestException as e:
-        app.logger.error(f"Error fetching categories from Salla: {e}")
+        current_app.logger.error(f"Error fetching categories from Salla: {e}")
         return []    
         
-
-
 def humanize_time(dt):
     """تحويل التاريخ إلى نص مقروء مثل 'منذ دقيقة'"""
     now = datetime.utcnow()
@@ -243,4 +242,4 @@ def humanize_time(dt):
     elif minutes > 0:
         return f"منذ {int(minutes)} دقيقة" if minutes > 1 else "منذ دقيقة"
     else:
-        return "الآن"        
+        return "الآن"

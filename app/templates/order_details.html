@@ -81,22 +81,6 @@
 </div>
 {% endif %}
   </td>
-  
-  <!-- باركود المنتج -->
-  <td style="width: 150px; min-width: 150px;">
-    {% if item.barcode %}
-    <div class="d-flex flex-column align-items-center">
-    
-      <div class="barcode-container p-1 border rounded">
-        <img src="{{ url_for('orders.serve_barcode', filename=item.barcode) | safe }}"
-             alt="باركود المنتج {{ item.name | safe }}"
-             class="img-fluid"
-             style="max-height: 40px;">
-        <div class="mt-1 small text-center">#{{ item.id | safe }}</div>
-      </div>
-    </div>
-    {% endif %}
-  </td>
 </tr>
                 {% endfor %}
               </tbody>
@@ -726,4 +710,4 @@
   });
   {% endif %}
 </script>
-{% endblock %} 
+{% endblock %}
