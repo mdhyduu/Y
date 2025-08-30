@@ -11,7 +11,7 @@ from .models import (
 )
 from werkzeug.utils import secure_filename
 from .config import Config
-from .utils import process_order_data, format_date, generate_barcode, humanize_time, 
+from .utils import process_order_data, format_date, generate_barcode, humanize_time
 from .token_utils import exchange_code_for_token, get_store_info, set_token_cookies, refresh_salla_token
 import os
 from datetime import datetime, timedelta
