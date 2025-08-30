@@ -81,40 +81,39 @@
 </div>
 {% endif %}
   </td>
-<td style="width: 150px; min-width: 150px;">
+<td style="width: 200px; min-width: 200px;">
     <div class="product-status-container text-center">
         {% set product_status = product_statuses.get(item.id|string, {}) %}
-        {% set is_completed = product_status.status == 'تم التنفيذ' %}
+        {% set current_status = product_status.status | default('قيد التنفيذ') %}
         
         <!-- حالة المنتج الحالية -->
         <div class="mb-2">
-            {% if is_completed %}
-                <span class="badge bg-success status-badge">تم التنفيذ</span>
-            {% else %}
-                <span class="badge bg-secondary status-badge">قيد التنفيذ</span>
-            {% endif %}
+            <span class="badge 
+                {% if current_status == 'تم التنفيذ' %}bg-success
+                {% elif current_status == 'قيد التنفيذ' %}bg-primary
+                {% elif current_status == 'معلق' %}bg-warning
+                {% elif current_status == 'ملغي' %}bg-danger
+                {% else %}bg-secondary{% endif %} status-badge">
+                {{ current_status }}
+            </span>
         </div>
         
-        <!-- زر تحديث الحالة -->
+        <!-- تحديث الحالة -->
         {% if current_employee and not is_reviewer %}
             <form class="update-product-status-form" data-order-id="{{ order.id }}" data-product-id="{{ item.id }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 
-                {% if not is_completed %}
-                    <div class="form-check form-switch d-inline-block">
-                        <input class="form-check-input mark-completed-checkbox" type="checkbox" 
-                               id="product-{{ item.id }}-status" 
-                               data-order-id="{{ order.id }}" 
-                               data-product-id="{{ item.id }}">
-                        <label class="form-check-label small" for="product-{{ item.id }}-status">
-                            تم
-                        </label>
-                    </div>
-                {% else %}
-                    <div class="text-success">
-                        <i class="fas fa-check-circle fa-lg"></i>
-                    </div>
-                {% endif %}
+                <div class="d-flex align-items-center justify-content-center">
+                    <select class="form-select form-select-sm me-1" name="status" required>
+                        <option value="قيد التنفيذ" {% if current_status == 'قيد التنفيذ' %}selected{% endif %}>قيد التنفيذ</option>
+                        <option value="تم التنفيذ" {% if current_status == 'تم التنفيذ' %}selected{% endif %}>تم التنفيذ</option>
+                        <option value="معلق" {% if current_status == 'معلق' %}selected{% endif %}>معلق</option>
+                        <option value="ملغي" {% if current_status == 'ملغي' %}selected{% endif %}>ملغي</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="fas fa-save"></i>
+                    </button>
+                </div>
             </form>
         {% endif %}
         
@@ -841,6 +840,90 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
-
+// معالجة تحديث حالة المنتج باستخدام النموذج
+document.querySelectorAll('.update-product-status-form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const orderId = this.dataset.orderId;
+        const productId = this.dataset.productId;
+        const status = this.querySelector('select[name="status"]').value;
+        
+        // عرض تحذير تأكيد
+        Swal.fire({
+            title: 'تأكيد التحديث',
+            text: `هل تريد تغيير حالة المنتج إلى "${status}"؟`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'نعم، حفظ',
+            cancelButtonText: 'إلغاء',
+            reverseButtons: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // إرسال طلب AJAX لتحديث الحالة
+                fetch(`/orders/${orderId}/update_product_status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.querySelector('input[name="csrf_token"]').value
+                    },
+                    body: JSON.stringify({
+                        product_id: productId,
+                        status: status
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // تحديث الواجهة دون إعادة تحميل الصفحة
+                        const statusContainer = this.closest('.product-status-container');
+                        
+                        // تحديث البادج
+                        const statusBadge = statusContainer.querySelector('.status-badge');
+                        if (statusBadge) {
+                            statusBadge.textContent = status;
+                            // تحديث لون البادج بناءً على الحالة
+                            statusBadge.className = 'badge status-badge ' + 
+                                (status === 'تم التنفيذ' ? 'bg-success' :
+                                 status === 'قيد التنفيذ' ? 'bg-primary' :
+                                 status === 'معلق' ? 'bg-warning' :
+                                 status === 'ملغي' ? 'bg-danger' : 'bg-secondary');
+                        }
+                        
+                        // تحديث وقت التحديث
+                        const timeElement = statusContainer.querySelector('.text-muted');
+                        if (timeElement) {
+                            timeElement.textContent = new Date().toLocaleTimeString('ar-SA') + ' ' + new Date().toLocaleDateString('ar-SA');
+                        } else {
+                            // إنشاء عنصر الوقت إذا لم يكن موجوداً
+                            const newTimeElement = document.createElement('div');
+                            newTimeElement.className = 'text-muted small mt-1';
+                            newTimeElement.textContent = new Date().toLocaleTimeString('ar-SA') + ' ' + new Date().toLocaleDateString('ar-SA');
+                            statusContainer.appendChild(newTimeElement);
+                        }
+                        
+                        Swal.fire({
+                            title: 'تم التحديث!',
+                            text: 'تم تحديث حالة المنتج بنجاح',
+                            icon: 'success',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                    } else {
+                        throw new Error(data.error || 'حدث خطأ غير متوقع');
+                    }
+                })
+                .catch(error => {
+                    Swal.fire({
+                        title: 'خطأ!',
+                        text: error.message,
+                        icon: 'error',
+                        confirmButtonText: 'حسناً'
+                    });
+                });
+            }
+        });
+    });
+});
 </script>
 {% endblock %}

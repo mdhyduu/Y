@@ -1999,6 +1999,11 @@ def update_product_status(order_id):
     if not product_id or not status:
         return jsonify({'success': False, 'error': 'بيانات ناقصة'}), 400
     
+    # التحقق من أن القيمة المرسلة صحيحة
+    valid_statuses = ['قيد التنفيذ', 'تم التنفيذ', 'معلق', 'ملغي']
+    if status not in valid_statuses:
+        return jsonify({'success': False, 'error': 'حالة غير صالحة'}), 400
+    
     try:
         # التحقق من أن الطلب مسند للموظف
         assignment = OrderAssignment.query.filter_by(
