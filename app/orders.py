@@ -1991,10 +1991,10 @@ def update_product_status(order_id):
     if not employee:
         return jsonify({'success': False, 'error': 'غير مصرح لك بهذا الإجراء'}), 403
     
-    data = request.get_json()
-    product_id = data.get('product_id')
-    status = data.get('status')
-    notes = data.get('notes', '')
+    # استخدام request.form بدلاً من request.get_json
+    product_id = request.form.get('product_id')
+    status = request.form.get('status')
+    notes = request.form.get('notes', '')
     
     if not product_id or not status:
         return jsonify({'success': False, 'error': 'بيانات ناقصة'}), 400

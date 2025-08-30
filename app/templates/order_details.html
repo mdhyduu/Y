@@ -102,7 +102,7 @@
         {% if current_employee and not is_reviewer %}
             <form class="update-product-status-form" data-order-id="{{ order.id }}" data-product-id="{{ item.id }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                
+                 <input type="hidden" name="product_id" value="{{ item.id }}">
                 <div class="d-flex align-items-center justify-content-center">
                     <select class="form-select form-select-sm me-1" name="status" required>
                         <option value="قيد التنفيذ" {% if current_status == 'قيد التنفيذ' %}selected{% endif %}>قيد التنفيذ</option>
