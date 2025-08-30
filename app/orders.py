@@ -1115,6 +1115,9 @@ def order_details(order_id):
         ).all()
         
         # ========== [8] جلب الحالات المخصصة للموظفين ==========
+# ... existing code ...
+
+        # ========== [8] جلب الحالات المخصصة للموظفين ==========
         employee_statuses = db.session.query(
             OrderEmployeeStatus,
             EmployeeCustomStatus,
@@ -1130,22 +1133,24 @@ def order_details(order_id):
         ).order_by(
             OrderEmployeeStatus.created_at.desc()
         ).all()
+
+        # جلب حالات المنتجات للطلب
         product_statuses = {}
-        if isinstance(order, SallaOrder):
-            # جلب حالات المنتجات للطلب
-            for item in processed_order.get('items', []):
-                product_id = item.get('id')
-                if product_id:
-                    status = OrderProductStatus.query.filter_by(
-                        order_id=str(order_id),
-                        product_id=str(product_id)
-                    ).first()
-                    if status:
-                        product_statuses[product_id] = {
-                            'status': status.status,
-                            'notes': status.notes,
-                            'updated_at': status.updated_at
-               }
+        for item in processed_order.get('items', []):
+            product_id = item.get('id')
+            if product_id:
+                status = OrderProductStatus.query.filter_by(
+                    order_id=str(order_id),
+                    product_id=str(product_id)
+                ).first()
+                if status:
+                    product_statuses[product_id] = {
+                        'status': status.status,
+                        'notes': status.notes,
+                        'updated_at': status.updated_at
+                    }
+
+# ... rest of the code ...
         return render_template('order_details.html', 
             order=processed_order,
             status_notes=status_notes,
