@@ -11,7 +11,7 @@ from .models import (
 )
 from werkzeug.utils import secure_filename
 from .config import Config
-from .utils import process_order_data, format_date, generate_barcode, humanize_time, process_single_item_data
+from .utils import process_order_data, format_date, generate_barcode, humanize_time, 
 from .token_utils import exchange_code_for_token, get_store_info, set_token_cookies, refresh_salla_token
 import os
 from datetime import datetime, timedelta
@@ -1960,84 +1960,40 @@ def custom_order_details(order_id):
                          employees=employees,
                          is_reviewer=is_reviewer,
                          current_employee=employee)
-@orders_bp.route('/<int:order_id>/item/<item_id>')
-def order_item_details(order_id, item_id):
-    """عرض تفاصيل منتج معين داخل الطلب"""
-    user, current_employee = get_user_from_cookies()
-    
+@orders_bp.route('/<int:order_id>/product/<item_id>')
+def product_details(order_id, item_id):
+    """عرض تفاصيل منتج معين داخل طلب"""
+    user, employee = get_user_from_cookies()
     if not user:
         flash("الرجاء تسجيل الدخول أولاً", "error")
         return redirect(url_for('user_auth.login'))
-    
+
     try:
-        # جلب بيانات الطلب والمنتج من Salla API
-        access_token = user.salla_access_token
-        if not access_token:
-            flash('يجب ربط متجرك مع سلة أولاً', 'error')
-            return redirect(url_for('auth.link_store' if request.cookies.get('is_admin') == 'true' else 'user_auth.logout'))
-        
         headers = {
-            'Authorization': f'Bearer {access_token}',
-            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {user.salla_access_token}',
             'Accept': 'application/json'
         }
-        
-        # جلب بيانات الطلب
-        order_response = requests.get(
-            f"{Config.SALLA_ORDERS_API}/{order_id}",
-            headers=headers,
-            timeout=10
-        )
-        
-        if order_response.status_code != 200:
-            flash("لم يتم العثور على الطلب", "error")
-            return redirect(url_for('orders.index'))
-        
-        order_data = order_response.json().get('data', {})
-        
-        # جلب عناصر الطلب
+
+        # جلب منتجات الطلب
         items_response = requests.get(
             f"{Config.SALLA_BASE_URL}/orders/items",
             params={'order_id': order_id, 'include': 'images'},
             headers=headers,
-            timeout=10
+            timeout=15
         )
-        
-        if items_response.status_code != 200:
-            flash("خطأ في جلب بيانات المنتجات", "error")
-            return redirect(url_for('orders.order_details', order_id=order_id))
-        
+        items_response.raise_for_status()
         items_data = items_response.json().get('data', [])
-        
-        # البحث عن المنتج المحدد
-        target_item = None
-        for item in items_data:
-            if str(item.get('id')) == str(item_id):
-                target_item = item
-                break
-        
-        if not target_item:
-            flash("لم يتم العثور على المنتج", "error")
+
+        # ابحث عن المنتج المطلوب
+        product = next((item for item in items_data if str(item.get('id')) == str(item_id)), None)
+        if not product:
+            flash("المنتج غير موجود في هذا الطلب", "error")
             return redirect(url_for('orders.order_details', order_id=order_id))
-        
-        # معالجة بيانات المنتج
-        processed_item = process_single_item_data(target_item)
-        
-        # معالجة بيانات الطلب الأساسية
-        processed_order = {
-            'id': order_id,
-            'reference_id': order_data.get('reference_id') or 'غير متوفر',
-            'customer_name': f"{order_data.get('customer', {}).get('first_name', '')} {order_data.get('customer', {}).get('last_name', '')}".strip(),
-            'status': {
-                'name': order_data.get('status', {}).get('name', 'غير معروف'),
-                'slug': order_data.get('status', {}).get('slug', 'unknown')
-            }
-        }
-        
-        return render_template('order_item_details.html', 
-                             order=processed_order,
-                             item=processed_item)
-    
+
+        return render_template('product_details.html',
+                               order_id=order_id,
+                               product=product)
+
     except Exception as e:
-        flash(f"حدث خطأ: {str(e)}", "error")
-        return redirect(url_for('orders.index'))
+        flash(f"حدث خطأ أثناء جلب المنتج: {str(e)}", "error")
+        return redirect(url_for('orders.order_details', order_id=order_id))
