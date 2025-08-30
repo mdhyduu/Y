@@ -755,20 +755,18 @@
   {% endif %}
   
 
-
-// معالجة تحديث حالة المنتج باستخدام النموذج
+>
 document.querySelectorAll('.update-product-status-form').forEach(form => {
     form.addEventListener('submit', function(e) {
         e.preventDefault();
         
         const orderId = this.dataset.orderId;
-        const productId = this.dataset.productId;
-        const status = this.querySelector('select[name="status"]').value;
+        const formData = new FormData(this);
         
         // عرض تحذير تأكيد
         Swal.fire({
             title: 'تأكيد التحديث',
-            text: `هل تريد تغيير حالة المنتج إلى "${status}"؟`,
+            text: `هل تريد تغيير حالة المنتج؟`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: 'نعم، حفظ',
@@ -776,50 +774,32 @@ document.querySelectorAll('.update-product-status-form').forEach(form => {
             reverseButtons: true
         }).then((result) => {
             if (result.isConfirmed) {
-                // إرسال طلب AJAX لتحديث الحالة
-                // داخل document.querySelectorAll('.update-product-status-form')
-fetch(`/orders/${orderId}/update_product_status`, {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json',  // تأكد من أن هذا موجود
-        'X-CSRFToken': this.querySelector('input[name="csrf_token"]').value
-    },
-    body: JSON.stringify({
-        product_id: productId,
-        status: status
-        // يمكن إضافة notes إذا كان مطلوباً
-    })
-})
+                // إرسال طلب AJAX لتحديث الحالة باستخدام FormData
+                fetch(`/orders/${orderId}/update_product_status`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': this.querySelector('input[name="csrf_token"]').value
+                    }
+                })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // تحديث الواجهة دون إعادة تحميل الصفحة
+                        // تحديث الواجهة بنجاح
                         const statusContainer = this.closest('.product-status-container');
-                        
-                        // تحديث البادج
                         const statusBadge = statusContainer.querySelector('.status-badge');
+                        
                         if (statusBadge) {
-                            statusBadge.textContent = status;
+                            statusBadge.textContent = formData.get('status');
                             // تحديث لون البادج بناءً على الحالة
                             statusBadge.className = 'badge status-badge ' + 
-                                (status === 'تم التنفيذ' ? 'bg-success' :
-                                 status === 'قيد التنفيذ' ? 'bg-primary' :
-                                 status === 'معلق' ? 'bg-warning' :
-                                 status === 'ملغي' ? 'bg-danger' : 'bg-secondary');
+                                (formData.get('status') === 'تم التنفيذ' ? 'bg-success' :
+                                 formData.get('status') === 'قيد التنفيذ' ? 'bg-primary' :
+                                 formData.get('status') === 'معلق' ? 'bg-warning' :
+                                 formData.get('status') === 'ملغي' ? 'bg-danger' : 'bg-secondary');
                         }
                         
-                        // تحديث وقت التحديث
-                        const timeElement = statusContainer.querySelector('.text-muted');
-                        if (timeElement) {
-                            timeElement.textContent = new Date().toLocaleTimeString('ar-SA') + ' ' + new Date().toLocaleDateString('ar-SA');
-                        } else {
-                            // إنشاء عنصر الوقت إذا لم يكن موجوداً
-                            const newTimeElement = document.createElement('div');
-                            newTimeElement.className = 'text-muted small mt-1';
-                            newTimeElement.textContent = new Date().toLocaleTimeString('ar-SA') + ' ' + new Date().toLocaleDateString('ar-SA');
-                            statusContainer.appendChild(newTimeElement);
-                        }
-                        
+                        // عرض رسالة النجاح
                         Swal.fire({
                             title: 'تم التحديث!',
                             text: 'تم تحديث حالة المنتج بنجاح',
@@ -843,5 +823,6 @@ fetch(`/orders/${orderId}/update_product_status`, {
         });
     });
 });
+
 </script>
 {% endblock %}
