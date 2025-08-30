@@ -1986,11 +1986,29 @@ def update_product_status(order_id, product_id):
     """تحديث حالة منتج معين في طلب"""
     user, employee = get_user_from_cookies()
     
+    # التحقق من المصادقة وإرجاع JSON بدلاً من التوجيه
     if not user:
-        return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
+        return jsonify({
+            'success': False, 
+            'error': 'الرجاء تسجيل الدخول أولاً',
+            'redirect': url_for('user_auth.login')
+        }), 401
+    
+    # التحقق من أن المستخدم موظف وليس مديراً
+    if request.cookies.get('is_admin') == 'true':
+        return jsonify({
+            'success': False,
+            'error': 'هذه الخدمة للموظفين فقط'
+        }), 403
+    
+    if not employee:
+        return jsonify({
+            'success': False,
+            'error': 'غير مصرح لك بهذا الإجراء'
+        }), 403
     
     try:
-        # Check if request is JSON
+        # التحقق من أن الطلب هو JSON
         if not request.is_json:
             return jsonify({
                 'success': False,
@@ -2009,7 +2027,7 @@ def update_product_status(order_id, product_id):
         if product_status:
             # تحديث الحالة الحالية
             product_status.status = new_status
-            product_status.employee_id = employee.id if employee else None
+            product_status.employee_id = employee.id
             product_status.updated_at = datetime.utcnow()
         else:
             # إنشاء حالة جديدة
@@ -2017,7 +2035,7 @@ def update_product_status(order_id, product_id):
                 order_id=str(order_id),
                 product_id=str(product_id),
                 status=new_status,
-                employee_id=employee.id if employee else None
+                employee_id=employee.id
             )
             db.session.add(product_status)
         

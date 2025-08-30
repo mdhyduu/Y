@@ -646,6 +646,7 @@
     document.addEventListener('DOMContentLoaded', function() {
   // معالجة النقر على زر "تم التنفيذ"
   // في قسم script
+// في قسم script
 document.querySelectorAll('.mark-completed-btn').forEach(btn => {
   btn.addEventListener('click', function() {
     const orderId = this.dataset.orderId;
@@ -666,20 +667,30 @@ document.querySelectorAll('.mark-completed-btn').forEach(btn => {
       body: JSON.stringify({ status: 'تم التنفيذ' })
     })
     .then(response => {
-      // التحقق من نوع الرد
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.indexOf("application/json") !== -1) {
-        return response.json();
-      } else {
-        // إذا لم يكن JSON، ربما يكون redirect إلى login
-        throw new Error('يجب تسجيل الدخول أولاً');
+      // التحقق من حالة الاستجابة
+      if (response.status === 401) {
+        // إذا كانت غير مصرح، توجيه إلى تسجيل الدخول
+        return response.json().then(data => {
+          if (data.redirect) {
+            window.location.href = data.redirect;
+          } else {
+            throw new Error('يجب تسجيل الدخول أولاً');
+          }
+        });
       }
+      return response.json();
     })
     .then(data => {
       if (data.success) {
         // تحديث الزر والعرض
         this.innerHTML = '<i class="fas fa-check"></i> تم التنفيذ';
         this.disabled = true;
+        
+        // تحديث حالة المنتج في الواجهة
+        const statusElement = this.nextElementSibling;
+        if (statusElement && statusElement.classList.contains('text-muted')) {
+          statusElement.textContent = 'تم التنفيذ';
+        }
         
         // إظهار رسالة نجاح
         Swal.fire({
