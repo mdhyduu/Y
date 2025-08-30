@@ -1130,14 +1130,30 @@ def order_details(order_id):
         ).order_by(
             OrderEmployeeStatus.created_at.desc()
         ).all()
-        
+        product_statuses = {}
+        if isinstance(order, SallaOrder):
+            # جلب حالات المنتجات للطلب
+            for item in processed_order.get('items', []):
+                product_id = item.get('id')
+                if product_id:
+                    status = OrderProductStatus.query.filter_by(
+                        order_id=str(order_id),
+                        product_id=str(product_id)
+                    ).first()
+                    if status:
+                        product_statuses[product_id] = {
+                            'status': status.status,
+                            'notes': status.notes,
+                            'updated_at': status.updated_at
+               }
         return render_template('order_details.html', 
             order=processed_order,
             status_notes=status_notes,
             employee_statuses=employee_statuses,
             custom_note_statuses=custom_note_statuses,
             current_employee=current_employee,
-            is_reviewer=is_reviewer
+            is_reviewer=is_reviewer,
+            product_statuses=product_statuses
         )
 
     except requests.exceptions.HTTPError as http_err:
