@@ -645,49 +645,70 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
   // معالجة النقر على زر "تم التنفيذ"
-  document.querySelectorAll('.mark-completed-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      const orderId = this.dataset.orderId;
-      const productId = this.dataset.productId;
-      
-      // إظهار تحميل
-      const originalText = this.innerHTML;
-      this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
-      this.disabled = true;
-      
-      // إرسال طلب AJAX
-      fetch(`/orders/${orderId}/product/${productId}/update_status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify({ status: 'تم التنفيذ' })
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          // تحديث الزر والعرض
-          this.innerHTML = '<i class="fas fa-check"></i> تم التنفيذ';
-          this.disabled = true;
-          
-          // إظهار رسالة نجاح
-          Swal.fire({
-            title: 'تم!',
-            text: 'تم تحديث حالة المنتج بنجاح',
-            icon: 'success',
-            confirmButtonText: 'حسناً',
-            timer: 2000
-          });
-        } else {
-          throw new Error(data.error || 'حدث خطأ غير متوقع');
-        }
-      })
-      .catch(error => {
-        // إعادة تعيين الزر
-        this.innerHTML = originalText;
-        this.disabled = false;
+  // في قسم script
+document.querySelectorAll('.mark-completed-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const orderId = this.dataset.orderId;
+    const productId = this.dataset.productId;
+    
+    // إظهار تحميل
+    const originalText = this.innerHTML;
+    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+    this.disabled = true;
+    
+    // إرسال طلب AJAX
+    fetch(`/orders/${orderId}/product/${productId}/update_status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token() }}'
+      },
+      body: JSON.stringify({ status: 'تم التنفيذ' })
+    })
+    .then(response => {
+      // التحقق من نوع الرد
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        return response.json();
+      } else {
+        // إذا لم يكن JSON، ربما يكون redirect إلى login
+        throw new Error('يجب تسجيل الدخول أولاً');
+      }
+    })
+    .then(data => {
+      if (data.success) {
+        // تحديث الزر والعرض
+        this.innerHTML = '<i class="fas fa-check"></i> تم التنفيذ';
+        this.disabled = true;
         
+        // إظهار رسالة نجاح
+        Swal.fire({
+          title: 'تم!',
+          text: 'تم تحديث حالة المنتج بنجاح',
+          icon: 'success',
+          confirmButtonText: 'حسناً',
+          timer: 2000
+        });
+      } else {
+        throw new Error(data.error || 'حدث خطأ غير متوقع');
+      }
+    })
+    .catch(error => {
+      // إعادة تعيين الزر
+      this.innerHTML = originalText;
+      this.disabled = false;
+      
+      // إذا كان الخطأ متعلقًا بالمصادقة، توجيه إلى صفحة Login
+      if (error.message.includes('تسجيل الدخول')) {
+        Swal.fire({
+          title: 'انتهت الجلسة',
+          text: 'يجب تسجيل الدخول مرة أخرى',
+          icon: 'warning',
+          confirmButtonText: 'تسجيل الدخول'
+        }).then(() => {
+          window.location.href = "{{ url_for('user_auth.login') }}";
+        });
+      } else {
         // إظهار رسالة خطأ
         Swal.fire({
           title: 'خطأ!',
@@ -695,10 +716,11 @@
           icon: 'error',
           confirmButtonText: 'حسناً'
         });
-      });
+      }
     });
   });
 });
+} );
 
   // التحقق قبل إرسال النماذج
   document.getElementById('status-form').addEventListener('submit', function(e) {

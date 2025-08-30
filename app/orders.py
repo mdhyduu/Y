@@ -1990,6 +1990,13 @@ def update_product_status(order_id, product_id):
         return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
     
     try:
+        # Check if request is JSON
+        if not request.is_json:
+            return jsonify({
+                'success': False,
+                'error': 'طلب غير صحيح - يجب أن يكون JSON'
+            }), 400
+            
         data = request.get_json()
         new_status = data.get('status', 'تم التنفيذ')
         
