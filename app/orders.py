@@ -7,7 +7,7 @@ from sqlalchemy import nullslast
 from .models import (
     db, User, Employee, Department, EmployeePermission, 
     Product, OrderDelivery, SallaOrder, CustomOrder, OrderAssignment,
-    OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, CustomNoteStatus, OrderStatus
+    OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, CustomNoteStatus, OrderStatus, OrderProductStatus
 )
 from werkzeug.utils import secure_filename
 from .config import Config
@@ -1976,3 +1976,62 @@ def custom_order_details(order_id):
                          employees=employees,
                          is_reviewer=is_reviewer,
                          current_employee=employee)
+@orders_bp.route('/<int:order_id>/update_product_status', methods=['POST'])
+def update_product_status(order_id):
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
+    
+    if not employee:
+        return jsonify({'success': False, 'error': 'غير مصرح لك بهذا الإجراء'}), 403
+    
+    data = request.get_json()
+    product_id = data.get('product_id')
+    status = data.get('status')
+    notes = data.get('notes', '')
+    
+    if not product_id or not status:
+        return jsonify({'success': False, 'error': 'بيانات ناقصة'}), 400
+    
+    try:
+        # التحقق من أن الطلب مسند للموظف
+        assignment = OrderAssignment.query.filter_by(
+            order_id=str(order_id),
+            employee_id=employee.id
+        ).first()
+        
+        if not assignment:
+            return jsonify({'success': False, 'error': 'الطلب غير مسند لك'}), 403
+        
+        # البحث عن حالة المنتج الحالية أو إنشاء جديدة
+        product_status = OrderProductStatus.query.filter_by(
+            order_id=str(order_id),
+            product_id=product_id
+        ).first()
+        
+        if product_status:
+            product_status.status = status
+            product_status.notes = notes
+            product_status.employee_id = employee.id
+        else:
+            product_status = OrderProductStatus(
+                order_id=str(order_id),
+                product_id=product_id,
+                status=status,
+                notes=notes,
+                employee_id=employee.id
+            )
+            db.session.add(product_status)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'تم تحديث حالة المنتج بنجاح'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error updating product status: {str(e)}")
+        return jsonify({'success': False, 'error': f'حدث خطأ: {str(e)}'}), 500
