@@ -1986,7 +1986,7 @@ def update_product_status(order_id, product_id):
     """تحديث حالة منتج معين في طلب"""
     user, employee = get_user_from_cookies()
     
-    # التحقق من المصادقة وإرجاع JSON بدلاً من التوجيه
+    # التحقق من المصادقة
     if not user:
         return jsonify({
             'success': False, 
