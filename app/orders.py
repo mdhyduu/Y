@@ -1991,15 +1991,18 @@ def update_product_status(order_id):
     if not employee:
         return jsonify({'success': False, 'error': 'غير مصرح لك بهذا الإجراء'}), 403
     
-    # استخدام request.form بدلاً من request.get_json
-    product_id = request.form.get('product_id')
-    status = request.form.get('status')
-    notes = request.form.get('notes', '')
+    # استخدام request.get_json بدلاً من request.form
+    data = request.get_json()
+    product_id = data.get('product_id')
+    status = data.get('status')
+    notes = data.get('notes', '')
     
     if not product_id or not status:
         return jsonify({'success': False, 'error': 'بيانات ناقصة'}), 400
     
-    # التحقق من أن القيمة المرسلة صحيحة
+    # ... بقية الكود بدون تغيير
+    
+    # الت حقق من أن القيمة المرسلة صحيحة
     valid_statuses = ['قيد التنفيذ', 'تم التنفيذ', 'معلق', 'ملغي']
     if status not in valid_statuses:
         return jsonify({'success': False, 'error': 'حالة غير صالحة'}), 400

@@ -777,17 +777,19 @@ document.querySelectorAll('.update-product-status-form').forEach(form => {
         }).then((result) => {
             if (result.isConfirmed) {
                 // إرسال طلب AJAX لتحديث الحالة
-                fetch(`/orders/${orderId}/update_product_status`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': this.querySelector('input[name="csrf_token"]').value
-                    },
-                    body: JSON.stringify({
-                        product_id: productId,
-                        status: status
-                    })
-                })
+                // داخل document.querySelectorAll('.update-product-status-form')
+fetch(`/orders/${orderId}/update_product_status`, {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',  // تأكد من أن هذا موجود
+        'X-CSRFToken': this.querySelector('input[name="csrf_token"]').value
+    },
+    body: JSON.stringify({
+        product_id: productId,
+        status: status
+        // يمكن إضافة notes إذا كان مطلوباً
+    })
+})
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
