@@ -81,6 +81,48 @@
 </div>
 {% endif %}
   </td>
+  
+  
+  
+  <!-- في قسم عرض المنتجات، أضف هذا العمود الجديد بعد عمود الخيارات
+ 
+  <!-- العمود الجديد: حالة المنتج -->
+  <td style="width: 150px; min-width: 150px;">
+    <div class="product-status-container text-center">
+      {% set product_status = product_statuses.get(item.id|string, {}) %}
+      
+      <!-- حالة المنتج الحالية -->
+      <div class="mb-2">
+        <span class="badge bg-{{ 'success' if product_status.status == 'تم التنفيذ' else 'secondary' }} status-badge">
+          {{ product_status.status if product_status else 'قيد التنفيذ' }}
+        </span>
+      </div>
+      
+      <!-- زر تحديث الحالة -->
+      {% if current_employee and not is_reviewer %}
+        <form class="update-product-status-form" data-order-id="{{ order.id }}" data-product-id="{{ item.id }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          
+          {% if product_status.status != 'تم التنفيذ' %}
+            <button type="button" class="btn btn-success btn-sm mark-completed-btn">
+              <i class="fas fa-check"></i> تم التنفيذ
+            </button>
+          {% else %}
+            <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
+              <i class="fas fa-check-double"></i> مكتمل
+            </button>
+          {% endif %}
+        </form>
+      {% endif %}
+      
+      <!-- وقت التحديث -->
+      {% if product_status.updated_at %}
+        <div class="text-muted small mt-1">
+          {{ product_status.updated_at.strftime('%H:%M %Y-%m-%d') }}
+        </div>
+      {% endif %}
+    </div>
+  </td>
 </tr>
                 {% endfor %}
               </tbody>
@@ -708,6 +750,81 @@
     confirmButtonText: 'حسناً',
     timer: 3000
   });
-  {% endif %}
+  
+
+document.addEventListener('DOMContentLoaded', function() {
+  // معالجة تحديث حالة المنتج
+  document.querySelectorAll('.mark-completed-btn').forEach(button => {
+    button.addEventListener('click', function() {
+      const form = this.closest('.update-product-status-form');
+      const orderId = form.dataset.orderId;
+      const productId = form.dataset.productId;
+      
+      // عرض تحذير تأكيد
+      Swal.fire({
+        title: 'تأكيد التحديث',
+        text: 'هل تريد وضع علامة "تم التنفيذ" على هذا المنتج؟',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'نعم، تم التنفيذ',
+        cancelButtonText: 'إلغاء',
+        reverseButtons: true
+      }).then((result) => {
+        if (result.isConfirmed) {
+          // إرسال طلب AJAX لتحديث الحالة
+          fetch(`/orders/${orderId}/update_product_status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': form.querySelector('input[name="csrf_token"]').value
+            },
+            body: JSON.stringify({
+              product_id: productId,
+              status: 'تم التنفيذ'
+            })
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              // تحديث الواجهة دون إعادة تحميل الصفحة
+              const statusContainer = form.closest('.product-status-container');
+              statusContainer.querySelector('.status-badge').textContent = 'تم التنفيذ';
+              statusContainer.querySelector('.status-badge').className = 'badge bg-success status-badge';
+              
+              // استبدال الزر بزر الحالة المكتملة
+              form.innerHTML = `
+                <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
+                  <i class="fas fa-check-double"></i> مكتمل
+                </button>
+                <div class="text-muted small mt-1">
+                  ${new Date().toLocaleTimeString('ar-SA')} ${new Date().toLocaleDateString('ar-SA')}
+                </div>
+              `;
+              
+              Swal.fire({
+                title: 'تم التحديث!',
+                text: 'تم تحديث حالة المنتج بنجاح',
+                icon: 'success',
+                timer: 2000,
+                showConfirmButton: false
+              });
+            } else {
+              throw new Error(data.error || 'حدث خطأ غير متوقع');
+            }
+          })
+          .catch(error => {
+            Swal.fire({
+              title: 'خطأ!',
+              text: error.message,
+              icon: 'error',
+              confirmButtonText: 'حسناً'
+            });
+          });
+        }
+      });
+    });
+  });
+});
+
 </script>
 {% endblock %}
