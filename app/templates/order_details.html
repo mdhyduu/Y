@@ -55,11 +55,9 @@
       الكمية: {{ item.quantity }}
     </div>
   </td>
-  <div class="text-muted small mt-1 update-time">
-    {% if product_status.updated_at %}
-        {{ product_status.updated_at.strftime('%H:%M %Y-%m-%d') }}
-    {% endif %}
-</div>
+  {% if product_statuses.get(item.id|string) and product_statuses[item.id|string].updated_at %}
+    {{ product_statuses[item.id|string].updated_at.strftime('%H:%M %Y-%m-%d') }}
+{% endif %} 
   <!-- خيارات المنتج -->
   <td style="min-width: 150px;">
 {% if item.options %}
