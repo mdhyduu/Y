@@ -1981,8 +1981,9 @@ def custom_order_details(order_id):
                          employees=employees,
                          is_reviewer=is_reviewer,
                          current_employee=employee)
-@orders_bp.route('/<order_id>/product/<product_id>/update_status', methods=['POST'])
+@orders_bp.route('/<string:order_id>/product/<string:product_id>/update_status', methods=['POST'])
 def update_product_status(order_id, product_id):
+    # Your existing code here
     """تحديث حالة منتج معين داخل الطلب"""
     user, employee = get_user_from_cookies()
     if not user:

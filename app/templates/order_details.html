@@ -84,8 +84,8 @@
 <td class="text-center align-middle">
 <!-- تأكد أن order.id يتم تمريره كنص -->
 <form class="update-product-status-form d-inline"
-      data-order-id="{{ order.id | string }}"  <!-- أضف | string هنا -->
-data-product-id="{{ item.id | string }}"
+      data-order-id="{{ order.id | string }}"
+      data-product-id="{{ item.id | string }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     
     <button type="submit"
@@ -93,8 +93,7 @@ data-product-id="{{ item.id | string }}"
             {% if product_statuses.get(item.id|string) and product_statuses[item.id|string].status == 'تم التنفيذ' %}disabled{% endif %}>
       <i class="fas fa-check"></i> تم التنفيذ
     </button>
-  </form>
-
+</form>
   <!-- عنصر لعرض حالة المنتج -->
   <div class="product-status text-muted small mt-1">
     {% if product_statuses.get(item.id|string) %}
@@ -653,13 +652,16 @@ data-product-id="{{ item.id | string }}"
 </style>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  document.querySelectorAll('.update-product-status-form').forEach(form => {
-    form.addEventListener('submit', function(e) {
-      e.preventDefault();
-      
-      const orderId = this.dataset.orderId;
-      const productId = this.dataset.productId;
+document.querySelectorAll('.update-product-status-form').forEach(form => {
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const orderId = this.dataset.orderId;
+    const productId = this.dataset.productId;
+
+    // Add validation for productId
+    
+
       const button = this.querySelector('button');
       const csrfToken = this.querySelector('input[name="csrf_token"]').value;
 
@@ -667,6 +669,15 @@ document.addEventListener('DOMContentLoaded', function() {
       const originalText = button.innerHTML;
       button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
       button.disabled = true;
+if (!productId || productId === 'undefined') {
+      Swal.fire({
+        title: 'خطأ!',
+        text: 'معرف المنتج غير صالح',
+        icon: 'error',
+        confirmButtonText: 'حسناً'
+      });
+      return;
+    }
 
       // بناء URL بشكل صحيح
       const url = `/orders/${encodeURIComponent(orderId)}/product/${encodeURIComponent(productId)}/update_status`;
