@@ -82,12 +82,21 @@
 {% endif %}
   </td>
 <td class="text-center align-middle">
-  <button class="btn btn-sm btn-success mark-completed-btn" 
-          data-order-id="{{ order.id }}"
-          data-product-id="{{ item.id }}"
-          {% if product_statuses.get(item.id|string) and product_statuses[item.id|string].status == 'تم التنفيذ' %}disabled{% endif %}>
-    <i class="fas fa-check"></i> تم التنفيذ
-  </button>
+  <form class="update-product-status-form d-inline"
+        data-order-id="{{ order.id }}"
+        data-product-id="{{ item.id }}">
+        
+    <!-- حقل مخفي للـ CSRF -->
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    
+    <!-- زر تغيير الحالة -->
+    <button type="submit"
+            class="btn btn-sm btn-success"
+            {% if product_statuses.get(item.id|string) and product_statuses[item.id|string].status == 'تم التنفيذ' %}disabled{% endif %}>
+      <i class="fas fa-check"></i> تم التنفيذ
+    </button>
+  </form>
+
   {% if product_statuses.get(item.id|string) %}
     <div class="text-muted small mt-1">
       {{ product_statuses[item.id|string].status }}
@@ -644,22 +653,21 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // معالجة النقر على زر "تم التنفيذ"
-  document.querySelectorAll('.mark-completed-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
+  document.querySelectorAll('.update-product-status-form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault(); // منع إرسال الفورم التقليدي
+      
       const orderId = this.dataset.orderId;
       const productId = this.dataset.productId;
-      const button = this;
-      
+      const button = this.querySelector('button');
+      const csrfToken = this.querySelector('input[name="csrf_token"]').value;
+
       // إظهار تحميل
       const originalText = button.innerHTML;
       button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
       button.disabled = true;
-      
-      // إعداد رأس الطلب مع CSRF token
-      const csrfToken = document.querySelector('input[name="csrf_token"]').value;
-      
-      // إرسال طلب AJAX
+
+      // إرسال AJAX
       fetch(`/orders/${orderId}/product/${productId}/update_status`, {
         method: 'POST',
         headers: {
@@ -669,75 +677,40 @@ document.addEventListener('DOMContentLoaded', function() {
         body: JSON.stringify({ status: 'تم التنفيذ' })
       })
       .then(response => {
-        // التحقق أولاً إذا كان الاستجابة هي HTML (خطأ)
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('text/html')) {
-          return response.text().then(html => {
-            throw new Error('الخادم أعاد صفحة HTML بدلاً من JSON. قد تكون الجلسة منتهية.');
-          });
-        }
-        
-        // إذا لم تكن HTML، تحقق من حالة الاستجابة
-        if (response.status === 401) {
-          throw new Error('يجب تسجيل الدخول أولاً');
-        }
-        
-        if (!response.ok) {
-          throw new Error(`خطأ في الخادم: ${response.status}`);
-        }
-        
+        if (!response.ok) throw new Error(`خطأ في الخادم: ${response.status}`);
         return response.json();
       })
       .then(data => {
         if (data.success) {
-          // تحديث الزر والعرض
           button.innerHTML = '<i class="fas fa-check"></i> تم التنفيذ';
           button.disabled = true;
-          
-          // تحديث حالة المنتج في الواجهة
-          const statusElement = button.nextElementSibling;
-          if (statusElement && statusElement.classList.contains('text-muted')) {
-            statusElement.textContent = 'تم التنفيذ';
+
+          // تحديث حالة المنتج المعروضة
+          let statusDiv = form.nextElementSibling;
+          if (statusDiv && statusDiv.classList.contains('text-muted')) {
+            statusDiv.textContent = 'تم التنفيذ';
           }
-          
-          // إظهار رسالة نجاح
+
           Swal.fire({
             title: 'تم!',
             text: 'تم تحديث حالة المنتج بنجاح',
             icon: 'success',
-            confirmButtonText: 'حسناً',
-            timer: 2000
+            timer: 2000,
+            showConfirmButton: false
           });
         } else {
           throw new Error(data.error || 'حدث خطأ غير متوقع');
         }
       })
       .catch(error => {
-        // إعادة تعيين الزر
         button.innerHTML = originalText;
         button.disabled = false;
-        
-        console.error('Error:', error);
-        
-        // إذا كان الخطأ متعلقًا بالمصادقة، توجيه إلى صفحة Login
-        if (error.message.includes('تسجيل الدخول') || error.message.includes('الجلسة')) {
-          Swal.fire({
-            title: 'انتهت الجلسة',
-            text: 'يجب تسجيل الدخول مرة أخرى',
-            icon: 'warning',
-            confirmButtonText: 'تسجيل الدخول'
-          }).then(() => {
-            window.location.href = "{{ url_for('user_auth.login') }}";
-          });
-        } else {
-          // إظهار رسالة خطأ
-          Swal.fire({
-            title: 'خطأ!',
-            text: error.message,
-            icon: 'error',
-            confirmButtonText: 'حسناً'
-          });
-        }
+        Swal.fire({
+          title: 'خطأ!',
+          text: error.message,
+          icon: 'error',
+          confirmButtonText: 'حسناً'
+        });
       });
     });
   });
