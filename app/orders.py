@@ -1981,36 +1981,37 @@ def custom_order_details(order_id):
                          employees=employees,
                          is_reviewer=is_reviewer,
                          current_employee=employee)
-@orders_bp.route('/<int:order_id>/product/<string:product_id>/update_status', methods=['POST'])
+@orders_bp.route('/<string:order_id>/product/<string:product_id>/update_status', methods=['POST'])
 def update_product_status(order_id, product_id):
     """تحديث حالة منتج معين داخل الطلب"""
     user, employee = get_user_from_cookies()
     if not user:
         return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
 
+    # استقبال البيانات كـ JSON
     data = request.get_json()
-    new_status = data.get('status')
+    if not data:
+        return jsonify({'success': False, 'error': 'بيانات غير صالحة'}), 400
+        
+    new_status = data.get('status', 'تم التنفيذ')  # قيمة افتراضية
     notes = data.get('notes', '')
 
-    if not new_status:
-        return jsonify({'success': False, 'error': 'يجب تحديد الحالة'}), 400
-
     try:
-        # تحويل order_id إلى string لتتوافق مع نوع الحقل في قاعدة البيانات
-        order_id_str = str(order_id)
-        
+        # البحث عن حالة المنتج الحالية أو إنشاء جديدة
         status_obj = OrderProductStatus.query.filter_by(
-            order_id=order_id_str,
-            product_id=product_id  # product_id هو الآن string
+            order_id=order_id,
+            product_id=product_id
         ).first()
 
         if status_obj:
             status_obj.status = new_status
             status_obj.notes = notes
             status_obj.updated_at = datetime.utcnow()
+            if employee:
+                status_obj.employee_id = employee.id
         else:
             status_obj = OrderProductStatus(
-                order_id=order_id_str,
+                order_id=order_id,
                 product_id=product_id,
                 status=new_status,
                 notes=notes,
@@ -2019,8 +2020,19 @@ def update_product_status(order_id, product_id):
             db.session.add(status_obj)
 
         db.session.commit()
-        return jsonify({'success': True, 'message': 'تم تحديث حالة المنتج بنجاح'})
+        
+        # إرجاع بيانات محدثة للعرض
+        return jsonify({
+            'success': True, 
+            'message': 'تم تحديث حالة المنتج بنجاح',
+            'status': new_status,
+            'updated_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M')
+        })
+        
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error updating product status: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'error': f'خطأ في الخادم: {str(e)}'}), 500
+        return jsonify({
+            'success': False, 
+            'error': f'خطأ في الخادم: {str(e)}'
+        }), 500

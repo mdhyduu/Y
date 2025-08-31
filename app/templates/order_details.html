@@ -82,9 +82,10 @@
 {% endif %}
   </td>
 <td class="text-center align-middle">
-  <form class="update-product-status-form d-inline"
-        data-order-id="{{ order.id }}"
-        data-product-id="{{ item.id }}">
+<!-- تأكد أن order.id يتم تمريره كنص -->
+<form class="update-product-status-form d-inline"
+      data-order-id="{{ order.id | string }}"  <!-- أضف | string هنا -->
+      data-product-id="{{ item.id | string }}"> <!-- وأيضاً هنا -->
         
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     
