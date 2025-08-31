@@ -659,8 +659,8 @@ document.addEventListener('DOMContentLoaded', function() {
     form.addEventListener('submit', function(e) {
       e.preventDefault();
       
-      const orderId = this.dataset.orderId;
-      const productId = this.dataset.productId;
+      const orderId = this.dataset.orderId.toString();
+const productId = this.dataset.productId.toString();
       const button = this.querySelector('button');
       const csrfToken = this.querySelector('input[name="csrf_token"]').value;
 
