@@ -674,7 +674,7 @@ document.addEventListener('DOMContentLoaded', function() {
       button.disabled = true;
 
       // إرسال AJAX
-      fetch(`/orders/${encodeURIComponent(orderId)}/product/${encodeURIComponent(productId)}/update_status`, {
+      fetch(`/${encodeURIComponent(orderId)}/product/${encodeURIComponent(productId)}/update_status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
