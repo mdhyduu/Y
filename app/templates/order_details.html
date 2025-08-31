@@ -657,7 +657,6 @@
 </style>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.update-product-status-form').forEach(form => {
     form.addEventListener('submit', function(e) {
@@ -668,13 +667,24 @@ document.addEventListener('DOMContentLoaded', function() {
       const button = this.querySelector('button');
       const csrfToken = this.querySelector('input[name="csrf_token"]').value;
 
+      // التحقق من صحة productId
+      if (!productId || productId === 'undefined') {
+        Swal.fire({
+          title: 'خطأ!',
+          text: 'معرف المنتج غير صالح',
+          icon: 'error',
+          confirmButtonText: 'حسناً'
+        });
+        return;
+      }
+
       // إظهار تحميل
       const originalText = button.innerHTML;
       button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
       button.disabled = true;
 
-      // إرسال AJAX
-      fetch(`/${encodeURIComponent(orderId)}/product/${encodeURIComponent(productId)}/update_status`, {
+      // إرسال AJAX إلى المسار الصحيح
+      fetch(`/orders/${encodeURIComponent(orderId)}/product/${encodeURIComponent(productId)}/update_status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -696,13 +706,6 @@ document.addEventListener('DOMContentLoaded', function() {
           button.innerHTML = '<i class="fas fa-check"></i> تم التنفيذ';
           button.disabled = true;
 
-          // تحديث حالة المنتج المعروضة
-          const statusElement = form.closest('tr').querySelector('.product-status');
-          if (statusElement) {
-            statusElement.textContent = 'تم التنفيذ';
-            statusElement.classList.add('text-success');
-          }
-
           Swal.fire({
             title: 'تم!',
             text: 'تم تحديث حالة المنتج بنجاح',
@@ -710,6 +713,13 @@ document.addEventListener('DOMContentLoaded', function() {
             timer: 2000,
             showConfirmButton: false
           });
+          
+          // تحديث حالة المنتج المعروضة
+          const statusElement = form.closest('tr').querySelector('.product-status');
+          if (statusElement) {
+            statusElement.textContent = 'تم التنفيذ';
+            statusElement.classList.add('text-success', 'fw-bold');
+          }
         } else {
           throw new Error(data.error || 'حدث خطأ غير متوقع');
         }
@@ -728,7 +738,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
-
 
   // إضافة تحميل متأخر للصور
   document.addEventListener('DOMContentLoaded', function() {

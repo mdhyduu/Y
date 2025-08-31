@@ -1135,16 +1135,19 @@ def order_details(order_id):
         ).all()
 
         # جلب حالات المنتجات للطلب
+        # جلب حالات المنتجات للطلب
         product_statuses = {}
         for item in processed_order.get('items', []):
             product_id = item.get('id')
             if product_id:
+                # تحويل product_id إلى string للتأكد من التطابق
+                product_id_str = str(product_id)
                 status = OrderProductStatus.query.filter_by(
                     order_id=str(order_id),
-                    product_id=str(product_id)
+                    product_id=product_id_str
                 ).first()
                 if status:
-                    product_statuses[product_id] = {
+                    product_statuses[product_id_str] = {
                         'status': status.status,
                         'notes': status.notes,
                         'updated_at': status.updated_at
@@ -1993,7 +1996,7 @@ def update_product_status(order_id, product_id):
     if not data:
         return jsonify({'success': False, 'error': 'بيانات غير صالحة'}), 400
         
-    new_status = data.get('status', 'تم التنفيذ')  # قيمة افتراضية
+    new_status = data.get('status', 'تم التنفيذ')
     notes = data.get('notes', '')
 
     # التحقق من صحة product_id
@@ -2043,4 +2046,3 @@ def update_product_status(order_id, product_id):
             'success': False, 
             'error': f'خطأ في الخادم: {str(e)}'
         }), 500
-
