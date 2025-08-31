@@ -684,7 +684,8 @@ document.addEventListener('DOMContentLoaded', function() {
       button.disabled = true;
 
       // إرسال AJAX
-      fetch(`/orders/${encodeURIComponent(orderId)}/product/${encodeURIComponent(productId)}/update_status`, {
+      // استخدم هذا إذا كان الـ blueprint مسجل بدون بادئة
+     fetch(`/${encodeURIComponent(orderId)}/product/${encodeURIComponent(productId)}/update_status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
