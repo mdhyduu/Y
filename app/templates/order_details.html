@@ -659,8 +659,8 @@ document.addEventListener('DOMContentLoaded', function() {
     form.addEventListener('submit', function(e) {
       e.preventDefault();
       
-      const orderId = this.dataset.orderId.toString();
-      const productId = this.dataset.productId.toString();
+      const orderId = this.dataset.orderId;
+      const productId = this.dataset.productId;
       const button = this.querySelector('button');
       const csrfToken = this.querySelector('input[name="csrf_token"]').value;
 
@@ -671,8 +671,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
       // بناء URL بشكل صحيح
       const url = `/orders/${orderId}/product/${productId}/update_status`;
-      
       console.log('Order ID:', orderId, 'Product ID:', productId); // للت debugging
+      console.log('Sending request to:', url);
 
       // إرسال AJAX
       fetch(url, {
