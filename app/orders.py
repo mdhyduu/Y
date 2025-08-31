@@ -1996,9 +1996,12 @@ def update_product_status(order_id, product_id):
         return jsonify({'success': False, 'error': 'يجب تحديد الحالة'}), 400
 
     try:
+        # تحويل order_id إلى string لتتوافق مع نوع الحقل في قاعدة البيانات
+        order_id_str = str(order_id)
+        
         status_obj = OrderProductStatus.query.filter_by(
-            order_id=str(order_id),  # تحويل إلى string إذا كان مخزناً كنص
-            product_id=str(product_id)  # تحويل إلى string
+            order_id=order_id_str,
+            product_id=product_id  # product_id هو الآن string
         ).first()
 
         if status_obj:
@@ -2007,8 +2010,8 @@ def update_product_status(order_id, product_id):
             status_obj.updated_at = datetime.utcnow()
         else:
             status_obj = OrderProductStatus(
-                order_id=str(order_id),
-                product_id=str(product_id),
+                order_id=order_id_str,
+                product_id=product_id,
                 status=new_status,
                 notes=notes,
                 employee_id=employee.id if employee else None

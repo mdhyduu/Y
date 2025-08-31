@@ -82,17 +82,12 @@
 {% endif %}
   </td>
 <td class="text-center align-middle">
-
-<form class="update-product-status-form d-inline"
-      data-order-id="{{ order.id | int }}"
-     
-
-      data-product-id="{{ item.id | int }}"> <!-- تحويل إلى integer -->
+  <form class="update-product-status-form d-inline"
+        data-order-id="{{ order.id }}"
+        data-product-id="{{ item.id }}">
         
-    <!-- حقل مخفي للـ CSRF -->
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     
-    <!-- زر تغيير الحالة -->
     <button type="submit"
             class="btn btn-sm btn-success"
             {% if product_statuses.get(item.id|string) and product_statuses[item.id|string].status == 'تم التنفيذ' %}disabled{% endif %}>
@@ -100,11 +95,14 @@
     </button>
   </form>
 
-  {% if product_statuses.get(item.id|string) %}
-    <div class="text-muted small mt-1">
+  <!-- عنصر لعرض حالة المنتج -->
+  <div class="product-status text-muted small mt-1">
+    {% if product_statuses.get(item.id|string) %}
       {{ product_statuses[item.id|string].status }}
-    </div>
-  {% endif %}
+    {% else %}
+      قيد التنفيذ
+    {% endif %}
+  </div>
 </td>
 </tr>
                 {% endfor %}
@@ -673,7 +671,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // بناء URL بشكل صحيح
       const url = `/orders/${orderId}/product/${productId}/update_status`;
       
-      console.log('Sending request to:', url); // للتdebug
+      console.log('Sending request to:', url);
 
       // إرسال AJAX
       fetch(url, {
@@ -682,11 +680,14 @@ document.addEventListener('DOMContentLoaded', function() {
           'Content-Type': 'application/json',
           'X-CSRFToken': csrfToken
         },
-        body: JSON.stringify({ status: 'تم التنفيذ', notes: '' })
+        body: JSON.stringify({ 
+          status: 'تم التنفيذ', 
+          notes: '' 
+        })
       })
       .then(response => {
         if (!response.ok) {
-          throw new Error(`خطأ في الخادم: ${response.status} - ${response.statusText}`);
+          throw new Error(`خطأ في الخادم: ${response.status}`);
         }
         return response.json();
       })
@@ -703,10 +704,11 @@ document.addEventListener('DOMContentLoaded', function() {
             showConfirmButton: false
           });
           
-          // تحديث الصفحة بعد ثانيتين
-          setTimeout(() => {
-            location.reload();
-          }, 2000);
+          // تحديث حالة المنتج المعروضة
+          const statusElement = form.closest('tr').querySelector('.product-status');
+          if (statusElement) {
+            statusElement.textContent = 'تم التنفيذ';
+          }
         } else {
           throw new Error(data.error || 'حدث خطأ غير متوقع');
         }
@@ -725,27 +727,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
-  // التحقق قبل إرسال النماذج
-  document.getElementById('status-form').addEventListener('submit', function(e) {
-    const status = document.getElementById('status').value;
-    if (status === 'canceled') {
-      e.preventDefault();
-      Swal.fire({
-        title: 'تأكيد الإلغاء',
-        text: 'هل أنت متأكد أنك تريد إلغاء الطلب؟',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'نعم، إلغاء',
-        cancelButtonText: 'تراجع',
-        reverseButtons: true
-      }).then((result) => {
-        if (result.isConfirmed) {
-          this.submit();
-        }
-      });
-    }
-  });
-
   // إضافة تحقق من الطول الأقصى للنصوص
   document.querySelectorAll('textarea[maxlength]').forEach(textarea => {
     textarea.addEventListener('input', function() {
