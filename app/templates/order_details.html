@@ -81,28 +81,33 @@
 </div>
 {% endif %}
   </td>
-<td class="text-center align-middle">
-<!-- تأكد أن order.id يتم تمريره كنص -->
-<form class="update-product-status-form d-inline"
-      data-order-id="{{ order.id | string }}"
-      data-product-id="{{ item.id | string }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    
-    <button type="submit"
-            class="btn btn-sm btn-success"
-            {% if product_statuses.get(item.id|string) and product_statuses[item.id|string].status == 'تم التنفيذ' %}disabled{% endif %}>
-      <i class="fas fa-check"></i> تم التنفيذ
-    </button>
-</form>
-  <!-- عنصر لعرض حالة المنتج -->
-  <div class="product-status text-muted small mt-1">
-    {% if product_statuses.get(item.id|string) %}
-      {{ product_statuses[item.id|string].status }}
-    {% else %}
-      قيد التنفيذ
-    {% endif %}
-  </div>
-</td>
+<!-- في قسم المنتجات، تأكد من تمرير product_id بشكل صحيح -->
+
+  <!-- ... الأكواد الأخرى ... -->
+  <td class="text-center align-middle">
+    <!-- تأكد من أن order.id يتم تمريره كنص -->
+    <form class="update-product-status-form d-inline"
+          data-order-id="{{ order.id | string }}"
+          data-product-id="{{ item.id | string }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      
+      <button type="submit"
+              class="btn btn-sm btn-success"
+              {% if product_statuses.get(item.id|string) and product_statuses[item.id|string].status == 'تم التنفيذ' %}disabled{% endif %}>
+        <i class="fas fa-check"></i> تم التنفيذ
+      </button>
+    </form>
+
+    <!-- عنصر لعرض حالة المنتج -->
+    <div class="product-status text-muted small mt-1">
+      {% if product_statuses.get(item.id|string) %}
+        {{ product_statuses[item.id|string].status }}
+      {% else %}
+        قيد التنفيذ
+      {% endif %}
+    </div>
+  </td>
+
 </tr>
                 {% endfor %}
               </tbody>
@@ -652,29 +657,34 @@
 </style>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-document.querySelectorAll('.update-product-status-form').forEach(form => {
-  form.addEventListener('submit', function(e) {
-    e.preventDefault();
-        
-     const orderId = this.dataset.orderId;
-     const productId = this.dataset.productId;
-
-
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.update-product-status-form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const orderId = this.dataset.orderId;
+      const productId = this.dataset.productId;
       const button = this.querySelector('button');
       const csrfToken = this.querySelector('input[name="csrf_token"]').value;
+
+      // التحقق من صحة productId
+      if (!productId || productId === 'undefined') {
+        Swal.fire({
+          title: 'خطأ!',
+          text: 'معرف المنتج غير صالح',
+          icon: 'error',
+          confirmButtonText: 'حسناً'
+        });
+        return;
+      }
 
       // إظهار تحميل
       const originalText = button.innerHTML;
       button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
       button.disabled = true;
 
-      // بناء URL بشكل صحيح
-      const url = `/orders/${encodeURIComponent(orderId)}/product/${encodeURIComponent(productId)}/update_status`;
-      console.log('Order ID:', orderId, 'Product ID:', productId); // للت debugging
-      console.log('Sending request to:', url);
-
       // إرسال AJAX
-      fetch(url, {
+      fetch(`/orders/${encodeURIComponent(orderId)}/product/${encodeURIComponent(productId)}/update_status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
