@@ -1981,7 +1981,7 @@ def custom_order_details(order_id):
                          employees=employees,
                          is_reviewer=is_reviewer,
                          current_employee=employee)
-@orders_bp.route('/<int:order_id>/product/<int:product_id>/update_status', methods=['POST'])
+@orders_bp.route('/<order_id>/product/<product_id>/update_status', methods=['POST'])
 def update_product_status(order_id, product_id):
     """تحديث حالة منتج معين داخل الطلب"""
     user, employee = get_user_from_cookies()
@@ -1992,7 +1992,9 @@ def update_product_status(order_id, product_id):
     data = request.get_json()
     if not data:
         return jsonify({'success': False, 'error': 'بيانات غير صالحة'}), 400
-        
+    
+    if not product_id or product_id == 'undefined':
+        return jsonify({'success': False, 'error': 'معرف المنتج غير صالح'}), 400
     new_status = data.get('status', 'تم التنفيذ')  # قيمة افتراضية
     notes = data.get('notes', '')
 

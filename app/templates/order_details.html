@@ -85,8 +85,7 @@
 <!-- تأكد أن order.id يتم تمريره كنص -->
 <form class="update-product-status-form d-inline"
       data-order-id="{{ order.id | string }}"  <!-- أضف | string هنا -->
-      data-product-id="{{ item.id | string }}"> <!-- وأيضاً هنا -->
-        
+data-product-id="{{ item.id | string }}"
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     
     <button type="submit"
@@ -670,7 +669,7 @@ document.addEventListener('DOMContentLoaded', function() {
       button.disabled = true;
 
       // بناء URL بشكل صحيح
-      const url = `/orders/${orderId}/product/${productId}/update_status`;
+      const url = `/orders/${encodeURIComponent(orderId)}/product/${encodeURIComponent(productId)}/update_status`;
       console.log('Order ID:', orderId, 'Product ID:', productId); // للت debugging
       console.log('Sending request to:', url);
 
