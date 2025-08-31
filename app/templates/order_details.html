@@ -655,12 +655,10 @@
 document.querySelectorAll('.update-product-status-form').forEach(form => {
   form.addEventListener('submit', function(e) {
     e.preventDefault();
-    
-    const orderId = this.dataset.orderId;
-    const productId = this.dataset.productId;
+        
+     const orderId = this.dataset.orderId;
+     const productId = this.dataset.productId;
 
-    // Add validation for productId
-    
 
       const button = this.querySelector('button');
       const csrfToken = this.querySelector('input[name="csrf_token"]').value;
@@ -669,15 +667,6 @@ document.querySelectorAll('.update-product-status-form').forEach(form => {
       const originalText = button.innerHTML;
       button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
       button.disabled = true;
-if (!productId || productId === 'undefined') {
-      Swal.fire({
-        title: 'خطأ!',
-        text: 'معرف المنتج غير صالح',
-        icon: 'error',
-        confirmButtonText: 'حسناً'
-      });
-      return;
-    }
 
       // بناء URL بشكل صحيح
       const url = `/orders/${encodeURIComponent(orderId)}/product/${encodeURIComponent(productId)}/update_status`;
