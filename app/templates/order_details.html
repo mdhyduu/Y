@@ -82,9 +82,10 @@
 {% endif %}
   </td>
 <td class="text-center align-middle">
-  <form class="update-product-status-form d-inline"
-        data-order-id="{{ order.id }}"
-        data-product-id="{{ item.id }}">
+
+<form class="update-product-status-form d-inline"
+      data-order-id="{{ order.id | int }}"  <!-- تحويل إلى integer -->
+      data-product-id="{{ item.id | int }}"> <!-- تحويل إلى integer -->
         
     <!-- حقل مخفي للـ CSRF -->
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -655,7 +656,7 @@
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.update-product-status-form').forEach(form => {
     form.addEventListener('submit', function(e) {
-      e.preventDefault(); // منع إرسال الفورم التقليدي
+      e.preventDefault();
       
       const orderId = this.dataset.orderId;
       const productId = this.dataset.productId;
@@ -667,29 +668,30 @@ document.addEventListener('DOMContentLoaded', function() {
       button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
       button.disabled = true;
 
+      // بناء URL بشكل صحيح
+      const url = `/orders/${orderId}/product/${productId}/update_status`;
+      
+      console.log('Sending request to:', url); // للتdebug
+
       // إرسال AJAX
-      fetch(`/orders/${orderId}/product/${productId}/update_status`, {
+      fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRFToken': csrfToken
         },
-        body: JSON.stringify({ status: 'تم التنفيذ' })
+        body: JSON.stringify({ status: 'تم التنفيذ', notes: '' })
       })
       .then(response => {
-        if (!response.ok) throw new Error(`خطأ في الخادم: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`خطأ في الخادم: ${response.status} - ${response.statusText}`);
+        }
         return response.json();
       })
       .then(data => {
         if (data.success) {
           button.innerHTML = '<i class="fas fa-check"></i> تم التنفيذ';
           button.disabled = true;
-
-          // تحديث حالة المنتج المعروضة
-          let statusDiv = form.nextElementSibling;
-          if (statusDiv && statusDiv.classList.contains('text-muted')) {
-            statusDiv.textContent = 'تم التنفيذ';
-          }
 
           Swal.fire({
             title: 'تم!',
@@ -698,6 +700,11 @@ document.addEventListener('DOMContentLoaded', function() {
             timer: 2000,
             showConfirmButton: false
           });
+          
+          // تحديث الصفحة بعد ثانيتين
+          setTimeout(() => {
+            location.reload();
+          }, 2000);
         } else {
           throw new Error(data.error || 'حدث خطأ غير متوقع');
         }
@@ -711,11 +718,11 @@ document.addEventListener('DOMContentLoaded', function() {
           icon: 'error',
           confirmButtonText: 'حسناً'
         });
+        console.error('Error:', error);
       });
     });
   });
 });
-
   // التحقق قبل إرسال النماذج
   document.getElementById('status-form').addEventListener('submit', function(e) {
     const status = document.getElementById('status').value;

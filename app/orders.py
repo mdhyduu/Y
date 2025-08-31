@@ -1984,6 +1984,8 @@ def custom_order_details(order_id):
 @orders_bp.route('/<int:order_id>/product/<int:product_id>/update_status', methods=['POST'])
 def update_product_status(order_id, product_id):
     """تحديث حالة منتج معين داخل الطلب"""
+    current_app.logger.info(f"Received product status update request: order_id={order_id}, product_id={product_id}")
+    
     user, employee = get_user_from_cookies()
     if not user:
         return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
@@ -1996,8 +1998,10 @@ def update_product_status(order_id, product_id):
         return jsonify({'success': False, 'error': 'يجب تحديد الحالة'}), 400
 
     try:
+        current_app.logger.info(f"Updating product status: order={order_id}, product={product_id}, status={new_status}")
+        
         status_obj = OrderProductStatus.query.filter_by(
-            order_id=str(order_id),
+            order_id=str(order_id),  # تأكد من أن هذا يتطابق مع نوع البيانات في DB
             product_id=str(product_id)
         ).first()
 
