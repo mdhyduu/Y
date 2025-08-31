@@ -1983,11 +1983,11 @@ def custom_order_details(order_id):
                          current_employee=employee)
 @orders_bp.route('/<int:order_id>/product/<int:product_id>/update_status', methods=['POST'])
 def update_product_status(order_id, product_id):
-    """تحديث حالة منتج محدد داخل الطلب"""
+    """تحديث حالة منتج معين داخل الطلب"""
     user, employee = get_user_from_cookies()
     if not user:
         return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
-    
+
     data = request.get_json()
     new_status = data.get('status')
     notes = data.get('notes', '')
@@ -1996,7 +1996,6 @@ def update_product_status(order_id, product_id):
         return jsonify({'success': False, 'error': 'يجب تحديد الحالة'}), 400
 
     try:
-        # جلب أو إنشاء سجل حالة المنتج
         status_obj = OrderProductStatus.query.filter_by(
             order_id=str(order_id),
             product_id=str(product_id)
