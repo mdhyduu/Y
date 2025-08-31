@@ -52,13 +52,18 @@ def format_date(date_str):
         return dt.strftime('%Y-%m-%d %H:%M')
     except:
         return date_str if date_str else 'غير معروف'
-    
 def process_order_data(order_id, items_data):
     """معالجة بيانات الطلب لتتناسب مع القالب مع إضافة الباركود لكل منتج"""
     items = []
     logger.info(f"Processing order items: {len(items_data)} items")
     
     for index, item in enumerate(items_data):
+        # تأكد من وجود معرف للمنتج، وإلا أنشئ واحدًا مؤقتًا
+        item_id = item.get('id')
+        if not item_id:
+            item_id = f"temp_{index}"
+            logger.warning(f"Item missing ID, using temporary ID: {item_id}")
+        
         # معالجة الصور - التعديل هنا
         main_image = ''
         
@@ -107,13 +112,13 @@ def process_order_data(order_id, items_data):
                 elif isinstance(raw_value, list):
                     # إذا كانت القيمة قائمة، نعالج كل عنصر فيها
                     values_list = []
-                    for item in raw_value:
-                        if isinstance(item, dict):
+                    for option_item in raw_value:  # تغيير اسم المتغير لتجنب التعارض
+                        if isinstance(option_item, dict):
                             # للعناصر القاموسية في القائمة
-                            value_str = item.get('name') or item.get('value') or str(item)
+                            value_str = option_item.get('name') or option_item.get('value') or str(option_item)
                             values_list.append(value_str)
                         else:
-                            values_list.append(str(item))
+                            values_list.append(str(option_item))
                     display_value = ', '.join(values_list)
                 else:
                     # في الحالات الأخرى نستخدم القيمة مباشرة
@@ -156,17 +161,14 @@ def process_order_data(order_id, items_data):
                     'date': reservation.get('date', '')
                 })
         
-        # إزالة توليد الباركود للعنصر
-        item_id = item.get('id')
-        
         product_info = {
-            'id': item.get('id'),
+            'id': item_id,  # استخدام item_id بدلاً من item.get('id')
             'name': item.get('name', ''),
             'description': item.get('notes', '')
         }
         
         item_data = {
-            'id': item_id,
+            'id': item_id,  # استخدام item_id
             'name': item.get('name', ''),
             'sku': item.get('sku', ''),
             'quantity': item.get('quantity', 0),
@@ -183,7 +185,6 @@ def process_order_data(order_id, items_data):
             'notes': item.get('notes', ''),
             'options': options,
             'main_image': main_image,
-            # إزالة حقل الباركود للعنصر
             'codes': digital_codes,
             'files': digital_files,
             'reservations': reservations,
@@ -191,8 +192,7 @@ def process_order_data(order_id, items_data):
         }
         
         items.append(item_data)
-        # تحديث رسالة السجل لعدم تضمين الباركود
-        logger.info(f"Processed item: {item_data['name']}")
+        logger.info(f"Processed item: {item_data['name']} (ID: {item_id})")
 
     processed_order = {
         'id': order_id,
@@ -202,7 +202,6 @@ def process_order_data(order_id, items_data):
     
     logger.info(f"Processed order with {len(items)} items and barcode: {processed_order['barcode']}")
     return processed_order
-
 def get_salla_categories(access_token):
     import requests
     from .config import Config
