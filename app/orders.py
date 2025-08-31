@@ -1992,17 +1992,22 @@ def update_product_status(order_id, product_id):
     data = request.get_json()
     if not data:
         return jsonify({'success': False, 'error': 'بيانات غير صالحة'}), 400
-    
-    if not product_id or product_id == 'undefined':
-        return jsonify({'success': False, 'error': 'معرف المنتج غير صالح'}), 400
+        
     new_status = data.get('status', 'تم التنفيذ')  # قيمة افتراضية
     notes = data.get('notes', '')
+
+    # التحقق من صحة product_id
+    if not product_id or product_id == 'undefined':
+        return jsonify({
+            'success': False, 
+            'error': 'معرف المنتج غير صالح'
+        }), 400
 
     try:
         # البحث عن حالة المنتج الحالية أو إنشاء جديدة
         status_obj = OrderProductStatus.query.filter_by(
-            order_id=order_id,
-            product_id=product_id
+            order_id=str(order_id),
+            product_id=str(product_id)
         ).first()
 
         if status_obj:
@@ -2013,8 +2018,8 @@ def update_product_status(order_id, product_id):
                 status_obj.employee_id = employee.id
         else:
             status_obj = OrderProductStatus(
-                order_id=order_id,
-                product_id=product_id,
+                order_id=str(order_id),
+                product_id=str(product_id),
                 status=new_status,
                 notes=notes,
                 employee_id=employee.id if employee else None
