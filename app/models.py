@@ -55,7 +55,7 @@ class User(db.Model):
     token_refreshed_at = db.Column(db.DateTime)
     
     # حقول إضافية
-    store_id = db.Column(db.Integer, nullable=True, index=True)
+    store_id = db.Column(db.Integer, default=1, index=True)
     last_sync = db.Column(db.DateTime)
     remember_token = db.Column(db.String(100))
     
