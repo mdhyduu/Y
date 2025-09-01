@@ -74,7 +74,7 @@ def refresh_salla_token(user):
             'grant_type': 'refresh_token',
             'refresh_token': refresh_token,
             'client_id': current_app.config['SALLA_CLIENT_ID'],
-            'client_secret': current_app.config['ALLA_CLIENT_SECRET']
+            'client_secret': current_app.config['SLLA_CLIENT_SECRET']
         }
         
         # إرسال طلب التجديد - استخدام نفس endpoint الأول
