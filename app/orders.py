@@ -885,30 +885,19 @@ def order_details(order_id):
     if not user:
         flash("الرجاء تسجيل الدخول أولاً", "error")
         response = make_response(redirect(url_for('user_auth.login')))
-        response.delete_cookie('user_id')
-        response.delete_cookie('is_admin')
-        response.delete_cookie('employee_role')
-        response.delete_cookie('store_id')
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
         return response
 
     try:
         # ========== [1] التحقق من صلاحية المستخدم ==========
-        is_admin = request.cookies.get('is_admin') == 'true'
-        is_reviewer = is_admin
+        is_reviewer = False
         
-        if not is_admin and current_employee:
+        if request.cookies.get('is_admin') == 'true':
+            is_reviewer = True
+        elif current_employee:
             if current_employee.role in ['reviewer', 'manager']:
                 is_reviewer = True
-            else:
-                # للموظفين العاديين: التحقق من أن الطلب مسند لهم
-                assignment = OrderAssignment.query.filter(
-                    (OrderAssignment.order_id == str(order_id)) & 
-                    (OrderAssignment.employee_id == current_employee.id)
-                ).first()
-                
-                if not assignment:
-                    flash('غير مصرح لك بالوصول إلى هذا الطلب', 'error')
-                    return redirect(url_for('orders.index'))
 
         # ========== [2] التحقق من صلاحية التوكن ==========
         def refresh_and_get_token():
@@ -916,22 +905,18 @@ def order_details(order_id):
             new_token = refresh_salla_token(user)
             if not new_token:
                 flash("انتهت صلاحية الجلسة، الرجاء إعادة الربط مع سلة", "error")
-                response = make_response(redirect(url_for('auth.link_store' if is_admin else 'user_auth.logout')))
-                response.delete_cookie('user_id')
-                response.delete_cookie('is_admin')
-                response.delete_cookie('employee_role')
-                response.delete_cookie('store_id')
-                return None
+                response = make_response(redirect(url_for('auth.link_store' if request.cookies.get('is_admin') == 'true' else 'user_auth.logout')))
+                response.set_cookie('user_id', '', expires=0)
+                response.set_cookie('is_admin', '', expires=0)
+                return response
             return new_token
 
         access_token = user.salla_access_token
         if not access_token:
             flash('يجب ربط متجرك مع سلة أولاً', 'error')
-            response = make_response(redirect(url_for('auth.link_store' if is_admin else 'user_auth.logout')))
-            response.delete_cookie('user_id')
-            response.delete_cookie('is_admin')
-            response.delete_cookie('employee_role')
-            response.delete_cookie('store_id')
+            response = make_response(redirect(url_for('auth.link_store' if request.cookies.get('is_admin') == 'true' else 'user_auth.logout')))
+            response.set_cookie('user_id', '', expires=0)
+            response.set_cookie('is_admin', '', expires=0)
             return response
 
         # ========== [3] جلب بيانات الطلب من Salla API ==========
@@ -941,10 +926,6 @@ def order_details(order_id):
             'Accept': 'application/json'
         }
 
-        # ... باقي الكود دون تغيير ...
-        
-        # في نهاية الدالة، تأكد من أنك تعيد render_template وليس redirect
-        
         # دالة مساعدة للتعامل مع طلبات API
         def make_salla_api_request(url, params=None):
             try:
@@ -1186,12 +1167,6 @@ def order_details(order_id):
         error_msg = f"خطأ في جلب تفاصيل الطلب: {http_err}"
         if http_err.response.status_code == 401:
             error_msg = "انتهت صلاحية الجلسة، الرجاء إعادة الربط مع سلة"
-            response = make_response(redirect(url_for('auth.link_store' if is_admin else 'user_auth.logout')))
-            response.delete_cookie('user_id')
-            response.delete_cookie('is_admin')
-            response.delete_cookie('employee_role')
-            response.delete_cookie('store_id')
-            return response
         flash(error_msg, "error")
         logger.error(f"HTTP Error: {http_err} - Status Code: {http_err.response.status_code}")
         return redirect(url_for('orders.index'))
@@ -1207,7 +1182,6 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
-
 @orders_bp.route('/<int:order_id>/update_status', methods=['POST'])
 def update_order_status(order_id):
     """تحديث حالة الطلب في سلة"""
@@ -2113,14 +2087,3 @@ def cancel_product_status(order_id, product_id):
             'success': False, 
             'error': f'خطأ في الخادم: {str(e)}'
         }), 500
-def clear_auth_cookies(response=None):
-    """حذف جميع كوكيز المصادقة"""
-    if response is None:
-        response = make_response()
-    response.delete_cookie('user_id')
-    response.delete_cookie('is_admin')
-    response.delete_cookie('employee_role')
-    response.delete_cookie('store_id')
-    response.delete_cookie('salla_access_token')
-    response.delete_cookie('salla_refresh_token')
-    return response
