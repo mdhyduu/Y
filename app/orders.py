@@ -2040,3 +2040,45 @@ def update_product_status(order_id, product_id):
             'success': False, 
             'error': f'خطأ في الخادم: {str(e)}'
         }), 500
+@orders_bp.route('/<order_id>/product/<product_id>/cancel_status', methods=['POST'])
+def cancel_product_status(order_id, product_id):
+    """إلغاء حالة منتج معين داخل الطلب"""
+    user, employee = get_user_from_cookies()
+    if not user:
+        return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
+
+    # التحقق من صحة product_id
+    if not product_id or product_id == 'undefined':
+        return jsonify({
+            'success': False, 
+            'error': 'معرف المنتج غير صالح'
+        }), 400
+
+    try:
+        # البحث عن حالة المنتج الحالية وحذفها
+        status_obj = OrderProductStatus.query.filter_by(
+            order_id=str(order_id),
+            product_id=str(product_id)
+        ).first()
+
+        if status_obj:
+            db.session.delete(status_obj)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True, 
+                'message': 'تم إلغاء حالة المنتج بنجاح'
+            })
+        else:
+            return jsonify({
+                'success': False, 
+                'error': 'لم يتم العثور على حالة المنتج'
+            }), 404
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error canceling product status: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False, 
+            'error': f'خطأ في الخادم: {str(e)}'
+        }), 500

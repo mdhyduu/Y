@@ -84,33 +84,47 @@
 <!-- في قسم المنتجات، تأكد من تمرير product_id بشكل صحيح -->
 
   <!-- ... الأكواد الأخرى ... -->
-  <td class="text-center align-middle">
-    <!-- تأكد من أن order.id يتم تمريره كنص -->
-<form class="update-product-status-form d-inline"
-      data-order-id="{{ order.id | string }}"
-      data-product-id="{{ item.id | string }}">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  
-<button type="submit"
-        class="btn btn-sm btn-success"
-        {% if product_statuses[item.id|string] and product_statuses[item.id|string].status == 'تم التنفيذ' %}disabled{% endif %}>
-    <i class="fas fa-check"></i> تم التنفيذ
-</button>
-</form>
+<!-- ... الكود السابق ... -->
+<td class="text-center align-middle">
+    <div class="d-flex flex-column align-items-center">
+        <!-- زر تم التنفيذ -->
+        <form class="update-product-status-form d-inline mb-1"
+              data-order-id="{{ order.id | string }}"
+              data-product-id="{{ item.id | string }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
+            <button type="submit"
+                    class="btn btn-sm btn-success"
+                    {% if product_statuses[item.id|string] and product_statuses[item.id|string].status == 'تم التنفيذ' %}disabled{% endif %}>
+                <i class="fas fa-check"></i> تم التنفيذ
+            </button>
+        </form>
 
+        <!-- زر إلغاء الحالة (يظهر فقط إذا كانت الحالة "تم التنفيذ") -->
+        {% if product_statuses[item.id|string] and product_statuses[item.id|string].status == 'تم التنفيذ' %}
+        <form class="cancel-product-status-form d-inline"
+              data-order-id="{{ order.id | string }}"
+              data-product-id="{{ item.id | string }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+                <i class="fas fa-undo"></i> إلغاء الحالة
+            </button>
+        </form>
+        {% endif %}
 
-<div class="product-status text-muted small mt-1 
-    {% if product_statuses[item.id|string] and product_statuses[item.id|string].status == 'تم التنفيذ' %} 
-        text-success fw-bold
-    {% endif %}">
-    {% if product_statuses[item.id|string] %}
-        {{ product_statuses[item.id|string].status }}
-    {% else %}
-        قيد التنفيذ
-    {% endif %}
-</div>
-  </td>
-
+        <div class="product-status text-muted small mt-1 
+            {% if product_statuses[item.id|string] and product_statuses[item.id|string].status == 'تم التنفيذ' %} 
+                text-success fw-bold
+            {% endif %}">
+            {% if product_statuses[item.id|string] %}
+                {{ product_statuses[item.id|string].status }}
+            {% else %}
+                قيد التنفيذ
+            {% endif %}
+        </div>
+    </div>
+</td>
+<!-- ... الكود اللاحق ... -->
 </tr>
                 {% endfor %}
               </tbody>
@@ -741,7 +755,88 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
+// معالجة إلغاء حالة المنتج
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.cancel-product-status-form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const orderId = this.dataset.orderId;
+      const productId = this.dataset.productId;
+      const button = this.querySelector('button');
+      const csrfToken = this.querySelector('input[name="csrf_token"]').value;
 
+      if (!productId || productId === 'undefined') {
+        Swal.fire({
+          title: 'خطأ!',
+          text: 'معرف المنتج غير صالح',
+          icon: 'error',
+          confirmButtonText: 'حسناً'
+        });
+        return;
+      }
+
+      // إظهار تحميل
+      const originalText = button.innerHTML;
+      button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإلغاء...';
+      button.disabled = true;
+
+      // إرسال AJAX لإلغاء الحالة
+      fetch(`/${encodeURIComponent(orderId)}/product/${encodeURIComponent(productId)}/cancel_status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`خطأ في الخادم: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data.success) {
+          // إعادة تمكين زر "تم التنفيذ" وإزالة زر الإلغاء
+          const mainForm = form.closest('.d-flex').querySelector('.update-product-status-form');
+          const mainButton = mainForm.querySelector('button');
+          mainButton.disabled = false;
+          
+          // إزالة زر الإلغاء
+          form.remove();
+          
+          // تحديث حالة المنتج المعروضة
+          const statusElement = form.closest('.d-flex').querySelector('.product-status');
+          if (statusElement) {
+            statusElement.textContent = 'قيد التنفيذ';
+            statusElement.classList.remove('text-success', 'fw-bold');
+          }
+
+          Swal.fire({
+            title: 'تم!',
+            text: 'تم إلغاء حالة المنتج بنجاح',
+            icon: 'success',
+            timer: 2000,
+            showConfirmButton: false
+          });
+        } else {
+          throw new Error(data.error || 'حدث خطأ غير متوقع');
+        }
+      })
+      .catch(error => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        Swal.fire({
+          title: 'خطأ!',
+          text: error.message,
+          icon: 'error',
+          confirmButtonText: 'حسناً'
+        });
+        console.error('Error:', error);
+      });
+    });
+  });
+});
   // إضافة تحميل متأخر للصور
   document.addEventListener('DOMContentLoaded', function() {
     const lazyImages = document.querySelectorAll('img[loading="lazy"]');
