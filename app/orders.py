@@ -33,20 +33,25 @@ def get_user_from_cookies():
     """استخراج بيانات المستخدم من الكوكيز"""
     user_id = request.cookies.get('user_id')
     is_admin = request.cookies.get('is_admin') == 'true'
+    employee_role = request.cookies.get('employee_role', '')
     
     if not user_id:
         return None, None
     
-    if is_admin:
-        user = User.query.get(user_id)
-        return user, None
-    else:
-        employee = Employee.query.get(user_id)
-        if employee:
-            user = User.query.filter_by(store_id=employee.store_id).first()
-            return user, employee
+    try:
+        if is_admin:
+            user = User.query.get(int(user_id))
+            return user, None
+        else:
+            employee = Employee.query.get(int(user_id))
+            if employee:
+                # الحصول على المستخدم الرئيسي للمتجر
+                user = User.query.filter_by(store_id=employee.store_id).first()
+                return user, employee
+            return None, None
+    except (ValueError, TypeError):
+        # إذا كان user_id غير رقمي
         return None, None
-
 def sync_order_statuses_internal(user, access_token, store_id):
     """دالة مساعدة لمزامنة حالات الطلبات (يمكن استدعاؤها داخلياً)"""
     try:
