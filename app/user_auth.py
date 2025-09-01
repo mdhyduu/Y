@@ -112,10 +112,11 @@ def register():
             if User.query.filter_by(email=email).first():
                 flash('البريد الإلكتروني مسجل مسبقاً', 'danger')
                 return redirect(url_for('user_auth.register'))
-            
             new_user = User(email=email)
             new_user.set_password(password)
-            
+            new_user.store_id = User.query.count() + 1  # Example: assign unique store_id
+            # ... rest of the code ...
+                    
             # إذا كان هذا هو المستخدم الأول، اجعله مسؤولاً
             if User.query.count() == 0:
                 new_user.is_admin = True

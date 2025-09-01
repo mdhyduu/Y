@@ -41,10 +41,7 @@ def repair_encrypted_token(token):
 
 class User(db.Model):
     __tablename__ = 'users'
-    __table_args__ = (
-        db.UniqueConstraint('store_id', name='uq_user_store_id'),
-    )
-    
+
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(128), nullable=False)
@@ -58,7 +55,7 @@ class User(db.Model):
     token_refreshed_at = db.Column(db.DateTime)
     
     # حقول إضافية
-    store_id = db.Column(db.Integer, default=1, index=True)
+    store_id = db.Column(db.Integer, nullable=True, index=True)
     last_sync = db.Column(db.DateTime)
     remember_token = db.Column(db.String(100))
     
