@@ -326,7 +326,7 @@ class Department(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     salla_id = db.Column(db.Integer, unique=True, nullable=False)
     name = db.Column(db.String(255), nullable=False)
-    store_id = db.Column(db.Integer, db.ForeignKey('users.store_id'), nullable=False)
+    store_id = db.Column(db.Integer, nullable=False)
     parent_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=True)
     
     children = relationship('Department', backref=backref('parent', remote_side=[id]))
