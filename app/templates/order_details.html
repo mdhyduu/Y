@@ -105,15 +105,7 @@
         </form>
         {% endif %}
 
-        <div class="product-status text-muted small mt-1 
-            {% if product_statuses[item.id|string] and product_statuses[item.id|string].status == 'تم التنفيذ' %} 
-                text-success fw-bold
-            {% endif %}">
-            {% if product_statuses[item.id|string] %}
-                {{ product_statuses[item.id|string].status }}
-          
-            {% endif %}
-        </div>
+      
     </div>
 </td>
 </tr>
