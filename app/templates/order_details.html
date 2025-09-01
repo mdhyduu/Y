@@ -100,7 +100,7 @@
         <form class="cancel-product-status-form d-inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-sm btn-outline-danger">
-
+                <i class="fas fa-undo"></i>
             </button>
         </form>
         {% endif %}
@@ -111,7 +111,7 @@
             {% endif %}">
             {% if product_statuses[item.id|string] %}
                 {{ product_statuses[item.id|string].status }}
-           
+          
             {% endif %}
         </div>
     </div>
