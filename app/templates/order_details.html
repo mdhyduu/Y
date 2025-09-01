@@ -83,16 +83,11 @@
   </td>
 <!-- في قسم المنتجات، تأكد من تمرير product_id بشكل صحيح -->
 
-  <!-- ... الأكواد الأخرى ... -->
-<!-- ... الكود السابق ... -->
 <td class="text-center align-middle">
-    <div class="d-flex flex-column align-items-center">
+    <div class="product-status-container" data-order-id="{{ order.id | string }}" data-product-id="{{ item.id | string }}">
         <!-- زر تم التنفيذ -->
-        <form class="update-product-status-form d-inline mb-1"
-              data-order-id="{{ order.id | string }}"
-              data-product-id="{{ item.id | string }}">
+        <form class="update-product-status-form d-inline mb-1">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            
             <button type="submit"
                     class="btn btn-sm btn-success"
                     {% if product_statuses[item.id|string] and product_statuses[item.id|string].status == 'تم التنفيذ' %}disabled{% endif %}>
@@ -100,11 +95,9 @@
             </button>
         </form>
 
-        <!-- زر إلغاء الحالة (يظهر فقط إذا كانت الحالة "تم التنفيذ") -->
+        <!-- زر إلغاء الحالة (سيتم إضافته ديناميكيًا) -->
         {% if product_statuses[item.id|string] and product_statuses[item.id|string].status == 'تم التنفيذ' %}
-        <form class="cancel-product-status-form d-inline"
-              data-order-id="{{ order.id | string }}"
-              data-product-id="{{ item.id | string }}">
+        <form class="cancel-product-status-form d-inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-sm btn-outline-danger">
                 <i class="fas fa-undo"></i> إلغاء الحالة
@@ -124,7 +117,6 @@
         </div>
     </div>
 </td>
-<!-- ... الكود اللاحق ... -->
 </tr>
                 {% endfor %}
               </tbody>
@@ -694,9 +686,11 @@ document.addEventListener('click', function(e) {
 });
 
 // دالة معالجة تحديث حالة المنتج
+// دالة معالجة تحديث حالة المنتج
 function handleProductStatusUpdate(form) {
-  const orderId = form.dataset.orderId;
-  const productId = form.dataset.productId;
+  const container = form.closest('.product-status-container');
+  const orderId = container.dataset.orderId;
+  const productId = container.dataset.productId;
   const button = form.querySelector('button');
   const csrfToken = form.querySelector('input[name="csrf_token"]').value;
 
@@ -736,8 +730,31 @@ function handleProductStatusUpdate(form) {
   .then(data => {
     if (data.success) {
       // تحديث واجهة المستخدم
-      updateUIAfterStatusChange(form, true);
-      
+      button.innerHTML = '<i class="fas fa-check"></i> تم التنفيذ';
+      button.disabled = true;
+
+      // تحديث نص الحالة
+      const statusElement = container.querySelector('.product-status');
+      if (statusElement) {
+        statusElement.textContent = 'تم التنفيذ';
+        statusElement.classList.add('text-success', 'fw-bold');
+      }
+
+      // إنشاء وإضافة زر الإلغاء إذا لم يكن موجودًا
+      let cancelForm = container.querySelector('.cancel-product-status-form');
+      if (!cancelForm) {
+        cancelForm = document.createElement('form');
+        cancelForm.className = 'cancel-product-status-form d-inline';
+        cancelForm.innerHTML = `
+          <input type="hidden" name="csrf_token" value="${csrfToken}">
+          <button type="submit" class="btn btn-sm btn-outline-danger">
+            <i class="fas fa-undo"></i> إلغاء الحالة
+          </button>
+        `;
+        // إدراج زر الإلغاء بعد زر التم التنفيذ
+        form.parentNode.insertBefore(cancelForm, form.nextSibling);
+      }
+
       Swal.fire({
         title: 'تم!',
         text: 'تم تحديث حالة المنتج بنجاح',
@@ -764,8 +781,9 @@ function handleProductStatusUpdate(form) {
 
 // دالة معالجة إلغاء حالة المنتج
 function handleProductStatusCancel(form) {
-  const orderId = form.dataset.orderId;
-  const productId = form.dataset.productId;
+  const container = form.closest('.product-status-container');
+  const orderId = container.dataset.orderId;
+  const productId = container.dataset.productId;
   const button = form.querySelector('button');
   const csrfToken = form.querySelector('input[name="csrf_token"]').value;
 
@@ -800,9 +818,21 @@ function handleProductStatusCancel(form) {
   })
   .then(data => {
     if (data.success) {
-      // تحديث واجهة المستخدم
-      updateUIAfterStatusChange(form, false);
-      
+      // إزالة زر الإلغاء
+      form.remove();
+
+      // تمكين زر "تم التنفيذ" مرة أخرى
+      const mainForm = container.querySelector('.update-product-status-form');
+      const mainButton = mainForm.querySelector('button');
+      mainButton.disabled = false;
+
+      // تحديث حالة المنتج المعروضة
+      const statusElement = container.querySelector('.product-status');
+      if (statusElement) {
+        statusElement.textContent = 'قيد التنفيذ';
+        statusElement.classList.remove('text-success', 'fw-bold');
+      }
+
       Swal.fire({
         title: 'تم!',
         text: 'تم إلغاء حالة المنتج بنجاح',
@@ -826,36 +856,8 @@ function handleProductStatusCancel(form) {
     console.error('Error:', error);
   });
 }
-
 // دالة مساعدة لتحديث واجهة المستخدم بعد تغيير الحالة
-function updateUIAfterStatusChange(form, isCompleted) {
-  const container = form.closest('.d-flex.flex-column');
-  
-  // البحث عن العناصر مع التحقق من وجودها
-  const mainForm = container.querySelector('.update-product-status-form');
-  const cancelForm = container.querySelector('.cancel-product-status-form');
-  const statusElement = container.querySelector('.product-status');
-  
-  if (mainForm) {
-    const mainButton = mainForm.querySelector('button');
-    if (mainButton) {
-      mainButton.disabled = isCompleted;
-    }
-  }
-  
-  if (cancelForm) {
-    cancelForm.style.display = isCompleted ? 'block' : 'none';
-  }
-  
-  if (statusElement) {
-    statusElement.textContent = isCompleted ? 'تم التنفيذ' : 'قيد التنفيذ';
-    if (isCompleted) {
-      statusElement.classList.add('text-success', 'fw-bold');
-    } else {
-      statusElement.classList.remove('text-success', 'fw-bold');
-    }
-  }
-}
+
 
   // إضافة تحميل متأخر للصور
   document.addEventListener('DOMContentLoaded', function() {
