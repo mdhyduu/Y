@@ -55,6 +55,8 @@ def set_token_cookies(response, access_token, refresh_token, expires_at):
                        max_age=timedelta(days=30).total_seconds())
     return response
 
+# ... existing code ...
+
 def refresh_salla_token(user):
     """تجديد توكن الوصول باستخدام توكن التحديث"""
     try:
@@ -72,13 +74,14 @@ def refresh_salla_token(user):
             'grant_type': 'refresh_token',
             'refresh_token': refresh_token,
             'client_id': current_app.config['SALLA_CLIENT_ID'],
-            'client_secret': current_app.config['SALLA_CLIENT_SECRET']
+            'client_secret': current_app.config['ALLA_CLIENT_SECRET']
         }
         
-        # إرسال طلب التجديد
+        # إرسال طلب التجديد - استخدام نفس endpoint الأول
         response = requests.post(
-            f"{current_app.config['SALLA_API_BASE_URL']}/oauth2/token",
+            Config.SALLA_TOKEN_URL,  # Changed from API_BASE_URL to TOKEN_URL
             data=data,
+            headers={'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'},
             timeout=30
         )
         
