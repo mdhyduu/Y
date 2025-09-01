@@ -945,7 +945,6 @@ def order_details(order_id):
         
         # في نهاية الدالة، تأكد من أنك تعيد render_template وليس redirect
         
-
         # دالة مساعدة للتعامل مع طلبات API
         def make_salla_api_request(url, params=None):
             try:
@@ -1159,7 +1158,9 @@ def order_details(order_id):
             OrderEmployeeStatus.created_at.desc()
         ).all()
 
-
+        # جلب حالات المنتجات للطلب
+        # جلب حالات المنتجات للطلب
+        # في دالة order_details، استبدل كود جلب حالات المنتجات بالكود التالي:
         product_statuses = {}
         # جلب جميع حالات المنتجات للطلب الحالي
         status_records = OrderProductStatus.query.filter_by(order_id=str(order_id)).all()
@@ -1206,6 +1207,7 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
+
 @orders_bp.route('/<int:order_id>/update_status', methods=['POST'])
 def update_order_status(order_id):
     """تحديث حالة الطلب في سلة"""
