@@ -10,9 +10,12 @@ from .models import (
     OrderEmployeeStatus, 
     CustomNoteStatus  # تمت الإضافة
 )
+
 from datetime import datetime, timedelta
 from functools import wraps
 from sqlalchemy.orm import joinedload
+import logging
+logger = logging.getLogger(__name__)
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 def login_required(view_func):
     """ديكوراتور للتحقق من تسجيل الدخول"""
@@ -21,30 +24,43 @@ def login_required(view_func):
         user_id = request.cookies.get('user_id')
         is_admin = request.cookies.get('is_admin') == 'true'
         
+        logger.info(f"محاولة دخول إلى لوحة التحكم - user_id: {user_id}, is_admin: {is_admin}")
+        
         # إذا لم يكن هناك user_id، نعيد التوجيه إلى تسجيل الدخول
         if not user_id:
+            logger.warning("لم يتم العثور على user_id في الكوكيز")
             flash('يجب تسجيل الدخول أولاً', 'warning')
             return redirect(url_for('user_auth.login'))
         
         # إذا كان user_id غير رقمية، نحذف الكوكيز ونعيد التوجيه
         if not user_id.isdigit():
+            logger.warning(f"user_id غير رقمي: {user_id}")
             return clear_cookies_and_redirect()
         
-        if is_admin:
-            user = User.query.get(user_id)
-            if not user:
-                return clear_cookies_and_redirect()
-            request.current_user = user
-        else:
-            employee = Employee.query.get(user_id)
-            if not employee:
-                flash('بيانات الموظف غير موجودة', 'error')
-                return clear_cookies_and_redirect()
-            request.current_user = employee
-        
-        return view_func(*args, **kwargs)
+        try:
+            if is_admin:
+                user = User.query.get(int(user_id))
+                if not user:
+                    logger.error(f"لم يتم العثور على المستخدم بالرقم: {user_id}")
+                    flash('بيانات المستخدم غير موجودة', 'error')
+                    return clear_cookies_and_redirect()
+                request.current_user = user
+                logger.info(f"تم التحقق من هوية المشرف: {user.email}")
+            else:
+                employee = Employee.query.get(int(user_id))
+                if not employee:
+                    logger.error(f"لم يتم العثور على الموظف بالرقم: {user_id}")
+                    flash('بيانات الموظف غير موجودة', 'error')
+                    return clear_cookies_and_redirect()
+                request.current_user = employee
+                logger.info(f"تم التحقق من هوية الموظف: {employee.email}")
+            
+            return view_func(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"خطأ في التحقق من تسجيل الدخول: {str(e)}", exc_info=True)
+            flash('حدث خطأ في التحقق من هوية المستخدم', 'error')
+            return clear_cookies_and_redirect()
     return wrapper
-
 def clear_cookies_and_redirect():
     """حذف الكوكيز وإعادة التوجيه إلى تسجيل الدخول"""
     resp = make_response(redirect(url_for('user_auth.login')))
