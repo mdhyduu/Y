@@ -144,3 +144,37 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // إظهار وإخفاء كلمة المرور
+    document.querySelectorAll('.toggle-password').forEach(button => {
+        button.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-target');
+            const passwordInput = document.getElementById(targetId);
+            const icon = this.querySelector('i');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                passwordInput.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        });
+    });
+    
+    // التحقق من تطابق كلمات المرور
+    const password = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirm_password');
+    
+    if (password && confirmPassword) {
+        confirmPassword.addEventListener('input', function() {
+            if (password.value !== confirmPassword.value) {
+                confirmPassword.classList.add('is-invalid');
+            } else {
+                confirmPassword.classList.remove('is-invalid');
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
