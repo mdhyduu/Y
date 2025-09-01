@@ -6,7 +6,7 @@
     
 
     <div class="row g-3 mb-4">
-        <div class="col-6 col-lg-3 col-xl">
+        <div class="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2">
             <div class="card kpi-card border-0 border-start border-primary border-3 h-100">
                 <div class="card-body d-flex align-items-center p-3">
                     <div class="kpi-icon bg-primary-soft text-primary me-3">
@@ -19,7 +19,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-6 col-lg-3 col-xl">
+        <div class="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2">
             <div class="card kpi-card border-0 border-start border-info border-3 h-100">
                 <div class="card-body d-flex align-items-center p-3">
                     <div class="kpi-icon bg-info-soft text-info me-3">
@@ -32,7 +32,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-6 col-lg-3 col-xl">
+        <div class="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2">
             <div class="card kpi-card border-0 border-start border-warning border-3 h-100">
                 <div class="card-body d-flex align-items-center p-3">
                     <div class="kpi-icon bg-warning-soft text-warning me-3">
@@ -45,7 +45,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-6 col-lg-3 col-xl">
+        <div class="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2">
             <div class="card kpi-card border-0 border-start border-danger border-3 h-100">
                 <div class="card-body d-flex align-items-center p-3">
                     <div class="kpi-icon bg-danger-soft text-danger me-3">
@@ -58,7 +58,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-6 col-lg-3 col-xl">
+        <div class="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2">
             <div class="card kpi-card border-0 border-start border-secondary border-3 h-100">
                 <div class="card-body d-flex align-items-center p-3">
                     <div class="kpi-icon bg-secondary-soft text-secondary me-3">
@@ -71,7 +71,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-6 col-lg-3 col-xl">
+        <div class="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2">
             <div class="card kpi-card border-0 border-start border-success border-3 h-100">
                 <div class="card-body d-flex align-items-center p-3">
                     <div class="kpi-icon bg-success-soft text-success me-3">
@@ -295,6 +295,7 @@
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 scales: {
                     y: {
                         beginAtZero: true,
@@ -309,6 +310,11 @@
                     }
                 }
             }
+        });
+        
+        // إضافة event listener لإعادة رسم المخطط عند تغيير حجم النافذة
+        window.addEventListener('resize', function() {
+            statusChart.resize();
         });
     });
 </script>
@@ -333,7 +339,10 @@
     body.dark-mode .text-dark { color: var(--bs-light) !important; }
 
     /* KPI Cards */
-    .kpi-card { transition: all 0.2s ease-in-out; }
+    .kpi-card { 
+        transition: all 0.2s ease-in-out; 
+        min-height: 100px;
+    }
     .kpi-card:hover { transform: translateY(-3px); box-shadow: var(--bs-box-shadow-sm); }
     .kpi-icon {
         width: 48px;
@@ -343,58 +352,77 @@
         justify-content: center;
         border-radius: 50%;
         font-size: 1.25rem;
+        flex-shrink: 0;
     }
-        .stats-grid {
+    
+    .stats-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
         gap: 0.75rem;
     }
+    
     /* Stats Grids */
     .stats-grid-compact {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
         gap: 0.5rem;
     }
- .stat-card-compact {
-    background-color: rgba(var(--status-color-rgb, 108, 117, 125), 0.1);
-    border-radius: var(--bs-border-radius-sm);
-    padding: 0.5rem 0.75rem;
-    border-left: 3px solid var(--status-color, var(--bs-secondary));
-    transition: background-color 0.2s ease;
-}
-.stat-card-compact:hover {
-     background-color: rgba(var(--status-color-rgb, 108, 117, 125), 0.15);
-}
-.stat-card-compact .stat-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-}
-.stat-card-compact .stat-count { 
-    font-weight: 700; 
-    font-size: 1.1rem; 
-    color: var(--status-color, var(--bs-body-color));
-}
-.stat-card-compact .stat-name { 
-    font-size: 0.75rem; 
-    color: var(--bs-secondary-color); 
-    font-weight: 500;
-} 
+    
+    .stat-card-compact {
+        background-color: rgba(var(--status-color-rgb, 108, 117, 125), 0.1);
+        border-radius: var(--bs-border-radius-sm);
+        padding: 0.5rem 0.75rem;
+        border-left: 3px solid var(--status-color, var(--bs-secondary));
+        transition: background-color 0.2s ease;
+        min-width: 0; /* يمنع التوسع خارج الحاوية */
+    }
+    
+    .stat-card-compact:hover {
+        background-color: rgba(var(--status-color-rgb, 108, 117, 125), 0.15);
+    }
+    
+    .stat-card-compact .stat-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        flex-wrap: nowrap;
+    }
+    
+    .stat-card-compact .stat-count { 
+        font-weight: 700; 
+        font-size: 1.1rem; 
+        color: var(--status-color, var(--bs-body-color));
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .stat-card-compact .stat-name { 
+        font-size: 0.75rem; 
+        color: var(--bs-secondary-color); 
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    } 
 
-/* Dark mode override */
-body.dark-mode .stat-card-compact {
-    background-color: rgba(var(--status-color-rgb, 108, 117, 125), 0.2);
-}
-body.dark-mode .stat-card-compact:hover {
-     background-color: rgba(var(--status-color-rgb, 108, 117, 125), 0.25);
-}
-body.dark-mode .stat-card-compact .stat-count {
-    color: var(--bs-body-color);
-}
-body.dark-mode .stat-card-compact .stat-name {
-    color: var(--status-color, var(--bs-secondary-color));
-    opacity: 0.9;
-}
+    /* Dark mode override */
+    body.dark-mode .stat-card-compact {
+        background-color: rgba(var(--status-color-rgb, 108, 117, 125), 0.2);
+    }
+    
+    body.dark-mode .stat-card-compact:hover {
+        background-color: rgba(var(--status-color-rgb, 108, 117, 125), 0.25);
+    }
+    
+    body.dark-mode .stat-card-compact .stat-count {
+        color: var(--bs-body-color);
+    }
+    
+    body.dark-mode .stat-card-compact .stat-name {
+        color: var(--status-color, var(--bs-secondary-color));
+        opacity: 0.9;
+    }
 
     /* Activity List */
     .list-group-item { border-left: 0; border-right: 0; border-radius: 0 !important; }
@@ -464,8 +492,74 @@ body.dark-mode .stat-card-compact .stat-name {
 
     /* Small devices */
     @media (max-width: 576px) {
-        .kpi-icon { width: 40px; height: 40px; font-size: 1rem; }
-        .kpi-card h4 { font-size: 1.25rem; }
+        .kpi-icon { 
+            width: 40px; 
+            height: 40px; 
+            font-size: 1rem; 
+            margin-right: 0.5rem !important;
+        }
+        
+        .kpi-card h4 { 
+            font-size: 1.1rem; 
+        }
+        
+        .kpi-card p {
+            font-size: 0.75rem;
+        }
+        
+        .stats-grid-compact {
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        }
+        
+        .stat-card-compact {
+            padding: 0.4rem 0.6rem;
+        }
+        
+        .stat-card-compact .stat-count {
+            font-size: 1rem;
+        }
+        
+        .stat-card-compact .stat-name {
+            font-size: 0.7rem;
+        }
+    }
+    
+    @media (max-width: 400px) {
+        .kpi-icon {
+            width: 36px;
+            height: 36px;
+            font-size: 0.9rem;
+        }
+        
+        .kpi-card h4 {
+            font-size: 1rem;
+        }
+        
+        .stats-grid-compact {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    /* تحسينات للشاشات المتوسطة */
+    @media (max-width: 768px) {
+        .card-body {
+            padding: 0.75rem;
+        }
+        
+        .stats-grid-compact {
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        }
+    }
+    
+    /* منع الـ text overflow في البطاقات */
+    .kpi-card .card-body > div {
+        min-width: 0; /* يسمح بتطبيق text-overflow */
+    }
+    
+    .kpi-card h4, .kpi-card p {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 </style>
 {% endblock %}
