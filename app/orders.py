@@ -2113,3 +2113,14 @@ def cancel_product_status(order_id, product_id):
             'success': False, 
             'error': f'خطأ في الخادم: {str(e)}'
         }), 500
+def clear_auth_cookies(response=None):
+    """حذف جميع كوكيز المصادقة"""
+    if response is None:
+        response = make_response()
+    response.delete_cookie('user_id')
+    response.delete_cookie('is_admin')
+    response.delete_cookie('employee_role')
+    response.delete_cookie('store_id')
+    response.delete_cookie('salla_access_token')
+    response.delete_cookie('salla_refresh_token')
+    return response

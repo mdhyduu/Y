@@ -56,73 +56,67 @@ def set_token_cookies(response, access_token, refresh_token, expires_at):
     return response
 
 def refresh_salla_token(user):
+    """تجديد توكن الوصول باستخدام توكن التحديث"""
     try:
-        if not user.salla_refresh_token:
-            logger.error("❌ No refresh token available in database")
+        if not user or not user.salla_refresh_token:
+            logger.error("No user or refresh token provided")
             return None
-
-        refresh_token = user.get_refresh_token()
+            
+        refresh_token = user.salla_refresh_token
         if not refresh_token:
-            logger.error("❌ Failed to decrypt refresh token for user ID %s", user.id)
+            logger.error("No refresh token available for user %s", user.id)
             return None
-
-        if len(refresh_token) < 20:
-            logger.error("❌ Refresh token appears malformed: %s...", refresh_token[:10])
-            return None
-
-        payload = {
+            
+        # إعداد بيانات الطلب
+        data = {
             'grant_type': 'refresh_token',
             'refresh_token': refresh_token,
-            'client_id': Config.SALLA_CLIENT_ID,
-            'client_secret': Config.SALLA_CLIENT_SECRET,
-            'redirect_uri': Config.REDIRECT_URI
+            'client_id': current_app.config['SALLA_CLIENT_ID'],
+            'client_secret': current_app.config['SALLA_CLIENT_SECRET']
         }
-
-        headers = {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Accept': 'application/json'
-        }
-
-        logger.info(f"🔄 Attempting to refresh token for user ID {user.id}")
-        logger.debug(f"🔍 Request payload (without refresh_token): {{ { {k: v for k, v in payload.items() if k != 'refresh_token'} } }}")
-
+        
+        # إرسال طلب التجديد
         response = requests.post(
-            Config.SALLA_TOKEN_URL,
-            data=payload,
-            headers=headers,
-            timeout=15
+            f"{current_app.config['SALLA_API_BASE_URL']}/oauth2/token",
+            data=data,
+            timeout=30
         )
-
-        logger.info(f"📡 Response Status: {response.status_code}")
-        logger.debug(f"📦 Response Body: {response.text[:500]}...")
-
-        if response.status_code == 200:
-            tokens = response.json()
-            new_access_token = tokens.get('access_token')
-            new_refresh_token = tokens.get('refresh_token', refresh_token)
-            expires_in = tokens.get('expires_in', 3600)
-
-            # تحديث القيم في قاعدة البيانات
-            user.salla_access_token = new_access_token
-            user.set_refresh_token(new_refresh_token)  # تخزين مشفر
-            user.token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
-            db.session.commit()
-
-            logger.info(f"✅ Token refreshed successfully for user ID {user.id}")
-            logger.debug(f"🆕 New Access Token: {new_access_token[:15]}...")
-            logger.debug(f"🆕 New Refresh Token: {new_refresh_token[:15]}...")
-            logger.debug(f"⏳ Expires At: {user.token_expires_at}")
-
-            return new_access_token
-
-        # لو فشل التجديد
-        error_data = response.json()
-        logger.error(f"❌ Token refresh failed: {error_data}")
-        if 'invalid_grant' in error_data.get('error', ''):
-            logger.error(f"⚠ Refresh token possibly expired or revoked for user ID {user.id}")
-
-        return None
-
+        
+        logger.info("Refresh token response status: %s", response.status_code)
+        
+        if response.status_code != 200:
+            error_msg = f"Token refresh failed: {response.text}"
+            logger.error(error_msg)
+            
+            # إذا كان الخطأ بسبب توكن التحديث غير الصالح، نحذف التوكنات
+            if response.status_code == 400:
+                error_data = response.json()
+                if error_data.get('error') == 'invalid_grant':
+                    logger.error("Refresh token invalid or expired for user %s", user.id)
+                    # نحذف التوكنات من قاعدة البيانات
+                    user._salla_access_token = None
+                    user._salla_refresh_token = None
+                    user.token_expires_at = None
+                    db.session.commit()
+                    
+            return None
+        
+        token_data = response.json()
+        
+        # تحديث التوكنات في قاعدة البيانات
+        success = user.set_tokens(
+            access_token=token_data['access_token'],
+            refresh_token=token_data['refresh_token'],
+            expires_in=token_data['expires_in']
+        )
+        
+        if success:
+            logger.info("Token refreshed successfully for user %s", user.id)
+            return token_data['access_token']
+        else:
+            logger.error("Failed to save new tokens for user %s", user.id)
+            return None
+            
     except Exception as e:
-        logger.exception(f"💥 Unexpected token refresh error for user ID {user.id}: {str(e)}")
+        logger.error("Error refreshing token: %s", str(e), exc_info=True)
         return None
