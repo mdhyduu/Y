@@ -1136,22 +1136,16 @@ def order_details(order_id):
 
         # جلب حالات المنتجات للطلب
         # جلب حالات المنتجات للطلب
+        # في دالة order_details، استبدل كود جلب حالات المنتجات بالكود التالي:
         product_statuses = {}
-        for item in processed_order.get('items', []):
-            product_id = item.get('id')
-            if product_id:
-                # تحويل product_id إلى string للتأكد من التطابق
-                product_id_str = str(product_id)
-                status = OrderProductStatus.query.filter_by(
-                    order_id=str(order_id),
-                    product_id=product_id_str
-                ).first()
-                if status:
-                    product_statuses[product_id_str] = {
-                        'status': status.status,
-                        'notes': status.notes,
-                        'updated_at': status.updated_at
-                    }
+        # جلب جميع حالات المنتجات للطلب الحالي
+        status_records = OrderProductStatus.query.filter_by(order_id=str(order_id)).all()
+        for status in status_records:
+            product_statuses[status.product_id] = {
+                'status': status.status,
+                'notes': status.notes,
+                'updated_at': status.updated_at
+            }
 
 # ... rest of the code ...
         return render_template('order_details.html', 

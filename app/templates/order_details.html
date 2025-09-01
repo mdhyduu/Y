@@ -91,20 +91,23 @@
       data-product-id="{{ item.id | string }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   
-  <button type="submit"
-          class="btn btn-sm btn-success"
-          {% if product_statuses.get(item.id|string) and product_statuses[item.id|string].status == 'تم التنفيذ' %}disabled{% endif %}>
+<button type="submit"
+        class="btn btn-sm btn-success"
+        {% if product_statuses[item.id|string] and product_statuses[item.id|string].status == 'تم التنفيذ' %}disabled{% endif %}>
     <i class="fas fa-check"></i> تم التنفيذ
-  </button>
+</button>
 </form>
 
-<!-- عنصر لعرض حالة المنتج -->
-<div class="product-status text-muted small mt-1 {% if product_statuses.get(item.id|string) and product_statuses[item.id|string].status == 'تم التنفيذ' %}text-success fw-bold{% endif %}">
-  {% if product_statuses.get(item.id|string) %}
-    {{ product_statuses[item.id|string].status }}
-  {% else %}
-    قيد التنفيذ
-  {% endif %}
+
+<div class="product-status text-muted small mt-1 
+    {% if product_statuses[item.id|string] and product_statuses[item.id|string].status == 'تم التنفيذ' %} 
+        text-success fw-bold
+    {% endif %}">
+    {% if product_statuses[item.id|string] %}
+        {{ product_statuses[item.id|string].status }}
+    {% else %}
+        قيد التنفيذ
+    {% endif %}
 </div>
   </td>
 
