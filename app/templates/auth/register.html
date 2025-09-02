@@ -3,292 +3,232 @@
 {% block title %}تسجيل مستخدم جديد{% endblock %}
 
 {% block content %}
-<div class="register-container">
-    <div class="register-wrapper">
-        <div class="register-card">
-            <div class="register-header">
-                <h2><i class="fas fa-user-plus me-2"></i>تسجيل مستخدم جديد</h2>
-                <p>انضم إلينا وابدأ رحلتك</p>
-            </div>
-            
-            <form method="POST" action="{{ url_for('user_auth.register') }}" class="register-form">
-                {{ form.hidden_tag() }}
-                
-                <div class="form-group">
-                    <label for="email">البريد الإلكتروني</label>
-                    <div class="input-group">
-                        <span class="input-icon"><i class="fas fa-envelope"></i></span>
-                        {{ form.email(class="form-control" + (' is-invalid' if form.email.errors else ''), id="email", placeholder="أدخل بريدك الإلكتروني") }}
+<div class="auth-container">
+    <div class="row justify-content-center align-items-center min-vh-100 py-4">
+        <div class="col-xl-5 col-lg-6 col-md-8">
+            <div class="auth-card card shadow-lg">
+                <div class="card-header bg-gradient-primary text-white text-center py-4">
+                    <h3 class="mb-0"><i class="fas fa-user-plus me-2"></i>تسجيل مستخدم جديد</h3>
+                    <p class="mt-2 mb-0 opacity-75">انضم إلينا وابدأ رحلتك</p>
+                </div>
+                <div class="card-body p-4 p-sm-5">
+                    <form method="POST" action="{{ url_for('user_auth.register') }}" class="auth-form">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-4">
+                            <label for="email" class="form-label">البريد الإلكتروني</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="fas fa-envelope text-primary"></i></span>
+                                {{ form.email(class="form-control form-control-lg" + (' is-invalid' if form.email.errors else ''), id="email", placeholder="أدخل بريدك الإلكتروني") }}
+                            </div>
+                            {% for error in form.email.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="password" class="form-label">كلمة المرور</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="fas fa-lock text-primary"></i></span>
+                                {{ form.password(class="form-control form-control-lg" + (' is-invalid' if form.password.errors else ''), id="password", placeholder="أنشئ كلمة مرور قوية") }}
+                                <button type="button" class="input-group-text bg-light toggle-password" data-target="password">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            {% for error in form.password.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                            <div class="form-text">يجب أن تتكون من 8 أحرف على الأقل</div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="confirm_password" class="form-label">تأكيد كلمة المرور</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="fas fa-lock text-primary"></i></span>
+                                {{ form.confirm_password(class="form-control form-control-lg" + (' is-invalid' if form.confirm_password.errors else ''), id="confirm_password", placeholder="أعد إدخال كلمة المرور") }}
+                                <button type="button" class="input-group-text bg-light toggle-password" data-target="confirm_password">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            {% for error in form.confirm_password.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="form-group mb-4 form-check">
+                            <input type="checkbox" class="form-check-input" id="terms" required>
+                            <label class="form-check-label" for="terms">أوافق على <a href="#" class="text-decoration-none">الشروط والأحكام</a></label>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg py-2">
+                                <i class="fas fa-user-plus me-2"></i>إنشاء حساب
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div class="mt-4 pt-3 text-center border-top">
+                        <p class="mb-0">لديك حساب؟ <a href="{{ url_for('user_auth.login') }}" class="text-primary fw-bold">سجل الدخول</a></p>
                     </div>
-                    {% for error in form.email.errors %}
-                        <div class="error-message">{{ error }}</div>
-                    {% endfor %}
                 </div>
-                
-                <div class="form-group">
-                    <label for="password">كلمة المرور</label>
-                    <div class="input-group">
-                        <span class="input-icon"><i class="fas fa-lock"></i></span>
-                        {{ form.password(class="form-control" + (' is-invalid' if form.password.errors else ''), id="password", placeholder="أنشئ كلمة مرور قوية") }}
-                        <button type="button" class="toggle-password" data-target="password">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                    {% for error in form.password.errors %}
-                        <div class="error-message">{{ error }}</div>
-                    {% endfor %}
-                    <div class="form-hint">يجب أن تتكون من 8 أحرف على الأقل</div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="confirm_password">تأكيد كلمة المرور</label>
-                    <div class="input-group">
-                        <span class="input-icon"><i class="fas fa-lock"></i></span>
-                        {{ form.confirm_password(class="form-control" + (' is-invalid' if form.confirm_password.errors else ''), id="confirm_password", placeholder="أعد إدخال كلمة المرور") }}
-                        <button type="button" class="toggle-password" data-target="confirm_password">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                    {% for error in form.confirm_password.errors %}
-                        <div class="error-message">{{ error }}</div>
-                    {% endfor %}
-                </div>
-                
-                <div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="terms" required>
-                    <label class="form-check-label" for="terms">أوافق على <a href="#">الشروط والأحكام</a></label>
-                </div>
-                
-                <button type="submit" class="register-btn">
-                    <i class="fas fa-user-plus me-2"></i>إنشاء حساب
-                </button>
-            </form>
-            
-            <div class="register-footer">
-                <p>لديك حساب؟ <a href="{{ url_for('user_auth.login') }}">سجل الدخول</a></p>
             </div>
         </div>
     </div>
 </div>
 
 <style>
-.register-container {
+.auth-container {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     min-height: 100vh;
-    background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-}
-
-.register-wrapper {
-    width: 100%;
-    max-width: 500px;
-}
-
-.register-card {
-    background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    position: relative;
     overflow: hidden;
+}
+
+.auth-container::before,
+.auth-container::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.auth-container::before {
+    width: 300px;
+    height: 300px;
+    top: -100px;
+    right: -100px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    opacity: 0.3;
+}
+
+.auth-container::after {
+    width: 200px;
+    height: 200px;
+    bottom: -50px;
+    left: -50px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    opacity: 0.3;
+}
+
+.auth-card {
+    border-radius: 1rem;
+    border: none;
+    overflow: hidden;
+    background-color: #fff;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.register-card:hover {
+.auth-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
 }
 
-body.dark-mode .register-card {
-    background: var(--content-dark);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+body.dark-mode .auth-card {
+    background-color: var(--content-dark);
 }
 
-.register-header {
+.auth-card .card-header {
+    border-radius: 0 !important;
+    border: none;
     background: linear-gradient(to right, var(--primary), var(--primary-light));
-    color: white;
-    text-align: center;
-    padding: 2rem;
 }
 
-.register-header h2 {
-    margin: 0 0 0.5rem 0;
-    font-weight: 700;
-}
-
-.register-header p {
-    margin: 0;
-    opacity: 0.9;
-}
-
-.register-form {
-    padding: 2rem;
-}
-
-.form-group {
-    margin-bottom: 1.5rem;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: var(--text-dark);
-}
-
-body.dark-mode .form-group label {
-    color: var(--text-light);
-}
-
-.input-group {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.input-icon {
-    position: absolute;
-    right: 15px;
-    color: var(--primary);
-    z-index: 2;
-}
-
-.form-control {
-    width: 100%;
-    padding: 0.75rem 1rem 0.75rem 3rem;
-    border: 2px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 1rem;
+.auth-form .form-control {
+    border-left: 0;
     transition: all 0.3s;
-    background: #f8fafc;
+    background-color: #f8f9fa;
+    border-color: #dee2e6;
 }
 
-body.dark-mode .form-control {
-    background: #2d3748;
+body.dark-mode .auth-form .form-control {
+    background-color: #2d3748;
     border-color: #4a5568;
     color: #e2e8f0;
 }
 
-.form-control:focus {
-    outline: none;
-    border-color: var(--primary-light);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
-    background: #fff;
+.auth-form .input-group-text {
+    border-right: 0;
+    transition: all 0.3s;
+    background-color: #e9ecef;
+    border-color: #dee2e6;
 }
 
-body.dark-mode .form-control:focus {
-    background: #2d3748;
+body.dark-mode .auth-form .input-group-text {
+    background-color: #4a5568;
+    border-color: #4a5568;
+    color: #e2e8f0;
+}
+
+.auth-form .form-control:focus {
+    box-shadow: none;
+    border-color: #86b7fe;
+    background-color: #fff;
+}
+
+body.dark-mode .auth-form .form-control:focus {
+    background-color: #2d3748;
+    border-color: #86b7fe;
+}
+
+.auth-form .input-group:focus-within {
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+    border-radius: 0.375rem;
+}
+
+.auth-form .input-group:focus-within .input-group-text {
+    border-color: #86b7fe;
+    background-color: #e8f0fe;
+}
+
+body.dark-mode .auth-form .input-group:focus-within .input-group-text {
+    background-color: #2b6cb0;
+    border-color: #86b7fe;
 }
 
 .toggle-password {
-    position: absolute;
-    left: 15px;
-    background: none;
-    border: none;
-    color: #64748b;
     cursor: pointer;
-    z-index: 2;
+    transition: color 0.3s ease;
 }
 
 .toggle-password:hover {
     color: var(--primary);
 }
 
-.error-message {
-    color: #e53e3e;
-    font-size: 0.875rem;
-    margin-top: 0.25rem;
-}
-
-.form-hint {
-    color: #64748b;
-    font-size: 0.875rem;
-    margin-top: 0.25rem;
-}
-
-body.dark-mode .form-hint {
-    color: #a0aec0;
-}
-
-.form-check {
-    display: flex;
-    align-items: center;
-    margin-bottom: 1.5rem;
-}
-
-.form-check-input {
-    margin-left: 0.5rem;
-}
-
-.form-check-label {
-    color: var(--text-dark);
-}
-
-body.dark-mode .form-check-label {
-    color: var(--text-light);
-}
-
-.form-check-label a {
-    color: var(--primary);
-    text-decoration: none;
-}
-
-.form-check-label a:hover {
-    text-decoration: underline;
-}
-
-.register-btn {
-    width: 100%;
-    padding: 1rem;
+.btn-primary {
     background: linear-gradient(to right, var(--primary), var(--primary-light));
-    color: white;
     border: none;
-    border-radius: 8px;
-    font-size: 1.1rem;
-    font-weight: 600;
-    cursor: pointer;
     transition: all 0.3s;
-}
-
-.register-btn:hover {
-    background: linear-gradient(to right, #2563eb, #3b82f6);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3);
-}
-
-.register-footer {
-    text-align: center;
-    padding: 1.5rem 2rem;
-    border-top: 1px solid #e2e8f0;
-    color: var(--text-dark);
-}
-
-body.dark-mode .register-footer {
-    border-top-color: #4a5568;
-    color: var(--text-light);
-}
-
-.register-footer a {
-    color: var(--primary);
-    text-decoration: none;
     font-weight: 600;
 }
 
-.register-footer a:hover {
-    text-decoration: underline;
+.btn-primary:hover {
+    background: linear-gradient(to right, #3a3fb8, #7a80f0);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.form-check-input:checked {
+    background-color: var(--primary);
+    border-color: var(--primary);
 }
 
 @media (max-width: 576px) {
-    .register-container {
-        padding: 10px;
-    }
-    
-    .register-form {
+    .auth-card .card-body {
         padding: 1.5rem;
     }
     
-    .register-header {
-        padding: 1.5rem;
+    .auth-container::before {
+        width: 200px;
+        height: 200px;
+        top: -70px;
+        right: -70px;
+    }
+    
+    .auth-container::after {
+        width: 150px;
+        height: 150px;
+        bottom: -40px;
+        left: -40px;
     }
 }
 
@@ -301,17 +241,17 @@ body.dark-mode .register-footer {
 
 .strength-weak {
     width: 33%;
-    background-color: #e53e3e;
+    background-color: #dc3545;
 }
 
 .strength-medium {
     width: 66%;
-    background-color: #ed8936;
+    background-color: #fd7e14;
 }
 
 .strength-strong {
     width: 100%;
-    background-color: #38a169;
+    background-color: #198754;
 }
 </style>
 
