@@ -13,19 +13,11 @@ def send_verification_email(email, code):
     """إرسال بريد التحقق بالكود"""
     try:
         # تكوين إعدادات البريد
-        smtp_server = current_app.config.get('MAIL_SERVER')
-        smtp_port = current_app.config.get('MAIL_PORT', 587)
-        smtp_username = current_app.config.get('MAIL_USERNAME')
-        smtp_password = current_app.config.get('MAIL_PASSWORD')
-        from_email = current_app.config.get('MAIL_DEFAULT_SENDER', smtp_username)
-        
-        # تسجيل معلومات الإعدادات للت debugging
-        current_app.logger.info(f"إعدادات البريد: Server={smtp_server}, Port={smtp_port}, Username={smtp_username}")
-
-        # التحقق من وجود جميع الإعدادات المطلوبة
-        if not all([smtp_server, smtp_username, smtp_password]):
-            current_app.logger.error("إعدادات البريد الإلكتروني غير مكتملة")
-            return False
+        smtp_server = current_app.config['MAIL_SERVER']
+        smtp_port = current_app.config['MAIL_PORT']
+        smtp_username = current_app.config['MAIL_USERNAME']
+        smtp_password = current_app.config['MAIL_PASSWORD']
+        from_email = current_app.config['MAIL_DEFAULT_SENDER']
 
         # إنشاء الرسالة
         msg = MIMEMultipart()
@@ -53,12 +45,7 @@ def send_verification_email(email, code):
             server.login(smtp_username, smtp_password)
             server.send_message(msg)
             
-        current_app.logger.info(f"تم إرسال بريد التحقق بنجاح إلى: {email}")
         return True
-        
-    except smtplib.SMTPException as e:
-        current_app.logger.error(f"خطأ في بروتوكول البريد: {str(e)}")
-        return False
     except Exception as e:
-        current_app.logger.error(f"فشل إرسال بريد التحقق: {str(e)}", exc_info=True)
+        current_app.logger.error(f"فشل إرسال بريد التحقق: {str(e)}")
         return False

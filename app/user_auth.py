@@ -7,8 +7,7 @@ import logging
 from .models import db, User, Employee
 from datetime import datetime, timedelta
 from functools import wraps
-from .email_utils import generate_verification_code, send_verification_email
-from flask import jsonify
+
 user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
 
@@ -26,9 +25,7 @@ def validate_email(form, field):
     email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
     if not re.match(email_regex, field.data):
         raise ValidationError('يجب إدخال بريد إلكتروني صالح')
-class VerifyEmailForm(FlaskForm):
-    verification_code = StringField('كود التحقق', 
-        validators=[DataRequired(), Length(min=6, max=6)])
+
 # نموذج تسجيل الدخول
 class LoginForm(FlaskForm):
     email = StringField('البريد الإلكتروني', validators=[DataRequired(), validate_email])
@@ -57,15 +54,6 @@ def login():
             # تسجيل دخول كمشرف
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
-                if not user.email_verified:
-                    flash('يجب تأكيد بريدك الإلكتروني أولاً', 'warning')
-                    response = make_response(redirect(url_for('user_auth.verify_email')))
-                    response.set_cookie('temp_user_id', str(user.id), 
-                                      max_age=timedelta(minutes=15).total_seconds(), 
-                                      httponly=True, secure=False)
-                    return response
-    
-    # باقي كود تسجيل الدخول...
                 response = make_response(redirect(url_for('dashboard.index')))
                 response.set_cookie('user_id', str(user.id), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=False)
                 response.set_cookie('is_admin', 'true', max_age=timedelta(days=30).total_seconds())  # تأكد من تعيينها إلى 'true'
@@ -119,40 +107,25 @@ def register():
     if form.validate_on_submit():
         email = form.email.data
         password = form.password.data
-        
-        if User.query.filter_by(email=email).first():
-            flash('البريد الإلكتروني مسجل مسبقاً', 'danger')
-            return redirect(url_for('user_auth.register'))
-        
-        new_user = User(email=email)
-        new_user.set_password(password)
-        new_user.store_id = User.query.count() + 1
-        
-        # إنشاء وإرسال كود التحقق
-        verification_code = generate_verification_code()
-        new_user.verification_token = verification_code
-        new_user.verification_token_expires = datetime.utcnow() + timedelta(minutes=15)
-        
-        if User.query.count() == 0:
-            new_user.is_admin = True
-        
-        db.session.add(new_user)
-        db.session.commit()
-        
-        # إرسال بريد التحقق
-        if send_verification_email(email, verification_code):
-            flash('تم إرسال كود التحقق إلى بريدك الإلكتروني', 'success')
+         
+        with current_app.app_context():
+            if User.query.filter_by(email=email).first():
+                flash('البريد الإلكتروني مسجل مسبقاً', 'danger')
+                return redirect(url_for('user_auth.register'))
+            new_user = User(email=email)
+            new_user.set_password(password)
+            new_user.store_id = User.query.count() + 1  # Example: assign unique store_id
+            # ... rest of the code ...
+                    
+            # إذا كان هذا هو المستخدم الأول، اجعله مسؤولاً
+            if User.query.count() == 0:
+                new_user.is_admin = True
             
-            # تعيين كوكي مؤقت للتحقق
-            response = make_response(redirect(url_for('user_auth.verify_email')))
-            response.set_cookie('temp_user_id', str(new_user.id), 
-                              max_age=timedelta(minutes=15).total_seconds(), 
-                              httponly=True, secure=False)
-            return response
-        else:
-            db.session.delete(new_user)
+            db.session.add(new_user)
             db.session.commit()
-            flash('فشل إرسال بريد التحقق. يرجى المحاولة لاحقاً', 'danger')
+        
+        flash('تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول', 'success')
+        return redirect(url_for('user_auth.login'))
     
     return render_template('auth/register.html', form=form)
 @user_auth_bp.route('/logout')
@@ -166,63 +139,3 @@ def logout():
     response.delete_cookie('salla_refresh_token')
     flash('تم تسجيل الخروج بنجاح', 'success')
     return response
-@user_auth_bp.route('/verify-email', methods=['GET', 'POST'])
-def verify_email():
-    form = VerifyEmailForm()
-    # ... باقي الكود
-    user_id = request.cookies.get('temp_user_id')
-    if not user_id:
-        flash('يرجى التسجيل أولاً', 'danger')
-        return redirect(url_for('user_auth.register'))
-    
-    user = User.query.get(user_id)
-    if not user:
-        flash('لم يتم العثور على المستخدم', 'danger')
-        return redirect(url_for('user_auth.register'))
-    
-    if user.email_verified:
-        flash('تم تأكيد بريدك الإلكتروني مسبقاً', 'info')
-        return redirect(url_for('user_auth.login'))
-    
-    if request.method == 'POST':
-        entered_code = request.form.get('verification_code')
-        
-        if entered_code == user.verification_token and user.verification_token_expires > datetime.utcnow():
-            user.email_verified = True
-            user.verification_token = None
-            user.verification_token_expires = None
-            db.session.commit()
-            
-            flash('تم تأكيد بريدك الإلكتروني بنجاح! يمكنك الآن تسجيل الدخول', 'success')
-            response = make_response(redirect(url_for('user_auth.login')))
-            response.delete_cookie('temp_user_id')
-            return response
-        else:
-            flash('كود التحقق غير صحيح أو منتهي الصلاحية', 'danger')
-    
-    return render_template('auth/verify_email.html')
-
-@user_auth_bp.route('/resend-verification', methods=['POST'])
-def resend_verification():
-    user_id = request.cookies.get('temp_user_id')
-    if not user_id:
-        return jsonify({'success': False, 'message': 'لم يتم العثور على المستخدم'})
-    
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'success': False, 'message': 'المستخدم غير موجود'})
-    
-    if user.email_verified:
-        return jsonify({'success': False, 'message': 'تم التحقق من البريد مسبقاً'})
-    
-    # إنشاء كود جديد
-    verification_code = generate_verification_code()
-    user.verification_token = verification_code
-    user.verification_token_expires = datetime.utcnow() + timedelta(minutes=15)
-    db.session.commit()
-    
-    # إرسال البريد الجديد
-    if send_verification_email(user.email, verification_code):
-        return jsonify({'success': True})
-    else:
-        return jsonify({'success': False, 'message': 'فشل إرسال البريد'})
