@@ -75,45 +75,22 @@
                 </div>
             </div>
             
-            <div class="text-center mt-4">
-                <p class="text-muted">© 2023 نظام إدارة الطلبات. جميع الحقوق محفوظة</p>
-            </div>
+
         </div>
     </div>
 </div>
 
 <style>
 .auth-container {
-    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    background-color: #f8fafc;
     min-height: 100vh;
     position: relative;
     overflow: hidden;
+    transition: background-color 0.3s ease;
 }
 
-.auth-container::before,
-.auth-container::after {
-    content: '';
-    position: absolute;
-    border-radius: 50%;
-    z-index: 0;
-}
-
-.auth-container::before {
-    width: 300px;
-    height: 300px;
-    top: -100px;
-    right: -100px;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-    opacity: 0.1;
-}
-
-.auth-container::after {
-    width: 200px;
-    height: 200px;
-    bottom: -50px;
-    left: -50px;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-    opacity: 0.1;
+body.dark-mode .auth-container {
+    background-color: #1a202c;
 }
 
 .auth-card {
@@ -121,7 +98,7 @@
     border: none;
     overflow: hidden;
     background-color: #fff;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
     position: relative;
     z-index: 1;
 }
@@ -132,8 +109,8 @@
 }
 
 body.dark-mode .auth-card {
-    background-color: var(--content-dark);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    background-color: #2d3748;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
 
 .auth-card .card-header {
@@ -152,7 +129,7 @@ body.dark-mode .auth-card {
 }
 
 body.dark-mode .auth-form .form-control {
-    background-color: #2d3748;
+    background-color: #4a5568;
     border-color: #4a5568;
     color: #e2e8f0;
 }
@@ -179,7 +156,7 @@ body.dark-mode .auth-form .input-group-text {
 }
 
 body.dark-mode .auth-form .form-control:focus {
-    background-color: #2d3748;
+    background-color: #4a5568;
     border-color: #86b7fe;
 }
 
@@ -237,20 +214,6 @@ body.dark-mode .auth-form .input-group:focus-within .input-group-text {
     .auth-card .card-body {
         padding: 1.5rem;
     }
-    
-    .auth-container::before {
-        width: 200px;
-        height: 200px;
-        top: -70px;
-        right: -70px;
-    }
-    
-    .auth-container::after {
-        width: 150px;
-        height: 150px;
-        bottom: -40px;
-        left: -40px;
-    }
 }
 
 .social-login {
@@ -280,6 +243,14 @@ body.dark-mode .auth-form .input-group:focus-within .input-group-text {
 .social-btn:hover {
     opacity: 0.9;
     transform: translateY(-2px);
+}
+
+.text-muted {
+    transition: color 0.3s ease;
+}
+
+body.dark-mode .text-muted {
+    color: #a0aec0 !important;
 }
 </style>
 
