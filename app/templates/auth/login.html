@@ -1,5 +1,7 @@
 {% extends 'base.html' %}
 
+{% block title %}تسجيل الدخول{% endblock %}
+
 {% block content %}
 <div class="auth-container">
     <div class="row justify-content-center align-items-center min-vh-100 py-4">
@@ -16,7 +18,7 @@
                         <div class="form-group mb-4">
                             <label for="email" class="form-label">البريد الإلكتروني</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-light"><i class="fas fa-envelope text-primary"></i></span>
+                                <span class="input-group-text"><i class="fas fa-envelope"></i></span>
                                 {{ form.email(class="form-control form-control-lg", id="email", placeholder="أدخل بريدك الإلكتروني") }}
                             </div>
                             {% if form.email.errors %}
@@ -31,9 +33,9 @@
                         <div class="form-group mb-4">
                             <label for="password" class="form-label">كلمة المرور</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-light"><i class="fas fa-lock text-primary"></i></span>
+                                <span class="input-group-text"><i class="fas fa-lock"></i></span>
                                 {{ form.password(class="form-control form-control-lg", id="password", placeholder="أدخل كلمة المرور") }}
-                                <button type="button" class="input-group-text bg-light toggle-password" data-target="password">
+                                <button type="button" class="input-group-text toggle-password" data-target="password">
                                     <i class="fas fa-eye"></i>
                                 </button>
                             </div>
@@ -46,24 +48,35 @@
                             {% endif %}
                         </div>
                         
-                        <div class="form-group mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="remember">
-                            <label class="form-check-label" for="remember">تذكرني</label>
+                        <div class="form-group mb-3 form-check d-flex justify-content-between align-items-center">
+                            <div>
+                                <input type="checkbox" class="form-check-input" id="remember" name="remember">
+                                <label class="form-check-label" for="remember">تذكرني</label>
+                            </div>
+                            <div>
+                                <a href="#" class="text-decoration-none text-primary small">نسيت كلمة المرور؟</a>
+                            </div>
                         </div>
                         
-                        <button type="submit" class="btn btn-primary btn-lg w-100 py-2 mt-2 mb-3">
+                        <button type="submit" class="btn btn-primary btn-lg w-100 py-3 mt-2 mb-3 fw-bold">
                             <i class="fas fa-sign-in-alt me-2"></i>تسجيل الدخول
                         </button>
                         
-                        <div class="text-center mt-4">
-                            <a href="#" class="text-decoration-none text-primary">نسيت كلمة المرور؟</a>
+                        <div class="text-center mb-3">
+                            <span class="text-muted">أو</span>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <a href="{{ url_for('user_auth.register') }}" class="btn btn-outline-primary">
+                                <i class="fas fa-user-plus me-2"></i>إنشاء حساب جديد
+                            </a>
                         </div>
                     </form>
-                    
-                    <div class="mt-4 pt-3 text-center border-top">
-                        <p class="mb-0">ليس لديك حساب؟ <a href="{{ url_for('user_auth.register') }}" class="text-primary fw-bold">سجل الآن</a></p>
-                    </div>
                 </div>
+            </div>
+            
+            <div class="text-center mt-4">
+                <p class="text-muted">© 2023 نظام إدارة الطلبات. جميع الحقوق محفوظة</p>
             </div>
         </div>
     </div>
@@ -71,63 +84,7 @@
 
 <style>
 .auth-container {
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    min-height: 100vh;
-}
-
-.auth-card {
-    border-radius: 1rem;
-    border: none;
-    overflow: hidden;
-}
-
-.auth-card .card-header {
-    border-radius: 0 !important;
-    border: none;
-}
-
-.auth-form .form-control {
-    border-left: 0;
-    transition: all 0.3s;
-}
-
-.auth-form .input-group-text {
-    border-right: 0;
-    transition: all 0.3s;
-}
-
-.auth-form .form-control:focus {
-    box-shadow: none;
-    border-color: #ced4da;
-}
-
-.auth-form .input-group:focus-within {
-    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
-    border-radius: 0.375rem;
-}
-
-.auth-form .input-group:focus-within .input-group-text {
-    border-color: #86b7fe;
-    background-color: #e8f0fe;
-}
-
-.toggle-password {
-    cursor: pointer;
-}
-
-.btn-primary {
-    background: linear-gradient(to right, #4e54c8, #8f94fb);
-    border: none;
-    transition: all 0.3s;
-}
-
-.btn-primary:hover {
-    background: linear-gradient(to right, #3a3fb8, #7a80f0);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-.auth-container {
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
     min-height: 100vh;
     position: relative;
     overflow: hidden;
@@ -138,7 +95,7 @@
     content: '';
     position: absolute;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
+    z-index: 0;
 }
 
 .auth-container::before {
@@ -146,8 +103,8 @@
     height: 300px;
     top: -100px;
     right: -100px;
-    background: linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%);
-    opacity: 0.5;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    opacity: 0.1;
 }
 
 .auth-container::after {
@@ -155,13 +112,174 @@
     height: 200px;
     bottom: -50px;
     left: -50px;
-    background: linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%);
-    opacity: 0.5;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    opacity: 0.1;
 }
+
+.auth-card {
+    border-radius: 16px;
+    border: none;
+    overflow: hidden;
+    background-color: #fff;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    position: relative;
+    z-index: 1;
+}
+
+.auth-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
+}
+
+body.dark-mode .auth-card {
+    background-color: var(--content-dark);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.auth-card .card-header {
+    border-radius: 0 !important;
+    border: none;
+    background: linear-gradient(to right, var(--primary), var(--primary-light));
+}
+
+.auth-form .form-control {
+    border-left: 0;
+    transition: all 0.3s;
+    background-color: #f8f9fa;
+    border-color: #dee2e6;
+    padding: 0.75rem 1rem;
+    height: auto;
+}
+
+body.dark-mode .auth-form .form-control {
+    background-color: #2d3748;
+    border-color: #4a5568;
+    color: #e2e8f0;
+}
+
+.auth-form .input-group-text {
+    border-right: 0;
+    transition: all 0.3s;
+    background-color: #e9ecef;
+    border-color: #dee2e6;
+    min-width: 45px;
+    justify-content: center;
+}
+
+body.dark-mode .auth-form .input-group-text {
+    background-color: #4a5568;
+    border-color: #4a5568;
+    color: #e2e8f0;
+}
+
+.auth-form .form-control:focus {
+    box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
+    border-color: #86b7fe;
+    background-color: #fff;
+}
+
+body.dark-mode .auth-form .form-control:focus {
+    background-color: #2d3748;
+    border-color: #86b7fe;
+}
+
+.auth-form .input-group:focus-within .input-group-text {
+    border-color: #86b7fe;
+    background-color: #e8f0fe;
+}
+
+body.dark-mode .auth-form .input-group:focus-within .input-group-text {
+    background-color: #2b6cb0;
+    border-color: #86b7fe;
+}
+
+.toggle-password {
+    cursor: pointer;
+    transition: color 0.3s ease;
+}
+
+.toggle-password:hover {
+    color: var(--primary);
+}
+
+.btn-primary {
+    background: linear-gradient(to right, var(--primary), var(--primary-light));
+    border: none;
+    transition: all 0.3s;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(to right, #2563eb, #3b82f6);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3);
+}
+
+.btn-outline-primary {
+    border-width: 2px;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--primary);
+    border-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.form-check-input:checked {
+    background-color: var(--primary);
+    border-color: var(--primary);
+}
+
 @media (max-width: 576px) {
     .auth-card .card-body {
         padding: 1.5rem;
     }
+    
+    .auth-container::before {
+        width: 200px;
+        height: 200px;
+        top: -70px;
+        right: -70px;
+    }
+    
+    .auth-container::after {
+        width: 150px;
+        height: 150px;
+        bottom: -40px;
+        left: -40px;
+    }
+}
+
+.social-login {
+    display: flex;
+    gap: 12px;
+    margin-top: 1rem;
+}
+
+.social-btn {
+    flex: 1;
+    padding: 0.5rem;
+    border-radius: 8px;
+    text-align: center;
+    transition: all 0.3s;
+}
+
+.social-btn.google {
+    background-color: #DB4437;
+    color: white;
+}
+
+.social-btn.facebook {
+    background-color: #4267B2;
+    color: white;
+}
+
+.social-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
 }
 </style>
 
@@ -183,6 +301,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 icon.classList.remove('fa-eye-slash');
                 icon.classList.add('fa-eye');
             }
+        });
+    });
+    
+    // تأثيرات عند التركيز على الحقول
+    const inputs = document.querySelectorAll('.form-control');
+    inputs.forEach(input => {
+        input.addEventListener('focus', function() {
+            this.parentElement.classList.add('focused');
+        });
+        
+        input.addEventListener('blur', function() {
+            this.parentElement.classList.remove('focused');
         });
     });
 });
