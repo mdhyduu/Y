@@ -18,7 +18,7 @@
                         <div class="mb-4">
                             <label for="email" class="form-label">البريد الإلكتروني</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-light"><i class="fas fa-envelope text-primary"></i></span>
+                                <span class="input-group-text"><i class="fas fa-envelope"></i></span>
                                 {{ form.email(class="form-control form-control-lg" + (' is-invalid' if form.email.errors else ''), id="email", placeholder="أدخل بريدك الإلكتروني") }}
                             </div>
                             {% for error in form.email.errors %}
@@ -29,9 +29,9 @@
                         <div class="mb-4">
                             <label for="password" class="form-label">كلمة المرور</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-light"><i class="fas fa-lock text-primary"></i></span>
+                                <span class="input-group-text"><i class="fas fa-lock"></i></span>
                                 {{ form.password(class="form-control form-control-lg" + (' is-invalid' if form.password.errors else ''), id="password", placeholder="أنشئ كلمة مرور قوية") }}
-                                <button type="button" class="input-group-text bg-light toggle-password" data-target="password">
+                                <button type="button" class="input-group-text toggle-password" data-target="password">
                                     <i class="fas fa-eye"></i>
                                 </button>
                             </div>
@@ -39,14 +39,15 @@
                                 <div class="invalid-feedback d-block">{{ error }}</div>
                             {% endfor %}
                             <div class="form-text">يجب أن تتكون من 8 أحرف على الأقل</div>
+                            <div class="password-strength mt-2"></div>
                         </div>
                         
                         <div class="mb-4">
                             <label for="confirm_password" class="form-label">تأكيد كلمة المرور</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-light"><i class="fas fa-lock text-primary"></i></span>
+                                <span class="input-group-text"><i class="fas fa-lock"></i></span>
                                 {{ form.confirm_password(class="form-control form-control-lg" + (' is-invalid' if form.confirm_password.errors else ''), id="confirm_password", placeholder="أعد إدخال كلمة المرور") }}
-                                <button type="button" class="input-group-text bg-light toggle-password" data-target="confirm_password">
+                                <button type="button" class="input-group-text toggle-password" data-target="confirm_password">
                                     <i class="fas fa-eye"></i>
                                 </button>
                             </div>
@@ -61,7 +62,7 @@
                         </div>
                         
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg py-2">
+                            <button type="submit" class="btn btn-primary btn-lg py-3">
                                 <i class="fas fa-user-plus me-2"></i>إنشاء حساب
                             </button>
                         </div>
@@ -78,44 +79,23 @@
 
 <style>
 .auth-container {
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    background-color: #f8fafc;
     min-height: 100vh;
     position: relative;
     overflow: hidden;
+    transition: background-color 0.3s ease;
 }
 
-.auth-container::before,
-.auth-container::after {
-    content: '';
-    position: absolute;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.auth-container::before {
-    width: 300px;
-    height: 300px;
-    top: -100px;
-    right: -100px;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-    opacity: 0.3;
-}
-
-.auth-container::after {
-    width: 200px;
-    height: 200px;
-    bottom: -50px;
-    left: -50px;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-    opacity: 0.3;
+body.dark-mode .auth-container {
+    background-color: #1a202c;
 }
 
 .auth-card {
-    border-radius: 1rem;
+    border-radius: 16px;
     border: none;
     overflow: hidden;
     background-color: #fff;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
 }
 
 .auth-card:hover {
@@ -124,7 +104,8 @@
 }
 
 body.dark-mode .auth-card {
-    background-color: var(--content-dark);
+    background-color: #2d3748;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
 
 .auth-card .card-header {
@@ -138,10 +119,11 @@ body.dark-mode .auth-card {
     transition: all 0.3s;
     background-color: #f8f9fa;
     border-color: #dee2e6;
+    padding: 0.75rem 1rem;
 }
 
 body.dark-mode .auth-form .form-control {
-    background-color: #2d3748;
+    background-color: #4a5568;
     border-color: #4a5568;
     color: #e2e8f0;
 }
@@ -151,6 +133,8 @@ body.dark-mode .auth-form .form-control {
     transition: all 0.3s;
     background-color: #e9ecef;
     border-color: #dee2e6;
+    min-width: 45px;
+    justify-content: center;
 }
 
 body.dark-mode .auth-form .input-group-text {
@@ -160,19 +144,14 @@ body.dark-mode .auth-form .input-group-text {
 }
 
 .auth-form .form-control:focus {
-    box-shadow: none;
+    box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
     border-color: #86b7fe;
     background-color: #fff;
 }
 
 body.dark-mode .auth-form .form-control:focus {
-    background-color: #2d3748;
+    background-color: #4a5568;
     border-color: #86b7fe;
-}
-
-.auth-form .input-group:focus-within {
-    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
-    border-radius: 0.375rem;
 }
 
 .auth-form .input-group:focus-within .input-group-text {
@@ -199,12 +178,13 @@ body.dark-mode .auth-form .input-group:focus-within .input-group-text {
     border: none;
     transition: all 0.3s;
     font-weight: 600;
+    letter-spacing: 0.5px;
 }
 
 .btn-primary:hover {
-    background: linear-gradient(to right, #3a3fb8, #7a80f0);
+    background: linear-gradient(to right, #2563eb, #3b82f6);
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3);
 }
 
 .form-check-input:checked {
@@ -212,31 +192,11 @@ body.dark-mode .auth-form .input-group:focus-within .input-group-text {
     border-color: var(--primary);
 }
 
-@media (max-width: 576px) {
-    .auth-card .card-body {
-        padding: 1.5rem;
-    }
-    
-    .auth-container::before {
-        width: 200px;
-        height: 200px;
-        top: -70px;
-        right: -70px;
-    }
-    
-    .auth-container::after {
-        width: 150px;
-        height: 150px;
-        bottom: -40px;
-        left: -40px;
-    }
-}
-
 .password-strength {
     height: 5px;
-    margin-top: 5px;
     border-radius: 5px;
     transition: all 0.3s ease;
+    width: 0;
 }
 
 .strength-weak {
@@ -252,6 +212,29 @@ body.dark-mode .auth-form .input-group:focus-within .input-group-text {
 .strength-strong {
     width: 100%;
     background-color: #198754;
+}
+
+.form-text {
+    transition: color 0.3s ease;
+}
+
+body.dark-mode .form-text {
+    color: #a0aec0 !important;
+}
+
+.border-top {
+    border-color: #e2e8f0 !important;
+    transition: border-color 0.3s ease;
+}
+
+body.dark-mode .border-top {
+    border-color: #4a5568 !important;
+}
+
+@media (max-width: 576px) {
+    .auth-card .card-body {
+        padding: 1.5rem;
+    }
 }
 </style>
 
@@ -292,9 +275,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // التحقق من قوة كلمة المرور
     if (password) {
-        const strengthBar = document.createElement('div');
-        strengthBar.className = 'password-strength';
-        password.parentNode.appendChild(strengthBar);
+        const strengthBar = document.querySelector('.password-strength');
         
         password.addEventListener('input', function() {
             const value = password.value;
