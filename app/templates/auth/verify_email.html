@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}تأكيد البريد الإلكتروني{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="row justify-content-center align-items-center min-vh-100 py-4">
+        <div class="col-xl-4 col-lg-5 col-md-6 col-sm-8">
+            <div class="auth-card card shadow-lg">
+                <div class="card-header bg-gradient-primary text-white text-center py-4">
+                    <h3 class="mb-0"><i class="fas fa-envelope me-2"></i>تأكيد البريد الإلكتروني</h3>
+                    <p class="mt-2 mb-0 opacity-75">أدخل كود التحقق المرسل إلى بريدك</p>
+                </div>
+                <div class="card-body p-4 p-sm-5">
+                    <form method="POST" action="{{ url_for('user_auth.verify_email') }}">
+                                                {{ form.hidden_tag() }}
+                        <div class="form-group mb-4">
+                            <label for="verification_code" class="form-label">كود التحقق</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-key"></i></span>
+                                <input type="text" class="form-control form-control-lg" 
+                                       id="verification_code" name="verification_code" 
+                                       placeholder="أدخل الكود المكون من 6 أرقام" 
+                                       required maxlength="6" pattern="[0-9]{6}">
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-lg w-100 py-3 mt-2 mb-3 fw-bold">
+                            <i class="fas fa-check-circle me-2"></i>تأكيد
+                        </button>
+                        
+                        <div class="text-center">
+                            <p class="mb-0">لم تستلم الكود؟ 
+                                <a href="#" class="text-primary resend-link">إعادة إرسال</a>
+                            </p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.resend-link {
+    cursor: pointer;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto focus on code input
+    document.getElementById('verification_code').focus();
+    
+    // Auto move to next input
+    const codeInput = document.getElementById('verification_code');
+    codeInput.addEventListener('input', function() {
+        if (this.value.length === 6) {
+            this.form.submit();
+        }
+    });
+    
+    // Resend code functionality
+    document.querySelector('.resend-link').addEventListener('click', function() {
+        fetch('{{ url_for("user_auth.resend_verification") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('تم إعادة إرسال كود التحقق');
+            } else {
+                alert('فشل إعادة الإرسال: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('حدث خطأ أثناء إعادة الإرسال');
+        });
+    });
+});
+</script>
+{% endblock %}

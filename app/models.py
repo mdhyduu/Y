@@ -58,8 +58,11 @@ class User(db.Model):
     store_id = db.Column(db.Integer, nullable=True, index=True)
     last_sync = db.Column(db.DateTime)
     remember_token = db.Column(db.String(100))
-    
-    # العلاقات
+    # في class User، أضف هذه الحقول بعد remember_token
+    email_verified = db.Column(db.Boolean, default=False)
+    verification_token = db.Column(db.String(100), unique=True, nullable=True)
+    verification_token_expires = db.Column(db.DateTime, nullable=True)
+        # العلاقات
     status_notes = relationship('OrderStatusNote', back_populates='admin', foreign_keys='OrderStatusNote.admin_id') 
     # === دوال إدارة التوكنات ===
     

@@ -12,12 +12,12 @@ from datetime import datetime, timedelta
 from flask import session
 import webcolors
 from flask import jsonify, render_template_string
-
+from flask_mail import Mail  # إضافة استيراد Flask-Mail
 # إنشاء كائنات الإضافات
 db = SQLAlchemy()
 migrate = Migrate()
 csrf = CSRFProtect()
-
+mail = Mail()
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -42,7 +42,7 @@ def create_app():
     # تهيئة الإضافات مع التطبيق
     db.init_app(app)
     csrf.init_app(app)
-
+    mail.init_app(app)
     # تسجيل النماذج مع سياق التطبيق
     with app.app_context():
         from . import models
