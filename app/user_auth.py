@@ -8,7 +8,7 @@ from .models import db, User, Employee
 from datetime import datetime, timedelta
 from functools import wraps
 from .email_utils import generate_verification_code, send_verification_email
-
+from flask import jsonify
 user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,9 @@ def validate_email(form, field):
     email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
     if not re.match(email_regex, field.data):
         raise ValidationError('يجب إدخال بريد إلكتروني صالح')
-
+class VerifyEmailForm(FlaskForm):
+    verification_code = StringField('كود التحقق', 
+        validators=[DataRequired(), Length(min=6, max=6)])
 # نموذج تسجيل الدخول
 class LoginForm(FlaskForm):
     email = StringField('البريد الإلكتروني', validators=[DataRequired(), validate_email])
@@ -166,6 +168,8 @@ def logout():
     return response
 @user_auth_bp.route('/verify-email', methods=['GET', 'POST'])
 def verify_email():
+    form = VerifyEmailForm()
+    # ... باقي الكود
     user_id = request.cookies.get('temp_user_id')
     if not user_id:
         flash('يرجى التسجيل أولاً', 'danger')

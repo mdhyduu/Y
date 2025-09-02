@@ -13,7 +13,10 @@
                 </div>
                 <div class="card-body p-4 p-sm-5">
                     <form method="POST" action="{{ url_for('user_auth.verify_email') }}">
-                                                {{ form.hidden_tag() }}
+
+
+<!-- أو استبدله بـ -->
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="form-group mb-4">
                             <label for="verification_code" class="form-label">كود التحقق</label>
                             <div class="input-group">
