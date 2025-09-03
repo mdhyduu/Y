@@ -64,9 +64,8 @@ class Config:
     
     # ------ إعدادات الباركود ------
     BARCODE_FOLDER = basedir / 'static' / 'barcodes'
-    
-    # ... الإعدادات الأخرى
-    UPLOAD_FOLDER = 'static/uploads/custom_orders'
+   
+    PERSISTENT_UPLOAD_FOLDER = os.environ.get('PERSISTENT_UPLOAD_FOLDER', '/persistent_storage/uploads')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
     # ------ إعدادات الكوكيز والأمان ------
     COOKIE_NAME = 'app_session'
