@@ -1826,11 +1826,10 @@ def get_next_order_number():
             # إذا كان order_number ليس رقماً، نعود لاستخدام ID
             return str(last_order.id + 1000)
     return "1000"
-# في orders.py، عدّل دالة serve_custom_order_image
 @orders_bp.route('/uploads/custom_orders/<filename>')
 def serve_custom_order_image(filename):
-    """خدمة صور الطلبات الخاصة من المسار الدائم"""
-    upload_folder = os.path.join(Config.PERSISTENT_UPLOAD_FOLDER, 'custom_orders')
+    """خدمة صور الطلبات الخاصة"""
+    upload_folder = os.path.join(current_app.root_path, 'static', 'uploads', 'custom_orders')
     return send_from_directory(upload_folder, filename)
 
 @orders_bp.route('/custom/add', methods=['GET', 'POST'])
@@ -1877,8 +1876,8 @@ def add_custom_order():
                     # إنشاء اسم فريد للصورة
                     image_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
                     
-                    # إنشاء المسار الكامل للملف في المسار الدائم
-                    upload_folder = os.path.join(Config.PERSISTENT_UPLOAD_FOLDER, 'custom_orders')
+                    # إنشاء المسار الكامل للملف
+                    upload_folder = os.path.join(current_app.root_path, 'static', 'uploads', 'custom_orders')
                     os.makedirs(upload_folder, exist_ok=True)
                     image_path = os.path.join(upload_folder, image_filename)
                     

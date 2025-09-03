@@ -47,11 +47,6 @@ def create_app():
     with app.app_context():
         from . import models
         db.create_all()
-        upload_folder = os.path.join('/persistent_storage', 'uploads', 'custom_orders')
-        if not os.path.exists(upload_folder):
-            os.makedirs(upload_folder, exist_ok=True)
-            # تغيير صلاحيات المجلد
-            os.chmod(upload_folder, 0o755)
    
     # استيراد الوظائف المطلوبة
     from .token_utils import refresh_salla_token
