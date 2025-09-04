@@ -9,6 +9,8 @@ import logging
 # إعداد المسجل
 logger = logging.getLogger(__name__)
 
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+UPLOAD_FOLDER = 'static/uploads/custom_orders'
 
 def allowed_file(filename):
     return '.' in filename and \

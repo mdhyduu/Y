@@ -9,6 +9,7 @@ from app.utils import get_user_from_cookies
 from app.config import Config
 import requests
 from datetime import datetime
+from app.models import Employee
 import logging
 
 logger = logging.getLogger(__name__)
