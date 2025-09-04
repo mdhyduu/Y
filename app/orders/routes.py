@@ -1,4 +1,6 @@
 # orders/routes.py
+# orders/routes.py
+# orders/routes.py
 import json
 import logging
 from math import ceil
@@ -7,7 +9,7 @@ from flask import (render_template, request, flash, redirect, url_for,
                    make_response, current_app)
 import requests
 from sqlalchemy import (nullslast, or_, and_, func, union_all, literal_column,
-                        select, desc, String, Integer)
+                        select, desc, String, Integer, cast)
 from sqlalchemy.orm import selectinload
 from . import orders_bp
 from app.models import (db, SallaOrder, CustomOrder, OrderStatus, Employee, 
@@ -59,11 +61,11 @@ def index():
         # [3] بناء استعلامات الطلبات باستخدام select() بدلاً من query()
         salla_select = select(
             SallaOrder.id.label('id'),
-            SallaOrder.id.cast(String).label('reference_id'),
+            SallaOrder.id.label('reference_id'),
             SallaOrder.customer_name.label('customer_name'),
             SallaOrder.created_at.label('created_at'),
             SallaOrder.status_id.label('status_id'),
-            literal_column("'salla'").label('order_type_literal')
+            literal_column("'salla'").label('order_type')
         ).where(SallaOrder.store_id == user.store_id)
 
         custom_select = select(
@@ -72,7 +74,7 @@ def index():
             CustomOrder.customer_name.label('customer_name'),
             CustomOrder.created_at.label('created_at'),
             CustomOrder.status_id.label('status_id'),
-            literal_column("'custom'").label('order_type_literal')
+            literal_column("'custom'").label('order_type')
         ).where(CustomOrder.store_id == user.store_id)
         
         # تحديد أي الاستعلامات سيتم استخدامها
@@ -88,15 +90,24 @@ def index():
         for stmt in select_statements:
             # فلتر الموظف
             if not is_reviewer and employee:
-                stmt = stmt.join(OrderAssignment, and_(
-                    OrderAssignment.order_id == stmt.c.id,
-                    OrderAssignment.order_id == stmt.c.order_type_literal
-                )).where(OrderAssignment.employee_id == employee.id)
+                # Use the correct join condition based on order type
+                if stmt.selected_columns.order_type == 'salla':
+                    stmt = stmt.join(OrderAssignment, and_(
+                        OrderAssignment.order_id == stmt.c.id
+                    )).where(OrderAssignment.employee_id == employee.id)
+                else:
+                    stmt = stmt.join(OrderAssignment, and_(
+                        OrderAssignment.custom_order_id == stmt.c.id
+                    )).where(OrderAssignment.employee_id == employee.id)
             elif employee_filter:
-                 stmt = stmt.join(OrderAssignment, and_(
-                    OrderAssignment.order_id == stmt.c.id,
-                    OrderAssignment.order_id == stmt.c.order_type_literal
-                )).where(OrderAssignment.employee_id == employee_filter)
+                if stmt.selected_columns.order_type == 'salla':
+                    stmt = stmt.join(OrderAssignment, and_(
+                        OrderAssignment.order_id == stmt.c.id
+                    )).where(OrderAssignment.employee_id == employee_filter)
+                else:
+                    stmt = stmt.join(OrderAssignment, and_(
+                        OrderAssignment.custom_order_id == stmt.c.id
+                    )).where(OrderAssignment.employee_id == employee_filter)
 
             # فلتر البحث
             if search_query:
@@ -114,22 +125,30 @@ def index():
                 date_to_obj = datetime.strptime(date_to_str, '%Y-%m-%d') + timedelta(days=1)
                 stmt = stmt.where(stmt.c.created_at < date_to_obj)
             
-            # فلتر الحالة الخاصة (late, missing, etc.)
+            # فلتر الحالة الخاصة (late, missing, not_shipped, refunded)
             if status_filter in ['late', 'missing', 'not_shipped', 'refunded']:
-                stmt = stmt.join(OrderStatusNote, and_(
-                    OrderStatusNote.order_id == stmt.c.id,
-                    OrderStatusNote.order_type == stmt.c.order_type_literal
-                )).where(OrderStatusNote.status_flag == status_filter)
+                if stmt.selected_columns.order_type == 'salla':
+                    stmt = stmt.join(OrderStatusNote, and_(
+                        OrderStatusNote.order_id == stmt.c.id
+                    )).where(OrderStatusNote.status_flag == status_filter)
+                else:
+                    stmt = stmt.join(OrderStatusNote, and_(
+                        OrderStatusNote.custom_order_id == stmt.c.id
+                    )).where(OrderStatusNote.status_flag == status_filter)
             elif status_filter:
                 stmt = stmt.join(OrderStatus, OrderStatus.id == stmt.c.status_id)\
                            .where(OrderStatus.slug == status_filter)
             
             # فلتر الحالة المخصصة
             if custom_status_filter:
-                stmt = stmt.join(OrderEmployeeStatus, and_(
-                    OrderEmployeeStatus.order_id == stmt.c.id,
-                    OrderEmployeeStatus.order_type == stmt.c.order_type_literal
-                )).where(OrderEmployeeStatus.status_id == custom_status_filter)
+                if stmt.selected_columns.order_type == 'salla':
+                    stmt = stmt.join(OrderEmployeeStatus, and_(
+                        OrderEmployeeStatus.order_id == stmt.c.id
+                    )).where(OrderEmployeeStatus.status_id == custom_status_filter)
+                else:
+                    stmt = stmt.join(OrderEmployeeStatus, and_(
+                        OrderEmployeeStatus.custom_order_id == stmt.c.id
+                    )).where(OrderEmployeeStatus.status_id == custom_status_filter)
             
             filtered_statements.append(stmt)
 
@@ -161,8 +180,8 @@ def index():
             })()
             
             order_ids_map = {
-                'salla': [row.id for row in pagination_obj.items if row.order_type_literal == 'salla'],
-                'custom': [row.id for row in pagination_obj.items if row.order_type_literal == 'custom']
+                'salla': [row.id for row in pagination_obj.items if row.order_type == 'salla'],
+                'custom': [row.id for row in pagination_obj.items if row.order_type == 'custom']
             }
 
         # [6] جلب البيانات الكاملة للطلبات التي تم ترحيلها فقط
@@ -187,7 +206,7 @@ def index():
 
         # إعادة ترتيب القائمة النهائية
         order_dict = {str(order.id) + ('salla' if isinstance(order, SallaOrder) else 'custom'): order for order in orders}
-        sorted_orders = [order_dict[str(row.id) + row.order_type_literal] for row in pagination_obj.items if str(row.id) + row.order_type_literal in order_dict]
+        sorted_orders = [order_dict[str(row.id) + row.order_type] for row in pagination_obj.items if str(row.id) + row.order_type in order_dict]
 
         # [7] معالجة البيانات للعرض
         processed_orders = []
@@ -251,6 +270,7 @@ def index():
         logger.exception(error_msg)
         return redirect(url_for('orders.index'))
 
+# بقية الكود بدون تغيير...
 @orders_bp.route('/<int:order_id>')
 def order_details(order_id):
     """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة"""
