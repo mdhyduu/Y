@@ -2,6 +2,7 @@ const CACHE_NAME = "pwa-cache-v10";  // زيادة رقم الإصدار لتح�
 const urlsToCache = [
   "/",
   "/static/css/main.css",
+    "/static/css/orders.css",
   "/static/icons/icon-192x192.png",
   "/static/icons/s.png",
   
