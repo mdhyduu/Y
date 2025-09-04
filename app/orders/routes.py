@@ -1,5 +1,6 @@
 # orders/routes.py
 import json
+import logging  # إضافة استيراد logging
 from math import ceil
 from datetime import datetime, timedelta
 from flask import (render_template, request, flash, redirect, url_for, 
@@ -9,10 +10,15 @@ from sqlalchemy import nullslast
 from . import orders_bp
 from app.models import (db, SallaOrder, CustomOrder, OrderStatus, Employee, 
                      OrderAssignment, EmployeeCustomStatus, OrderStatusNote, 
-                     OrderEmployeeStatus, OrderProductStatus)
+                     OrderEmployeeStatus, OrderProductStatus, CustomNoteStatus)  # إضافة CustomNoteStatus وإزالة الفاصلة الزائدة
 from app.utils import get_user_from_cookies, process_order_data, format_date, generate_barcode, humanize_time
 from app.token_utils import refresh_salla_token
 from app.config import Config
+
+# إضافة تعريف الـ logger
+logger = logging.getLogger(__name__)
+
+# باقي الكود بدون تغيير...
 
 @orders_bp.route('/')
 def index():
