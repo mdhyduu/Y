@@ -17,7 +17,7 @@ from app.config import Config
 from sqlalchemy import literal, cast, String, func
 from sqlalchemy.sql import union_all
 
-@login_required
+@orders_bp.route('/')
 def index():
     user = current_user
     page = request.args.get("page", 1, type=int)
