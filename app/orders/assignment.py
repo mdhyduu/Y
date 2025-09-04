@@ -4,8 +4,8 @@ from . import orders_bp
 from app.models import db, Employee, OrderAssignment, SallaOrder, CustomOrder
 from app.utils import get_user_from_cookies
 
-
-
+import logging
+logger = logging.getLogger(__name__)
 
 @orders_bp.route('/assign', methods=['POST'])
 def assign_orders():
