@@ -1,5 +1,5 @@
 # orders/utils_routes.py
-from flask import render_template, redirect, url_for, make_response, flash, send_from_directory
+from flask import render_template, redirect, url_for, make_response, flash, send_from_directory, redirect
 from . import orders_bp
 from app.utils import get_user_from_cookies
 from app.config import Config

@@ -2,7 +2,7 @@ from datetime import datetime
 import os
 import barcode
 from barcode.writer import ImageWriter
-from flask import current_app
+from flask import current_app, redirect
 import logging
 
 # إعداد المسجل
