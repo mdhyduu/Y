@@ -3,7 +3,7 @@ import os
 import barcode
 from barcode.writer import ImageWriter
 from flask import current_app, redirect, request
-from .models import db, User, Employee
+from .models import db, User, Employee, CustomOrder
 import logging
 
 # إعداد المسجل
