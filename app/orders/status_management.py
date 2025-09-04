@@ -2,8 +2,8 @@
 from flask import jsonify, request, redirect, url_for, flash, render_template
 from . import orders_bp
 from app.models import db, OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, CustomNoteStatus, OrderProductStatus
-from .utils import get_user_from_cookies
-from .config import Config
+from app.utils import get_user_from_cookies
+from app.config import Config
 import requests
 from datetime import datetime
 

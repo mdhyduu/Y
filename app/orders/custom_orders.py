@@ -6,7 +6,7 @@ from flask import (render_template, request, flash, redirect, url_for,
 from werkzeug.utils import secure_filename
 from . import orders_bp
 from app.models import db, CustomOrder, Employee
-from .utils import get_user_from_cookies, allowed_file, get_next_order_number
+from app.utils import get_user_from_cookies, allowed_file, get_next_order_number
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 UPLOAD_FOLDER = 'static/uploads/custom_orders'

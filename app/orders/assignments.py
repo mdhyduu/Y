@@ -2,7 +2,7 @@
 from flask import jsonify, request
 from . import orders_bp
 from app.models import db, Employee, OrderAssignment, SallaOrder, CustomOrder
-from .utils import get_user_from_cookies
+from app.utils import get_user_from_cookies
 
 
 logger = logging.getLogger(__name__)

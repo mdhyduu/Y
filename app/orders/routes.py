@@ -10,9 +10,9 @@ from . import orders_bp
 from app.models import (db, SallaOrder, CustomOrder, OrderStatus, Employee, 
                      OrderAssignment, EmployeeCustomStatus, OrderStatusNote, 
                      OrderEmployeeStatus, OrderProductStatus)
-from .utils import get_user_from_cookies, process_order_data, format_date, generate_barcode, humanize_time
-from .token_utils import refresh_salla_token
-from .config import Config
+from app.utils import get_user_from_cookies, process_order_data, format_date, generate_barcode, humanize_time
+from app.token_utils import refresh_salla_token
+from app.config import Config
 
 @orders_bp.route('/')
 def index():

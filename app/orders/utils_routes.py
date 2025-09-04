@@ -1,8 +1,8 @@
 # orders/utils_routes.py
 from flask import render_template, redirect, url_for, make_response, flash, send_from_directory
 from . import orders_bp
-from .utils import get_user_from_cookies
-from .config import Config
+from app.utils import get_user_from_cookies
+from app.config import Config
 
 @orders_bp.route('/static/barcodes/<filename>')
 def serve_barcode(filename):

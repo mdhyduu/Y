@@ -4,8 +4,8 @@ import requests
 from datetime import datetime
 from weasyprint import HTML
 from . import orders_bp
-from .utils import get_user_from_cookies, process_order_data, format_date
-from .config import Config
+from app.utils import get_user_from_cookies, process_order_data, format_date
+from app.config import Config
 
 @orders_bp.route('/print_orders')
 def print_orders():
