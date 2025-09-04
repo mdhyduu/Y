@@ -19,9 +19,20 @@ from app.config import Config
 logger = logging.getLogger(__name__)
 
 # باقي الكود بدون تغيير...
+ 
+from flask_caching import Cache
 
+# إعداد التخزين المؤقت
+cache = Cache(config={'CACHE_TYPE': 'simple'})
+
+def initialize_cache(app):
+    cache.init_app(app)
+
+# استخدام التخزين المؤقت للاستعلامات المتكررة
 @orders_bp.route('/')
+@cache.cached(timeout=60, query_string=True)  # التخزين المؤقت لمدة دقيقة مع مراعاة معلمات URL
 def index():
+    # الكود السابق...
     """عرض قائمة الطلبات (سلة + مخصصة) مع نظام الترحيل الكامل"""
     user, employee = get_user_from_cookies()
     
@@ -75,15 +86,17 @@ def index():
         is_reviewer = employee.role in ['reviewer', 'manager']
     
     try:
-        # استخدام selectinload بدلاً من joinedload لتحسين الأداء
+  
         salla_query = SallaOrder.query.filter_by(store_id=user.store_id).options(
-            db.selectinload(SallaOrder.status),
-            db.selectinload(SallaOrder.assignments).selectinload(OrderAssignment.employee)
+            db.joinedload(SallaOrder.status),
+            db.joinedload(SallaOrder.assignments).joinedload(OrderAssignment.employee),
+            db.joinedload(SallaOrder.status_notes)  # إضافة joinedload للملاحظات
         )
         
         custom_query = CustomOrder.query.filter_by(store_id=user.store_id).options(
-            db.selectinload(CustomOrder.status),
-            db.selectinload(CustomOrder.assignments).selectinload(OrderAssignment.employee)
+            db.joinedload(CustomOrder.status),
+            db.joinedload(CustomOrder.assignments).joinedload(OrderAssignment.employee),
+            db.joinedload(CustomOrder.status_notes)  # إضافة joinedload للملاحظات
         )
         
         # للموظفين العاديين: عرض فقط الطلبات المسندة لهم
@@ -93,8 +106,10 @@ def index():
         
         # تطبيق الفلاتر المشتركة
         # تطبيق فلتر الحالة الخاصة (late, missing, etc.)
+        # تطبيق فلتر الحالة الخاصة (late, missing, etc.)
         if status_filter in ['late', 'missing', 'not_shipped', 'refunded']:
             if order_type in ['all', 'salla']:
+                # للطلبات السلة: استخدام status_notes المرتبطة بـ SallaOrder
                 salla_query = salla_query.join(
                     OrderStatusNote, 
                     OrderStatusNote.order_id == SallaOrder.id
@@ -102,6 +117,7 @@ def index():
                     OrderStatusNote.status_flag == status_filter
                 )
             if order_type in ['all', 'custom']:
+                # للطلبات المخصصة: استخدام status_notes المرتبطة بـ CustomOrder
                 custom_query = custom_query.join(
                     OrderStatusNote, 
                     OrderStatusNote.custom_order_id == CustomOrder.id
@@ -135,37 +151,21 @@ def index():
                     OrderStatusNote.custom_status_id == custom_status_id
                 )
         
-        # تطبيق فلتر البحث - تحسين الأداء باستخدام ILIKE فقط إذا كان هناك بحث
+        # تطبيق فلتر البحث
         if search_query:
-            search_filter = f'%{search_query}%'
             if order_type in ['all', 'salla']:
                 salla_query = salla_query.filter(
-                    db.or_(
-                        SallaOrder.customer_name.ilike(search_filter),
-                        SallaOrder.id.ilike(search_filter)
-                    )
+                    SallaOrder.customer_name.ilike(f'%{search_query}%') | 
+                    SallaOrder.id.ilike(f'%{search_query}%')
                 )
             if order_type in ['all', 'custom']:
                 custom_query = custom_query.filter(
-                    db.or_(
-                        CustomOrder.customer_name.ilike(search_filter),
-                        CustomOrder.order_number.ilike(search_filter)
-                    )
+                    CustomOrder.customer_name.ilike(f'%{search_query}%') | 
+                    CustomOrder.order_number.ilike(f'%{search_query}%')
                 )
         
-        # فلترة حسب التاريخ - تحسين باستخدام between للفترات
-        if date_from and date_to:
-            try:
-                date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
-                date_to_obj = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
-                
-                if order_type in ['all', 'salla']:
-                    salla_query = salla_query.filter(SallaOrder.created_at.between(date_from_obj, date_to_obj))
-                if order_type in ['all', 'custom']:
-                    custom_query = custom_query.filter(CustomOrder.created_at.between(date_from_obj, date_to_obj))
-            except ValueError:
-                pass
-        elif date_from:
+        # فلترة حسب التاريخ
+        if date_from:
             try:
                 date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
                 if order_type in ['all', 'salla']:
@@ -174,7 +174,8 @@ def index():
                     custom_query = custom_query.filter(CustomOrder.created_at >= date_from_obj)
             except ValueError:
                 pass
-        elif date_to:
+        
+        if date_to:
             try:
                 date_to_obj = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
                 if order_type in ['all', 'salla']:
@@ -183,6 +184,8 @@ def index():
                     custom_query = custom_query.filter(CustomOrder.created_at <= date_to_obj)
             except ValueError:
                 pass
+        
+        # ... [بقية الكود دون تغيير] ...
         
         # جلب الحالات المخصصة بشكل صحيح
         custom_statuses = []
@@ -195,62 +198,51 @@ def index():
             # للموظفين العاديين: حالاتهم الخاصة فقط
             custom_statuses = EmployeeCustomStatus.query.filter_by(employee_id=employee.id).all()
         
-        # جلب الطلبات بناءً على النوع المحدد مع تحسين الأداء
+        # جلب الطلبات بناءً على النوع المحدد
         if order_type == 'salla':
-            orders_query = salla_query.order_by(db.desc(SallaOrder.created_at))
-            pagination_obj = orders_query.paginate(page=page, per_page=per_page, error_out=False)
+            orders_query = salla_query.order_by(nullslast(db.desc('created_at')))
+            pagination_obj = orders_query.paginate(page=page, per_page=per_page)
             orders = pagination_obj.items
         elif order_type == 'custom':
-            orders_query = custom_query.order_by(db.desc(CustomOrder.created_at))
-            pagination_obj = orders_query.paginate(page=page, per_page=per_page, error_out=False)
+            orders_query = custom_query.order_by(nullslast(db.desc('created_at')))
+            pagination_obj = orders_query.paginate(page=page, per_page=per_page)
             orders = pagination_obj.items
-        else:  # all - استخدام UNION للدمج بدلاً من الدمج في الذاكرة
-            # جلب طلبات سلة مع إضافة عمود للنوع
-            salla_subquery = salla_query.add_columns(
-                db.literal('salla').label('order_type')
-            ).subquery()
+        else:  # all - دمج النتيجتين
+            # جلب طلبات سلة
+            salla_orders = salla_query.all()
+            custom_orders = custom_query.all()
             
-            # جلب طلبات مخصصة مع إضافة عمود للنوع
-            custom_subquery = custom_query.add_columns(
-                db.literal('custom').label('order_type')
-            ).subquery()
+            # دمج القائمتين وترتيبهم حسب تاريخ الإنشاء
+            all_orders = salla_orders + custom_orders
+            all_orders.sort(key=lambda x: x.created_at or datetime.min, reverse=True)
             
-            # استخدام UNION ALL للدمج
-            union_query = db.session.query(
-                salla_subquery
-            ).union_all(
-                db.session.query(custom_subquery)
-            ).order_by(
-                db.desc('created_at')
-            )
-            
-            # الترحيل اليدوي للاستعلام المدمج
-            total_orders = union_query.count()
-            total_pages = ceil(total_orders / per_page)
-            offset = (page - 1) * per_page
-            
-            orders = union_query.offset(offset).limit(per_page).all()
+            # تطبيق الترحيل يدوياً
+            total_orders = len(all_orders)
+            start_idx = (page - 1) * per_page
+            end_idx = start_idx + per_page
+            paginated_orders = all_orders[start_idx:end_idx]
             
             # إنشاء كائن Pagination مخصص
             pagination_obj = type('Obj', (object,), {
-                'items': orders,
+                'items': paginated_orders,
                 'page': page,
                 'per_page': per_page,
                 'total': total_orders,
-                'pages': total_pages,
+                'pages': ceil(total_orders / per_page),
                 'has_prev': page > 1,
-                'has_next': page < total_pages,
+                'has_next': end_idx < total_orders,
                 'prev_num': page - 1 if page > 1 else None,
-                'next_num': page + 1 if page < total_pages else None
+                'next_num': page + 1 if end_idx < total_orders else None
             })()
+            
+            orders = pagination_obj.items
         
         # معالجة البيانات للعرض
         processed_orders = []
         
         for order in orders:
-            # معالجة حسب نوع الطلب
-            if hasattr(order, 'order_type') and order.order_type == 'salla':
-                # معالجة طلبات سلة من UNION
+            if isinstance(order, SallaOrder):
+                # معالجة طلبات سلة
                 raw_data = json.loads(order.raw_data) if order.raw_data else {}
                 reference_id = raw_data.get('reference_id', order.id)
                 status_name = order.status.name if order.status else 'غير محدد'
@@ -268,10 +260,12 @@ def index():
                     'status_obj': order.status,
                     'raw_created_at': order.created_at,
                     'type': 'salla',
-                    'assignments': order.assignments
+                    'assignments': order.assignments,
+                    'employee_statuses': order.employee_statuses,  # <<< أضف هذا
+                    'status_notes': order.status_notes             # <<< وأيضًا هذا لو عايز تعرض الملاحظات
                 } 
-            elif hasattr(order, 'order_type') and order.order_type == 'custom':
-                # معالجة طلبات مخصصة من UNION
+                
+            else:  # CustomOrder
                 processed_order = {
                     'id': order.id,
                     'reference_id': order.order_number,
@@ -285,46 +279,10 @@ def index():
                     'raw_created_at': order.created_at,
                     'type': 'custom',
                     'total_amount': order.total_amount,
-                    'currency': order.currency
+                    'currency': order.currency,
+                    'employee_statuses': order.employee_statuses,  # <<< نفس الشيء هنا
+                    'status_notes': order.status_notes
                 }
-            else:
-                # معالجة الطلبات العادية (بدون UNION)
-                if isinstance(order, SallaOrder):
-                    raw_data = json.loads(order.raw_data) if order.raw_data else {}
-                    reference_id = raw_data.get('reference_id', order.id)
-                    status_name = order.status.name if order.status else 'غير محدد'
-                    status_slug = order.status.slug if order.status else 'unknown'
-                    
-                    processed_order = {
-                        'id': order.id,
-                        'reference_id': reference_id,
-                        'customer_name': order.customer_name,
-                        'created_at': humanize_time(order.created_at) if order.created_at else '',
-                        'status': {
-                            'slug': status_slug,
-                            'name': status_name
-                        },
-                        'status_obj': order.status,
-                        'raw_created_at': order.created_at,
-                        'type': 'salla',
-                        'assignments': order.assignments
-                    } 
-                else:  # CustomOrder
-                    processed_order = {
-                        'id': order.id,
-                        'reference_id': order.order_number,
-                        'customer_name': order.customer_name,
-                        'created_at': humanize_time(order.created_at) if order.created_at else '',
-                        'status': {
-                            'slug': order.status_id or 'custom',
-                            'name': order.status.name if order.status else 'مخصص'
-                        },
-                        'status_obj': order.status,
-                        'raw_created_at': order.created_at,
-                        'type': 'custom',
-                        'total_amount': order.total_amount,
-                        'currency': order.currency
-                    }
                     
             processed_orders.append(processed_order)
         
@@ -384,6 +342,7 @@ def index():
         flash(error_msg, 'error')
         logger.exception(error_msg)
         return redirect(url_for('orders.index'))
+        
 @orders_bp.route('/<int:order_id>')
 def order_details(order_id):
     """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة"""
