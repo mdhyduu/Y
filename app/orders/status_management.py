@@ -1,19 +1,15 @@
 # orders/status_management.py
-from flask import jsonify, request, redirect, url_for, flash, render_template
+# orders/status_management.py
+from flask import (jsonify, request, redirect, url_for, flash, render_template, 
+                   make_response, current_app)  # إضافة make_response و current_app
 from . import orders_bp
-from app.models import db, OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, CustomNoteStatus, OrderProductStatus
+from app.models import (db, OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, 
+                       CustomNoteStatus, OrderProductStatus)
 from app.utils import get_user_from_cookies
 from app.config import Config
 import requests
 from datetime import datetime
-
 import logging
-
-
-
-
-
-
 
 logger = logging.getLogger(__name__)
 
