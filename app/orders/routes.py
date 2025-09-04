@@ -90,12 +90,12 @@ def index():
             if not is_reviewer and employee:
                 stmt = stmt.join(OrderAssignment, and_(
                     OrderAssignment.order_id == stmt.c.id,
-                    OrderAssignment.type == stmt.c.order_type_literal
+                    OrderAssignment.order_id == stmt.c.order_type_literal
                 )).where(OrderAssignment.employee_id == employee.id)
             elif employee_filter:
                  stmt = stmt.join(OrderAssignment, and_(
                     OrderAssignment.order_id == stmt.c.id,
-                    OrderAssignment.type == stmt.c.order_type_literal
+                    OrderAssignment.order_id == stmt.c.order_type_literal
                 )).where(OrderAssignment.employee_id == employee_filter)
 
             # فلتر البحث
