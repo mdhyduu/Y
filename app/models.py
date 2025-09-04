@@ -347,7 +347,10 @@ class EmployeePermission(db.Model):
 
 class SallaOrder(db.Model):
     __tablename__ = 'salla_orders'
-    
+    __table_args__ = (
+        db.Index('ix_salla_orders_store_created', 'store_id', 'created_at'),
+        db.Index('ix_salla_orders_status', 'status_id'),
+    )
     id = db.Column(db.String(50), primary_key=True)
     store_id = db.Column(db.Integer, nullable=False)
     customer_name = db.Column(db.String(255))
@@ -373,6 +376,11 @@ class SallaOrder(db.Model):
 class CustomOrder(db.Model):
     __tablename__ = 'custom_orders'
     
+    __table_args__ = (
+        db.Index('ix_custom_orders_store_created', 'store_id', 'created_at'),
+        db.Index('ix_custom_orders_status', 'status_id'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     order_number = db.Column(db.String(50), unique=True, nullable=False)
     customer_name = db.Column(db.String(255), nullable=False)
@@ -402,7 +410,11 @@ class CustomOrder(db.Model):
 
 class OrderStatusNote(db.Model):
     __tablename__ = 'order_status_notes'
-    
+    __table_args__ = (
+        db.Index('ix_status_notes_order', 'order_id'),
+        db.Index('ix_status_notes_custom_order', 'custom_order_id'),
+        db.Index('ix_status_notes_flag', 'status_flag'),
+    )
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.String(50), ForeignKey('salla_orders.id'), nullable=False)
     status_flag = db.Column(db.String(20), nullable=False)
