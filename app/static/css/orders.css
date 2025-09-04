@@ -1,241 +1,236 @@
-/* =================================== */
-/* General Styles             */
-/* =================================== */
-.status-badge { padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; }
-.status-pending, .status-awaiting_payment { background-color: #fff3cd; color: #856404; }
-.status-processing { background-color: #cce5ff; color: #004085; }
-.status-under_review { background-color: #e2e3e5; color: #383d41; }
-.status-shipped { background-color: #d1ecf1; color: #0c5460; }
-.status-delivered { background-color: #d4edda; color: #155724; }
-.status-canceled { background-color: #f8d7da; color: #721c24; }
-
-.avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 0.7rem; font-weight: 600; }
-.avatar-text { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 50%; }
-
-.card { border-radius: 12px; overflow: hidden; }
-.card-header { border-radius: 12px 12px 0 0 !important; }
-.table th { font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; }
-.table td { vertical-align: middle; }
-.btn-icon { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
-.bg-gradient-primary { background: linear-gradient(135deg, #4e73df 0%, #224abe 100%); }
-
-/* تحسينات الجدول */
-.clickable-row { cursor: pointer; transition: all 0.2s ease; }
-.clickable-row:hover { background-color: rgba(78, 115, 223, 0.05) !important; transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-.clickable-row.selected-row { background-color: rgba(78, 115, 223, 0.1) !important; }
-
-.actions-cell { 
-    position: relative; 
-    z-index: 5; /* تأكد من أن أزرار الإجراءات تظهر فوق الصف */
-}
-
-/* تأثير النبض للأزرار عند التحديد */
-.pulse-effect {
-    animation: pulse 1s;
-}
-
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-}
-
-/* تحسينات للشاشات الصغيرة */
-@media (max-width: 768px) {
-    .card-header h6 { font-size: 0.9rem; }
-    #sync-orders-btn .sync-text,
-    #sync-statuses-btn .sync-text { display: none; }
-    #sync-orders-btn i,
-    #sync-statuses-btn i { margin-right: 0 !important; }
-    .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .table td, .table th { white-space: nowrap; }
+    .status-badge { padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 500; display: inline-flex; align-items: center; }
+    .status-pending, .status-awaiting_payment { background-color: #fff3cd; color: #856404; }
+    .status-processing { background-color: #cce5ff; color: #004085; }
+    .status-under_review { background-color: #e2e3e5; color: #383d41; }
+    .status-shipped { background-color: #d1ecf1; color: #0c5460; }
+    .status-delivered { background-color: #d4edda; color: #155724; }
+    .status-canceled { background-color: #f8d7da; color: #721c24; }
     
-    /* إخفاء بعض الأعمدة في الشاشات الصغيرة */
-
-    .table th:nth-child(3),
-    .table td:nth-child(3),
-    .table th:nth-child(7),
-    .table td:nth-child(7) {
-        display: none;
+    .avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 0.7rem; font-weight: 600; }
+    .avatar-text { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 50%; }
+    
+    .card { border-radius: 12px; overflow: hidden; }
+    .card-header { border-radius: 12px 12px 0 0 !important; }
+    .table th { font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; }
+    .table td { vertical-align: middle; }
+    .btn-icon { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+    .bg-gradient-primary { background: linear-gradient(135deg, #4e73df 0%, #224abe 100%); }
+    
+    /* تحسينات الجدول */
+    .clickable-row { cursor: pointer; transition: all 0.2s ease; }
+    .clickable-row:hover { background-color: rgba(78, 115, 223, 0.05) !important; transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .clickable-row.selected-row { background-color: rgba(78, 115, 223, 0.1) !important; }
+    
+    .actions-cell { 
+        position: relative; 
+        z-index: 5; /* تأكد من أن أزرار الإجراءات تظهر فوق الصف */
     }
     
-    {% if not is_reviewer %}
-    .table th:nth-child(4),
-    .table td:nth-child(4) {
-        display: none;
-    }
-    {% endif }
-
-    
-    /* تحسين عرض الأعمدة في الشاشات الصغيرة */
-    .table th:nth-child(1) { width: 8%; } /* عمود التحديد */
-    .table th:nth-child(2) { width: 17%; } /* رقم الطلب */
-    .table th:nth-child(4) { width: 17%; } 
-    .table th:nth-child(5) { width: 17%; }  
-    .table th:nth-child(6) { width: 16%; } /* العلامات */
-    .table th:last-child { width: 25%; } /* الإجراءات */
-    
-    /* تحسين شريط الإجراءات السريعة */
-    #quick-actions {
-        flex-wrap: wrap;
-        gap: 10px;
+    /* تأثير النبض للأزرار عند التحديد */
+    .pulse-effect {
+        animation: pulse 1s;
     }
     
-    #quick-actions .btn {
-        flex: 1;
-        min-width: 120px;
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
     }
     
-    /* تحسين التصفية */
-    #advanced-filters .col-md-3,
-    #advanced-filters .col-md-2 {
-        margin-bottom: 15px;
+    /* تحسينات للشاشات الصغيرة */
+    @media (max-width: 768px) {
+        .card-header h6 { font-size: 0.9rem; }
+        #sync-orders-btn .sync-text,
+        #sync-statuses-btn .sync-text { display: none; }
+        #sync-orders-btn i,
+        #sync-statuses-btn i { margin-right: 0 !important; }
+        .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .table td, .table th { white-space: nowrap; }
+        
+        /* إخفاء بعض الأعمدة في الشاشات الصغيرة */
+
+        .table th:nth-child(3),
+        .table td:nth-child(3),
+        .table th:nth-child(7),
+        .table td:nth-child(7) {
+            display: none;
+        }
+        
+        {% if not is_reviewer %}
+        .table th:nth-child(4),
+        .table td:nth-child(4) {
+            display: none;
+        }
+        {% endif %}
+
+        
+        /* تحسين عرض الأعمدة في الشاشات الصغيرة */
+        .table th:nth-child(1) { width: 8%; } /* عمود التحديد */
+        .table th:nth-child(2) { width: 17%; } /* رقم الطلب */
+        .table th:nth-child(4) { width: 17%; } 
+        .table th:nth-child(5) { width: 17%; }  
+        .table th:nth-child(6) { width: 16%; } /* العلامات */
+        .table th:last-child { width: 25%; } /* الإجراءات */
+        
+        /* تحسين شريط الإجراءات السريعة */
+        #quick-actions {
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        #quick-actions .btn {
+            flex: 1;
+            min-width: 120px;
+        }
+        
+        /* تحسين التصفية */
+        #advanced-filters .col-md-3,
+        #advanced-filters .col-md-2 {
+            margin-bottom: 15px;
+        }
     }
-}
-
-/* تحسينات للشاشات المتوسطة */
-@media (max-width: 992px) {
-    .table th:nth-child(7),
-    .table td:nth-child(7) {
-        display: none;
+    
+    /* تحسينات للشاشات المتوسطة */
+    @media (max-width: 992px) {
+        .table th:nth-child(7),
+        .table td:nth-child(7) {
+            display: none;
+        }
     }
-}
+    
+    /* =================================== */
+    /* Dark Mode Styles          */
+    /* =================================== */
+    body.dark-mode .border-bottom { border-bottom-color: var(--border-color-dark) !important; }
+    
+    .badge-late {
+        background-color: rgba(220, 38, 38, 0.1) !important;
+        color: #dc2626 !important;
+        border: 1px solid #dc2626;
+    }
 
-/* =================================== */
-/* Dark Mode Styles          */
-/* =================================== */
-body.dark-mode .border-bottom { border-bottom-color: var(--border-color-dark) !important; }
+    .badge-missing {
+        background-color: rgba(234, 88, 12, 0.1) !important;
+        color: #ea580c !important;
+        border: 1px solid #ea580c;
+    }
 
-.badge-late {
-    background-color: rgba(220, 38, 38, 0.1) !important;
-    color: #dc2626 !important;
-    border: 1px solid #dc2626;
-}
+    .badge-refunded {
+        background-color: rgba(109, 40, 217, 0.1) !important;
+        color: #6d28d9 !important;
+        border: 1px solid #6d28d9;
+    }
 
-.badge-missing {
-    background-color: rgba(234, 88, 12, 0.1) !important;
-    color: #ea580c !important;
-    border: 1px solid #ea580c;
-}
+    .badge-not_shipped {
+        background-color: rgba(16, 185, 129, 0.1) !important;
+        color: #10b981 !important;
+        border: 1px solid #10b981;
+    }
+    
+    /* أنماط الحالات الجديدة */
+    .status-payment_pending { background-color: #fff3cd; color: #856404; }
+    .status-waiting_for_payment_confirmation { background-color: #fff3cd; color: #856404; }
+    .status-payment_failed { background-color: #f8d7da; color: #721c24; }
+    .status-waiting_to_receive { background-color: #e2e3e5; color: #383d41; }
+    .status-in_progress { background-color: #cce5ff; color: #004085; }
+    .status-completed { background-color: #d4edda; color: #155724; }
+    .status-delivering { background-color: #d1ecf1; color: #0c5460; }
+    .status-restored { background-color: #d4edda; color: #155724; }
+    .status-restoring { background-color: #cce5ff; color: #004085; }
 
-.badge-refunded {
-    background-color: rgba(109, 40, 217, 0.1) !important;
-    color: #6d28d9 !important;
-    border: 1px solid #6d28d9;
-}
+    /* للوضع الليلي */
+    body.dark-mode .status-payment_pending,
+    body.dark-mode .status-waiting_for_payment_confirmation { background-color: rgba(252, 211, 77, 0.15); color: #facc15; }
+    body.dark-mode .status-payment_failed { background-color: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    body.dark-mode .status-waiting_to_receive { background-color: rgba(156, 163, 175, 0.15); color: #9ca3af; }
+    body.dark-mode .status-in_progress,
+    body.dark-mode .status-restoring { background-color: rgba(96, 165, 250, 0.15); color: #60a5fa; }
+    body.dark-mode .status-completed,
+    body.dark-mode .status-restored { background-color: rgba(52, 211, 153, 0.15); color: #34d399; }
+    body.dark-mode .status-delivering { background-color: rgba(52, 211, 153, 0.15); color: #34d399; }
 
-.badge-not_shipped {
-    background-color: rgba(16, 185, 129, 0.1) !important;
-    color: #10b981 !important;
-    border: 1px solid #10b981;
-}
+    /* للوضع الليلي */
+    body.dark-mode .badge-late {
+        background-color: rgba(220, 38, 38, 0.2) !important;
+        color: #fca5a5 !important;
+    }
 
-/* أنماط الحالات الجديدة */
-.status-payment_pending { background-color: #fff3cd; color: #856404; }
-.status-waiting_for_payment_confirmation { background-color: #fff3cd; color: #856404; }
-.status-payment_failed { background-color: #f8d7da; color: #721c24; }
-.status-waiting_to_receive { background-color: #e2e3e5; color: #383d41; }
-.status-in_progress { background-color: #cce5ff; color: #004085; }
-.status-completed { background-color: #d4edda; color: #155724; }
-.status-delivering { background-color: #d1ecf1; color: #0c5460; }
-.status-restored { background-color: #d4edda; color: #155724; }
-.status-restoring { background-color: #cce5ff; color: #004085; }
+    body.dark-mode .badge-missing {
+        background-color: rgba(234, 88, 12, 0.2) !important;
+        color: #fdba74 !important;
+    }
 
-/* للوضع الليلي */
-body.dark-mode .status-payment_pending,
-body.dark-mode .status-waiting_for_payment_confirmation { background-color: rgba(252, 211, 77, 0.15); color: #facc15; }
-body.dark-mode .status-payment_failed { background-color: rgba(239, 68, 68, 0.15); color: #ef4444; }
-body.dark-mode .status-waiting_to_receive { background-color: rgba(156, 163, 175, 0.15); color: #9ca3af; }
-body.dark-mode .status-in_progress,
-body.dark-mode .status-restoring { background-color: rgba(96, 165, 250, 0.15); color: #60a5fa; }
-body.dark-mode .status-completed,
-body.dark-mode .status-restored { background-color: rgba(52, 211, 153, 0.15); color: #34d399; }
-body.dark-mode .status-delivering { background-color: rgba(52, 211, 153, 0.15); color: #34d399; }
+    body.dark-mode .badge-refunded {
+        background-color: rgba(109, 40, 217, 0.2) !important;
+        color: #c4b5fd !important;
+    }
 
-/* للوضع الليلي */
-body.dark-mode .badge-late {
-    background-color: rgba(220, 38, 38, 0.2) !important;
-    color: #fca5a5 !important;
-}
+    body.dark-mode .badge-not_shipped {
+        background-color: rgba(16, 185, 129, 0.2) !important;
+        color: #6ee7b7 !important;
+    }
+    
+    body.dark-mode .border-top { border-top-color: var(--border-color-dark) !important; }
+    body.dark-mode .text-muted { color: #a0aec0 !important; }
 
-body.dark-mode .badge-missing {
-    background-color: rgba(234, 88, 12, 0.2) !important;
-    color: #fdba74 !important;
-}
+    /* Filters */
+    body.dark-mode .input-daterange .input-group-text.bg-light { background-color: #374151 !important; border-color: var(--border-color-dark); }
 
-body.dark-mode .badge-refunded {
-    background-color: rgba(109, 40, 217, 0.2) !important;
-    color: #c4b5fd !important;
-}
+    /* Table */
+    body.dark-mode #table-loading { background-color: rgba(42, 46, 66, 0.75); }
+    body.dark-mode .table th { color: #a0aec0; }
+    body.dark-mode .clickable-row:hover { background-color: rgba(78, 115, 223, 0.1) !important; }
+    body.dark-mode .clickable-row.selected-row { background-color: rgba(78, 115, 223, 0.15) !important; }
 
-body.dark-mode .badge-not_shipped {
-    background-color: rgba(16, 185, 129, 0.2) !important;
-    color: #6ee7b7 !important;
-}
+    /* Status Badges */
+    body.dark-mode .status-pending,
+    body.dark-mode .status-awaiting_payment { background-color: rgba(252, 211, 77, 0.15); color: #facc15; }
+    body.dark-mode .status-processing { background-color: rgba(96, 165, 250, 0.15); color: #60a5fa; }
+    body.dark-mode .status-under_review { background-color: rgba(156, 163, 175, 0.15); color: #9ca3af; }
+    body.dark-mode .status-shipped { background-color: rgba(52, 211, 153, 0.15); color: #34d399; }
+    body.dark-mode .status-delivered { background-color: rgba(29, 78, 216, 0.2); color: #3b82f6; }
+    body.dark-mode .status-canceled { background-color: rgba(239, 68, 68, 0.15); color: #ef4444; }
 
-body.dark-mode .border-top { border-top-color: var(--border-color-dark) !important; }
-body.dark-mode .text-muted { color: #a0aec0 !important; }
+    /* Avatars & small badges */
+    body.dark-mode .badge.bg-secondary.bg-opacity-10 { background-color: rgba(107, 114, 128, 0.2) !important; color: #9ca3af !important; }
+    body.dark-mode .avatar-text.bg-light.text-dark { background-color: #4b5563 !important; color: var(--text-light) !important; }
+    body.dark-mode .badge.bg-light.text-muted { background-color: #374151 !important; color: #d1d5db !important; }
 
-/* Filters */
-body.dark-mode .input-daterange .input-group-text.bg-light { background-color: #374151 !important; border-color: var(--border-color-dark); }
+    /* Pagination */
+    body.dark-mode .page-link { background-color: var(--content-dark); border-color: var(--border-color-dark); color: var(--primary-light); }
+    body.dark-mode .page-item.disabled .page-link { background-color: transparent; border-color: var(--border-color-dark); color: #6c757d; }
+    body.dark-mode .page-link:hover { background-color: #3a3f58; }
+    body.dark-mode .page-item.active .page-link { background-color: var(--primary); border-color: var(--primary); color: #fff; }
 
-/* Table */
-body.dark-mode #table-loading { background-color: rgba(42, 46, 66, 0.75); }
-body.dark-mode .table th { color: #a0aec0; }
-body.dark-mode .clickable-row:hover { background-color: rgba(78, 115, 223, 0.1) !important; }
-body.dark-mode .clickable-row.selected-row { background-color: rgba(78, 115, 223, 0.15) !important; }
+    body.dark-mode .badge[style*="background-color"] {
+        filter: brightness(0.9) contrast(1.2);
+    }
+    
+    /* "No orders" state */
+    body.dark-mode .text-gray-300 { color: #4b5563 !important; }
+    body.dark-mode .text-gray-600 { color: #d1d5db !important; }
+    
+    .status-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
 
-/* Status Badges */
-body.dark-mode .status-pending,
-body.dark-mode .status-awaiting_payment { background-color: rgba(252, 211, 77, 0.15); color: #facc15; }
-body.dark-mode .status-processing { background-color: rgba(96, 165, 250, 0.15); color: #60a5fa; }
-body.dark-mode .status-under_review { background-color: rgba(156, 163, 175, 0.15); color: #9ca3af; }
-body.dark-mode .status-shipped { background-color: rgba(52, 211, 153, 0.15); color: #34d399; }
-body.dark-mode .status-delivered { background-color: rgba(29, 78, 216, 0.2); color: #3b82f6; }
-body.dark-mode .status-canceled { background-color: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .status-under_review {
+        background-color: #fff3cd;
+        color: #856404;
+    }
 
-/* Avatars & small badges */
-body.dark-mode .badge.bg-secondary.bg-opacity-10 { background-color: rgba(107, 114, 128, 0.2) !important; color: #9ca3af !important; }
-body.dark-mode .avatar-text.bg-light.text-dark { background-color: #4b5563 !important; color: var(--text-light) !important; }
-body.dark-mode .badge.bg-light.text-muted { background-color: #374151 !important; color: #d1d5db !important; }
+    .status-delivered {
+        background-color: #d4edda;
+        color: #155724;
+    }
 
-/* Pagination */
-body.dark-mode .page-link { background-color: var(--content-dark); border-color: var(--border-color-dark); color: var(--primary-light); }
-body.dark-mode .page-item.disabled .page-link { background-color: transparent; border-color: var(--border-color-dark); color: #6c757d; }
-body.dark-mode .page-link:hover { background-color: #3a3f58; }
-body.dark-mode .page-item.active .page-link { background-color: var(--primary); border-color: var(--primary); color: #fff; }
-
-body.dark-mode .badge[style*="background-color"] {
-    filter: brightness(0.9) contrast(1.2);
-}
-
-/* "No orders" state */
-body.dark-mode .text-gray-300 { color: #4b5563 !important; }
-body.dark-mode .text-gray-600 { color: #d1d5db !important; }
-
-.status-badge {
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-}
-
-.status-under_review {
-    background-color: #fff3cd;
-    color: #856404;
-}
-
-.status-delivered {
-    background-color: #d4edda;
-    color: #155724;
-}
-
-.status-cancelled {
-    background-color: #f8d7da;
-    color: #721c24;
-}
-
-/* تحسينات إضافية للقائمة السريعة */
+    .status-cancelled {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
 #quickListContent .row {
     display: flex;
     flex-wrap: wrap;
