@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timedelta
 from flask import jsonify, request, current_app, url_for
 from . import orders_bp
-from .models import db, SallaOrder, OrderStatus, User
+from app.models import db, SallaOrder, OrderStatus, User
 from .utils import get_user_from_cookies
 from .config import Config
 from .token_utils import refresh_salla_token
