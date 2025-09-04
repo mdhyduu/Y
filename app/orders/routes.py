@@ -19,20 +19,9 @@ from app.config import Config
 logger = logging.getLogger(__name__)
 
 # باقي الكود بدون تغيير...
- 
-from flask_caching import Cache
 
-# إعداد التخزين المؤقت
-cache = Cache(config={'CACHE_TYPE': 'simple'})
-
-def initialize_cache(app):
-    cache.init_app(app)
-
-# استخدام التخزين المؤقت للاستعلامات المتكررة
 @orders_bp.route('/')
-@cache.cached(timeout=60, query_string=True)  # التخزين المؤقت لمدة دقيقة مع مراعاة معلمات URL
 def index():
-    # الكود السابق...
     """عرض قائمة الطلبات (سلة + مخصصة) مع نظام الترحيل الكامل"""
     user, employee = get_user_from_cookies()
     
