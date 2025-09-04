@@ -164,7 +164,7 @@
 
                 <tbody>
                     {% for order in orders %}
-                    <tr data-order-id="{{ order.id }}" data-order-type="{{ order.type }}" data-order-status="{{ order.status.slug }}" class="align-middle clickable-row">
+                    <tr data-order-id="{{ order.id }}" data-order-type="{{ order.type }}" data-order-status="{{ order.status.slug if order.status else 'unknown' }}" class="align-middle clickable-row">
                         <td class="ps-4">
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}" data-type="{{ order.type }}">
