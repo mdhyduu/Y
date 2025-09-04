@@ -8,7 +8,7 @@ from flask import (render_template, request, flash, redirect, url_for,
 import requests
 from sqlalchemy import (nullslast, or_, and_, func, union_all, literal_column,
                         select, desc, String, Integer)
-from sqlalchemy.orm import selectinload, aliased
+from sqlalchemy.orm import selectinload
 from . import orders_bp
 from app.models import (db, SallaOrder, CustomOrder, OrderStatus, Employee, 
                      OrderAssignment, EmployeeCustomStatus, OrderStatusNote, 
@@ -19,8 +19,6 @@ from app.config import Config
 
 # إعداد الـ logger
 logger = logging.getLogger(__name__)
-
-
 
 @orders_bp.route('/')
 def index():
@@ -154,9 +152,10 @@ def index():
             paginated_items = db.session.execute(final_query).all()
 
             # إنشاء كائن pagination يدوي
+            pages = ceil(total_items / per_page) if total_items > 0 else 0
             pagination_obj = type('Obj', (object,), {
                 'items': paginated_items, 'total': total_items, 'page': page, 'per_page': per_page,
-                'pages': ceil(total_items / per_page), 'has_prev': page > 1,
+                'pages': pages, 'has_prev': page > 1,
                 'has_next': page * per_page < total_items, 'prev_num': page - 1 if page > 1 else None,
                 'next_num': page + 1 if page * per_page < total_items else None
             })()
@@ -251,6 +250,7 @@ def index():
         flash(error_msg, 'error')
         logger.exception(error_msg)
         return redirect(url_for('orders.index'))
+
 @orders_bp.route('/<int:order_id>')
 def order_details(order_id):
     """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة"""
