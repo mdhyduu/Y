@@ -19,7 +19,7 @@ from sqlalchemy.sql import union_all
 
 @orders_bp.route('/')
 def index():
-    user = current_user
+    user, employee = get_user_from_cookies()
     page = request.args.get("page", 1, type=int)
     per_page = 10
 
