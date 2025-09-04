@@ -55,8 +55,6 @@ def set_token_cookies(response, access_token, refresh_token, expires_at):
                        max_age=timedelta(days=30).total_seconds())
     return response
 
-# ... existing code ...
-
 def refresh_salla_token(user):
     """تجديد توكن الوصول باستخدام توكن التحديث"""
     try:

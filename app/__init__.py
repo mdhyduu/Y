@@ -11,7 +11,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 from flask import session
 import webcolors
-from .models import db, User, Employee
 from flask import jsonify, render_template_string
 from flask_mail import Mail  # إضافة استيراد Flask-Mail
 # إنشاء كائنات الإضافات
