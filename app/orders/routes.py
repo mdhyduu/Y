@@ -1,24 +1,24 @@
 # orders/routes.py
+# orders/routes.py
 import json
-import logging  # إضافة استيراد logging
+import logging
 from math import ceil
 from datetime import datetime, timedelta
 from flask import (render_template, request, flash, redirect, url_for, 
                    make_response, current_app)
 import requests
-from sqlalchemy import nullslast
+from sqlalchemy import nullslast, or_, and_, func
+from sqlalchemy.orm import selectinload
 from . import orders_bp
 from app.models import (db, SallaOrder, CustomOrder, OrderStatus, Employee, 
                      OrderAssignment, EmployeeCustomStatus, OrderStatusNote, 
-                     OrderEmployeeStatus, OrderProductStatus, CustomNoteStatus)  # إضافة CustomNoteStatus وإزالة الفاصلة الزائدة
+                     OrderEmployeeStatus, OrderProductStatus, CustomNoteStatus)
 from app.utils import get_user_from_cookies, process_order_data, format_date, generate_barcode, humanize_time
 from app.token_utils import refresh_salla_token
 from app.config import Config
 
-# إضافة تعريف الـ logger
+# إعداد الـ logger
 logger = logging.getLogger(__name__)
-
-# باقي الكود بدون تغيير...
 
 @orders_bp.route('/')
 def index():
@@ -75,17 +75,15 @@ def index():
         is_reviewer = employee.role in ['reviewer', 'manager']
     
     try:
-  
+        # استخدام selectinload بدلاً من joinedload لتحسين الأداء
         salla_query = SallaOrder.query.filter_by(store_id=user.store_id).options(
-            db.joinedload(SallaOrder.status),
-            db.joinedload(SallaOrder.assignments).joinedload(OrderAssignment.employee),
-            db.joinedload(SallaOrder.status_notes)  # إضافة joinedload للملاحظات
+            selectinload(SallaOrder.status),
+            selectinload(SallaOrder.assignments).selectinload(OrderAssignment.employee)
         )
         
         custom_query = CustomOrder.query.filter_by(store_id=user.store_id).options(
-            db.joinedload(CustomOrder.status),
-            db.joinedload(CustomOrder.assignments).joinedload(OrderAssignment.employee),
-            db.joinedload(CustomOrder.status_notes)  # إضافة joinedload للملاحظات
+            selectinload(CustomOrder.status),
+            selectinload(CustomOrder.assignments).selectinload(OrderAssignment.employee)
         )
         
         # للموظفين العاديين: عرض فقط الطلبات المسندة لهم
@@ -95,10 +93,8 @@ def index():
         
         # تطبيق الفلاتر المشتركة
         # تطبيق فلتر الحالة الخاصة (late, missing, etc.)
-        # تطبيق فلتر الحالة الخاصة (late, missing, etc.)
         if status_filter in ['late', 'missing', 'not_shipped', 'refunded']:
             if order_type in ['all', 'salla']:
-                # للطلبات السلة: استخدام status_notes المرتبطة بـ SallaOrder
                 salla_query = salla_query.join(
                     OrderStatusNote, 
                     OrderStatusNote.order_id == SallaOrder.id
@@ -106,7 +102,6 @@ def index():
                     OrderStatusNote.status_flag == status_filter
                 )
             if order_type in ['all', 'custom']:
-                # للطلبات المخصصة: استخدام status_notes المرتبطة بـ CustomOrder
                 custom_query = custom_query.join(
                     OrderStatusNote, 
                     OrderStatusNote.custom_order_id == CustomOrder.id
@@ -140,21 +135,37 @@ def index():
                     OrderStatusNote.custom_status_id == custom_status_id
                 )
         
-        # تطبيق فلتر البحث
+        # تطبيق فلتر البحث - تحسين الأداء باستخدام ILIKE فقط إذا كان هناك بحث
         if search_query:
+            search_filter = f'%{search_query}%'
             if order_type in ['all', 'salla']:
                 salla_query = salla_query.filter(
-                    SallaOrder.customer_name.ilike(f'%{search_query}%') | 
-                    SallaOrder.id.ilike(f'%{search_query}%')
+                    or_(
+                        SallaOrder.customer_name.ilike(search_filter),
+                        SallaOrder.id.ilike(search_filter)
+                    )
                 )
             if order_type in ['all', 'custom']:
                 custom_query = custom_query.filter(
-                    CustomOrder.customer_name.ilike(f'%{search_query}%') | 
-                    CustomOrder.order_number.ilike(f'%{search_query}%')
+                    or_(
+                        CustomOrder.customer_name.ilike(search_filter),
+                        CustomOrder.order_number.ilike(search_filter)
+                    )
                 )
         
-        # فلترة حسب التاريخ
-        if date_from:
+        # فلترة حسب التاريخ - تحسين باستخدام between للفترات
+        if date_from and date_to:
+            try:
+                date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
+                date_to_obj = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
+                
+                if order_type in ['all', 'salla']:
+                    salla_query = salla_query.filter(SallaOrder.created_at.between(date_from_obj, date_to_obj))
+                if order_type in ['all', 'custom']:
+                    custom_query = custom_query.filter(CustomOrder.created_at.between(date_from_obj, date_to_obj))
+            except ValueError:
+                pass
+        elif date_from:
             try:
                 date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
                 if order_type in ['all', 'salla']:
@@ -163,8 +174,7 @@ def index():
                     custom_query = custom_query.filter(CustomOrder.created_at >= date_from_obj)
             except ValueError:
                 pass
-        
-        if date_to:
+        elif date_to:
             try:
                 date_to_obj = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
                 if order_type in ['all', 'salla']:
@@ -173,8 +183,6 @@ def index():
                     custom_query = custom_query.filter(CustomOrder.created_at <= date_to_obj)
             except ValueError:
                 pass
-        
-        # ... [بقية الكود دون تغيير] ...
         
         # جلب الحالات المخصصة بشكل صحيح
         custom_statuses = []
@@ -187,28 +195,37 @@ def index():
             # للموظفين العاديين: حالاتهم الخاصة فقط
             custom_statuses = EmployeeCustomStatus.query.filter_by(employee_id=employee.id).all()
         
-        # جلب الطلبات بناءً على النوع المحدد
+        # جلب الطلبات بناءً على النوع المحدد مع تحسين الأداء
         if order_type == 'salla':
-            orders_query = salla_query.order_by(nullslast(db.desc('created_at')))
-            pagination_obj = orders_query.paginate(page=page, per_page=per_page)
+            orders_query = salla_query.order_by(nullslast(db.desc(SallaOrder.created_at)))
+            pagination_obj = orders_query.paginate(page=page, per_page=per_page, error_out=False)
             orders = pagination_obj.items
         elif order_type == 'custom':
-            orders_query = custom_query.order_by(nullslast(db.desc('created_at')))
-            pagination_obj = orders_query.paginate(page=page, per_page=per_page)
+            orders_query = custom_query.order_by(nullslast(db.desc(CustomOrder.created_at)))
+            pagination_obj = orders_query.paginate(page=page, per_page=per_page, error_out=False)
             orders = pagination_obj.items
-        else:  # all - دمج النتيجتين
-            # جلب طلبات سلة
-            salla_orders = salla_query.all()
-            custom_orders = custom_query.all()
+        else:  # all - دمج النتيجتين مع تحسين الأداء
+            # جلب طلبات سلة مع الترحيل
+            salla_pagination = salla_query.order_by(nullslast(db.desc(SallaOrder.created_at))).paginate(
+                page=1, per_page=per_page * 2, error_out=False)
+            
+            # جلب طلبات مخصصة مع الترحيل
+            custom_pagination = custom_query.order_by(nullslast(db.desc(CustomOrder.created_at))).paginate(
+                page=1, per_page=per_page * 2, error_out=False)
             
             # دمج القائمتين وترتيبهم حسب تاريخ الإنشاء
-            all_orders = salla_orders + custom_orders
+            all_orders = salla_pagination.items + custom_pagination.items
             all_orders.sort(key=lambda x: x.created_at or datetime.min, reverse=True)
             
             # تطبيق الترحيل يدوياً
-            total_orders = len(all_orders)
+            total_orders = salla_pagination.total + custom_pagination.total
             start_idx = (page - 1) * per_page
             end_idx = start_idx + per_page
+            
+            # التأكد من أن المؤشرات ضمن النطاق الصحيح
+            start_idx = max(0, min(start_idx, total_orders))
+            end_idx = max(0, min(end_idx, total_orders))
+            
             paginated_orders = all_orders[start_idx:end_idx]
             
             # إنشاء كائن Pagination مخصص
@@ -250,8 +267,8 @@ def index():
                     'raw_created_at': order.created_at,
                     'type': 'salla',
                     'assignments': order.assignments,
-                    'employee_statuses': order.employee_statuses,  # <<< أضف هذا
-                    'status_notes': order.status_notes             # <<< وأيضًا هذا لو عايز تعرض الملاحظات
+                    'employee_statuses': order.employee_statuses,
+                    'status_notes': order.status_notes
                 } 
                 
             else:  # CustomOrder
@@ -269,7 +286,7 @@ def index():
                     'type': 'custom',
                     'total_amount': order.total_amount,
                     'currency': order.currency,
-                    'employee_statuses': order.employee_statuses,  # <<< نفس الشيء هنا
+                    'employee_statuses': order.employee_statuses,
                     'status_notes': order.status_notes
                 }
                     
@@ -331,7 +348,6 @@ def index():
         flash(error_msg, 'error')
         logger.exception(error_msg)
         return redirect(url_for('orders.index'))
-        
 @orders_bp.route('/<int:order_id>')
 def order_details(order_id):
     """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة"""
