@@ -12,11 +12,7 @@ import logging
 
 
 
-@orders_bp.route('/<order_id>/product/<product_id>/update_status', methods=['POST'])
-def update_product_status(order_id, product_id):
-    """Updates the status of a specific product within an order."""
-    # ... (Copy the full update_product_status route function here) ...
-    pass
+
 
 @orders_bp.route('/<order_id>/product/<product_id>/cancel_status', methods=['POST'])
 def cancel_product_status(order_id, product_id):
