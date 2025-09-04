@@ -14,12 +14,6 @@ import logging
 
 
 
-@orders_bp.route('/<order_id>/product/<product_id>/cancel_status', methods=['POST'])
-def cancel_product_status(order_id, product_id):
-    """Cancels (deletes) the status of a specific product within an order."""
-    # ... (Copy the full cancel_product_status route function here) ...
-    pass
-
 
 logger = logging.getLogger(__name__)
 
