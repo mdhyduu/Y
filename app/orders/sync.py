@@ -1,0 +1,406 @@
+# orders/sync.py
+import requests
+import json
+import time
+from datetime import datetime, timedelta
+from flask import jsonify, request, current_app, url_for
+from . import orders_bp
+from .models import db, SallaOrder, OrderStatus, User
+from .utils import get_user_from_cookies
+from .config import Config
+from .token_utils import refresh_salla_token
+
+
+def sync_order_statuses_internal(user, access_token, store_id):
+    """دالة مساعدة لمزامنة حالات الطلبات (يمكن استدعاؤها داخلياً)"""
+    try:
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Accept': 'application/json'
+        }
+        
+        current_app.logger.info(f"بدء مزامنة حالات الطلبات للمتجر {store_id}")
+        
+        response = requests.get(
+            f"{Config.SALLA_API_BASE_URL}/orders/statuses",
+            headers=headers,
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            error_msg = f"خطأ في استجابة سلة: {response.status_code} - {response.text}"
+            current_app.logger.error(error_msg)
+            return False, f"فشل في جلب حالات الطلبات من سلة: {response.text[:200] if response.text else ''}"
+        
+        data = response.json()
+        if 'data' not in data:
+            error_msg = "استجابة غير متوقعة من سلة: هيكل البيانات غير مطابق للمواصفات"
+            current_app.logger.error(error_msg)
+            return False, error_msg
+        
+        statuses = data['data']
+        current_app.logger.info(f"تم جلب {len(statuses)} حالة طلب للمزامنة")
+        
+        new_count, updated_count = 0, 0
+        
+        for status_data in statuses:
+            try:
+                status_id = str(status_data.get('id'))
+                if not status_id:
+                    continue
+                
+                # --- Normalize slug ---
+                slug = status_data.get('slug')
+                if not slug and status_data.get('name'):
+                    slug = status_data['name'].lower().replace(' ', '_')
+                if slug:
+                    slug = slug.strip().lower().replace('-', '_')
+                
+                # البحث عن الحالة
+                existing_status = OrderStatus.query.filter_by(id=status_id, store_id=store_id).first()
+                
+                if existing_status:
+                    existing_status.name = status_data.get('name', '')
+                    existing_status.type = status_data.get('type', '')
+                    existing_status.slug = slug
+                    existing_status.sort = status_data.get('sort', 0)
+                    existing_status.message = status_data.get('message', '')
+                    existing_status.icon = status_data.get('icon', '')
+                    existing_status.is_active = status_data.get('is_active', True)
+                    existing_status.store_id = store_id
+                    
+                    original_data = status_data.get('original', {})
+                    if original_data and 'id' in original_data:
+                        existing_status.original_id = str(original_data['id'])
+                    
+                    parent_data = status_data.get('parent', {})
+                    if parent_data and 'id' in parent_data:
+                        existing_status.parent_id = str(parent_data['id'])
+                    
+                    updated_count += 1
+                else:
+                    new_status = OrderStatus(
+                        id=status_id,
+                        name=status_data.get('name', ''),
+                        type=status_data.get('type', ''),
+                        slug=slug,
+                        sort=status_data.get('sort', 0),
+                        message=status_data.get('message', ''),
+                        icon=status_data.get('icon', ''),
+                        is_active=status_data.get('is_active', True),
+                        store_id=store_id
+                    )
+                    
+                    original_data = status_data.get('original', {})
+                    if original_data and 'id' in original_data:
+                        new_status.original_id = str(original_data['id'])
+                    
+                    parent_data = status_data.get('parent', {})
+                    if parent_data and 'id' in parent_data:
+                        new_status.parent_id = str(parent_data['id'])
+                    
+                    db.session.add(new_status)
+                    new_count += 1
+                    
+            except Exception as e:
+                current_app.logger.error(f"خطأ في معالجة الحالة {status_data.get('id', 'unknown')}: {str(e)}")
+        
+        db.session.commit()
+        
+        current_app.logger.info(f"تمت مزامنة حالات الطلبات بنجاح: {new_count} جديد، {updated_count} محدث")
+        return True, f'تمت مزامنة حالات الطلبات بنجاح: {new_count} حالة جديدة، {updated_count} حالة محدثة'
+    
+    except requests.exceptions.RequestException as e:
+        error_msg = f"خطأ في الاتصال بسلة: {str(e)}"
+        current_app.logger.error(error_msg, exc_info=True)
+        return False, error_msg
+    except Exception as e:
+        error_msg = f"خطأ غير متوقع: {str(e)}"
+        current_app.logger.error(error_msg, exc_info=True)
+        return False, error_msg
+
+@orders_bp.route('/sync_statuses', methods=['POST'])
+def sync_order_statuses():
+    """مزامنة حالات الطلبات من سلة إلى قاعدة البيانات المحلية"""
+    try:
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            response = jsonify({
+                'success': False, 
+                'error': 'الرجاء تسجيل الدخول أولاً',
+                'code': 'UNAUTHORIZED'
+            })
+            response.set_cookie('user_id', '', expires=0)
+            response.set_cookie('is_admin', '', expires=0)
+            return response, 401
+        
+        store_id = None
+        access_token = None
+        
+        if request.cookies.get('is_admin') == 'true':
+            store_id = user.store_id
+            access_token = user.salla_access_token
+        else:
+            if not employee:
+                return jsonify({
+                    'success': False,
+                    'error': 'الموظف غير موجود',
+                    'code': 'EMPLOYEE_NOT_FOUND'
+                }), 404
+                
+            store_id = employee.store_id
+            access_token = user.salla_access_token
+        
+        if not access_token:
+            return jsonify({
+                'success': False,
+                'error': 'يجب ربط المتجر مع سلة أولاً',
+                'code': 'MISSING_ACCESS_TOKEN'
+            }), 400
+        
+        # استخدام الدالة المساعدة للمزامنة
+        success, message = sync_order_statuses_internal(user, access_token, store_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': message
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': message,
+                'code': 'SYNC_ERROR'
+            }), 500
+            
+    except Exception as e:
+        error_msg = f"خطأ غير متوقع: {str(e)}"
+        current_app.logger.error(error_msg, exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': error_msg,
+            'code': 'INTERNAL_ERROR'
+        }), 500
+
+@orders_bp.route('/sync_orders', methods=['POST'])
+def sync_orders():
+    """مزامنة الطلبات من سلة إلى قاعدة البيانات المحلية وفق المواصفات الرسمية"""
+    try:
+        user, employee = get_user_from_cookies()
+        
+        # التحقق من صحة الكوكيز
+        if not user:
+            response = jsonify({
+                'success': False, 
+                'error': 'الرجاء تسجيل الدخول أولاً',
+                'code': 'UNAUTHORIZED'
+            })
+            response.set_cookie('user_id', '', expires=0)
+            response.set_cookie('is_admin', '', expires=0)
+            return response, 401
+        
+        # الحصول على معرف المتجر وتوكن الوصول
+        store_id = None
+        access_token = None
+        if request.cookies.get('is_admin') == 'true':
+            store_id = user.store_id
+            access_token = user.salla_access_token
+        else:
+            if not employee:
+                return jsonify({
+                    'success': False,
+                    'error': 'الموظف غير موجود',
+                    'code': 'EMPLOYEE_NOT_FOUND'
+                }), 404
+            store_id = employee.store_id
+            access_token = user.salla_access_token
+        
+        # التحقق من وجود توكن الوصول
+        if not access_token:
+            return jsonify({
+                'success': False,
+                'error': 'يجب ربط المتجر مع سلة أولاً',
+                'code': 'MISSING_ACCESS_TOKEN'
+            }), 400
+        
+        # مزامنة حالات الطلبات أولاً لضمان وجود أحدث الحالات
+        status_success, status_message = sync_order_statuses_internal(user, access_token, store_id)
+        if not status_success:
+            return jsonify({
+                'success': False,
+                'error': f'فشل في مزامنة حالات الطلبات: {status_message}',
+                'code': 'STATUS_SYNC_ERROR'
+            }), 500
+        
+        ## التحسين: جلب كل معرفات الحالات (status IDs) الصالحة مرة واحدة لتحسين الأداء
+        
+        # تحديد وقت آخر مزامنة
+        last_sync = getattr(user, 'last_sync', None)
+        from_date = (datetime.utcnow() - timedelta(days=7)).strftime('%Y-%m-%d') if not last_sync else last_sync.strftime('%Y-%m-%d')
+        
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Accept': 'application/json'
+        }
+        
+        current_app.logger.info(f"بدء مزامنة الطلبات للمتجر {store_id} منذ {from_date}")
+        
+        all_orders = []
+        page, total_pages = 1, 1
+        token_refreshed = False
+        
+        while page <= total_pages:
+            params = {'perPage': 100, 'page': page, 'from_date': from_date, 'sort_by': 'updated_at-desc'}
+            
+            # (اختياري) إضافة فلاتر من الطلب
+            request_data = request.get_json() or {}
+            for param in ['status', 'payment_method', 'country', 'city', 'product', 'tags']:
+                if param in request_data:
+                    params[param] = request_data[param]
+            
+            response = requests.get(f"{Config.SALLA_API_BASE_URL}/orders", headers=headers, params=params, timeout=30)
+            
+            if response.status_code == 401 and not token_refreshed:
+                new_token = refresh_salla_token(user)
+                if new_token:
+                    headers['Authorization'] = f'Bearer {new_token}'
+                    access_token = new_token
+                    token_refreshed = True
+                    continue
+                else:
+                    return jsonify({
+                        'success': False, 'error': "انتهت صلاحية الجلسة، الرجاء إعادة تسجيل الدخول",
+                        'code': 'TOKEN_EXPIRED', 'action_required': True, 'redirect_url': url_for('user_auth.logout')
+                    }), 401
+            
+            if response.status_code != 200:
+                error_msg = f"خطأ في استجابة سلة: {response.status_code} - {response.text}"
+                return jsonify({'success': False, 'error': "فشل في جلب البيانات من سلة", 'code': 'SALLA_API_ERROR', 'details': response.text[:200]}), 500
+            
+            data = response.json()
+            if 'data' not in data or 'pagination' not in data:
+                return jsonify({'success': False, 'error': "استجابة غير متوقعة من سلة", 'code': 'INVALID_RESPONSE_FORMAT'}), 500
+            
+            orders = data['data']
+            all_orders.extend(orders)
+            pagination = data['pagination']
+            total_pages = pagination.get('totalPages', 1)
+            current_app.logger.info(f"تم جلب {len(orders)} طلب من الصفحة {pagination.get('currentPage', page)}/{total_pages}")
+            page += 1
+            time.sleep(0.2)
+        
+        current_app.logger.info(f"تم جلب {len(all_orders)} طلب إجمالاً للمعالجة")
+        
+        # معالجة الطلبات
+        # ... بعد سطر current_app.logger.info(f"تم جلب {len(all_orders)} طلب إجمالاً للمعالجة")
+
+# معالجة الطلبات
+        new_count, updated_count, skipped_count = 0, 0, 0
+        
+        for order_data in all_orders:
+            try:
+                order_id = str(order_data.get('id'))
+                if not order_id:
+                    skipped_count += 1
+                    continue
+                
+                status_info = order_data.get('status', {})
+                status_id_from_api = str(status_info.get('id')) if status_info.get('id') else None
+                status_slug_from_api = status_info.get('slug')
+                
+                # --- Normalize slug ---
+                if status_slug_from_api:
+                    status_slug_from_api = status_slug_from_api.strip().lower().replace('-', '_')
+                
+                # البحث عن الحالة: id -> slug -> name
+                found_status = None
+                if status_id_from_api:
+                    found_status = OrderStatus.query.filter_by(id=status_id_from_api, store_id=store_id).first()
+                if not found_status and status_slug_from_api:
+                    found_status = OrderStatus.query.filter_by(slug=status_slug_from_api, store_id=store_id).first()
+                if not found_status and status_info.get('name'):
+                    normalized_name = status_info['name'].strip().lower().replace(' ', '_')
+                    found_status = OrderStatus.query.filter_by(slug=normalized_name, store_id=store_id).first()
+                if not found_status and status_id_from_api:
+                    found_status = OrderStatus.query.filter_by(id=status_id_from_api).first()
+                
+                final_status_id = found_status.id if found_status else None
+                
+                # Debug log
+                current_app.logger.info(
+                    f"ربط حالة الطلب {order_id}: "
+                    f"id={status_id_from_api}, slug={status_slug_from_api}, "
+                    f"name={status_info.get('name')}, found={found_status}"
+                )
+                
+                existing_order = SallaOrder.query.get(order_id)
+                
+                created_at = None
+                date_info = order_data.get('date', {})
+                if date_info and 'date' in date_info:
+                    try:
+                        date_str = date_info['date'].split('.')[0]
+                        created_at = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+                    except Exception:
+                        pass 
+                
+                total_info = order_data.get('total', {})
+                total_amount = float(total_info.get('amount', 0))
+                currency = total_info.get('currency', 'SAR')
+                
+                if existing_order:
+                    existing_order.total_amount = total_amount
+                    existing_order.currency = currency
+                    existing_order.payment_method = order_data.get('payment_method', '')
+                    existing_order.raw_data = json.dumps(order_data, ensure_ascii=False)
+                    existing_order.updated_at = datetime.utcnow()
+                    existing_order.status_id = final_status_id
+                    updated_count += 1
+                else:
+                    customer = order_data.get('customer', {})
+                    customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip() or order_data.get('customer', '')
+                    
+                    new_order = SallaOrder(
+                        id=order_id,
+                        store_id=store_id,
+                        customer_name=customer_name,
+                        created_at=created_at or datetime.utcnow(),
+                        total_amount=total_amount,
+                        currency=currency,
+                        payment_method=order_data.get('payment_method', ''),
+                        raw_data=json.dumps(order_data, ensure_ascii=False),
+                        status_id=final_status_id
+                    )
+                    db.session.add(new_order)
+                    new_count += 1
+                    
+            except Exception as e: 
+                skipped_count += 1
+                current_app.logger.error(f"خطأ في معالجة الطلب {order_data.get('id', 'unknown')}: {str(e)}", exc_info=True)
+
+# ... استكمل باقي الدالة من هنا (user.last_sync = ...)
+        
+        user.last_sync = datetime.utcnow()
+        db.session.commit()
+        
+        current_app.logger.info(f"تمت المزامنة بنجاح: {new_count} جديد، {updated_count} محدث، {skipped_count} متخطى")
+        
+        return jsonify({
+            'success': True,
+            'message': f'تمت المزامنة بنجاح: {new_count} طلب جديد، {updated_count} محدث. {status_message}',
+            'stats': {
+                'new_orders': new_count, 'updated_orders': updated_count,
+                'skipped_orders': skipped_count, 'total_processed': len(all_orders)
+            }
+        })
+    
+    except requests.exceptions.RequestException as e:
+        error_msg = f"خطأ في الاتصال بسلة: {str(e)}"
+        current_app.logger.error(error_msg, exc_info=True)
+        return jsonify({'success': False,'error': error_msg,'code': 'NETWORK_ERROR'}), 500
+        
+    except Exception as e:
+        error_msg = f"خطأ غير متوقع: {str(e)}"
+        current_app.logger.error(error_msg, exc_info=True)
+        return jsonify({'success': False,'error': error_msg,'code': 'INTERNAL_ERROR'}), 500

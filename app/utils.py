@@ -8,6 +8,45 @@ import logging
 # إعداد المسجل
 logger = logging.getLogger(__name__)
 
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def get_next_order_number():
+    """إنشاء رقم طلب تلقائي يبدأ من 1000"""
+    last_order = CustomOrder.query.order_by(CustomOrder.id.desc()).first()
+    if last_order and last_order.order_number:
+        try:
+            last_number = int(last_order.order_number)
+            return str(last_number + 1)
+        except ValueError:
+            # إذا كان order_number ليس رقماً، نعود لاستخدام ID
+            return str(last_order.id + 1000)
+    return "1000"
+def get_user_from_cookies():
+    """استخراج بيانات المستخدم من الكوكيز"""
+    user_id = request.cookies.get('user_id')
+    is_admin = request.cookies.get('is_admin') == 'true'
+    employee_role = request.cookies.get('employee_role', '')
+    
+    if not user_id:
+        return None, None
+    
+    try:
+        if is_admin:
+            user = User.query.get(int(user_id))
+            return user, None
+        else:
+            employee = Employee.query.get(int(user_id))
+            if employee:
+                # الحصول على المستخدم الرئيسي للمتجر
+                user = User.query.filter_by(store_id=employee.store_id).first()
+                return user, employee
+            return None, None
+    except (ValueError, TypeError):
+        # إذا كان user_id غير رقمي
+        return None, None
 def generate_barcode(data, prefix=""):
     """إنشاء باركود مخصص مع إمكانية إضافة بادئة"""
     try:
