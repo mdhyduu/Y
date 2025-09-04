@@ -5,7 +5,7 @@ from flask import (render_template, request, flash, redirect, url_for,
                    current_app, send_from_directory)
 from werkzeug.utils import secure_filename
 from . import orders_bp
-from app.models import db, CustomOrder, Employee
+from app.models import db, CustomOrder, Employee, OrderAssignment
 from app.utils import get_user_from_cookies, allowed_file, get_next_order_number
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
