@@ -7,7 +7,7 @@ from flask import (render_template, request, flash, redirect, url_for,
 import requests
 from sqlalchemy import nullslast
 from . import orders_bp
-from .models import (db, SallaOrder, CustomOrder, OrderStatus, Employee, 
+from app.models import (db, SallaOrder, CustomOrder, OrderStatus, Employee, 
                      OrderAssignment, EmployeeCustomStatus, OrderStatusNote, 
                      OrderEmployeeStatus, OrderProductStatus)
 from .utils import get_user_from_cookies, process_order_data, format_date, generate_barcode, humanize_time
