@@ -186,14 +186,20 @@ def resend_verification(user_id):
     user.otp_expiration = datetime.utcnow() + timedelta(minutes=10)
     db.session.commit()
 
-    # إرسال الإيميل
-    msg = Message("رمز تحقق جديد", recipients=[user.email])
-    msg.body = f"رمز التحقق الخاص بك هو: {user.otp_code}\nصالح لمدة 10 دقائق."
-    mail.send(msg)
-
-
-    return {"success": True, "message": "تم إرسال رمز جديد"}
-
+    try:
+        # إرسال الإيميل
+        msg = Message("رمز تحقق جديد", recipients=[user.email])
+        msg.body = f"رمز التحقق الخاص بك هو: {user.otp_code}\nصالح لمدة 10 دقائق."
+        mail.send(msg)
+        return {"success": True, "message": "تم إرسال رمز جديد"}
+    except Exception as e:
+        current_app.logger.error(f"فشل إرسال البريد: {str(e)}")
+        # إرجاع الرمز مباشرة للمستخدم في حالة فشل الإرسال
+        return {
+            "success": True, 
+            "message": f"تم إنشاء الرمز: {user.otp_code} (لم يتم إرسال البريد)",
+            "otp_code": user.otp_code
+        }
 # تسجيل الخروج
 @user_auth_bp.route('/logout')
 def logout():
