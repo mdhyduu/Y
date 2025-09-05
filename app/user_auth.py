@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from flask_mail import Message
 import random
-
+from . import mail   # استدعاء mail من __init__.py
 user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
 
@@ -147,7 +147,8 @@ def register():
             # إرسال الإيميل
             msg = Message("رمز التحقق من البريد", recipients=[email])
             msg.body = f"رمز التحقق الخاص بك هو: {new_user.otp_code}\nصالح لمدة 10 دقائق."
-            current_app.mail.send(msg)
+            mail.send(msg)
+
 
         flash('تم إنشاء الحساب! تحقق من بريدك وأدخل الرمز', 'info')
         return redirect(url_for('user_auth.verify_otp', user_id=new_user.id))
@@ -188,7 +189,8 @@ def resend_verification(user_id):
     # إرسال الإيميل
     msg = Message("رمز تحقق جديد", recipients=[user.email])
     msg.body = f"رمز التحقق الخاص بك هو: {user.otp_code}\nصالح لمدة 10 دقائق."
-    current_app.mail.send(msg)
+    mail.send(msg)
+
 
     return {"success": True, "message": "تم إرسال رمز جديد"}
 
