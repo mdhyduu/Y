@@ -194,12 +194,13 @@ def resend_verification(user_id):
         return {"success": True, "message": "تم إرسال رمز جديد"}
     except Exception as e:
         current_app.logger.error(f"فشل إرسال البريد: {str(e)}")
-        # إرجاع الرمز مباشرة في حالة فشل الإرسال
+        # إرجاع الرمز مباشرة للمستخدم في حالة فشل الإرسال
         return {
             "success": True, 
-            "message": f"تم إنشاء الرمز: {user.otp_code}",
+            "message": f"تم إنشاء الرمز: {user.otp_code} (لم يتم إرسال البريد)",
             "otp_code": user.otp_code
         }
+# تسجيل الخروج
 @user_auth_bp.route('/logout')
 def logout():
     response = make_response(redirect(url_for('user_auth.login')))
