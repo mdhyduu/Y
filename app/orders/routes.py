@@ -34,7 +34,7 @@ def index():
     
     # جلب معلمات الترحيل والتصفية
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int) 
+    per_page = request.args.get('per_page', 25, type=int) 
     status_filter = request.args.get('status', '')
     employee_filter = request.args.get('employee', '')
     order_statuses = OrderStatus.query.filter_by(store_id=user.store_id).order_by(OrderStatus.sort).all()
@@ -47,8 +47,8 @@ def index():
     # التحقق من صحة معاملات الترحيل
     if page < 1: 
         page = 1
-    if per_page not in [10, 20, 50, 100]: 
-        per_page = 20
+    if per_page not in [10, 25, 50, 100]: 
+        per_page = 25
     
     # جلب بيانات المستخدم والمتجر
     is_general_employee = False
