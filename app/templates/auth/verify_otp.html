@@ -60,37 +60,60 @@
 </style>
 
 <script>
-<script>
 document.addEventListener('DOMContentLoaded', function() {
     // Auto focus on code input
     document.getElementById('otp_code').focus();
 
     // Resend code functionality
-    document.querySelector('.resend-link').addEventListener('click', function(e) {
-        e.preventDefault();
-        fetch('{{ url_for("user_auth.resend_verification", user_id=user.id) }}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                if (data.otp_code) {
-                    // إذا كان الرمز متوفرًا في الرد، أعد تحميل الصفحة مع عرض الرمز
-                    window.location.href = window.location.pathname + '?otp_code=' + data.otp_code;
-                } else {
-                    alert('تم إعادة إرسال كود التحقق');
+    const resendLink = document.querySelector('.resend-link');
+    if (resendLink) {
+        resendLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // إظهار مؤشر تحميل
+            const originalText = resendLink.textContent;
+            resendLink.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإرسال...';
+            resendLink.classList.add('disabled');
+            
+            // الحصول على معرف المستخدم من URL
+            const pathParts = window.location.pathname.split('/');
+            const userId = pathParts[pathParts.length - 1];
+            
+            fetch(`/resend_verification/${userId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
                 }
-            } else {
-                alert('فشل إعادة الإرسال: ' + data.message);
-            }
-        })
-        .catch(error => {
-            alert('حدث خطأ أثناء إعادة الإرسال');
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('فشل في الاتصال بالخادم');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    if (data.otp_code) {
+                        // إذا كان الرمز متوفرًا في الرد، أعد تحميل الصفحة مع عرض الرمز
+                        window.location.href = window.location.pathname + '?otp_code=' + data.otp_code;
+                    } else {
+                        alert('تم إعادة إرسال كود التحقق بنجاح');
+                    }
+                } else {
+                    alert('فشل إعادة الإرسال: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('حدث خطأ أثناء إعادة الإرسال: ' + error.message);
+            })
+            .finally(() => {
+                // إعادة حالة الرابط إلى الطبيعي
+                resendLink.textContent = originalText;
+                resendLink.classList.remove('disabled');
+            });
         });
-    });
+    }
 });
 </script>
 {% endblock %}
