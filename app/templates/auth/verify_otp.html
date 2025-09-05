@@ -31,7 +31,9 @@
                             <p class="mb-0">لم تستلم الكود؟ 
                                 <a href="#" class="text-primary resend-link">إعادة إرسال</a>
                             </p>
-                            {% with messages = get_flashed_messages(with_categories=true) %}
+                            
+                        </div>
+                    {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
     {% for category, message in messages %}
       {% if "otp_code" in message %}
@@ -42,8 +44,11 @@
     {% endfor %}
   {% endif %}
 {% endwith %}
-                        </div>
-                    
+{% if request.args.get('debug_otp') %}
+<div class="alert alert-warning mt-3">
+    <strong>وضع التصحيح:</strong> رمز التحقق هو: {{ user.otp_code }}
+</div>
+{% endif %}
                     </form>
                 </div>
             </div>
