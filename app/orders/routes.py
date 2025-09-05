@@ -123,18 +123,17 @@ def index():
             if order_type in ['all', 'custom']:
                 custom_query = custom_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
         
-        # تطبيق فلتر الحالة المخصصة
+
         if custom_status_filter:
             custom_status_id = int(custom_status_filter)
             if order_type in ['all', 'salla']:
-                salla_query = salla_query.join(SallaOrder.status_notes).filter(
-                    OrderStatusNote.custom_status_id == custom_status_id
+                salla_query = salla_query.join(SallaOrder.employee_statuses).filter(
+                    OrderEmployeeStatus.status_id == custom_status_id
                 )
             if order_type in ['all', 'custom']:
-                custom_query = custom_query.join(CustomOrder.status_notes).filter(
-                    OrderStatusNote.custom_status_id == custom_status_id
+                custom_query = custom_query.join(CustomOrder.employee_statuses).filter(
+                    OrderEmployeeStatus.status_id == custom_status_id
                 )
-        
         # تطبيق فلتر البحث - تحسين الأداء باستخدام ILIKE فقط إذا كان هناك بحث
         if search_query:
             search_filter = f'%{search_query}%'
