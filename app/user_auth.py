@@ -191,7 +191,6 @@ def resend_verification(user_id):
     current_app.mail.send(msg)
 
     return {"success": True, "message": "تم إرسال رمز جديد"}
-
 # تسجيل الخروج
 @user_auth_bp.route('/logout')
 def logout():
