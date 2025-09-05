@@ -12,6 +12,15 @@
                     <p class="mt-2 mb-0 opacity-75">أدخل كود التحقق المرسل إلى بريدك</p>
                 </div>
                 <div class="card-body p-4 p-sm-5">
+                    <!-- عرض الرمز مباشرة إذا كان متوفرًا -->
+                    {% if request.args.get('debug_otp') or request.args.get('otp_code') %}
+                    <div class="alert alert-info mb-4">
+                        <h6><i class="fas fa-info-circle me-2"></i>رمز التحقق:</h6>
+                        <p class="mb-0 fs-4 fw-bold text-center">{{ request.args.get('otp_code') or user.otp_code }}</p>
+                        <small class="d-block mt-2">لم يتم إرسال البريد، استخدم هذا الرمز للتحقق</small>
+                    </div>
+                    {% endif %}
+                    
                     <form method="POST">
                         {{ form.hidden_tag() }}
 
@@ -31,24 +40,7 @@
                             <p class="mb-0">لم تستلم الكود؟ 
                                 <a href="#" class="text-primary resend-link">إعادة إرسال</a>
                             </p>
-                            
                         </div>
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    {% for category, message in messages %}
-      {% if "otp_code" in message %}
-        <div class="alert alert-info">
-          <strong>رمز التحقق:</strong> {{ message|replace("تم إنشاء الرمز: ", "")|replace(" (لم يتم إرسال البريد)", "") }}
-        </div>
-      {% endif %}
-    {% endfor %}
-  {% endif %}
-{% endwith %}
-{% if request.args.get('debug_otp') %}
-<div class="alert alert-warning mt-3">
-    <strong>وضع التصحيح:</strong> رمز التحقق هو: {{ user.otp_code }}
-</div>
-{% endif %}
                     </form>
                 </div>
             </div>
@@ -60,8 +52,14 @@
 .resend-link {
     cursor: pointer;
 }
+.alert-info {
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+    color: #0c5460;
+}
 </style>
 
+<script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Auto focus on code input
@@ -74,13 +72,17 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token() }}'
             }
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('تم إعادة إرسال كود التحقق');
+                if (data.otp_code) {
+                    // إذا كان الرمز متوفرًا في الرد، أعد تحميل الصفحة مع عرض الرمز
+                    window.location.href = window.location.pathname + '?otp_code=' + data.otp_code;
+                } else {
+                    alert('تم إعادة إرسال كود التحقق');
+                }
             } else {
                 alert('فشل إعادة الإرسال: ' + data.message);
             }
@@ -90,5 +92,5 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
-</script>
+</script>>
 {% endblock %}
