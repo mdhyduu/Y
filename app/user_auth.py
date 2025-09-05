@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, make_response, current_app, jsonify
+from flask import Blueprint, render_template, redirect, url_for, flash, request, make_response, current_app
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, EqualTo, Length, ValidationError
@@ -147,8 +147,7 @@ def register():
             # إرسال الإيميل
             msg = Message("رمز التحقق من البريد", recipients=[email])
             msg.body = f"رمز التحقق الخاص بك هو: {new_user.otp_code}\nصالح لمدة 10 دقائق."
-            mail.send(msg)
-
+            current_app.mail.send(msg)
 
         flash('تم إنشاء الحساب! تحقق من بريدك وأدخل الرمز', 'info')
         return redirect(url_for('user_auth.verify_otp', user_id=new_user.id))
@@ -177,34 +176,23 @@ def verify_otp(user_id):
     return render_template('auth/verify_otp.html', form=form, user=user)
 @user_auth_bp.route('/resend_verification/<int:user_id>', methods=['POST'])
 def resend_verification(user_id):
-    try:
-        user = User.query.get_or_404(user_id)
-        if user.is_verified:
-            return jsonify({"success": False, "message": "الحساب مفعل بالفعل"})
+    user = User.query.get_or_404(user_id)
+    if user.is_verified:
+        return {"success": False, "message": "الحساب مفعل بالفعل"}
 
-        # توليد كود جديد
-        user.otp_code = str(random.randint(100000, 999999))
-        user.otp_expiration = datetime.utcnow() + timedelta(minutes=10)
-        db.session.commit()
+    # توليد كود جديد
+    user.otp_code = str(random.randint(100000, 999999))
+    user.otp_expiration = datetime.utcnow() + timedelta(minutes=10)
+    db.session.commit()
 
-        try:
-            # إرسال الإيميل
-            msg = Message("رمز تحقق جديد", recipients=[user.email])
-            msg.body = f"رمز التحقق الخاص بك هو: {user.otp_code}\nصالح لمدة 10 دقائق."
-            mail.send(msg)
-            return jsonify({"success": True, "message": "تم إرسال رمز جديد"})
-        except Exception as e:
-            current_app.logger.error(f"فشل إرسال البريد: {str(e)}")
-            # إرجاع الرمز مباشرة في حالة فشل الإرسال
-            return jsonify({
-                "success": True, 
-                "message": f"تم إنشاء الرمز: {user.otp_code}",
-                "otp_code": user.otp_code
-            })
-            
-    except Exception as e:
-        current_app.logger.error(f"خطأ في إعادة الإرسال: {str(e)}")
-        return jsonify({"success": False, "message": "حدث خطأ غير متوقع"})
+    # إرسال الإيميل
+    msg = Message("رمز تحقق جديد", recipients=[user.email])
+    msg.body = f"رمز التحقق الخاص بك هو: {user.otp_code}\nصالح لمدة 10 دقائق."
+    current_app.mail.send(msg)
+
+    return {"success": True, "message": "تم إرسال رمز جديد"}
+
+# تسجيل الخروج
 @user_auth_bp.route('/logout')
 def logout():
     response = make_response(redirect(url_for('user_auth.login')))
