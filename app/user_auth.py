@@ -1,12 +1,14 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, make_response, current_app
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField
+from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, EqualTo, Length, ValidationError
 import re
 import logging
 from .models import db, User, Employee
 from datetime import datetime, timedelta
 from functools import wraps
+from flask_mail import Message
+import random
 
 user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
@@ -41,6 +43,13 @@ class RegisterForm(FlaskForm):
                                    validators=[DataRequired(), 
                                               EqualTo('password', message='كلمتا المرور غير متطابقتين')])
 
+# نموذج إدخال كود التحقق
+class VerifyOTPForm(FlaskForm):
+    otp_code = StringField('رمز التحقق', validators=[DataRequired(), Length(min=6, max=6)])
+    submit = SubmitField('تأكيد')
+
+
+# تسجيل الدخول
 @user_auth_bp.route('/login', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def login():
@@ -54,9 +63,13 @@ def login():
             # تسجيل دخول كمشرف
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
+                if not user.is_verified:
+                    flash('يجب تفعيل بريدك الإلكتروني أولاً باستخدام رمز التحقق', 'warning')
+                    return redirect(url_for('user_auth.verify_otp', user_id=user.id))
+
                 response = make_response(redirect(url_for('dashboard.index')))
                 response.set_cookie('user_id', str(user.id), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=False)
-                response.set_cookie('is_admin', 'true', max_age=timedelta(days=30).total_seconds())  # تأكد من تعيينها إلى 'true'
+                response.set_cookie('is_admin', 'true', max_age=timedelta(days=30).total_seconds())
                 response.set_cookie('employee_role', '', max_age=timedelta(days=30).total_seconds())
                 
                 if user.salla_access_token:
@@ -100,6 +113,9 @@ def login():
             logger.error(f"خطأ في تسجيل الدخول: {str(e)}", exc_info=True)
     
     return render_template('auth/login.html', form=form)
+
+
+# تسجيل حساب جديد
 @user_auth_bp.route('/register', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def register():
@@ -112,22 +128,70 @@ def register():
             if User.query.filter_by(email=email).first():
                 flash('البريد الإلكتروني مسجل مسبقاً', 'danger')
                 return redirect(url_for('user_auth.register'))
+
             new_user = User(email=email)
             new_user.set_password(password)
             new_user.store_id = User.query.count() + 1  # Example: assign unique store_id
-            # ... rest of the code ...
-                    
+
             # إذا كان هذا هو المستخدم الأول، اجعله مسؤولاً
             if User.query.count() == 0:
                 new_user.is_admin = True
-            
+
+            # توليد كود تحقق (OTP)
+            new_user.otp_code = str(random.randint(100000, 999999))
+            new_user.otp_expiration = datetime.utcnow() + timedelta(minutes=10)
+
             db.session.add(new_user)
             db.session.commit()
-        
-        flash('تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول', 'success')
-        return redirect(url_for('user_auth.login'))
+
+            # إرسال الإيميل
+            msg = Message("رمز التحقق من البريد", recipients=[email])
+            msg.body = f"رمز التحقق الخاص بك هو: {new_user.otp_code}\nصالح لمدة 10 دقائق."
+            current_app.mail.send(msg)
+
+        flash('تم إنشاء الحساب! تحقق من بريدك وأدخل الرمز', 'info')
+        return redirect(url_for('user_auth.verify_otp', user_id=new_user.id))
     
     return render_template('auth/register.html', form=form)
+
+
+# التحقق من الكود
+@user_auth_bp.route('/verify/<int:user_id>', methods=['GET', 'POST'])
+def verify_otp(user_id):
+    user = User.query.get_or_404(user_id)
+    form = VerifyOTPForm()
+
+    if form.validate_on_submit():
+        if user.otp_code == form.otp_code.data and user.otp_expiration > datetime.utcnow():
+            user.is_verified = True
+            user.otp_code = None
+            user.otp_expiration = None
+            db.session.commit()
+            flash('تم تفعيل حسابك بنجاح! يمكنك تسجيل الدخول الآن', 'success')
+            return redirect(url_for('user_auth.login'))
+        else:
+            flash('رمز غير صحيح أو منتهي الصلاحية', 'danger')
+
+    return render_template('auth/verify_otp.html', form=form)
+@user_auth_bp.route('/resend_verification/<int:user_id>', methods=['POST'])
+def resend_verification(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.is_verified:
+        return {"success": False, "message": "الحساب مفعل بالفعل"}
+
+    # توليد كود جديد
+    user.otp_code = str(random.randint(100000, 999999))
+    user.otp_expiration = datetime.utcnow() + timedelta(minutes=10)
+    db.session.commit()
+
+    # إرسال الإيميل
+    msg = Message("رمز تحقق جديد", recipients=[user.email])
+    msg.body = f"رمز التحقق الخاص بك هو: {user.otp_code}\nصالح لمدة 10 دقائق."
+    current_app.mail.send(msg)
+
+    return {"success": True, "message": "تم إرسال رمز جديد"}
+
+# تسجيل الخروج
 @user_auth_bp.route('/logout')
 def logout():
     response = make_response(redirect(url_for('user_auth.login')))
@@ -139,3 +203,4 @@ def logout():
     response.delete_cookie('salla_refresh_token')
     flash('تم تسجيل الخروج بنجاح', 'success')
     return response
+    
