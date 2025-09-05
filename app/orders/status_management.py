@@ -464,41 +464,45 @@ def update_product_status(order_id, product_id):
             db.session.add(status_obj)
 
         db.session.commit()
-        
-        # ===== التحقق من حالة جميع منتجات الطلب وتحديث الحالة المخصصة =====
-        if new_status == 'تم التنفيذ':
-            # جلب جميع منتجات الطلب
-            all_products = OrderProductStatus.query.filter_by(
-                order_id=str(order_id)
-            ).all()
-            
-            # التحقق إذا كانت جميع المنتجات تم تنفيذها
-            all_completed = all(prod.status == 'تم التنفيذ' for prod in all_products)
-            
-            if all_completed:
-                # البحث عن حالة "تم التنفيذ" المخصصة للموظف
-                completed_status = EmployeeCustomStatus.query.filter_by(
-                    name='تم التنفيذ',
+
+        # التحقق: إذا كل المنتجات تم تنفيذها -> تحديث حالة الطلب المخصصة
+        all_statuses = OrderProductStatus.query.filter_by(order_id=str(order_id)).all()
+        if all_statuses and all(s.status == "تم التنفيذ" for s in all_statuses):
+            try:
+                # نبحث عن حالة "تم التنفيذ" في الحالات الافتراضية/المخصصة
+                done_status = EmployeeCustomStatus.query.filter_by(
+                    name="تم التنفيذ",
                     employee_id=employee.id
                 ).first()
-                
-                if completed_status:
-                    # تحديث حالة الطلب المخصصة
-                    order_status = OrderEmployeeStatus(
+
+                if done_status:
+                    # تحديث أو إضافة الحالة للطلب
+                    order_status = OrderEmployeeStatus.query.filter_by(
                         order_id=str(order_id),
-                        status_id=completed_status.id,
-                        note='تم تنفيذ جميع منتجات الطلب تلقائياً'
-                    )
-                    db.session.add(order_status)
+                        status_id=done_status.id
+                    ).first()
+
+                    if not order_status:
+                        order_status = OrderEmployeeStatus(
+                            order_id=str(order_id),
+                            status_id=done_status.id,
+                            note="تم تحويل الطلب تلقائياً بعد تنفيذ جميع المنتجات"
+                        )
+                        db.session.add(order_status)
+                    else:
+                        order_status.note = "تم تحديث تلقائياً بعد تنفيذ جميع المنتجات"
+
                     db.session.commit()
-        
+            except Exception as e:
+                db.session.rollback()
+                current_app.logger.error(f"Error auto-updating order status: {str(e)}", exc_info=True)
+
         # إرجاع بيانات محدثة للعرض
         return jsonify({
             'success': True, 
             'message': 'تم تحديث حالة المنتج بنجاح',
             'status': new_status,
-            'updated_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M'),
-            'all_completed': all_completed  # إرجاع حالة إكمال جميع المنتجات
+            'updated_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M')
         })
         
     except Exception as e:
