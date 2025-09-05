@@ -31,7 +31,19 @@
                             <p class="mb-0">لم تستلم الكود؟ 
                                 <a href="#" class="text-primary resend-link">إعادة إرسال</a>
                             </p>
+                            {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      {% if "otp_code" in message %}
+        <div class="alert alert-info">
+          <strong>رمز التحقق:</strong> {{ message|replace("تم إنشاء الرمز: ", "")|replace(" (لم يتم إرسال البريد)", "") }}
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+{% endwith %}
                         </div>
+                    
                     </form>
                 </div>
             </div>
