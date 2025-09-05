@@ -40,7 +40,9 @@
                     </div>
                     <div>
                         <h4 class="mb-0 fw-bolder">{{ stats.late_orders }}</h4>
-                        <p class="mb-0 text-muted small">طلبات متأخرة</p>
+<a href="{{ stats_links.late_orders }}">
+  <div class="stat-card">متأخر: {{ stats.late_orders }}</div>
+</a>
                     </div>
                 </div>
             </div>
