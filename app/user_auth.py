@@ -172,7 +172,8 @@ def verify_otp(user_id):
         else:
             flash('رمز غير صحيح أو منتهي الصلاحية', 'danger')
 
-    return render_template('auth/verify_otp.html', form=form)
+    # Pass the user object to the template
+    return render_template('auth/verify_otp.html', form=form, user=user)
 @user_auth_bp.route('/resend_verification/<int:user_id>', methods=['POST'])
 def resend_verification(user_id):
     user = User.query.get_or_404(user_id)
