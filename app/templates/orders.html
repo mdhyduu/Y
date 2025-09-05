@@ -197,32 +197,37 @@
                                 </span>
                             {% endif %}
                         </td>
+                        <td>
+                            {% if order.employee_statuses %}
+                                {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
+                                <span class="badge rounded-pill" style="background-color: {{ last_custom_status.status.color }}; color: white">
+                                    {{ last_custom_status.status.name }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted small">-</span>
+                            {% endif %}
+                        </td>
                      <td>
-    {% if order.last_emp_status %}
-        <span class="badge rounded-pill" style="background-color: {{ order.last_emp_status.status.color }}; color: white">
-            {{ order.last_emp_status.status.name }}
-        </span>
-    {% else %}
-        <span class="text-muted small">-</span>
-    {% endif %}
-</td><td>
-    {% if order.last_note %}
+    {% set last_note = order.status_notes | sort(attribute='created_at', reverse=true) | first %}
+    {% if last_note %}
         <div class="d-flex align-items-center">
-            {% if order.last_note.custom_status %}
+            {% if last_note.custom_status %}
+                <!-- حالة مخصصة مع لون مخصص -->
                 <span class="badge rounded-pill me-1" 
-                      style="background-color: {{ order.last_note.custom_status.color }}; color: white">
-                    {{ order.last_note.custom_status.name }}
+                      style="background-color: {{ last_note.custom_status.color }}; color: white">
+                    {{ last_note.custom_status.name }}
                 </span>
-            {% elif order.last_note.status_flag %}
-                {% set flag_class = "badge-" + order.last_note.status_flag %}
+            {% elif last_note.status_flag %}
+                <!-- حالة خاصة (status_flag) -->
+                {% set flag_class = "badge-" + last_note.status_flag %}
                 {% set flag_text = {
                     'late': 'متأخر',
                     'missing': 'واصل ناقص',
                     'refunded': 'مرتجع',
                     'not_shipped': 'لم يشحن'
-                }.get(order.last_note.status_flag, order.last_note.status_flag) %}
+                }.get(last_note.status_flag, last_note.status_flag) %}
                 <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
-            {% endif %}
+            {% endif %} 
         </div>
     {% else %}
         <span class="text-muted small">-</span>
