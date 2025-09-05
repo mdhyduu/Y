@@ -418,9 +418,28 @@ def bulk_update_status():
         }), 500
         
         
+def get_done_status_id(employee_id):
+    """جلب ID الخاص بحالة 'تم التنفيذ' مع كاش داخلي لزيادة السرعة"""
+    if not hasattr(current_app, "done_status_cache"):
+        current_app.done_status_cache = {}
+
+    if employee_id in current_app.done_status_cache:
+        return current_app.done_status_cache[employee_id]
+
+    status = EmployeeCustomStatus.query.filter_by(
+        name="تم التنفيذ",
+        employee_id=employee_id
+    ).first()
+
+    if status:
+        current_app.done_status_cache[employee_id] = status.id
+        return status.id
+    return None
+
+
 @orders_bp.route('/<order_id>/product/<product_id>/update_status', methods=['POST'])
 def update_product_status(order_id, product_id):
-    """تحديث حالة منتج معين داخل الطلب"""
+    """تحديث حالة منتج معين داخل الطلب + تحديث حالة الطلب إذا كل المنتجات تم تنفيذها"""
     user, employee = get_user_from_cookies()
     if not user:
         return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
@@ -465,27 +484,26 @@ def update_product_status(order_id, product_id):
 
         db.session.commit()
 
-        # التحقق: إذا كل المنتجات تم تنفيذها -> تحديث حالة الطلب المخصصة
-        all_statuses = OrderProductStatus.query.filter_by(order_id=str(order_id)).all()
-        if all_statuses and all(s.status == "تم التنفيذ" for s in all_statuses):
-            try:
-                # نبحث عن حالة "تم التنفيذ" في الحالات الافتراضية/المخصصة
-                done_status = EmployeeCustomStatus.query.filter_by(
-                    name="تم التنفيذ",
-                    employee_id=employee.id
-                ).first()
+        # ✅ التحقق السريع: إذا ما فيه أي منتج غير "تم التنفيذ"
+        not_done = OrderProductStatus.query.filter(
+            OrderProductStatus.order_id == str(order_id),
+            OrderProductStatus.status != "تم التنفيذ"
+        ).first()
 
-                if done_status:
+        if not not_done:
+            try:
+                done_status_id = get_done_status_id(employee.id)
+                if done_status_id:
                     # تحديث أو إضافة الحالة للطلب
                     order_status = OrderEmployeeStatus.query.filter_by(
                         order_id=str(order_id),
-                        status_id=done_status.id
+                        status_id=done_status_id
                     ).first()
 
                     if not order_status:
                         order_status = OrderEmployeeStatus(
                             order_id=str(order_id),
-                            status_id=done_status.id,
+                            status_id=done_status_id,
                             note="تم تحويل الطلب تلقائياً بعد تنفيذ جميع المنتجات"
                         )
                         db.session.add(order_status)
