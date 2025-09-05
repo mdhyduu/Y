@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from flask_mail import Message
 import random
-from . import mail   # استدعاء mail من __init__.py
+
 user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
 

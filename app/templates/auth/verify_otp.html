@@ -33,19 +33,7 @@
                             </p>
                             
                         </div>
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    {% for category, message in messages %}
-      {% if "otp_code" in message %}
-        <div class="alert alert-info">
-          <strong>رمز التحقق:</strong> {{ message|replace("تم إنشاء الرمز: ", "")|replace(" (لم يتم إرسال البريد)", "") }}
-        </div>
-      {% endif %}
-    {% endfor %}
-  {% endif %}
-{% endwith %}
-
-<div class="alert alert-warning mt-3">
+                    <div class="alert alert-warning mt-3">
     <strong>وضع التصحيح:</strong> رمز التحقق هو: {{ user.otp_code }}
 </div>
                     </form>
