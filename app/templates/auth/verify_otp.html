@@ -12,19 +12,14 @@
                     <p class="mt-2 mb-0 opacity-75">أدخل كود التحقق المرسل إلى بريدك</p>
                 </div>
                 <div class="card-body p-4 p-sm-5">
-                    <form method="POST" action="{{ url_for('user_auth.verify_email') }}">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
 
-
-<!-- أو استبدله بـ -->
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="form-group mb-4">
-                            <label for="verification_code" class="form-label">كود التحقق</label>
+                            <label for="otp_code" class="form-label">كود التحقق</label>
                             <div class="input-group">
                                 <span class="input-group-text"><i class="fas fa-key"></i></span>
-                                <input type="text" class="form-control form-control-lg" 
-                                       id="verification_code" name="verification_code" 
-                                       placeholder="أدخل الكود المكون من 6 أرقام" 
-                                       required maxlength="6" pattern="[0-9]{6}">
+                                {{ form.otp_code(class="form-control form-control-lg", id="otp_code", placeholder="أدخل الكود المكون من 6 أرقام") }}
                             </div>
                         </div>
                         
@@ -53,22 +48,16 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Auto focus on code input
-    document.getElementById('verification_code').focus();
-    
-    // Auto move to next input
-    const codeInput = document.getElementById('verification_code');
-    codeInput.addEventListener('input', function() {
-        if (this.value.length === 6) {
-            this.form.submit();
-        }
-    });
-    
+    document.getElementById('otp_code').focus();
+
     // Resend code functionality
-    document.querySelector('.resend-link').addEventListener('click', function() {
-        fetch('{{ url_for("user_auth.resend_verification") }}', {
+    document.querySelector('.resend-link').addEventListener('click', function(e) {
+        e.preventDefault();
+        fetch('{{ url_for("user_auth.resend_verification", user_id=user.id) }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
             }
         })
         .then(response => response.json())

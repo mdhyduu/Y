@@ -53,8 +53,12 @@ class User(db.Model):
     _salla_refresh_token = db.Column('salla_refresh_token', LargeBinary)
     token_expires_at = db.Column(db.DateTime)
     token_refreshed_at = db.Column(db.DateTime)
+
+
+    is_verified = db.Column(db.Boolean, default=False)
+    otp_code = db.Column(db.String(6), nullable=True)
+    otp_expiration = db.Column(db.DateTime, nullable=True)
     
-    # حقول إضافية
     store_id = db.Column(db.Integer, nullable=True, index=True)
     last_sync = db.Column(db.DateTime)
     remember_token = db.Column(db.String(100))
@@ -197,7 +201,11 @@ class User(db.Model):
         except Exception as e:
             current_app.logger.error(f"فشل إنشاء توكن تذكرني: {str(e)}")
             return None
-    
+    def generate_otp(self):
+        import random
+        self.otp_code = str(random.randint(100000, 999999))
+        self.otp_expiration = datetime.utcnow() + timedelta(minutes=10)  # صالح 10 دقائق
+    # حقول إضافية    
     @classmethod
     def verify_remember_token(cls, token):
         """التحقق من توكن تذكرني"""
