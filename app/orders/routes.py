@@ -350,7 +350,7 @@ def index():
         return redirect(url_for('orders.index'))
 @orders_bp.route('/<int:order_id>')
 def order_details(order_id):
-    """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة"""
+    """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة (بدون shipments)"""
     user, current_employee = get_user_from_cookies()
     
     if not user:
@@ -363,16 +363,13 @@ def order_details(order_id):
     try:
         # ========== [1] التحقق من صلاحية المستخدم ==========
         is_reviewer = False
-        
         if request.cookies.get('is_admin') == 'true':
             is_reviewer = True
-        elif current_employee:
-            if current_employee.role in ['reviewer', 'manager']:
-                is_reviewer = True
+        elif current_employee and current_employee.role in ['reviewer', 'manager']:
+            is_reviewer = True
 
         # ========== [2] التحقق من صلاحية التوكن ==========
         def refresh_and_get_token():
-            """دالة مساعدة لتجديد التوكن"""
             new_token = refresh_salla_token(user)
             if not new_token:
                 flash("انتهت صلاحية الجلسة، الرجاء إعادة الربط مع سلة", "error")
@@ -390,35 +387,30 @@ def order_details(order_id):
             response.set_cookie('is_admin', '', expires=0)
             return response
 
-        # ========== [3] جلب بيانات الطلب من Salla API ==========
         headers = {
             'Authorization': f'Bearer {access_token}',
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         }
 
-        # دالة مساعدة للتعامل مع طلبات API
         def make_salla_api_request(url, params=None):
             try:
                 response = requests.get(url, headers=headers, params=params, timeout=15)
-                
-                # إذا كان التوكن منتهي الصلاحية، حاول تجديده
                 if response.status_code == 401:
                     new_token = refresh_and_get_token()
-                    if isinstance(new_token, str):  # إذا كان التوكن الجديد نصًا (تم تجديده بنجاح)
+                    if isinstance(new_token, str):
                         headers['Authorization'] = f'Bearer {new_token}'
                         response = requests.get(url, headers=headers, params=params, timeout=15)
-                    else:  # إذا كان redirect (فشل التجديد)
-                        return new_token  # هذا سيكون redirect response
-                
+                    else:
+                        return new_token
                 response.raise_for_status()
                 return response
             except requests.exceptions.RequestException as e:
                 raise e
 
-        # جلب بيانات الطلب الأساسية - بدون format=light للحصول على العنوان
+        # ========== [3] جلب بيانات الطلب ==========
         order_response = make_salla_api_request(f"{Config.SALLA_ORDERS_API}/{order_id}")
-        if not isinstance(order_response, requests.Response):  # إذا كان redirect
+        if not isinstance(order_response, requests.Response):
             return order_response
         order_data = order_response.json().get('data', {})
 
@@ -431,44 +423,23 @@ def order_details(order_id):
             return items_response
         items_data = items_response.json().get('data', [])
 
-        # جلب بيانات الشحنات الخاصة بالطلب
-        shipments_response = make_salla_api_request(
-            f"{Config.SALLA_API_BASE_URL}/shipments",
-            params={'order_id': order_id}
-        )
-        if not isinstance(shipments_response, requests.Response):
-            return shipments_response
-        shipments_data = shipments_response.json().get('data', [])
-
         # ========== [4] معالجة بيانات الطلب ==========
         processed_order = process_order_data(order_id, items_data)
 
-        # ========== [5] استخراج بيانات العنوان بشكل صحيح ==========
-        # تهيئة بيانات المستلم مسبقًا لتجنب الخطأ
-        receiver_info = {}
+        # ========== [5] استخراج بيانات العنوان ==========
         address_data = {}
         full_address = 'لم يتم تحديد العنوان'
-        
-        # المحاولة 1: من بيانات الشحنات (shipments)
-        if shipments_data and len(shipments_data) > 0:
-            # نأخذ أول شحنة (يمكن تعديل هذا إذا كان هناك multiple shipments)
-            first_shipment = shipments_data[0]
-            address_data = first_shipment.get('ship_to', {})
-            current_app.logger.info(f"تم العثور على عنوان من shipments: {address_data}")
-        
-        # المحاولة 2: من shipping.address في بيانات الطلب
-        if not address_data:
-            shipping_data = order_data.get('shipping', {})
-            if shipping_data and 'address' in shipping_data:
-                address_data = shipping_data.get('address', {})
-                current_app.logger.info(f"تم العثور على عنوان من shipping.address: {address_data}")
-        
-        # المحاولة 3: من ship_to مباشرة في بيانات الطلب
+
+        # المحاولة 1: من shipping.address
+        shipping_data = order_data.get('shipping', {})
+        if shipping_data and 'address' in shipping_data:
+            address_data = shipping_data.get('address', {})
+
+        # المحاولة 2: من ship_to
         if not address_data and 'ship_to' in order_data:
             address_data = order_data.get('ship_to', {})
-            current_app.logger.info(f"تم العثور على عنوان من order_data.ship_to: {address_data}")
-        
-        # المحاولة 4: من customer (fallback أخير)
+
+        # المحاولة 3: fallback على customer
         if not address_data and 'customer' in order_data:
             customer = order_data.get('customer', {})
             address_data = {
@@ -476,9 +447,8 @@ def order_details(order_id):
                 'city': customer.get('city', ''),
                 'description': customer.get('location', '')
             }
-            current_app.logger.info(f"تم استخدام بيانات العميل كعنوان: {address_data}")
 
-        # بناء العنوان الكامل للمستلم
+        # بناء العنوان الكامل
         if address_data:
             parts = []
             if address_data.get('name'):
@@ -499,18 +469,15 @@ def order_details(order_id):
                 parts.append(f"وصف إضافي: {address_data['description']}")
             if address_data.get('postal_code'):
                 parts.append(f"الرمز البريدي: {address_data['postal_code']}")
-            
             if parts:
                 full_address = "، ".join(parts)
 
-        # استخراج معلومات المستلم من بيانات العنوان
+        # بيانات المستلم
         receiver_info = {
             'name': address_data.get('name', ''),
             'phone': address_data.get('phone', ''),
             'email': address_data.get('email', '')
         }
-
-        # إذا لم تكن هناك بيانات مستقلة للمستلم، نستخدم بيانات العميل
         if not receiver_info['name']:
             customer_info = order_data.get('customer', {})
             receiver_info = {
@@ -519,7 +486,7 @@ def order_details(order_id):
                 'email': customer_info.get('email', '')
             }
 
-        # تحديث بيانات الطلب المعالجة
+        # تحديث بيانات الطلب
         processed_order.update({
             'id': order_id,
             'reference_id': order_data.get('reference_id') or 'غير متوفر',
@@ -542,8 +509,6 @@ def order_details(order_id):
                 'method': order_data.get('shipping', {}).get('courier_name', 'غير محدد'),
                 'tracking_number': order_data.get('shipping', {}).get('tracking_number', ''),
                 'tracking_link': order_data.get('shipping', {}).get('tracking_link', ''),
-                
-                # بيانات العنوان
                 'address': full_address,
                 'country': address_data.get('country', ''),
                 'city': address_data.get('city', ''),
@@ -551,8 +516,6 @@ def order_details(order_id):
                 'street': address_data.get('street', ''),
                 'description': address_data.get('description', ''),
                 'postal_code': address_data.get('postal_code', ''),
-
-                # البيانات الأصلية كمرجع
                 'raw_data': address_data
             },
             'payment': {
@@ -567,33 +530,26 @@ def order_details(order_id):
             }
         })
 
-        # إنشاء الباركود إذا لم يكن موجوداً
         if not processed_order.get('barcode'):
             barcode_filename = generate_barcode(order_id)
             if barcode_filename:
                 processed_order['barcode'] = barcode_filename
 
-        # ========== [6] جلب البيانات الإضافية من قاعدة البيانات ==========
-        # جلب الملاحظات الخاصة بالطلب (للمراجعين فقط)
+        # ========== [6] جلب البيانات الإضافية ==========
         custom_note_statuses = CustomNoteStatus.query.filter_by(
             store_id=user.store_id
         ).all()
-    
-        # ========== [7] جلب ملاحظات الحالة مع العلاقات ==========
+
         status_notes = OrderStatusNote.query.filter_by(
             order_id=str(order_id)
         ).options(
             db.joinedload(OrderStatusNote.admin),
             db.joinedload(OrderStatusNote.employee),
-            db.joinedload(OrderStatusNote.custom_status)  # إضافة تحميل الحالة المخصصة
+            db.joinedload(OrderStatusNote.custom_status)
         ).order_by(
             OrderStatusNote.created_at.desc()
         ).all()
-        
-        # ========== [8] جلب الحالات المخصصة للموظفين ==========
-# ... existing code ...
 
-        # ========== [8] جلب الحالات المخصصة للموظفين ==========
         employee_statuses = db.session.query(
             OrderEmployeeStatus,
             EmployeeCustomStatus,
@@ -610,11 +566,7 @@ def order_details(order_id):
             OrderEmployeeStatus.created_at.desc()
         ).all()
 
-        # جلب حالات المنتجات للطلب
-        # جلب حالات المنتجات للطلب
-        # في دالة order_details، استبدل كود جلب حالات المنتجات بالكود التالي:
         product_statuses = {}
-        # جلب جميع حالات المنتجات للطلب الحالي
         status_records = OrderProductStatus.query.filter_by(order_id=str(order_id)).all()
         for status in status_records:
             product_statuses[status.product_id] = {
@@ -623,7 +575,6 @@ def order_details(order_id):
                 'updated_at': status.updated_at
             }
 
-# ... rest of the code ...
         return render_template('order_details.html', 
             order=processed_order,
             status_notes=status_notes,
@@ -653,4 +604,3 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
-        
