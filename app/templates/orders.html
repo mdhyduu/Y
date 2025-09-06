@@ -1,6 +1,57 @@
 {% extends 'base.html' %}
 {% block styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/orders.css') }}">
+       <style>
+        /* تنسيقات الوضع الليلي للقائمة السريعة */
+        [data-bs-theme="dark"] #quickListModal .modal-content {
+            background-color: #333;
+            color: #fff;
+        }
+
+        [data-bs-theme="dark"] #quickListModal .modal-header {
+            border-bottom: 1px solid #555;
+        }
+
+        [data-bs-theme="dark"] #quickListModal .modal-footer {
+            border-top: 1px solid #555;
+        }
+
+        [data-bs-theme="dark"] #quickListModal .card {
+            background-color: #444;
+            color: #fff;
+            border: 1px solid #555;
+        }
+
+        [data-bs-theme="dark"] #quickListModal .form-check-label {
+            color: #fff;
+        }
+
+        [data-bs-theme="dark"] #quickListModal .text-muted {
+            color: #aaa !important;
+        }
+
+        [data-bs-theme="dark"] #quickListModal .border-top {
+            border-top: 1px solid #555 !important;
+        }
+
+        /* ضبط z-index للنوافذ المنبثقة */
+        #changeStatusModal {
+            z-index: 1060;
+        }
+
+        #quickListModal {
+            z-index: 1050;
+        }
+
+        /* تأثيرات انتقال سلسة */
+        .modal {
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-backdrop {
+            transition: opacity 0.3s ease;
+        }
+    </style>
 {% endblock %}
 
 {% block content %} 
@@ -372,6 +423,7 @@
             </div>
             <div class="modal-body">
                 <p>سيتم تطبيق الحالة المحددة على <span id="selected-count-modal" class="fw-bold">0</span> طلب.</p>
+                
                 <div class="mb-3">
                     <label for="status-select" class="form-label">اختر الحالة:</label>
                     <select class="form-select" id="status-select">
@@ -394,20 +446,16 @@
     </div>
 </div>
 
-<!-- نافذة القائمة السريعة -->
-<!-- نافذة القائمة السريعة -->
-<div class="modal fade" id="quickListModal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
+<div class="modal fade" id="quickListModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">القائمة السريعة للطلبات المحددة</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <!-- خانة تحديد الكل -->
-                <div class="form-check mb-3">
+                <!-- باقي محتوى القائمة السريعة -->
+                       <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" id="selectAllQuickList" checked>
                     <label class="form-check-label fw-bold" for="selectAllQuickList">
                         تحديد جميع الطلبات
@@ -463,8 +511,9 @@
                 </div>
                 {% endif %}
             </div>
+            </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">إغلاق</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
             </div>
         </div>
     </div>
@@ -861,9 +910,7 @@ document.addEventListener('click', function(e) {
         // فتح نافذة الطباعة
         window.open(`{{ url_for('orders.print_orders') }}?order_ids=${selectedOrders.join(',')}`, '_blank');
     }
-});
-
-// معالج حدث تغيير الحالة من القائمة السريعة (للموظفين العاديين)
+}); 
 document.addEventListener('click', function(e) {
     if (e.target && e.target.id === 'quickListChangeStatusBtn') {
         const selectedOrders = [];
@@ -876,10 +923,15 @@ document.addEventListener('click', function(e) {
             return;
         }
 
-        // فتح نافذة تغيير الحالة
-        $('#selected-count-modal').text(selectedOrders.length);
-        $('#changeStatusModal').data('selected-orders', selectedOrders);
-        $('#changeStatusModal').modal('show');
+        // إغلاق نافذة القائمة السريعة أولاً
+        $('#quickListModal').modal('hide');
+        
+        // ثم فتح نافذة تغيير الحالة بعد تأخير بسيط
+        setTimeout(() => {
+            $('#selected-count-modal').text(selectedOrders.length);
+            $('#changeStatusModal').data('selected-orders', selectedOrders);
+            $('#changeStatusModal').modal('show');
+        }, 300);
     }
 });
 
@@ -890,53 +942,94 @@ document.addEventListener('click', function(e) {
         $('#selected-count-modal').text(orderIds.length);
         $('#changeStatusModal').modal('show');
     });
-
-    $(document).on('click', '#confirm-status-change', function() {
-    let orderIds;
-    
-    // التحقق مما إذا كانت الطلبات من القائمة السريعة
-    if ($('#changeStatusModal').data('selected-orders')) {
-        orderIds = $('#changeStatusModal').data('selected-orders');
-        $('#changeStatusModal').removeData('selected-orders');
-    } else {
-        // الطلبات من الصفحة الرئيسية
-        orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
-    }
-    
-    const statusId = $('#status-select').val();
-    const note = $('#status-note').val();
-    
-    if (!statusId) {
-        showSweetAlert('warning', 'تحذير', 'يجب اختيار حالة');
-        return;
-    }
-    
-    $('#changeStatusModal').modal('hide');
-    
-    $.ajax({
-        url: "{{ url_for('orders.bulk_update_status') }}",
-        type: "POST",
-        contentType: "application/json",
-        headers: { 'X-CSRFToken': csrfToken },
-        data: JSON.stringify({
-            order_ids: orderIds,
-            status_id: statusId,
-            note: note
-        }),
-    })
-    .done(function(response) {
-        if (response.success) {
-            showSweetAlert('success', 'نجح التحديث!', response.message);
-            setTimeout(() => location.reload(), 1500);
-        } else {
-            showSweetAlert('error', 'فشل التحديث', response.error);
+   $(document).on('click', '#confirm-status-change', function() {
+        const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
+        const statusId = $('#status-select').val();
+        const note = $('#status-note').val();
+        
+        if (!statusId) {
+            showSweetAlert('warning', 'تحذير', 'يجب اختيار حالة');
+            return;
         }
-    })
-    .fail(function(xhr) {
-        const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم';
-        showSweetAlert('error', 'حدث خطأ', errorMsg);
+        
+        $('#changeStatusModal').modal('hide');
+        
+        $.ajax({
+            url: "{{ url_for('orders.bulk_update_status') }}",
+            type: "POST",
+            contentType: "application/json",
+            headers: { 'X-CSRFToken': csrfToken },
+            data: JSON.stringify({
+                order_ids: orderIds,
+                status_id: statusId,
+                note: note
+            }),
+        })
+        .done(function(response) {
+            if (response.success) {
+                showSweetAlert('success', 'نجح التحديث!', response.message);
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showSweetAlert('error', 'فشل التحديث', response.error);
+            }
+        })
+        .fail(function(xhr) {
+            const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم';
+            showSweetAlert('error', 'حدث خطأ', errorMsg);
+        });
     });
-}); 
+ $(document).on('input', '#search-order-id', _.debounce(function() {
+        reloadOrders();
+    }, 500));
+    
+    $(document).on('click', '#sync-statuses-btn', function() {
+        const btn = $(this);
+        const icon = btn.find('i');
+        const progressContainer = $('#sync-progress');
+        const progressBar = progressContainer.find('.progress-bar');
+        const detailsText = progressContainer.find('.sync-details');
+
+        btn.prop('disabled', true);
+        icon.addClass('fa-spin');
+        btn.find('.sync-text').text('جاري مزامنة الحالات...');
+        progressContainer.removeClass('d-none');
+        progressBar.css('width', '10%');
+        detailsText.text('جاري الاتصال بالخادم...');
+
+        // محاكاة التقدم
+        progressBar.animate({ width: "70%" }, 1500);
+
+        $.ajax({
+            url: "{{ url_for('orders.sync_order_statuses') }}",
+            type: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({}),
+            headers: { 'X-CSRFToken': csrfToken }
+        })
+        .done(function(response) {
+            progressBar.css('width', '100%');
+            if (response.success) {
+                detailsText.text(response.message);
+                showSweetAlert('success', 'نجحت مزامنة الحالات!', response.message);
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                showSweetAlert('error', 'فشلت مزامنة الحالات', response.error, 5000);
+                btn.prop('disabled', false);
+                icon.removeClass('fa-spin');
+                btn.find('.sync-text').text('مزامنة الحالات');
+                progressContainer.addClass('d-none');
+            }
+        })
+        .fail(function(xhr) {
+            progressBar.css('width', '100%');
+            const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم. تحقق من الشبكة.';
+            showSweetAlert('error', 'حدث خطأ فادح', errorMsg, 5000);
+            btn.prop('disabled', false);
+            icon.removeClass('fa-spin');
+            btn.find('.sync-text').text('مزامنة الحالات');
+            progressContainer.addClass('d-none');
+        });
+    }); 
     // 6. تطبيق الفلاتر مع تأخير للبحث
     $(document).on('submit', '#advanced-filters', function(e) {
         e.preventDefault();
