@@ -85,6 +85,8 @@
         .product-image-container {
             flex: 0 0 120px;
             text-align: center;
+            display: flex;
+            flex-direction: column;
         }
         
         .product-image {
@@ -135,20 +137,7 @@
         
         .product-options {
             margin-top: 10px;
-            padding: 10px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-            border: 1px solid #eee;
-        }
-        
-        .options-title {
-            font-size: 14px;
-            font-weight: bold;
-            margin-bottom: 8px;
-            text-align: center;
-            color: #2c3e50;
-            padding-bottom: 5px;
-            border-bottom: 1px solid #ddd;
+            padding: 8px 0;
         }
         
         .option {
@@ -156,6 +145,11 @@
             font-size: 13px;
             display: flex;
             justify-content: space-between;
+            padding: 2px 5px;
+        }
+        
+        .option:nth-child(odd) {
+            background-color: #f9f9f9;
         }
         
         .option-name {
@@ -303,24 +297,36 @@
                             {% else %}
                             <div class="no-image">لا توجد صورة</div>
                             {% endif %}
+                            
+                            {% if item.options and item.options|length <= 3 %}
+                            <div class="product-options">
+                                {% for option in item.options %}
+                                <div class="option">
+                                    <span class="option-name">{{ option.name }}:</span>
+                                    <span class="option-value">{{ option.value }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                         </div>
                         
                         <div class="product-details">
                             <div class="product-name">{{ item.name }}</div>
-                            <div class="product-info">
-                                <strong>الكمية:</strong> {{ item.quantity }}
-                            </div>
+                            
                             {% if item.price %}
                             <div class="product-info">
                                 <strong>السعر:</strong> {{ item.price }} ر.س
                             </div>
                             {% endif %}
+                            
+                            <div class="product-info">
+                                <strong>الكمية:</strong> {{ item.quantity }}
+                            </div>
                         </div>
                     </div>
                     
-                    {% if item.options %}
+                    {% if item.options and item.options|length > 3 %}
                     <div class="product-options">
-                        <div class="options-title">خيارات المنتج</div>
                         {% for option in item.options %}
                         <div class="option">
                             <span class="option-name">{{ option.name }}:</span>
