@@ -80,10 +80,8 @@ def update_order_status(order_id):
         flash(f"حدث خطأ غير متوقع: {str(e)}", "error")
         return redirect(url_for('orders.order_details', order_id=order_id))
 
-
-
-@orders_bp.route('/int:order_id/add_status_note', methods=['POST'])
-def add_status_note(order_id): 
+@orders_bp.route('/<int:order_id>/add_status_note', methods=['POST'])
+def add_status_note(order_id):
     user, employee = get_user_from_cookies()
     
     if not user:
@@ -167,8 +165,9 @@ def add_status_note(order_id):
     
     return redirect(url_for('orders.order_details', order_id=order_id))
 
-@orders_bp.route('/int:order_id/add_employee_status', methods=['POST']) 
+@orders_bp.route('/<int:order_id>/add_employee_status', methods=['POST'])
 def add_employee_status(order_id):
+    ...
     user, employee = get_user_from_cookies()
 
     if not user:
