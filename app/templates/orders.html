@@ -396,6 +396,7 @@
 </div>
 
 <!-- نافذة القائمة السريعة -->
+<!-- نافذة القائمة السريعة -->
 <div class="modal fade" id="quickListModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -443,6 +444,25 @@
                     </div>
                 </div>
                 {% endif %}
+                
+                <!-- قسم الطباعة وتغيير الحالة (يظهر للموظفين العاديين) -->
+                {% if not is_reviewer %}
+                <div class="mt-4 pt-3 border-top">
+                    <h6 class="mb-3"><i class="fas fa-cogs me-2"></i>إجراءات سريعة</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <button type="button" class="btn btn-warning w-100" id="quickListPrintBtn">
+                                <i class="fas fa-print me-1"></i> طباعة الطلبات المحددة
+                            </button>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <button type="button" class="btn btn-info w-100" id="quickListChangeStatusBtn">
+                                <i class="fas fa-tag me-1"></i> تغيير حالة الطلبات
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">إغلاق</button>
@@ -450,7 +470,6 @@
         </div>
     </div>
 </div>
-
 {% block scripts %}
 
 
@@ -827,7 +846,91 @@ $(document).ready(function () {
             }
         });
     });
+    // معالج حدث الطباعة من القائمة السريعة (للموظفين العاديين)
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.id === 'quickListPrintBtn') {
+        const selectedOrders = [];
+        document.querySelectorAll('#quickListContent input.quick-list-order:checked').forEach(checkbox => {
+            selectedOrders.push(checkbox.value);
+        });
+
+        if (selectedOrders.length === 0) {
+            showSweetAlert('warning', 'تحذير', 'يرجى تحديد طلب واحد على الأقل للطباعة');
+            return;
+        }
+
+        // فتح نافذة الطباعة
+        window.open(`{{ url_for('orders.print_orders') }}?order_ids=${selectedOrders.join(',')}`, '_blank');
+    }
+});
+
+// معالج حدث تغيير الحالة من القائمة السريعة (للموظفين العاديين)
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.id === 'quickListChangeStatusBtn') {
+        const selectedOrders = [];
+        document.querySelectorAll('#quickListContent input.quick-list-order:checked').forEach(checkbox => {
+            selectedOrders.push(checkbox.value);
+        });
+
+        if (selectedOrders.length === 0) {
+            showSweetAlert('warning', 'تحذير', 'يرجى تحديد طلب واحد على الأقل لتغيير الحالة');
+            return;
+        }
+
+        // فتح نافذة تغيير الحالة
+        $('#selected-count-modal').text(selectedOrders.length);
+        $('#changeStatusModal').data('selected-orders', selectedOrders);
+        $('#changeStatusModal').modal('show');
+    }
+});
+
+// تعديل معالج تأكيد تغيير الحالة للتعامل مع القائمة السريعة
+$(document).on('click', '#confirm-status-change', function() {
+    let orderIds;
     
+    // التحقق مما إذا كانت الطلبات من القائمة السريعة
+    if ($('#changeStatusModal').data('selected-orders')) {
+        orderIds = $('#changeStatusModal').data('selected-orders');
+        $('#changeStatusModal').removeData('selected-orders');
+    } else {
+        // الطلبات من الصفحة الرئيسية
+        orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
+    }
+    
+    const statusId = $('#status-select').val();
+    const note = $('#status-note').val();
+    
+    if (!statusId) {
+        showSweetAlert('warning', 'تحذير', 'يجب اختيار حالة');
+        return;
+    }
+    
+    $('#changeStatusModal').modal('hide');
+    
+    $.ajax({
+        url: "{{ url_for('orders.bulk_update_status') }}",
+        type: "POST",
+        contentType: "application/json",
+        headers: { 'X-CSRFToken': csrfToken },
+        data: JSON.stringify({
+            order_ids: orderIds,
+            status_id: statusId,
+            note: note
+        }),
+    })
+    .done(function(response) {
+        if (response.success) {
+            showSweetAlert('success', 'نجح التحديث!', response.message);
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showSweetAlert('error', 'فشل التحديث', response.error);
+        }
+    })
+    .fail(function(xhr) {
+        const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم';
+        showSweetAlert('error', 'حدث خطأ', errorMsg);
+    });
+});
     // 5. تغيير حالة الطلبات
     $(document).on('click', '#change-status-btn', function() {
         const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
