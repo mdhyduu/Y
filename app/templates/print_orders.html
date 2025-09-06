@@ -33,12 +33,16 @@
         
         .orders-container {
             display: flex;
-            flex-direction: column;
-            gap: 25px;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
         }
         
         .order {
             page-break-inside: avoid;
+            width: calc(50% - 20px);
+            min-width: 300px;
+            margin-bottom: 20px;
             padding: 15px;
             border: 1px solid #333;
             border-radius: 8px;
@@ -66,33 +70,26 @@
             font-size: 14px;
         }
         
-        .products-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin-bottom: 15px;
-        }
-        
         .product {
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            background-color: #f9f9f9;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #ddd;
         }
         
         .product-content {
             display: flex;
-            gap: 12px;
+            gap: 15px;
+            margin-bottom: 10px;
         }
         
         .product-image-container {
-            flex: 0 0 100px;
+            flex: 0 0 120px;
             text-align: center;
         }
         
         .product-image {
-            max-width: 100px;
-            max-height: 100px;
+            max-width: 120px;
+            max-height: 120px;
             width: auto;
             height: auto;
             object-fit: contain;
@@ -100,11 +97,12 @@
             border-radius: 5px;
             padding: 3px;
             background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         .no-image {
-            width: 100px;
-            height: 100px;
+            width: 120px;
+            height: 120px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -122,13 +120,13 @@
         .product-name {
             font-weight: bold;
             margin-bottom: 8px;
-            font-size: 15px;
+            font-size: 16px;
             color: #2c3e50;
         }
         
         .product-info {
             margin-bottom: 5px;
-            font-size: 13px;
+            font-size: 14px;
         }
         
         .product-info strong {
@@ -137,20 +135,27 @@
         
         .product-options {
             margin-top: 10px;
-            padding: 8px 0;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border: 1px solid #eee;
+        }
+        
+        .options-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            text-align: center;
+            color: #2c3e50;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #ddd;
         }
         
         .option {
-            margin-bottom: 4px;
-            font-size: 12px;
+            margin-bottom: 5px;
+            font-size: 13px;
             display: flex;
             justify-content: space-between;
-            padding: 2px 5px;
-        }
-        
-        .option:nth-child(odd) {
-            background-color: #f0f0f0;
-            border-radius: 3px;
         }
         
         .option-name {
@@ -191,17 +196,17 @@
         }
         
         .compact-view .product-image-container {
-            flex: 0 0 80px;
+            flex: 0 0 100px;
         }
         
         .compact-view .product-image {
-            max-width: 80px;
-            max-height: 80px;
+            max-width: 100px;
+            max-height: 100px;
         }
         
         .compact-view .no-image {
-            width: 80px;
-            height: 80px;
+            width: 100px;
+            height: 100px;
         }
         
         .compact-view .product-name {
@@ -226,6 +231,7 @@
                 border: 1px solid #000;
                 background-color: white;
                 page-break-inside: avoid;
+                width: calc(50% - 10px);
             }
             
             .product {
@@ -245,7 +251,7 @@
             }
             
             .product-info, .option {
-                font-size: 11px;
+                font-size: 12px;
             }
             
             .barcode-image {
@@ -256,16 +262,11 @@
             .barcode-number {
                 font-size: 13px;
             }
-            
-            .products-grid {
-                grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-                gap: 12px;
-            }
         }
         
         @media (max-width: 768px) {
-            .products-grid {
-                grid-template-columns: 1fr;
+            .order {
+                width: 100%;
             }
         }
     </style>
@@ -293,46 +294,43 @@
                     <div class="order-date">تاريخ الطلب: {{ order.created_at }}</div>
                 </div>
                 
-                <div class="products-grid">
-                    {% for item in order.order_items %}
-                    <div class="product">
-                        <div class="product-content">
-                            <div class="product-image-container">
-                                {% if item.main_image %}
-                                <img src="{{ item.main_image }}" alt="{{ item.name }}" class="product-image">
-                                {% else %}
-                                <div class="no-image">لا توجد صورة</div>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="product-details">
-                                <div class="product-name">{{ item.name }}</div>
-                                
-                                {% if item.price %}
-                                <div class="product-info">
-                                    <strong>السعر:</strong> {{ item.price }} ر.س
-                                </div>
-                                {% endif %}
-                                
-                                <div class="product-info">
-                                    <strong>الكمية:</strong> {{ item.quantity }}
-                                </div>
-                            </div>
+                {% for item in order.order_items %}
+                <div class="product">
+                    <div class="product-content">
+                        <div class="product-image-container">
+                            {% if item.main_image %}
+                            <img src="{{ item.main_image }}" alt="{{ item.name }}" class="product-image">
+                            {% else %}
+                            <div class="no-image">لا توجد صورة</div>
+                            {% endif %}
                         </div>
                         
-                        {% if item.options %}
-                        <div class="product-options">
-                            {% for option in item.options %}
-                            <div class="option">
-                                <span class="option-name">{{ option.name }}:</span>
-                                <span class="option-value">{{ option.value }}</span>
+                        <div class="product-details">
+                            <div class="product-name">{{ item.name }}</div>
+                            <div class="product-info">
+                                <strong>الكمية:</strong> {{ item.quantity }}
                             </div>
-                            {% endfor %}
+                            {% if item.price %}
+                            <div class="product-info">
+                                <strong>السعر:</strong> {{ item.price }} ر.س
+                            </div>
+                            {% endif %}
                         </div>
-                        {% endif %}
                     </div>
-                    {% endfor %}
+                    
+                    {% if item.options %}
+                    <div class="product-options">
+                        <div class="options-title">خيارات المنتج</div>
+                        {% for option in item.options %}
+                        <div class="option">
+                            <span class="option-name">{{ option.name }}:</span>
+                            <span class="option-value">{{ option.value }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
+                {% endfor %}
                 
                 <div class="barcode-section">
                     {% if order.barcode %}
@@ -345,8 +343,8 @@
                 </div>
             </div>
             
-            {% if not loop.last %}
-            <div class="separator"></div>
+            {% if not loop.last and loop.index % 2 == 0 %}
+            <div class="separator page-break"></div>
             {% endif %}
             {% endfor %}
         </div>
