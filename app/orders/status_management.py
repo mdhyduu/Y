@@ -83,7 +83,8 @@ def update_order_status(order_id):
 
 
 @orders_bp.route('/int:order_id/add_status_note', methods=['POST'])
-def add_status_note(order_id): user, employee = get_user_from_cookies()
+def add_status_note(order_id): 
+    user, employee = get_user_from_cookies()
     
     if not user:
         flash("الرجاء تسجيل الدخول أولاً", "error")
@@ -158,7 +159,7 @@ def add_status_note(order_id): user, employee = get_user_from_cookies()
             flash("تم حفظ الملاحظة بنجاح", "success")
         
         handle_status_transitions(order_id, status_flag, custom_status_id)
-    
+     
     except Exception as e:
         db.session.rollback()
         flash(f"حدث خطأ: {str(e)}", "error")
