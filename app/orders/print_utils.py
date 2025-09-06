@@ -107,15 +107,7 @@ def get_quick_list_data():
         return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
     
     # التحقق من الصلاحيات
-    is_reviewer = False
-    if request.cookies.get('is_admin') == 'true':
-        is_reviewer = True
-    else:
-        if employee and employee.role in ['reviewer', 'manager']:
-            is_reviewer = True
     
-    if not is_reviewer:
-        return jsonify({'success': False, 'error': 'غير مصرح لك بهذا الإجراء'}), 403
     
     data = request.get_json()
     order_ids = data.get('order_ids', [])
