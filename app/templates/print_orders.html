@@ -5,161 +5,155 @@
 {% block styles %}
 {{ super() }}
 <style>
-    /* إعدادات الصفحة الأساسية للطباعة */
     @page {
         size: A4;
-        margin: 1cm; /* هامش أكبر قليلاً لتجنب قطع المحتوى */
+        margin: 1cm;
     }
-    
-    /* إخفاء العناصر غير المرغوب فيها عند الطباعة (مثل شريط التنقل في القالب الأساسي) */
+
+    /* إعدادات الطباعة العامة */
     @media print {
         body {
-            font-size: 10px; /* تصغير الخط العام قليلاً */
+            font-size: 10px;
             background-color: #fff;
+            color: #000;
         }
         .no-print {
             display: none !important;
         }
         .order-card {
-            border: 1px solid #555; /* حدود أوضح للطباعة */
+            border: 1px solid #000;
             box-shadow: none;
+            margin-bottom: 10mm; /* إضافة مسافة أكبر بين الطلبات عند الطباعة */
+        }
+        /* تعديل الشبكة للطباعة لتناسب عرض A4 بشكل أفضل */
+        .order-items-grid {
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
         }
     }
-    
-    /* تنسيق المحتوى الرئيسي */
+
+    /* حاوية الطباعة الرئيسية */
     .print-container {
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         color: #333;
-        line-height: 1.4;
     }
-    
+
     .print-header {
         text-align: center;
         margin-bottom: 20px;
-        border-bottom: 2px solid #eee;
         padding-bottom: 10px;
     }
     
     /* بطاقة الطلب الرئيسية */
     .order-card {
-        page-break-inside: avoid; /* محاولة منع كسر البطاقة بين الصفحات */
-        margin-bottom: 15px;
+        page-break-inside: avoid;
+        margin-bottom: 20px;
         border: 1px solid #ddd;
         border-radius: 8px;
         background-color: #fff;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        overflow: hidden; /* لضمان احتواء كل شيء داخل الحدود */
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
     }
     
     .order-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 10px 15px;
-        background-color: #f9f9f9;
-        border-bottom: 1px solid #eee;
+        padding: 12px 15px;
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
     }
     
     .order-id {
-        font-size: 16px;
+        font-size: 18px;
         font-weight: bold;
     }
     
     .order-date {
-        font-size: 12px;
-        color: #666;
+        font-size: 13px;
+        color: #6c757d;
     }
     
-    .order-items-container {
+    /* حاوية المنتجات بنظام الشبكة (Grid) - هذا هو التغيير الجوهري */
+    .order-items-grid {
+        display: grid;
+        /* إنشاء أعمدة مرنة تتكيف مع المساحة المتاحة */
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 15px; /* المسافة بين بطاقات المنتجات */
+        padding: 15px;
+    }
+    
+    /* بطاقة المنتج الواحد داخل الشبكة */
+    .product-card {
+        border: 1px solid #eee;
+        border-radius: 6px;
+        background-color: #fff;
         padding: 10px;
-    }
-    
-    /* تصميم المنتج الواحد (الأهم) */
-    .product-item {
-        display: flex; /* <-- هذا هو مفتاح التصميم الجديد */
-        align-items: flex-start;
-        gap: 15px; /* مسافة بين الصورة والتفاصيل */
-        padding: 10px 0;
-        page-break-inside: avoid;
-    }
-    /* إضافة خط فاصل بين المنتجات ما عدا الأخير */
-    .product-item:not(:last-child) {
-        border-bottom: 1px dashed #ccc;
-    }
-    
-    .product-image-col {
-        flex: 0 0 100px; /* عرض ثابت للصورة: لا تكبر، لا تصغر، العرض 100 بكسل */
         text-align: center;
+        page-break-inside: avoid; /* محاولة منع كسر البطاقة نفسها */
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     }
     
     .product-image {
         max-width: 100%;
-        height: auto;
-        border-radius: 4px;
-        border: 1px solid #eee;
+        height: 150px; /* ارتفاع ثابت للصورة */
+        object-fit: contain; /* لضمان ظهور الصورة كاملة دون قص */
+        margin-bottom: 10px;
     }
     
     .no-image {
-        width: 100px;
-        height: 100px;
+        width: 100%;
+        height: 150px;
         display: flex;
         align-items: center;
         justify-content: center;
         background: #f5f5f5;
         border: 1px solid #eee;
         border-radius: 4px;
-        font-size: 11px;
+        font-size: 14px;
         color: #999;
-    }
-    
-    .product-details-col {
-        flex: 1; /* يأخذ باقي المساحة المتاحة */
+        margin-bottom: 10px;
     }
     
     .product-name {
         font-weight: bold;
-        font-size: 14px;
-        margin-bottom: 5px;
+        font-size: 15px;
+        margin-bottom: 8px;
     }
     
     .product-info {
-        font-size: 12px;
-        margin-bottom: 8px;
+        font-size: 13px;
+        margin-bottom: 10px;
+        font-weight: bold;
+        color: #007bff; /* تمييز الكمية بلون مختلف */
     }
     
     .product-options {
         font-size: 12px;
-        background-color: #fafafa;
-        border: 1px solid #eee;
-        border-radius: 4px;
-        padding: 8px;
+        text-align: right; /* محاذاة الخيارات لليمين لترتيب أفضل */
+        background-color: #fdfdfd;
+        border-top: 1px dashed #eee;
+        padding-top: 10px;
+        margin-top: 10px;
     }
     
     .option {
-        display: flex;
+        margin-bottom: 5px;
     }
     
     .option-name {
         font-weight: bold;
-        color: #555;
-        min-width: 60px; /* لترتيب الخيارات تحت بعضها */
+        color: #666;
     }
-    
-    .option-value {
-        margin-right: 5px;
-    }
-    
-    /* تذييل الطلب (الباركود) */
+
     .order-footer {
         text-align: center;
         padding: 15px;
-        border-top: 1px solid #eee;
-        background-color: #f9f9f9;
+        border-top: 1px solid #dee2e6;
+        background-color: #f8f9fa;
     }
     
     .barcode-image {
-        max-width: 250px;
-        height: 50px; /* تقليل ارتفاع الباركود */
+        max-width: 280px;
+        height: 55px;
     }
     
     .barcode-number {
@@ -167,10 +161,8 @@
         font-weight: bold;
         margin-top: 5px;
     }
-
 </style>
 {% endblock %}
-
 
 {% block content %}
 <div class="print-container">
@@ -178,7 +170,7 @@
         <h1>طباعة الطلبات</h1>
         <p>تم الإنشاء في: {{ current_time }}</p>
     </div>
-    
+
     {% for order in orders %}
     <div class="order-card">
         <div class="order-header">
@@ -186,34 +178,31 @@
             <div class="order-date">تاريخ الطلب: {{ order.created_at }}</div>
         </div>
         
-        <div class="order-items-container">
+        <div class="order-items-grid">
             {% for item in order.order_items %}
-            <div class="product-item">
-                <div class="product-image-col">
-                    {% if item.main_image %}
-                    <img src="{{ item.main_image }}" alt="{{ item.name }}" class="product-image">
-                    {% else %}
-                    <div class="no-image">لا توجد صورة</div>
-                    {% endif %}
+            <div class="product-card">
+                {% if item.main_image %}
+                <img src="{{ item.main_image }}" alt="{{ item.name }}" class="product-image">
+                {% else %}
+                <div class="no-image">لا توجد صورة</div>
+                {% endif %}
+                
+                <div class="product-name">{{ item.name }}</div>
+
+                <div class="product-info">
+                    الكمية: {{ item.quantity }}
                 </div>
                 
-                <div class="product-details-col">
-                    <div class="product-name">{{ item.name }}</div>
-                    <div class="product-info">
-                        <strong>الكمية:</strong> {{ item.quantity }}
+                {% if item.options %}
+                <div class="product-options">
+                    {% for option in item.options %}
+                    <div class="option">
+                        <span class="option-name">{{ option.name }}:</span>
+                        <span>{{ option.value }}</span>
                     </div>
-                    
-                    {% if item.options %}
-                    <div class="product-options">
-                        {% for option in item.options %}
-                        <div class="option">
-                            <span class="option-name">{{ option.name }}:</span>
-                            <span class="option-value">{{ option.value }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
+                    {% endfor %}
                 </div>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
@@ -232,13 +221,10 @@
 </div>
 {% endblock %}
 
-
 {% block scripts %}
 {{ super() }}
 <script>
-    // طباعة تلقائية عند تحميل الصفحة
     window.onload = function() {
-        // تأخير بسيط للتأكد من تحميل كل الصور قبل الطباعة
         setTimeout(function() {
             window.print();
         }, 500);
