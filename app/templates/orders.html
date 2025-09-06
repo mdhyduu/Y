@@ -1,7 +1,26 @@
 {% extends 'base.html' %}
 {% block styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/orders.css') }}">
-  
+       <style>
+   
+        /* ضبط z-index للنوافذ المنبثقة */
+        #changeStatusModal {
+            z-index: 1060;
+        }
+
+        #quickListModal {
+            z-index: 1050;
+        }
+
+        /* تأثيرات انتقال سلسة */
+        .modal {
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-backdrop {
+            transition: opacity 0.3s ease;
+        }
+    </style>
 {% endblock %}
 
 {% block content %} 
