@@ -31,24 +31,22 @@
             border-bottom: 2px solid #ddd;
         }
         
-        .orders-container {
-            display: flex;
-            flex-wrap: wrap;
+        .orders-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 20px;
             justify-content: center;
         }
         
         .order {
             page-break-inside: avoid;
-            width: calc(50% - 20px);
-            min-width: 300px;
-            margin-bottom: 20px;
             padding: 15px;
             border: 1px solid #333;
             border-radius: 8px;
             background-color: #fff;
             break-inside: avoid;
             box-sizing: border-box;
+            height: fit-content;
         }
         
         .order-header {
@@ -221,11 +219,15 @@
                 padding: 10px;
             }
             
+            .orders-grid {
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 15px;
+            }
+            
             .order {
                 border: 1px solid #000;
                 background-color: white;
                 page-break-inside: avoid;
-                width: calc(50% - 10px);
             }
             
             .product {
@@ -259,8 +261,8 @@
         }
         
         @media (max-width: 768px) {
-            .order {
-                width: 100%;
+            .orders-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -277,10 +279,13 @@
                 <button onclick="toggleCompactView()" class="no-print" style="padding: 8px 15px; background: #7f8c8d; color: white; border: none; border-radius: 4px; cursor: pointer;">
                     <i class="fas fa-compress"></i> عرض مضغوط
                 </button>
+                <button onclick="toggleLayout()" class="no-print" style="padding: 8px 15px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
+                    <i class="fas fa-th"></i> تبديل التخطيط
+                </button>
             </div>
         </div>
         
-        <div class="orders-container" id="orders-container">
+        <div class="orders-grid" id="orders-container">
             {% for order in orders %}
             <div class="order">
                 <div class="order-header">
@@ -348,10 +353,6 @@
                     {% endif %}
                 </div>
             </div>
-            
-            {% if not loop.last and loop.index % 2 == 0 %}
-            <div class="separator page-break"></div>
-            {% endif %}
             {% endfor %}
         </div>
     </div>
@@ -378,6 +379,26 @@
             } else {
                 compactButton.innerHTML = '<i class="fas fa-compress"></i> عرض مضغوط';
                 compactButton.style.background = '#7f8c8d';
+            }
+        }
+        
+        function toggleLayout() {
+            const container = document.getElementById('orders-container');
+            const layoutButton = document.querySelectorAll('button')[2];
+            
+            if (container.classList.contains('horizontal-layout')) {
+                container.classList.remove('horizontal-layout');
+                container.classList.add('vertical-layout');
+                layoutButton.innerHTML = '<i class="fas fa-th-list"></i> تخطيط عمودي';
+                layoutButton.style.background = '#3498db';
+            } else if (container.classList.contains('vertical-layout')) {
+                container.classList.remove('vertical-layout');
+                layoutButton.innerHTML = '<i class="fas fa-th"></i> تخطيط أفقي';
+                layoutButton.style.background = '#27ae60';
+            } else {
+                container.classList.add('horizontal-layout');
+                layoutButton.innerHTML = '<i class="fas fa-th-large"></i> تخطيط شبكي';
+                layoutButton.style.background = '#e74c3c';
             }
         }
     </script>
