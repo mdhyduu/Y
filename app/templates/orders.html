@@ -883,8 +883,15 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// تعديل معالج تأكيد تغيير الحالة للتعامل مع القائمة السريعة
-$(document).on('click', '#confirm-status-change', function() {
+// تعديل معالج تأكيد تغيير الحال
+    // 5. تغيير حالة الطلبات
+    $(document).on('click', '#change-status-btn', function() {
+        const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
+        $('#selected-count-modal').text(orderIds.length);
+        $('#changeStatusModal').modal('show');
+    });
+
+    $(document).on('click', '#confirm-status-change', function() {
     let orderIds;
     
     // التحقق مما إذا كانت الطلبات من القائمة السريعة
@@ -929,51 +936,7 @@ $(document).on('click', '#confirm-status-change', function() {
         const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم';
         showSweetAlert('error', 'حدث خطأ', errorMsg);
     });
-});
-    // 5. تغيير حالة الطلبات
-    $(document).on('click', '#change-status-btn', function() {
-        const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
-        $('#selected-count-modal').text(orderIds.length);
-        $('#changeStatusModal').modal('show');
-    });
-
-    $(document).on('click', '#confirm-status-change', function() {
-        const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
-        const statusId = $('#status-select').val();
-        const note = $('#status-note').val();
-        
-        if (!statusId) {
-            showSweetAlert('warning', 'تحذير', 'يجب اختيار حالة');
-            return;
-        }
-        
-        $('#changeStatusModal').modal('hide');
-        
-        $.ajax({
-            url: "{{ url_for('orders.bulk_update_status') }}",
-            type: "POST",
-            contentType: "application/json",
-            headers: { 'X-CSRFToken': csrfToken },
-            data: JSON.stringify({
-                order_ids: orderIds,
-                status_id: statusId,
-                note: note
-            }),
-        })
-        .done(function(response) {
-            if (response.success) {
-                showSweetAlert('success', 'نجح التحديث!', response.message);
-                setTimeout(() => location.reload(), 1500);
-            } else {
-                showSweetAlert('error', 'فشل التحديث', response.error);
-            }
-        })
-        .fail(function(xhr) {
-            const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم';
-            showSweetAlert('error', 'حدث خطأ', errorMsg);
-        });
-    });
-    
+}); 
     // 6. تطبيق الفلاتر مع تأخير للبحث
     $(document).on('submit', '#advanced-filters', function(e) {
         e.preventDefault();
