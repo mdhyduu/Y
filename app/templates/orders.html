@@ -2,25 +2,38 @@
 {% block styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/orders.css') }}">
        <style>
-   
-        /* ضبط z-index للنوافذ المنبثقة */
-        #changeStatusModal {
-            z-index: 1060;
+        /* تنسيقات الوضع الليلي للقائمة السريعة */
+        [data-bs-theme="dark"] #quickListModal .modal-content {
+            background-color: #333;
+            color: #fff;
         }
 
-        #quickListModal {
-            z-index: 1050;
+        [data-bs-theme="dark"] #quickListModal .modal-header {
+            border-bottom: 1px solid #555;
         }
 
-        /* تأثيرات انتقال سلسة */
-        .modal {
-            transition: opacity 0.3s ease;
+        [data-bs-theme="dark"] #quickListModal .modal-footer {
+            border-top: 1px solid #555;
         }
 
-        .modal-backdrop {
-            transition: opacity 0.3s ease;
+        [data-bs-theme="dark"] #quickListModal .card {
+            background-color: #444;
+            color: #fff;
+            border: 1px solid #555;
         }
-    </style>
+
+        [data-bs-theme="dark"] #quickListModal .form-check-label {
+            color: #fff;
+        }
+
+        [data-bs-theme="dark"] #quickListModal .text-muted {
+            color: #aaa !important;
+        }
+
+        [data-bs-theme="dark"] #quickListModal .border-top {
+            border-top: 1px solid #555 !important;
+        }
+  </style>
 {% endblock %}
 
 {% block content %} 
