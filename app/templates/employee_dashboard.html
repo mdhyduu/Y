@@ -5,69 +5,79 @@
     
     <div class="row g-3 mb-4">
         <div class="col-6 col-lg-3 col-xl">
-            <div class="card kpi-card border-0 border-start border-danger border-3 h-100">
-                <div class="card-body d-flex align-items-center p-3">
-                    <div class="kpi-icon bg-danger-soft text-danger me-3">
-                        <i class="fas fa-exclamation-circle"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-0 fw-bolder">{{ stats.missing_orders }}</h4>
-                        <p class="mb-0 text-muted small">واصل ناقص</p>
+            <a href="{{ url_for('orders.index') }}?status=missing" class="text-decoration-none">
+                <div class="card kpi-card border-0 border-start border-danger border-3 h-100">
+                    <div class="card-body d-flex align-items-center p-3">
+                        <div class="kpi-icon bg-danger-soft text-danger me-3">
+                            <i class="fas fa-exclamation-circle"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 fw-bolder">{{ stats.missing_orders }}</h4>
+                            <p class="mb-0 text-muted small">واصل ناقص</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </a>
         </div>
         <div class="col-6 col-lg-3 col-xl">
-            <div class="card kpi-card border-0 border-start border-warning border-3 h-100">
-                <div class="card-body d-flex align-items-center p-3">
-                    <div class="kpi-icon bg-warning-soft text-warning me-3">
-                        <i class="fas fa-clock"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-0 fw-bolder">{{ stats.late_orders }}</h4>
-                        <p class="mb-0 text-muted small">طلبات متأخرة</p>
+            <a href="{{ url_for('orders.index') }}?status=late" class="text-decoration-none">
+                <div class="card kpi-card border-0 border-start border-warning border-3 h-100">
+                    <div class="card-body d-flex align-items-center p-3">
+                        <div class="kpi-icon bg-warning-soft text-warning me-3">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 fw-bolder">{{ stats.late_orders }}</h4>
+                            <p class="mb-0 text-muted small">طلبات متأخرة</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </a>
         </div>
         <div class="col-6 col-lg-3 col-xl">
-            <div class="card kpi-card border-0 border-start border-primary border-3 h-100">
-                <div class="card-body d-flex align-items-center p-3">
-                    <div class="kpi-icon bg-primary-soft text-primary me-3">
-                        <i class="fas fa-shopping-cart"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-0 fw-bolder">{{ stats.new_orders }}</h4>
-                        <p class="mb-0 text-muted small">طلبات جديدة</p>
+            <a href="{{ url_for('orders.index') }}?status=new" class="text-decoration-none">
+                <div class="card kpi-card border-0 border-start border-primary border-3 h-100">
+                    <div class="card-body d-flex align-items-center p-3">
+                        <div class="kpi-icon bg-primary-soft text-primary me-3">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 fw-bolder">{{ stats.new_orders }}</h4>
+                            <p class="mb-0 text-muted small">طلبات جديدة</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </a>
         </div>
         <div class="col-6 col-lg-3 col-xl">
-            <div class="card kpi-card border-0 border-start border-dark border-3 h-100">
-                <div class="card-body d-flex align-items-center p-3">
-                    <div class="kpi-icon bg-dark-soft text-dark me-3">
-                        <i class="fas fa-undo-alt"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-0 fw-bolder">{{ stats.refunded_orders }}</h4>
-                        <p class="mb-0 text-muted small">مسترجع</p>
+            <a href="{{ url_for('orders.index') }}?status=refunded" class="text-decoration-none">
+                <div class="card kpi-card border-0 border-start border-dark border-3 h-100">
+                    <div class="card-body d-flex align-items-center p-3">
+                        <div class="kpi-icon bg-dark-soft text-dark me-3">
+                            <i class="fas fa-undo-alt"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 fw-bolder">{{ stats.refunded_orders }}</h4>
+                            <p class="mb-0 text-muted small">مسترجع</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </a>
         </div>
          <div class="col-12 col-lg-3 col-xl">
-            <div class="card kpi-card border-0 border-start border-info border-3 h-100">
-                <div class="card-body d-flex align-items-center p-3">
-                    <div class="kpi-icon bg-info-soft text-info me-3">
-                        <i class="fas fa-truck-loading"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-0 fw-bolder">{{ stats.not_shipped_orders }}</h4>
-                        <p class="mb-0 text-muted small">لم يتم الشحن</p>
+            <a href="{{ url_for('orders.index') }}?status=not_shipped" class="text-decoration-none">
+                <div class="card kpi-card border-0 border-start border-info border-3 h-100">
+                    <div class="card-body d-flex align-items-center p-3">
+                        <div class="kpi-icon bg-info-soft text-info me-3">
+                            <i class="fas fa-truck-loading"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 fw-bolder">{{ stats.not_shipped_orders }}</h4>
+                            <p class="mb-0 text-muted small">لم يتم الشحن</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </a>
         </div>
     </div>
 
@@ -105,29 +115,35 @@
             <div class="stats-grid-compact">
                 {% if selected_employee %}
                     {% for item in default_status_stats %}
-                    <div class="stat-card-compact" style="--status-color: {{ item.color }};">
-                        <div class="stat-content">
-                            <span class="stat-count">{{ item.count }}</span>
-                            <span class="stat-name">{{ item.name }}</span>
+                    <a href="{{ url_for('orders.index') }}?custom_status={{ item.id }}" class="text-decoration-none">
+                        <div class="stat-card-compact" style="--status-color: {{ item.color }};">
+                            <div class="stat-content">
+                                <span class="stat-count">{{ item.count }}</span>
+                                <span class="stat-name">{{ item.name }}</span>
+                            </div>
                         </div>
-                    </div>
+                    </a>
                     {% endfor %}
                     {% for item in custom_status_stats_selected %}
-                    <div class="stat-card-compact" style="--status-color: {{ item.color }};">
-                         <div class="stat-content">
-                            <span class="stat-count">{{ item.count }}</span>
-                            <span class="stat-name">{{ item.name }}</span>
+                    <a href="{{ url_for('orders.index') }}?custom_status={{ item.id }}" class="text-decoration-none">
+                        <div class="stat-card-compact" style="--status-color: {{ item.color }};">
+                             <div class="stat-content">
+                                <span class="stat-count">{{ item.count }}</span>
+                                <span class="stat-name">{{ item.name }}</span>
+                            </div>
                         </div>
-                    </div>
+                    </a>
                     {% endfor %}
                 {% else %}
                     {% for item in all_employee_status_stats %}
-               <div class="stat-card-compact" style="--status-color: {{ item.color }}; --status-color-rgb: {{ item.color | hex_to_rgb }};">
-                         <div class="stat-content">
-                            <span class="stat-count">{{ item.count }}</span>
-                            <span class="stat-name">{{ item.name }}</span>
+                    <a href="{{ url_for('orders.index') }}?custom_status={{ item.id }}" class="text-decoration-none">
+                        <div class="stat-card-compact" style="--status-color: {{ item.color }}; --status-color-rgb: {{ item.color | hex_to_rgb }};">
+                             <div class="stat-content">
+                                <span class="stat-count">{{ item.count }}</span>
+                                <span class="stat-name">{{ item.name }}</span>
+                            </div>
                         </div>
-                    </div>
+                    </a>
                     {% endfor %}
                 {% endif %}
             </div>
@@ -140,16 +156,16 @@
         <h5 class="mb-3 fw-bold"><i class="fas fa-stream me-2"></i>حالات المتابعة الخاصة بي</h5>
         <div class="stats-grid">
             {% for item in custom_status_stats %}
-            <div class="stat-card-item">
-                <a href="#" class="stat-card-link text-decoration-none">
+            <a href="{{ url_for('orders.index') }}?custom_status={{ item.status.id }}" class="text-decoration-none">
+                <div class="stat-card-item">
                     <div class="stat-card h-100" style="background-color: {{ item.status.color }}; color: {{ item.status.color | get_text_color }};">
                         <div class="stat-card-content">
                             <h5 class="mb-1 fw-bolder">{{ item.count }}</h5>
                             <p class="mb-0 small fw-medium">{{ item.status.name }}</p>
                         </div>
                     </div>
-                </a>
-            </div>
+                </div>
+            </a>
             {% endfor %}
         </div>
     </div>
