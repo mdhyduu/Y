@@ -234,8 +234,8 @@ def index():
                                 all_employees=all_employees,
                                 all_employee_status_stats=all_employee_status_stats,
                                 is_admin=True),
-                        base_orders_url=base_orders_url)  # إضافة base_url
-            
+                                base_orders_url=base_orders_url)  # إضافة base_url
+                
     
         # ... بقية الكود للموظفين غير المديرين
     
