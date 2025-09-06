@@ -142,9 +142,12 @@ def index():
             
             # جلب عدد المنتجات (افتراضي)
             products_count = 0
-            
             # إذا تم اختيار موظف معين
+            selected_employee = None
+            default_status_stats = []
+            custom_status_stats_selected = []
             if selected_employee_id:
+    
                 selected_employee = next((emp for emp in all_employees if emp.id == selected_employee_id), None)
                 if selected_employee:
                     # جلب الحالات التلقائية للموظف المحدد
