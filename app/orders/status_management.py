@@ -124,6 +124,15 @@ def add_status_note(order_id):
             # حالة تلقائية
             status_flag = status_type
         
+        # التحقق من تعارض الحالات قبل الإضافة
+        has_conflict, conflict_message = check_status_conflict(
+            order_id, status_flag, custom_status_id
+        )
+        
+        if has_conflict:
+            flash(conflict_message, "error")
+            return redirect(url_for('orders.order_details', order_id=order_id))
+        
         # إنشاء كائن الملاحظة الجديدة
         new_note = OrderStatusNote(
             order_id=str(order_id),
@@ -140,6 +149,10 @@ def add_status_note(order_id):
         
         db.session.add(new_note)
         db.session.commit()
+        
+        # إدارة تحولات الحالات تلقائياً
+        handle_status_transitions(order_id, status_flag, custom_status_id)
+        
         flash("تم حفظ الملاحظة بنجاح", "success")
     except Exception as e:
         db.session.rollback()
@@ -248,6 +261,15 @@ def add_employee_status(order_id):
         return redirect(url_for('orders.order_details', order_id=order_id))
     
     try:
+        # التحقق من تعارض الحالات قبل الإضافة
+        has_conflict, conflict_message = check_status_conflict(
+            order_id, 'custom', status_id
+        )
+        
+        if has_conflict:
+            flash(conflict_message, "error")
+            return redirect(url_for('orders.order_details', order_id=order_id))
+        
         new_status = OrderEmployeeStatus(
             order_id=str(order_id),
             status_id=status_id,
@@ -255,6 +277,10 @@ def add_employee_status(order_id):
         )
         db.session.add(new_status)
         db.session.commit()
+        
+        # إدارة تحولات الحالات تلقائياً
+        handle_status_transitions(order_id, 'custom', status_id)
+        
         flash('تم إضافة الحالة بنجاح', 'success')
     except Exception as e:
         db.session.rollback()
@@ -572,4 +598,109 @@ def cancel_product_status(order_id, product_id):
             'success': False, 
             'error': f'خطأ في الخادم: {str(e)}'
         }), 500
+# دوال مساعدة لإدارة تحولات الحالات
+def handle_status_transitions(order_id, new_status_type, custom_status_id=None):
+    """
+    إدارة التحولات بين الحالات بشكل تلقائي
+    - إزالة الطلب من الحالات السابقة عندما ينتقل إلى حالة أكثر تقدمًا
+    """
+    try:
+        # الحصول على اسم الحالة المخصصة إذا كانت موجودة
+        custom_status_name = None
+        if custom_status_id:
+            custom_status = EmployeeCustomStatus.query.get(custom_status_id)
+            if custom_status:
+                custom_status_name = custom_status.name
+
+        # قواعد التحول بين الحالات
+        status_rules = {
+            'تم التنفيذ': ['قيد التنفيذ', 'متأخر', 'معلق'],
+            'تم التوصيل': ['قيد التوصيل', 'متأخر', 'معلق'],
+            'قيد التوصيل': ['متأخر', 'معلق'],
+            'مستلم': ['متأخر', 'معلق', 'قيد التوصيل'],
+            'ملغى': ['قيد التنفيذ', 'متأخر', 'معلق']
+        }
+
+        # الحالات التي يجب إزالتها عند إضافة الحالة الجديدة
+        statuses_to_remove = []
+
+        if new_status_type in status_rules:
+            statuses_to_remove = status_rules[new_status_type]
+        elif custom_status_name in status_rules:
+            statuses_to_remove = status_rules[custom_status_name]
+
+        # إزالة الحالات القديمة
+        for status_name in statuses_to_remove:
+            # البحث عن الحالات المخصصة بهذا الاسم
+            statuses = EmployeeCustomStatus.query.filter_by(name=status_name).all()
+            for status in statuses:
+                # حذف سجلات حالة الموظف المرتبطة
+                OrderEmployeeStatus.query.filter_by(
+                    order_id=str(order_id),
+                    status_id=status.id
+                ).delete()
+                
+                # حذف ملاحظات الحالة المرتبطة
+                OrderStatusNote.query.filter_by(
+                    order_id=str(order_id),
+                    status_flag=status_name
+                ).delete()
+
+        db.session.commit()
+        return True
         
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error in handle_status_transitions: {str(e)}", exc_info=True)
+        return False
+
+def check_status_conflict(order_id, new_status_type, custom_status_id=None):
+    """
+    التحقق من وجود تعارض بين الحالة الجديدة والحالات الحالية
+    """
+    try:
+        # الحصول على الحالات الحالية للطلب
+        current_employee_statuses = OrderEmployeeStatus.query.filter_by(
+            order_id=str(order_id)
+        ).all()
+        
+        current_status_notes = OrderStatusNote.query.filter_by(
+            order_id=str(order_id)
+        ).all()
+
+        # الحالات المتعارضة (لا يمكن وجودها معاً)
+        conflict_rules = {
+            'تم التنفيذ': ['ملغى', 'مسترجعة'],
+            'ملغى': ['تم التنفيذ', 'قيد التنفيذ', 'تم التوصيل'],
+            'مسترجعة': ['تم التنفيذ', 'قيد التنفيذ', 'تم التوصيل']
+        }
+
+        # جمع جميع الحالات الحالية
+        current_statuses = []
+        for status in current_employee_statuses:
+            custom_status = EmployeeCustomStatus.query.get(status.status_id)
+            if custom_status:
+                current_statuses.append(custom_status.name)
+        
+        for note in current_status_notes:
+            if note.status_flag and note.status_flag not in current_statuses:
+                current_statuses.append(note.status_flag)
+
+        # الحصول على اسم الحالة الجديدة
+        new_status_name = new_status_type
+        if custom_status_id:
+            custom_status = EmployeeCustomStatus.query.get(custom_status_id)
+            if custom_status:
+                new_status_name = custom_status.name
+
+        # التحقق من التعارض
+        if new_status_name in conflict_rules:
+            for conflicting_status in conflict_rules[new_status_name]:
+                if conflicting_status in current_statuses:
+                    return True, f"لا يمكن إضافة حالة '{new_status_name}' مع وجود حالة '{conflicting_status}'"
+
+        return False, ""
+        
+    except Exception as e:
+        current_app.logger.error(f"Error in check_status_conflict: {str(e)}", exc_info=True)
+        return True, f"حدث خطأ في التحقق من التعارض: {str(e)}"
