@@ -599,52 +599,74 @@ def cancel_product_status(order_id, product_id):
             'error': f'خطأ في الخادم: {str(e)}'
         }), 500
 # دوال مساعدة لإدارة تحولات الحالات
+# إضافة قاموس الأولويات في بداية الملف
+STATUS_PRIORITIES = {
+    'قيد التنفيذ': 1,
+    'تم التنفيذ': 2,
+    'جاهز للشحن': 3,
+    'تم الشحن': 4,
+    'جاري التوصيل': 5,
+    'تم التوصيل': 6
+}
+
+# تعديل دالة handle_status_transitions
 def handle_status_transitions(order_id, new_status_type, custom_status_id=None):
     """
-    إدارة التحولات بين الحالات بشكل تلقائي
-    - إزالة الطلب من الحالات السابقة عندما ينتقل إلى حالة أكثر تقدمًا
+    إدارة التحولات بين الحالات بشكل تلقائي حسب الأولوية
+    - إزالة الحالات الأقل أولوية عند إضافة حالة جديدة أعلى أولوية
     """
     try:
-        # الحصول على اسم الحالة المخصصة إذا كانت موجودة
-        custom_status_name = None
+        # الحصول على اسم الحالة الجديدة
+        new_status_name = new_status_type
         if custom_status_id:
             custom_status = EmployeeCustomStatus.query.get(custom_status_id)
             if custom_status:
-                custom_status_name = custom_status.name
+                new_status_name = custom_status.name
 
-        # قواعد التحول بين الحالات
-        status_rules = {
-            'تم التنفيذ': ['قيد التنفيذ', 'متأخر', 'معلق'],
-            'تم التوصيل': ['قيد التوصيل', 'متأخر', 'معلق'],
-            'قيد التوصيل': ['متأخر', 'معلق'],
-            'مستلم': ['متأخر', 'معلق', 'قيد التوصيل'],
-            'ملغى': ['قيد التنفيذ', 'متأخر', 'معلق']
-        }
+        # الحصول على أولوية الحالة الجديدة
+        new_priority = STATUS_PRIORITIES.get(new_status_name, 0)
 
-        # الحالات التي يجب إزالتها عند إضافة الحالة الجديدة
-        statuses_to_remove = []
-
-        if new_status_type in status_rules:
-            statuses_to_remove = status_rules[new_status_type]
-        elif custom_status_name in status_rules:
-            statuses_to_remove = status_rules[custom_status_name]
-
-        # إزالة الحالات القديمة
-        for status_name in statuses_to_remove:
-            # البحث عن الحالات المخصصة بهذا الاسم
-            statuses = EmployeeCustomStatus.query.filter_by(name=status_name).all()
-            for status in statuses:
-                # حذف سجلات حالة الموظف المرتبطة
-                OrderEmployeeStatus.query.filter_by(
-                    order_id=str(order_id),
-                    status_id=status.id
-                ).delete()
-                
-                # حذف ملاحظات الحالة المرتبطة
-                OrderStatusNote.query.filter_by(
-                    order_id=str(order_id),
-                    status_flag=status_name
-                ).delete()
+        # إذا كانت الحالة الجديدة لها أولوية، نبحث عن الحالات الأقل أولوية لإزالتها
+        if new_priority > 0:
+            # جلب جميع الحالات الحالية للطلب
+            current_statuses = []
+            
+            # جلب حالات الموظفين
+            employee_statuses = OrderEmployeeStatus.query.filter_by(
+                order_id=str(order_id)
+            ).all()
+            
+            for status in employee_statuses:
+                custom_status = EmployeeCustomStatus.query.get(status.status_id)
+                if custom_status and custom_status.name in STATUS_PRIORITIES:
+                    current_statuses.append({
+                        'id': status.id,
+                        'name': custom_status.name,
+                        'priority': STATUS_PRIORITIES[custom_status.name],
+                        'type': 'employee'
+                    })
+            
+            # جلب ملاحظات الحالة
+            status_notes = OrderStatusNote.query.filter_by(
+                order_id=str(order_id)
+            ).all()
+            
+            for note in status_notes:
+                if note.status_flag in STATUS_PRIORITIES:
+                    current_statuses.append({
+                        'id': note.id,
+                        'name': note.status_flag,
+                        'priority': STATUS_PRIORITIES[note.status_flag],
+                        'type': 'note'
+                    })
+            
+            # إزالة الحالات الأقل أولوية
+            for status in current_statuses:
+                if status['priority'] < new_priority:
+                    if status['type'] == 'employee':
+                        OrderEmployeeStatus.query.filter_by(id=status['id']).delete()
+                    elif status['type'] == 'note':
+                        OrderStatusNote.query.filter_by(id=status['id']).delete()
 
         db.session.commit()
         return True
@@ -653,7 +675,6 @@ def handle_status_transitions(order_id, new_status_type, custom_status_id=None):
         db.session.rollback()
         current_app.logger.error(f"Error in handle_status_transitions: {str(e)}", exc_info=True)
         return False
-
 def check_status_conflict(order_id, new_status_type, custom_status_id=None):
     """
     التحقق من وجود تعارض بين الحالة الجديدة والحالات الحالية
