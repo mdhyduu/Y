@@ -224,6 +224,7 @@ def index():
             # تحويل القاموس إلى قائمة
             all_employee_status_stats = list(status_stats_dict.values())
             base_orders_url = url_for('orders.index')
+            
             return render_template('dashboard.html', 
                                 current_user=user,
                                 stats=stats,
@@ -232,10 +233,11 @@ def index():
                                 employees_count=employees_count,
                                 products_count=products_count,
                                 all_employees=all_employees,
-                                all_employee_status_stats=all_employee_status_stats,
-                                is_admin=True),
-                                base_orders_url=base_orders_url)  # إضافة base_url
-                
+                                selected_employee=selected_employee,
+                                default_status_stats=default_status_stats,
+                                custom_status_stats_selected=custom_status_stats_selected,
+                                is_admin=True,
+                                base_orders_url=base_orders_url)  # إضافة base_url                
     
         # ... بقية الكود للموظفين غير المديرين
     
