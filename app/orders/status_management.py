@@ -84,158 +84,160 @@ def update_order_status(order_id):
 
 @orders_bp.route('/int:order_id/add_status_note', methods=['POST'])
 def add_status_note(order_id): user, employee = get_user_from_cookies()
-
-if not user:
-    flash("الرجاء تسجيل الدخول أولاً", "error")
-    response = make_response(redirect(url_for('user_auth.login')))
-    response.set_cookie('user_id', '', expires=0)
-    response.set_cookie('is_admin', '', expires=0)
-    return response
-
-# التحقق من الصلاحية: فقط المراجعون والمديرون
-is_reviewer = False
-if request.cookies.get('is_admin') == 'true':
-    is_reviewer = True
-else:
-    if employee and employee.role in ['reviewer', 'manager']:
+    
+    if not user:
+        flash("الرجاء تسجيل الدخول أولاً", "error")
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
+    
+    # التحقق من الصلاحية: فقط المراجعون والمديرون
+    is_reviewer = False
+    if request.cookies.get('is_admin') == 'true':
         is_reviewer = True
-
-if not is_reviewer:
-    flash('غير مصرح لك بهذا الإجراء', 'error')
-    return redirect(url_for('orders.order_details', order_id=order_id))
-
-status_type = request.form.get('status_type')
-note = request.form.get('note', '')
-
-if not status_type:
-    flash("يجب اختيار حالة", "error")
-    return redirect(url_for('orders.order_details', order_id=order_id))
-
-try:
-    custom_status_id = None
-    status_flag = None
-    
-    if status_type.startswith('custom_'):
-        custom_status_id = status_type.split('_')[1]
-        status_flag = "custom"
     else:
-        status_flag = status_type
+        if employee and employee.role in ['reviewer', 'manager']:
+            is_reviewer = True
     
-    has_conflict, conflict_message = check_status_conflict(
-        order_id, status_flag, custom_status_id
-    )
-    
-    if has_conflict:
-        flash(conflict_message, "error")
+    if not is_reviewer:
+        flash('غير مصرح لك بهذا الإجراء', 'error')
         return redirect(url_for('orders.order_details', order_id=order_id))
     
-    # ✅ تحديث أو إنشاء جديد
-    existing_note = OrderStatusNote.query.filter_by(
-        order_id=str(order_id),
-        status_flag=status_flag,
-        custom_status_id=custom_status_id
-    ).first()
-
-    if existing_note:
-        existing_note.note = note
-        existing_note.updated_at = datetime.utcnow()
-        db.session.commit()
-        flash("تم تحديث الملاحظة بنجاح", "success")
-    else:
-        new_note = OrderStatusNote(
+    status_type = request.form.get('status_type')
+    note = request.form.get('note', '')
+    
+    if not status_type:
+        flash("يجب اختيار حالة", "error")
+        return redirect(url_for('orders.order_details', order_id=order_id))
+    
+    try:
+        custom_status_id = None
+        status_flag = None
+        
+        if status_type.startswith('custom_'):
+            custom_status_id = status_type.split('_')[1]
+            status_flag = "custom"
+        else:
+            status_flag = status_type
+        
+        has_conflict, conflict_message = check_status_conflict(
+            order_id, status_flag, custom_status_id
+        )
+        
+        if has_conflict:
+            flash(conflict_message, "error")
+            return redirect(url_for('orders.order_details', order_id=order_id))
+        
+        # ✅ تحديث أو إنشاء جديد
+        existing_note = OrderStatusNote.query.filter_by(
             order_id=str(order_id),
             status_flag=status_flag,
-            custom_status_id=custom_status_id,
-            note=note
-        )
-        if request.cookies.get('is_admin') == 'true':
-            new_note.admin_id = request.cookies.get('user_id')
+            custom_status_id=custom_status_id
+        ).first()
+    
+        if existing_note:
+            existing_note.note = note
+            existing_note.updated_at = datetime.utcnow()
+            db.session.commit()
+            flash("تم تحديث الملاحظة بنجاح", "success")
         else:
-            new_note.employee_id = employee.id
+            new_note = OrderStatusNote(
+                order_id=str(order_id),
+                status_flag=status_flag,
+                custom_status_id=custom_status_id,
+                note=note
+            )
+            if request.cookies.get('is_admin') == 'true':
+                new_note.admin_id = request.cookies.get('user_id')
+            else:
+                new_note.employee_id = employee.id
+            
+            db.session.add(new_note)
+            db.session.commit()
+            flash("تم حفظ الملاحظة بنجاح", "success")
         
-        db.session.add(new_note)
-        db.session.commit()
-        flash("تم حفظ الملاحظة بنجاح", "success")
+        handle_status_transitions(order_id, status_flag, custom_status_id)
     
-    handle_status_transitions(order_id, status_flag, custom_status_id)
-
-except Exception as e:
-    db.session.rollback()
-    flash(f"حدث خطأ: {str(e)}", "error")
-    current_app.logger.error(f"Error adding status note: {str(e)}", exc_info=True)
-
-return redirect(url_for('orders.order_details', order_id=order_id))
-
-@orders_bp.route('/int:order_id/add_employee_status', methods=['POST']) def add_employee_status(order_id): user, employee = get_user_from_cookies()
-
-if not user:
-    flash('الرجاء تسجيل الدخول أولاً', 'error')
-    response = make_response(redirect(url_for('user_auth.login')))
-    response.set_cookie('user_id', '', expires=0)
-    response.set_cookie('is_admin', '', expires=0)
-    return response
-
-if request.cookies.get('is_admin') == 'true':
-    flash('هذه الخدمة للموظفين فقط', 'error')
-    return redirect(url_for('orders.order_details', order_id=order_id))
-
-if not employee:
-    flash('غير مصرح لك بهذا الإجراء', 'error')
-    return redirect(url_for('orders.order_details', order_id=order_id))
-
-status_id = request.form.get('status_id')
-note = request.form.get('note', '')
-
-if not status_id:
-    flash('يجب اختيار حالة', 'error')
-    return redirect(url_for('orders.order_details', order_id=order_id))
-
-custom_status = EmployeeCustomStatus.query.filter_by(
-    id=status_id,
-    employee_id=employee.id
-).first()
-
-if not custom_status:
-    flash('الحالة المحددة غير صالحة', 'error')
-    return redirect(url_for('orders.order_details', order_id=order_id))
-
-try:
-    has_conflict, conflict_message = check_status_conflict(
-        order_id, 'custom', status_id
-    )
+    except Exception as e:
+        db.session.rollback()
+        flash(f"حدث خطأ: {str(e)}", "error")
+        current_app.logger.error(f"Error adding status note: {str(e)}", exc_info=True)
     
-    if has_conflict:
-        flash(conflict_message, "error")
+    return redirect(url_for('orders.order_details', order_id=order_id))
+
+@orders_bp.route('/int:order_id/add_employee_status', methods=['POST']) 
+def add_employee_status(order_id):
+    user, employee = get_user_from_cookies()
+
+    if not user:
+        flash('الرجاء تسجيل الدخول أولاً', 'error')
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
+    
+    if request.cookies.get('is_admin') == 'true':
+        flash('هذه الخدمة للموظفين فقط', 'error')
         return redirect(url_for('orders.order_details', order_id=order_id))
     
-    # ✅ تحديث أو إنشاء جديد
-    existing_status = OrderEmployeeStatus.query.filter_by(
-        order_id=str(order_id),
-        status_id=status_id
+    if not employee:
+        flash('غير مصرح لك بهذا الإجراء', 'error')
+        return redirect(url_for('orders.order_details', order_id=order_id))
+    
+    status_id = request.form.get('status_id')
+    note = request.form.get('note', '')
+    
+    if not status_id:
+        flash('يجب اختيار حالة', 'error')
+        return redirect(url_for('orders.order_details', order_id=order_id))
+    
+    custom_status = EmployeeCustomStatus.query.filter_by(
+        id=status_id,
+        employee_id=employee.id
     ).first()
-
-    if existing_status:
-        existing_status.note = note
-        existing_status.updated_at = datetime.utcnow()
-        db.session.commit()
-        flash("تم تحديث الحالة بنجاح", "success")
-    else:
-        new_status = OrderEmployeeStatus(
-            order_id=str(order_id),
-            status_id=status_id,
-            note=note
+    
+    if not custom_status:
+        flash('الحالة المحددة غير صالحة', 'error')
+        return redirect(url_for('orders.order_details', order_id=order_id))
+    
+    try:
+        has_conflict, conflict_message = check_status_conflict(
+            order_id, 'custom', status_id
         )
-        db.session.add(new_status)
-        db.session.commit()
-        flash('تم إضافة الحالة بنجاح', 'success')
+        
+        if has_conflict:
+            flash(conflict_message, "error")
+            return redirect(url_for('orders.order_details', order_id=order_id))
+        
+        # ✅ تحديث أو إنشاء جديد
+        existing_status = OrderEmployeeStatus.query.filter_by(
+            order_id=str(order_id),
+            status_id=status_id
+        ).first()
     
-    handle_status_transitions(order_id, 'custom', status_id)
+        if existing_status:
+            existing_status.note = note
+            existing_status.updated_at = datetime.utcnow()
+            db.session.commit()
+            flash("تم تحديث الحالة بنجاح", "success")
+        else:
+            new_status = OrderEmployeeStatus(
+                order_id=str(order_id),
+                status_id=status_id,
+                note=note
+            )
+            db.session.add(new_status)
+            db.session.commit()
+            flash('تم إضافة الحالة بنجاح', 'success')
+        
+        handle_status_transitions(order_id, 'custom', status_id)
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ: {str(e)}', 'error')
     
-except Exception as e:
-    db.session.rollback()
-    flash(f'حدث خطأ: {str(e)}', 'error')
-
-return redirect(url_for('orders.order_details', order_id=order_id))
+    return redirect(url_for('orders.order_details', order_id=order_id))
 
 
 @orders_bp.route('/employee_status', methods=['GET', 'POST'])
