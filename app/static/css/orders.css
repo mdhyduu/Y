@@ -212,7 +212,37 @@ body.dark-mode .badge[style*="background-color"] {
 /* "No orders" state */
 body.dark-mode .text-gray-300 { color: #4b5563 !important; }
 body.dark-mode .text-gray-600 { color: #d1d5db !important; }
+    /* تنسيقات الوضع الليلي للقائمة السريعة */
+body.dark-mode  .modal-content {
+            background-color: #333;
+            color: #fff;
+        }
 
+body.dark-mode  .modal-header {
+            border-bottom: 1px solid #555;
+        }
+
+body.dark-mode  .modal-footer {
+            border-top: 1px solid #555;
+        }
+
+body.dark-mode  .card {
+            background-color: #444;
+            color: #fff;
+            border: 1px solid #555;
+        }
+
+body.dark-mode  .form-check-label {
+            color: #fff;
+        }
+
+body.dark-mode  .text-muted {
+            color: #aaa !important;
+        }
+
+body.dark-mode  .border-top {
+            border-top: 1px solid #555 !important;
+        }
 .status-badge {
     padding: 0.25rem 0.5rem;
     border-radius: 0.25rem;
