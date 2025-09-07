@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from flask_mail import Message
 import random
-
+from . import mail
 user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
 
@@ -146,17 +146,15 @@ def register():
         # إرسال الإيميل مع معالجة الأخطاء
         try:
             msg = Message(
-                subject="رمز التحقق من البريد",
-                recipients=[email],
-                body=f"رمز التحقق الخاص بك هو: {new_user.otp_code}\nصالح لمدة 10 دقائق."
-            )
-            current_app.mail.send(msg)
-            flash('تم إنشاء الحساب! تحقق من بريدك وأدخل الرمز', 'info')
-        except Exception as e:
-            # في حالة فشل الإرسال، نعرض الرمز للمستخدم مباشرة للتطوير
-            logger.error(f"فشل إرسال البريد: {str(e)}")
-            flash(f'تم إنشاء الحساب! لكن حدث خطأ في إرسال البريد. رمز التحقق هو: {new_user.otp_code}', 'warning')
-
+                        subject="رمز التحقق من البريد",
+                        recipients=[email],
+                        body=f"رمز التحقق الخاص بك هو: {new_user.otp_code}\nصالح لمدة 10 دقائق."
+                    )
+                    mail.send(msg)  # Use mail directly instead of current_app.mail
+                    flash('تم إنشاء الحساب! تحقق من بريدك وأدخل الرمز', 'info')
+                except Exception as e:
+                    logger.error(f"فشل إرسال البريد: {str(e)}")
+                    flash(f'تم إنشاء الحساب! لكن حدث خطأ في إرسال البريد. رمز التحقق هو: {new_user.otp_code}', 'warning')            
         return redirect(url_for('user_auth.verify_otp', user_id=new_user.id))
     
     return render_template('auth/register.html', form=form)
@@ -193,15 +191,15 @@ def resend_verification(user_id):
 
     try:
         msg = Message(
-            subject="رمز تحقق جديد",
-            recipients=[user.email],
-            body=f"رمز التحقق الخاص بك هو: {user.otp_code}\nصالح لمدة 10 دقائق."
-        )
-        current_app.mail.send(msg)
-        return {"success": True, "message": "تم إرسال رمز جديد"}
-    except Exception as e:
-        logger.error(f"فشل إعادة إرسال البريد: {str(e)}")
-        return {"success": False, "message": f"فشل إرسال البريد: {str(e)}"}
+                    subject="رمز تحقق جديد",
+                    recipients=[user.email],
+                    body=f"رمز التحقق الخاص بك هو: {user.otp_code}\nصالح لمدة 10 دقائق."
+                )
+                mail.send(msg)  # Use mail directly
+                return {"success": True, "message": "تم إرسال رمز جديد"}
+            except Exception as e:
+                logger.error(f"فشل إعادة إرسال البريد: {str(e)}")
+                return {"success": False, "message": f"فشل إرسال البريد: {str(e)}"}
 # تسجيل الخروج
 @user_auth_bp.route('/logout')
 def logout():

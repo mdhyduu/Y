@@ -43,7 +43,9 @@ def create_app():
     db.init_app(app)
     csrf.init_app(app)
     mail.init_app(app)
-    # تسجيل النماذج مع سياق التطبيق
+ 
+    app.mail = mail  # Attach the mail instance to the app for use in blueprints
+        # تسجيل النماذج مع سياق التطبيق
     with app.app_context():
         from . import models
         db.create_all()
