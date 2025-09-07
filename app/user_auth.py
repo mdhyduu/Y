@@ -111,6 +111,12 @@ def login():
             db.session.rollback()
             flash('حدث خطأ أثناء تسجيل الدخول. يرجى المحاولة لاحقًا', 'danger')
             logger.error(f"خطأ في تسجيل الدخول: {str(e)}", exc_info=True)
+
+    response = make_response(render_template('auth/login.html', form=form))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
     
     return render_template('auth/login.html', form=form)
 
