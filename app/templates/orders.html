@@ -749,12 +749,26 @@ $(document).ready(function () {
             $(this).closest('tr').removeClass('selected-row');
         }
     });
-    document.addEventListener('DOMContentLoaded', function() {
-    // زر تحميل القالب مع الطلبات المحددة
-    document.getElementById('download-excel-btn').addEventListener('click', function() {
+ 
+// زر تحميل قالب Excel بالطلبات المحددة
+document.addEventListener('DOMContentLoaded', function() {
+    // إضافة زر جديد للتحميل المخصص
+    const downloadBtn = document.createElement('button');
+    downloadBtn.id = 'download-selected-excel-btn';
+    downloadBtn.className = 'btn btn-success me-2';
+    downloadBtn.innerHTML = '<i class="fas fa-download me-1"></i> تحميل الطلبات المحددة';
+    
+    // إضافة الزر إلى واجهة المستخدم
+    const quickActions = document.getElementById('quick-actions');
+    if (quickActions) {
+        quickActions.insertBefore(downloadBtn, quickActions.firstChild);
+    }
+
+    // معالج حدث النقر على زر التحميل
+    downloadBtn.addEventListener('click', function() {
         const selectedOrders = [];
         
-        // جمع الطلبات المحددة
+        // جمع الطلبات المحددة مع نوعها
         document.querySelectorAll('input.order-checkbox:checked').forEach(checkbox => {
             const row = checkbox.closest('tr');
             const orderId = row.dataset.orderId;
@@ -763,18 +777,53 @@ $(document).ready(function () {
         });
         
         if (selectedOrders.length === 0) {
-            showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للتحميل');
+            Swal.fire({
+                icon: 'warning',
+                title: 'تحذير',
+                text: 'لم يتم تحديد أي طلبات للتحميل',
+                confirmButtonText: 'موافق',
+                customClass: {
+                    confirmButton: 'btn btn-warning'
+                }
+            });
             return;
         }
         
         // إنشاء رابط التحميل مع المعلمات
         const url = `{{ url_for('orders.download_excel_template') }}?selected_orders=${encodeURIComponent(selectedOrders.join(','))}`;
         
-        // فتح الرابط في نافذة جديدة لبدء التحميل
-        window.open(url, '_blank');
+        // إنشاء رابط خفي للتحميل
+        const downloadLink = document.createElement('a');
+        downloadLink.href = url;
+        downloadLink.style.display = 'none';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        
+        // إظهار رسالة نجاح
+        Swal.fire({
+            icon: 'success',
+            title: 'جاري التحميل',
+            text: `سيتم تحميل ${selectedOrders.length} طلب`,
+            timer: 2000,
+            showConfirmButton: false
+        });
     });
-});
 
+    // تحديث حالة زر التحميل عند تغيير التحديدات
+    function updateDownloadButtonState() {
+        const checkedCount = document.querySelectorAll('input.order-checkbox:checked').length;
+        document.getElementById('download-selected-excel-btn').disabled = checkedCount === 0;
+    }
+
+    // إضافة مستمعي الأحداث لجميع صناديق التحديد
+    document.querySelectorAll('input.order-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', updateDownloadButtonState);
+    });
+
+    // التهيئة الأولية لحالة الزر
+    updateDownloadButtonState();
+});
 // تأكد من أن هذا الكود يعمل بعد تحميل DOM
 document.addEventListener('DOMContentLoaded', function() {
     // الحصول على عناصر DOM ذات الصلة
