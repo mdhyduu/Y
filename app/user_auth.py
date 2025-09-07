@@ -116,6 +116,8 @@ def login():
 
 
 # تسجيل حساب جديد
+# ... الكود السابق ...
+
 @user_auth_bp.route('/register', methods=['GET', 'POST'])
 @redirect_if_authenticated
 def register():
@@ -123,37 +125,40 @@ def register():
     if form.validate_on_submit():
         email = form.email.data
         password = form.password.data
-         
-        with current_app.app_context():
-            if User.query.filter_by(email=email).first():
-                flash('البريد الإلكتروني مسجل مسبقاً', 'danger')
-                return redirect(url_for('user_auth.register'))
+        
+        # إزالة with current_app.app_context() غير الضروري
+        if User.query.filter_by(email=email).first():
+            flash('البريد الإلكتروني مسجل مسبقاً', 'danger')
+            return redirect(url_for('user_auth.register'))
 
-            new_user = User(email=email)
-            new_user.set_password(password)
-            new_user.store_id = User.query.count() + 1  # Example: assign unique store_id
+        new_user = User(email=email)
+        new_user.set_password(password)
+        new_user.store_id = User.query.count() + 1
 
-            # إذا كان هذا هو المستخدم الأول، اجعله مسؤولاً
-            if User.query.count() == 0:
-                new_user.is_admin = True
+        if User.query.count() == 0:
+            new_user.is_admin = True
 
-            # توليد كود تحقق (OTP)
-            new_user.otp_code = str(random.randint(100000, 999999))
-            new_user.otp_expiration = datetime.utcnow() + timedelta(minutes=10)
+        new_user.otp_code = str(random.randint(100000, 999999))
+        new_user.otp_expiration = datetime.utcnow() + timedelta(minutes=10)
 
-            db.session.add(new_user)
-            db.session.commit()
+        db.session.add(new_user)
+        db.session.commit()
 
-            # إرسال الإيميل
+        # إرسال الإيميل
+        try:
             msg = Message("رمز التحقق من البريد", recipients=[email])
             msg.body = f"رمز التحقق الخاص بك هو: {new_user.otp_code}\nصالح لمدة 10 دقائق."
             current_app.mail.send(msg)
+        except Exception as e:
+            flash('حدث خطأ في إرسال البريد الإلكتروني', 'danger')
+            logger.error(f"خطأ في إرسال البريد: {str(e)}")
 
         flash('تم إنشاء الحساب! تحقق من بريدك وأدخل الرمز', 'info')
         return redirect(url_for('user_auth.verify_otp', user_id=new_user.id))
     
     return render_template('auth/register.html', form=form)
 
+# ... الكود اللاحق ...
 
 # التحقق من الكود
 @user_auth_bp.route('/verify/<int:user_id>', methods=['GET', 'POST'])
