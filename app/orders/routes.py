@@ -801,9 +801,9 @@ def download_excel_template():
     
     # إنشاء DataFrame
     df = pd.DataFrame(data)
-    
+     
     # إنشاء Excel في الذاكرة
-    output = BytesIo()
+    output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name='الطلبات', index=False)
         
@@ -820,7 +820,7 @@ def download_excel_template():
         from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, OneCellAnchor
         from openpyxl.utils import get_column_letter
         import requests
-        from io import BytesIO
+
         
         for row_idx, images in enumerate(image_urls, start=2):  # البدء من الصف الثاني
             if images and images[0]:  # إذا كانت هناك صور
