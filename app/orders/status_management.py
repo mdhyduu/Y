@@ -625,13 +625,13 @@ STATUS_PRIORITIES = {
     'تم التوصيل': 6
 }
 
-# تعديل دالة handle_status_transitions
 def handle_status_transitions(order_id, new_status_type, custom_status_id=None):
     """
     إدارة التحولات بين الحالات:
     - صارمة للحالات التلقائية: الطلب يبقى في حالة واحدة فقط
     - صارمة للحالات الخاصة: الطلب يبقى في حالة واحدة فقط
     - مسموح يجتمع (واحدة تلقائية + واحدة خاصة) معًا
+    - يتم تسجيل ملاحظات انتقال عند حذف حالة
     """
     try:
         # تحديد اسم الحالة الجديدة
@@ -654,17 +654,21 @@ def handle_status_transitions(order_id, new_status_type, custom_status_id=None):
             "تم التوصيل"
         ]
 
+        removed_statuses = []  # لتسجيل الحالات التي حُذفت
+
         if not is_custom:
             # ✅ لو الحالة جديدة تلقائية → نحذف كل الحالات التلقائية السابقة فقط
             employee_statuses = OrderEmployeeStatus.query.filter_by(order_id=str(order_id)).all()
             for status in employee_statuses:
                 cs = EmployeeCustomStatus.query.get(status.status_id)
                 if cs and cs.name in DEFAULT_NAMES:
+                    removed_statuses.append(cs.name)
                     db.session.delete(status)
 
             status_notes = OrderStatusNote.query.filter_by(order_id=str(order_id)).all()
             for note in status_notes:
                 if note.status_flag in DEFAULT_NAMES:
+                    removed_statuses.append(note.status_flag)
                     db.session.delete(note)
 
         else:
@@ -673,12 +677,24 @@ def handle_status_transitions(order_id, new_status_type, custom_status_id=None):
             for status in employee_statuses:
                 cs = EmployeeCustomStatus.query.get(status.status_id)
                 if cs and cs.name not in DEFAULT_NAMES:  # يعني حالة خاصة
+                    removed_statuses.append(cs.name)
                     db.session.delete(status)
 
             status_notes = OrderStatusNote.query.filter_by(order_id=str(order_id)).all()
             for note in status_notes:
                 if note.status_flag not in DEFAULT_NAMES:  # يعني حالة خاصة
+                    removed_statuses.append(note.status_flag)
                     db.session.delete(note)
+
+        # ✅ إضافة ملاحظة انتقال لو تم حذف حالات
+        for old_status in removed_statuses:
+            transition_note = OrderStatusNote(
+                order_id=str(order_id),
+                status_flag="انتقال",
+                note=f"تم الانتقال من الحالة '{old_status}' إلى '{new_status_name}'",
+                created_at=datetime.utcnow()
+            )
+            db.session.add(transition_note)
 
         db.session.commit()
         return True
