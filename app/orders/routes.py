@@ -16,7 +16,9 @@ from app.models import (db, SallaOrder, CustomOrder, OrderStatus, Employee,
 from app.utils import get_user_from_cookies, process_order_data, format_date, generate_barcode, humanize_time
 from app.token_utils import refresh_salla_token
 from app.config import Config
-
+from flask import send_file
+import pandas as pd
+from io import BytesIO
 # إعداد الـ logger
 logger = logging.getLogger(__name__)
 
@@ -599,3 +601,155 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
+
+@orders_bp.route('/upload_updated_excel', methods=['POST'])
+def upload_updated_excel():
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        flash('الرجاء تسجيل الدخول أولاً', 'error')
+        return redirect(url_for('user_auth.login'))
+    
+    if 'excel_file' not in request.files:
+        flash('لم يتم اختيار ملف', 'error')
+        return redirect(request.referrer or url_for('orders.index'))
+    
+    file = request.files['excel_file']
+    if file.filename == '':
+        flash('لم يتم اختيار ملف', 'error')
+        return redirect(request.referrer or url_for('orders.index'))
+    
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        flash('يجب أن يكون الملف بصيغة Excel', 'error')
+        return redirect(request.referrer or url_for('orders.index'))
+    
+    try:
+        # قراءة ملف Excel
+        df = pd.read_excel(file)
+        
+        # معالجة كل صف
+        updated_count = 0
+        for _, row in df.iterrows():
+            order_id = str(row['order_id'])
+            order_type = row['order_type']
+            new_status = row['new_status']
+            notes = row.get('notes', '')
+            
+            if not new_status or pd.isna(new_status):
+                continue
+            
+            # البحث عن الطلب
+            if order_type == 'salla':
+                order = SallaOrder.query.filter_by(id=order_id, store_id=user.store_id).first()
+            else:
+                order = CustomOrder.query.filter_by(order_number=order_id, store_id=user.store_id).first()
+            
+            if not order:
+                continue
+            
+            # تحديث الحالة
+            if order_type == 'salla':
+                status_note = OrderStatusNote(
+                    order_id=order_id,
+                    employee_id=employee.id,
+                    status_flag=new_status,
+                    notes=notes
+                )
+            else:
+                status_note = OrderStatusNote(
+                    custom_order_id=order_id,
+                    employee_id=employee.id,
+                    status_flag=new_status,
+                    notes=notes
+                )
+            
+            db.session.add(status_note)
+            updated_count += 1
+        
+        db.session.commit()
+        flash(f'تم تحديث {updated_count} طلب بنجاح', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ أثناء معالجة الملف: {str(e)}', 'error')
+        current_app.logger.error(f"Error processing Excel file: {str(e)}")
+    
+    return redirect(url_for('orders.index'))
+
+
+# routes.py - إضافة endpoint جديد
+
+
+@orders_bp.route('/download_excel_template')
+def download_excel_template():
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        flash('الرجاء تسجيل الدخول أولاً', 'error')
+        return redirect(url_for('user_auth.login'))
+    
+    # جلب الطلبات المطلوبة حسب الصلاحيات
+    if request.cookies.get('is_admin') == 'true' or (employee and employee.role in ['reviewer', 'manager']):
+        salla_orders = SallaOrder.query.filter_by(store_id=user.store_id).all()
+        custom_orders = CustomOrder.query.filter_by(store_id=user.store_id).all()
+    else:
+        salla_orders = SallaOrder.query.join(OrderAssignment).filter(
+            OrderAssignment.employee_id == employee.id,
+            SallaOrder.store_id == user.store_id
+        ).all()
+        custom_orders = CustomOrder.query.join(OrderAssignment).filter(
+            OrderAssignment.employee_id == employee.id,
+            CustomOrder.store_id == user.store_id
+        ).all()
+    
+    # تحضير البيانات ل Excel
+    data = []
+    for order in salla_orders + custom_orders:
+        order_type = 'salla' if isinstance(order, SallaOrder) else 'custom'
+        order_id = order.id if order_type == 'salla' else order.order_number
+        
+        data.append({
+            'order_id': order_id,
+            'order_type': order_type,
+            'customer_name': order.customer_name,
+            'current_status': order.status.name if order.status else 'غير محدد',
+            'assigned_employee': ', '.join([assign.employee.name for assign in order.assignments]) if order.assignments else 'غير معين',
+            'new_status': '',
+            'notes': '',
+            'barcode': order_id  # يمكن استخدامه للباركود
+        })
+    
+    # إن DataFrame
+    df = pd.DataFrame(data)
+    
+    # إنشاء Excel في الذاكرة
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='الطلبات', index=False)
+        
+        # الحصول على ورقة العمل للتنسيق
+        worksheet = writer.sheets['الطلبات']
+        
+        # تنسيق الأعمدة
+        for column in worksheet.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            worksheet.column_dimensions[column_letter].width = adjusted_width
+    
+    output.seek(0)
+    
+    # إرسال الملف
+    filename = f"orders_template_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )

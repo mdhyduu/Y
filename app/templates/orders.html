@@ -395,7 +395,37 @@
         </div>
     </div>
 </div>
+<!-- في قسم الأزرار أو الإجراءات -->
+<div class="btn-group mb-3">
+    <a href="{{ url_for('orders.download_excel_template') }}" class="btn btn-success">
+        <i class="fas fa-download"></i> تحميل قالب Excel
+    </a>
+    
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadExcelModal">
+        <i class="fas fa-upload"></i> رفع Excel محدث
+    </button>
+</div>
 
+<!-- Modal لرفع الملف -->
+<div class="modal fade" id="uploadExcelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">رفع ملف Excel المحدث</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('orders.upload_updated_excel') }}" method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="excelFile" class="form-label">اختر ملف Excel</label>
+                        <input class="form-control" type="file" id="excelFile" name="excel_file" accept=".xlsx,.xls" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">رفع الملف</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 <div class="modal fade" id="quickListModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -718,7 +748,66 @@ $(document).ready(function () {
             $(this).closest('tr').removeClass('selected-row');
         }
     });
-
+// تأكد من أن هذا الكود يعمل بعد تحميل DOM
+document.addEventListener('DOMContentLoaded', function() {
+    // الحصول على عناصر DOM ذات الصلة
+    const uploadExcelModal = document.getElementById('uploadExcelModal');
+    const excelFileInput = document.getElementById('excelFile');
+    const uploadForm = document.querySelector('#uploadExcelModal form');
+    
+    // إضافة حدث لزر رفع الملف داخل النافذة المنبثقة
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // التحقق من وجود ملف مرفوع
+            if (!excelFileInput.files || excelFileInput.files.length === 0) {
+                alert('يرجى اختيار ملف Excel لرفعه');
+                return;
+            }
+            
+            // إنشاء FormData لإرسال الملف
+            const formData = new FormData();
+            formData.append('excel_file', excelFileInput.files[0]);
+            
+            // إرسال الملف باستخدام Fetch API
+            fetch("{{ url_for('orders.upload_updated_excel') }}", {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                } else {
+                    return response.json();
+                }
+            })
+            .then(data => {
+                if (data && data.success) {
+                    alert('تم رفع الملف بنجاح');
+                    // إغلاق النافذة المنبثقة
+                    const modal = bootstrap.Modal.getInstance(uploadExcelModal);
+                    modal.hide();
+                    // إعادة تحميل الصفحة أو تحديث الجدول حسب الحاجة
+                    window.location.reload();
+                } else if (data && data.error) {
+                    alert('حدث خطأ: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('حدث خطأ أثناء رفع الملف');
+            });
+        });
+    }
+    
+    // إضافة حدث لإغلاق النافذة المنبثقة وإعادة تعيين الحقل
+    if (uploadExcelModal) {
+        uploadExcelModal.addEventListener('hidden.bs.modal', function () {
+            excelFileInput.value = '';
+        });
+    }
+});
     // 3. إسناد الطلبات المحددة
     $(document).on('click', '#assign-orders-btn', function() {
         const selectedOrders = $('.order-checkbox:checked').map((_, el) => {
