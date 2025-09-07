@@ -213,5 +213,6 @@ def logout():
     response.delete_cookie('salla_refresh_token', path='/')
     response.delete_cookie('token_expires_at', path='/')
     response.delete_cookie('store_linked', path='/')
+    response.delete_cookie('oauth_state', path='/')  # تمت إضافته
     flash('تم تسجيل الخروج بنجاح', 'success')
     return response
