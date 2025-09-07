@@ -19,6 +19,9 @@ from app.config import Config
 from flask import send_file
 import pandas as pd
 from io import BytesIO
+import openpyxl
+from openpyxl.worksheet.datavalidation import DataValidation
+from openpyxl.styles import Alignment
 from openpyxl.worksheet.datavalidation import DataValidation
 # إعداد الـ logger
 logger = logging.getLogger(__name__)
