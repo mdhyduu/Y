@@ -749,6 +749,32 @@ $(document).ready(function () {
             $(this).closest('tr').removeClass('selected-row');
         }
     });
+    document.addEventListener('DOMContentLoaded', function() {
+    // زر تحميل القالب مع الطلبات المحددة
+    document.getElementById('download-excel-btn').addEventListener('click', function() {
+        const selectedOrders = [];
+        
+        // جمع الطلبات المحددة
+        document.querySelectorAll('input.order-checkbox:checked').forEach(checkbox => {
+            const row = checkbox.closest('tr');
+            const orderId = row.dataset.orderId;
+            const orderType = row.dataset.orderType;
+            selectedOrders.push(`${orderType}:${orderId}`);
+        });
+        
+        if (selectedOrders.length === 0) {
+            showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للتحميل');
+            return;
+        }
+        
+        // إنشاء رابط التحميل مع المعلمات
+        const url = `{{ url_for('orders.download_excel_template') }}?selected_orders=${encodeURIComponent(selectedOrders.join(','))}`;
+        
+        // فتح الرابط في نافذة جديدة لبدء التحميل
+        window.open(url, '_blank');
+    });
+});
+
 // تأكد من أن هذا الكود يعمل بعد تحميل DOM
 document.addEventListener('DOMContentLoaded', function() {
     // الحصول على عناصر DOM ذات الصلة
@@ -810,31 +836,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-document.addEventListener('DOMContentLoaded', function() {
-    // زر تحميل القالب مع الطلبات المحددة
-    document.getElementById('download-excel-btn').addEventListener('click', function() {
-        const selectedOrders = [];
-        
-        // جمع الطلبات المحددة
-        document.querySelectorAll('input.order-checkbox:checked').forEach(checkbox => {
-            const row = checkbox.closest('tr');
-            const orderId = row.dataset.orderId;
-            const orderType = row.dataset.orderType;
-            selectedOrders.push(`${orderType}:${orderId}`);
-        });
-        
-        if (selectedOrders.length === 0) {
-            showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للتحميل');
-            return;
-        }
-        
-        // إنشاء رابط التحميل مع المعلمات
-        const url = `{{ url_for('orders.download_excel_template') }}?selected_orders=${encodeURIComponent(selectedOrders.join(','))}`;
-        
-        // فتح الرابط في نافذة جديدة لبدء التحميل
-        window.open(url, '_blank');
-    });
-});
 
     // 3. إسناد الطلبات المحددة
     $(document).on('click', '#assign-orders-btn', function() {
