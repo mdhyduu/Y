@@ -869,6 +869,10 @@ def download_excel_template():
                         
                         # ضبط ارتفاع الصف لاستيعاب الصورة
                         worksheet.row_dimensions[row_idx].height = 60
+                        
+                except Exception as e:
+                    logger.error(f"Error loading image: {str(e)}")
+                    worksheet.cell(row=row_idx, column=2, value=images[0])  # وضع الرابط كنص إذا فشل تحميل الصورة
         # بـ:
         for row_idx, images in enumerate(image_urls, start=2):
             if images:  # إذا كانت هناك صور
