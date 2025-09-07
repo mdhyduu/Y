@@ -628,13 +628,11 @@ STATUS_PRIORITIES = {
 def handle_status_transitions(order_id, new_status_type, custom_status_id=None):
     """
     إدارة التحولات بين الحالات:
-    - صارمة للحالات التلقائية: الطلب يبقى في حالة واحدة فقط
-    - صارمة للحالات الخاصة: الطلب يبقى في حالة واحدة فقط
-    - مسموح يجتمع (واحدة تلقائية + واحدة خاصة) معًا
-    - يتم تسجيل ملاحظات انتقال عند حذف حالة
+    - صارمة داخل نفس النوع (تلقائي ↔ تلقائي أو خاص ↔ خاص)
+    - تسمح بتعايش حالة تلقائية + حالة خاصة معًا
+    - تسجيل ملاحظات الانتقال عند الحذف
     """
     try:
-        # تحديد اسم الحالة الجديدة
         new_status_name = new_status_type
         is_custom = False
 
@@ -644,7 +642,6 @@ def handle_status_transitions(order_id, new_status_type, custom_status_id=None):
                 new_status_name = custom_status.name
                 is_custom = True
 
-        # الحالات التلقائية (الافتراضية)
         DEFAULT_NAMES = [
             "قيد التنفيذ", 
             "تم التنفيذ", 
@@ -654,39 +651,37 @@ def handle_status_transitions(order_id, new_status_type, custom_status_id=None):
             "تم التوصيل"
         ]
 
-        removed_statuses = []  # لتسجيل الحالات التي حُذفت
+        removed_statuses = []
 
-        if not is_custom:
-            # ✅ لو الحالة جديدة تلقائية → نحذف كل الحالات التلقائية السابقة فقط
-            employee_statuses = OrderEmployeeStatus.query.filter_by(order_id=str(order_id)).all()
-            for status in employee_statuses:
-                cs = EmployeeCustomStatus.query.get(status.status_id)
-                if cs and cs.name in DEFAULT_NAMES:
-                    removed_statuses.append(cs.name)
-                    db.session.delete(status)
+        # --- حذف الحالات السابقة من نفس النوع فقط ---
+        employee_statuses = OrderEmployeeStatus.query.filter_by(order_id=str(order_id)).all()
+        for status in employee_statuses:
+            cs = EmployeeCustomStatus.query.get(status.status_id)
+            if not cs:
+                continue
 
-            status_notes = OrderStatusNote.query.filter_by(order_id=str(order_id)).all()
-            for note in status_notes:
-                if note.status_flag in DEFAULT_NAMES:
-                    removed_statuses.append(note.status_flag)
-                    db.session.delete(note)
+            # إذا الحالة الجديدة تلقائية → نحذف فقط التلقائيات القديمة
+            if not is_custom and cs.name in DEFAULT_NAMES:
+                removed_statuses.append(cs.name)
+                db.session.delete(status)
 
-        else:
-            # ✅ لو الحالة جديدة خاصة → نحذف كل الحالات الخاصة السابقة فقط
-            employee_statuses = OrderEmployeeStatus.query.filter_by(order_id=str(order_id)).all()
-            for status in employee_statuses:
-                cs = EmployeeCustomStatus.query.get(status.status_id)
-                if cs and cs.name not in DEFAULT_NAMES:  # يعني حالة خاصة
-                    removed_statuses.append(cs.name)
-                    db.session.delete(status)
+            # إذا الحالة الجديدة خاصة → نحذف فقط الحالات الخاصة القديمة
+            if is_custom and cs.name not in DEFAULT_NAMES:
+                removed_statuses.append(cs.name)
+                db.session.delete(status)
 
-            status_notes = OrderStatusNote.query.filter_by(order_id=str(order_id)).all()
-            for note in status_notes:
-                if note.status_flag not in DEFAULT_NAMES:  # يعني حالة خاصة
-                    removed_statuses.append(note.status_flag)
-                    db.session.delete(note)
+        status_notes = OrderStatusNote.query.filter_by(order_id=str(order_id)).all()
+        for note in status_notes:
+            # نفس المنطق لكن مع الملاحظات
+            if not is_custom and note.status_flag in DEFAULT_NAMES:
+                removed_statuses.append(note.status_flag)
+                db.session.delete(note)
 
-        # ✅ إضافة ملاحظة انتقال لو تم حذف حالات
+            if is_custom and note.status_flag not in DEFAULT_NAMES:
+                removed_statuses.append(note.status_flag)
+                db.session.delete(note)
+
+        # --- تسجيل ملاحظات انتقال ---
         for old_status in removed_statuses:
             transition_note = OrderStatusNote(
                 order_id=str(order_id),
