@@ -397,9 +397,10 @@
 </div>
 <!-- في قسم الأزرار أو الإجراءات -->
 <div class="btn-group mb-3">
-    <a href="{{ url_for('orders.download_excel_template') }}" class="btn btn-success">
-        <i class="fas fa-download"></i> تحميل قالب Excel
-    </a>
+<!-- بدلاً من الزر الحالي -->
+<button type="button" class="btn btn-success" id="download-excel-btn">
+    <i class="fas fa-download"></i> تحميل الطلبات المحددة
+</button>
     
     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadExcelModal">
         <i class="fas fa-upload"></i> رفع Excel محدث
@@ -808,6 +809,33 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+document.addEventListener('DOMContentLoaded', function() {
+    // زر تحميل القالب مع الطلبات المحددة
+    document.getElementById('download-excel-btn').addEventListener('click', function() {
+        const selectedOrders = [];
+        
+        // جمع الطلبات المحددة
+        document.querySelectorAll('input.order-checkbox:checked').forEach(checkbox => {
+            const row = checkbox.closest('tr');
+            const orderId = row.dataset.orderId;
+            const orderType = row.dataset.orderType;
+            selectedOrders.push(`${orderType}:${orderId}`);
+        });
+        
+        if (selectedOrders.length === 0) {
+            showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للتحميل');
+            return;
+        }
+        
+        // إنشاء رابط التحميل مع المعلمات
+        const url = `{{ url_for('orders.download_excel_template') }}?selected_orders=${encodeURIComponent(selectedOrders.join(','))}`;
+        
+        // فتح الرابط في نافذة جديدة لبدء التحميل
+        window.open(url, '_blank');
+    });
+});
+
     // 3. إسناد الطلبات المحددة
     $(document).on('click', '#assign-orders-btn', function() {
         const selectedOrders = $('.order-checkbox:checked').map((_, el) => {

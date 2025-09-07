@@ -679,7 +679,6 @@ def upload_updated_excel():
 
 # routes.py - إضافة endpoint جديد
 
-
 @orders_bp.route('/download_excel_template')
 def download_excel_template():
     user, employee = get_user_from_cookies()
@@ -688,19 +687,50 @@ def download_excel_template():
         flash('الرجاء تسجيل الدخول أولاً', 'error')
         return redirect(url_for('user_auth.login'))
     
-    # جلب الطلبات المطلوبة حسب الصلاحيات
-    if request.cookies.get('is_admin') == 'true' or (employee and employee.role in ['reviewer', 'manager']):
-        salla_orders = SallaOrder.query.filter_by(store_id=user.store_id).all()
-        custom_orders = CustomOrder.query.filter_by(store_id=user.store_id).all()
-    else:
-        salla_orders = SallaOrder.query.join(OrderAssignment).filter(
-            OrderAssignment.employee_id == employee.id,
+    # جلب الطلبات المحددة من المعامل
+    selected_orders_param = request.args.get('selected_orders', '')
+    selected_orders = selected_orders_param.split(',') if selected_orders_param else []
+    
+    # جلب الطلبات المطلوبة حسب الصلاحيات والطلبات المحددة
+    if selected_orders:
+        # فصل الطلبات إلى سلة ومخصصة
+        salla_order_ids = []
+        custom_order_ids = []
+        
+        for order_str in selected_orders:
+            if ':' in order_str:
+                order_type, order_id = order_str.split(':', 1)
+                if order_type == 'salla':
+                    salla_order_ids.append(order_id)
+                elif order_type == 'custom':
+                    custom_order_ids.append(order_id)
+        
+        # جلب طلبات سلة المحددة
+        salla_orders = SallaOrder.query.filter(
+            SallaOrder.id.in_(salla_order_ids),
             SallaOrder.store_id == user.store_id
-        ).all()
-        custom_orders = CustomOrder.query.join(OrderAssignment).filter(
-            OrderAssignment.employee_id == employee.id,
+        ).all() if salla_order_ids else []
+        
+        # جلب الطلبات المخصصة المحددة
+        custom_orders = CustomOrder.query.filter(
+            CustomOrder.id.in_(custom_order_ids),
             CustomOrder.store_id == user.store_id
-        ).all()
+        ).all() if custom_order_ids else []
+        
+    else:
+        # جلب جميع الطلبات حسب الصلاحيات (السلوك الأصلي)
+        if request.cookies.get('is_admin') == 'true' or (employee and employee.role in ['reviewer', 'manager']):
+            salla_orders = SallaOrder.query.filter_by(store_id=user.store_id).all()
+            custom_orders = CustomOrder.query.filter_by(store_id=user.store_id).all()
+        else:
+            salla_orders = SallaOrder.query.join(OrderAssignment).filter(
+                OrderAssignment.employee_id == employee.id,
+                SallaOrder.store_id == user.store_id
+            ).all()
+            custom_orders = CustomOrder.query.join(OrderAssignment).filter(
+                OrderAssignment.employee_id == employee.id,
+                CustomOrder.store_id == user.store_id
+            ).all()
     
     # تحضير البيانات ل Excel
     data = []
@@ -708,18 +738,39 @@ def download_excel_template():
         order_type = 'salla' if isinstance(order, SallaOrder) else 'custom'
         order_id = order.id if order_type == 'salla' else order.order_number
         
+        # جلب الحالة المخصصة (آخر حالة)
+        last_emp_status = None
+        if order_type == 'salla':
+            last_emp_status = OrderEmployeeStatus.query.filter_by(order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
+        else:
+            last_emp_status = OrderEmployeeStatus.query.filter_by(custom_order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
+        
+        custom_status_name = last_emp_status.status.name if last_emp_status and last_emp_status.status else ''
+
+        # جلب صورة المنتج (لطلبات سلة)
+        product_image = ''
+        if order_type == 'salla' and order.raw_data:
+            try:
+                raw_data = json.loads(order.raw_data)
+                items = raw_data.get('items', [])
+                if items and len(items) > 0:
+                    first_item = items[0]
+                    product_image = first_item.get('product', {}).get('main_image', '')
+            except:
+                pass
+        
         data.append({
             'order_id': order_id,
             'order_type': order_type,
             'customer_name': order.customer_name,
             'current_status': order.status.name if order.status else 'غير محدد',
-            'assigned_employee': ', '.join([assign.employee.name for assign in order.assignments]) if order.assignments else 'غير معين',
+            'custom_status': custom_status_name,
+            'product_image': product_image,
             'new_status': '',
-            'notes': '',
-            'barcode': order_id  # يمكن استخدامه للباركود
+            'notes': ''
         })
     
-    # إن DataFrame
+    # إنشاء DataFrame
     df = pd.DataFrame(data)
     
     # إنشاء Excel في الذاكرة
