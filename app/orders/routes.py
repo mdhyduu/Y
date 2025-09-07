@@ -773,7 +773,7 @@ def download_excel_template():
             'order_type': order_type,
             'customer_name': order.customer_name,
             'current_status': order.status.name if order.status else 'غير محدد',
-            'custom_status': '',  # نتركه فارغاً لضمان ظهور القائمة المنسدلة
+            'custom_status': custom_status_name,  # هذا العمود سيكون به القائمة المنسدلة
             'product_image': product_image,
             'notes': ''
         })
@@ -793,18 +793,17 @@ def download_excel_template():
         # إضافة قائمة منسدلة للحالات في عمود custom_status (العمود E)
         if status_names:
             # إنشاء ورقة مخفية للحالات
-            status_sheet = workbook.create_sheet("الحالات_المخفية")
-            
-            # كتابة الحالات في العمود الأول من الورقة المخفية
+            status_sheet = workbook.create_sheet("الحالات المخفية")
             for i, status in enumerate(status_names, 1):
                 status_sheet.cell(row=i, column=1, value=status)
             
             # إضافة قائمة منسدلة باستخدام Data Validation
+            from openpyxl.worksheet.datavalidation import DataValidation
+            
+            # تحديد نطاق الخلايا التي ستتضمن القائمة المنسدلة (عمود custom_status)
             dv = DataValidation(
-                type="list", 
-                formula1='=الحالات_المخفية!$A$1:$A$' + str(len(status_names)),
-                allow_blank=True,
-                showDropDown=True
+                type="list",
+                formula1="='الحالات المخفية'!$A$1:$A$" + str(len(status_names))
             )
             dv.error = 'القيمة غير صحيحة'
             dv.errorTitle = 'قيمة غير صالحة'
@@ -813,29 +812,25 @@ def download_excel_template():
             
             # تطبيق التحقق على العمود E (عمود custom_status)
             for row in range(2, len(df) + 2):  # بدءًا من الصف الثاني
-                dv.add(worksheet.cell(row=row, column=5))
+                dv.add(worksheet.cell(row=row, column=5))  # العمود 5 هو custom_status
             
             worksheet.add_data_validation(dv)
             
             # إخفاء ورقة الحالات
             status_sheet.sheet_state = 'hidden'
-            
-            # إضافة تعليمات للمستخدم في الصف الأول
-            worksheet.cell(row=1, column=5, value="custom_status (اختر من القائمة)")
         
         # تنسيق الأعمدة
-        column_widths = {
-            'A': 15,  # order_id
-            'B': 10,  # order_type
-            'C': 20,  # customer_name
-            'D': 15,  # current_status
-            'E': 20,  # custom_status
-            'F': 30,  # product_image
-            'G': 30   # notes
-        }
-        
-        for col_letter, width in column_widths.items():
-            worksheet.column_dimensions[col_letter].width = width
+        for column in worksheet.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            worksheet.column_dimensions[column_letter].width = adjusted_width
     
     output.seek(0)
     
