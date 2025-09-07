@@ -203,16 +203,28 @@ def resend_verification(user_id):
 # تسجيل الخروج
 @user_auth_bp.route('/logout')
 def logout():
+    # مسح بيانات الجلسة أولاً
+    from flask import session
+    session.clear()
+    
     response = make_response(redirect(url_for('user_auth.login')))
-    # حذف جميع الكوكيز مع تحديد المسار الأساسي
-    response.delete_cookie('user_id', path='/')
-    response.delete_cookie('is_admin', path='/')
-    response.delete_cookie('employee_role', path='/')
-    response.delete_cookie('store_id', path='/')
-    response.delete_cookie('salla_access_token', path='/')
-    response.delete_cookie('salla_refresh_token', path='/')
-    response.delete_cookie('token_expires_at', path='/')
-    response.delete_cookie('store_linked', path='/')
-    response.delete_cookie('oauth_state', path='/')  # تمت إضافته
+    
+    # قائمة بجميع الكوكيز المعروفة
+    cookies_to_delete = [
+        'user_id', 'is_admin', 'employee_role', 'store_id',
+        'salla_access_token', 'salla_refresh_token',
+        'token_expires_at', 'store_linked', 'oauth_state'
+    ]
+    
+    # حذف جميع الكوكيز المعروفة
+    for cookie_name in cookies_to_delete:
+        response.delete_cookie(cookie_name, path='/')
+    
+    # حذف أي كوكيز إضافية قد تكون كبيرة
+    # يمكنك إضافة أي كوكيز أخرى تجدها كبيرة
+    additional_cookies = ['large_data_cookie', 'other_large_cookie']
+    for cookie_name in additional_cookies:
+        response.delete_cookie(cookie_name, path='/')
+    
     flash('تم تسجيل الخروج بنجاح', 'success')
     return response
