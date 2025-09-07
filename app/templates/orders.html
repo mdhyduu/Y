@@ -749,30 +749,15 @@ $(document).ready(function () {
             $(this).closest('tr').removeClass('selected-row');
         }
     });
- 
-// زر تحميل قالب Excel بالطلبات المحددة
-document.addEventListener('DOMContentLoaded', function() {
-    // إضافة زر جديد للتحميل المخصص
-    const downloadBtn = document.createElement('button');
-    downloadBtn.id = 'download-selected-excel-btn';
-    downloadBtn.className = 'btn btn-success me-2';
-    downloadBtn.innerHTML = '<i class="fas fa-download me-1"></i> تحميل الطلبات المحددة';
-    
-    // إضافة الزر إلى واجهة المستخدم
-    const quickActions = document.getElementById('quick-actions');
-    if (quickActions) {
-        quickActions.insertBefore(downloadBtn, quickActions.firstChild);
-    }
 
-    // معالج حدث النقر على زر التحميل
-    downloadBtn.addEventListener('click', function() {
+    $(document).on('click', '#download-excel-btn', function() {
         const selectedOrders = [];
         
         // جمع الطلبات المحددة مع نوعها
-        document.querySelectorAll('input.order-checkbox:checked').forEach(checkbox => {
-            const row = checkbox.closest('tr');
-            const orderId = row.dataset.orderId;
-            const orderType = row.dataset.orderType;
+        $('input.order-checkbox:checked').each(function() {
+            const row = $(this).closest('tr');
+            const orderId = row.data('order-id');
+            const orderType = row.data('order-type');
             selectedOrders.push(`${orderType}:${orderId}`);
         });
         
@@ -812,18 +797,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // تحديث حالة زر التحميل عند تغيير التحديدات
     function updateDownloadButtonState() {
-        const checkedCount = document.querySelectorAll('input.order-checkbox:checked').length;
-        document.getElementById('download-selected-excel-btn').disabled = checkedCount === 0;
+        const checkedCount = $('input.order-checkbox:checked').length;
+        $('#download-excel-btn').prop('disabled', checkedCount === 0);
     }
 
     // إضافة مستمعي الأحداث لجميع صناديق التحديد
-    document.querySelectorAll('input.order-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', updateDownloadButtonState);
-    });
+    $('input.order-checkbox').on('change', updateDownloadButtonState);
 
     // التهيئة الأولية لحالة الزر
-    updateDownloadButtonState();
-});
+
+    
+    // ... باقي الكود الحالي ...
 // تأكد من أن هذا الكود يعمل بعد تحميل DOM
 document.addEventListener('DOMContentLoaded', function() {
     // الحصول على عناصر DOM ذات الصلة
@@ -1484,6 +1468,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // تهيئة زر القائمة السريعة
     toggleQuickListButton();
+    updateDownloadButtonState();
 });
 </script>
 
