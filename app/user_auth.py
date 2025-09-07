@@ -204,14 +204,14 @@ def resend_verification(user_id):
 @user_auth_bp.route('/logout')
 def logout():
     response = make_response(redirect(url_for('user_auth.login')))
-    response.delete_cookie('user_id')
-    response.delete_cookie('is_admin')
-    response.delete_cookie('employee_role')
-    response.delete_cookie('store_id')
-    response.delete_cookie('salla_access_token')
-    response.delete_cookie('salla_refresh_token')
-    # Delete the additional cookies that were set in token_utils.py
-    response.delete_cookie('token_expires_at')
-    response.delete_cookie('store_linked')
+    # حذف جميع الكوكيز مع تحديد المسار الأساسي
+    response.delete_cookie('user_id', path='/')
+    response.delete_cookie('is_admin', path='/')
+    response.delete_cookie('employee_role', path='/')
+    response.delete_cookie('store_id', path='/')
+    response.delete_cookie('salla_access_token', path='/')
+    response.delete_cookie('salla_refresh_token', path='/')
+    response.delete_cookie('token_expires_at', path='/')
+    response.delete_cookie('store_linked', path='/')
     flash('تم تسجيل الخروج بنجاح', 'success')
     return response
