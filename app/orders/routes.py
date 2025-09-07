@@ -19,6 +19,7 @@ from app.config import Config
 from flask import send_file
 import pandas as pd
 from io import BytesIO
+from openpyxl.worksheet.datavalidation import DataValidation
 # إعداد الـ logger
 logger = logging.getLogger(__name__)
 
@@ -691,6 +692,10 @@ def download_excel_template():
     selected_orders_param = request.args.get('selected_orders', '')
     selected_orders = selected_orders_param.split(',') if selected_orders_param else []
     
+    # جلب الحالات المخصصة المتاحة
+    custom_statuses = EmployeeCustomStatus.query.filter_by(store_id=user.store_id).all()
+    status_names = [status.name for status in custom_statuses]
+    
     # جلب الطلبات المطلوبة حسب الصلاحيات والطلبات المحددة
     if selected_orders:
         # فصل الطلبات إلى سلة ومخصصة
@@ -779,7 +784,34 @@ def download_excel_template():
         df.to_excel(writer, sheet_name='الطلبات', index=False)
         
         # الحصول على ورقة العمل للتنسيق
+        workbook = writer.book
         worksheet = writer.sheets['الطلبات']
+        
+        # إضافة قائمة منسدلة للحالات في عمود new_status
+        if status_names:
+            # إنشاء ورقة مخفية للحالات
+            status_sheet = workbook.create_sheet("الحالات المخفية")
+            for i, status in enumerate(status_names, 1):
+                status_sheet.cell(row=i, column=1, value=status)
+            
+            # إضافة قائمة منسدلة باستخدام Data Validation
+            from openpyxl.worksheet.datavalidation import DataValidation
+            
+            # تحديد نطاق الخلايا التي ستتضمن القائمة المنسدلة (عمود new_status)
+            dv = DataValidation(type="list", formula1='=الحالات_المخفية!$A$1:$A$' + str(len(status_names)))
+            dv.error = 'القيمة غير صحيحة'
+            dv.errorTitle = 'قيمة غير صالحة'
+            dv.prompt = 'يرجى اختيار حالة من القائمة'
+            dv.promptTitle = 'اختيار الحالة'
+            
+            # تطبيق التحقق على العمود G (عمود new_status)
+            for row in range(2, len(df) + 2):  # بدءًا من الصف الثاني
+                dv.add(worksheet.cell(row=row, column=7))  # العمود 7 هو new_status
+            
+            worksheet.add_data_validation(dv)
+            
+            # إخفاء ورقة الحالات
+            status_sheet.sheet_state = 'hidden'
         
         # تنسيق الأعمدة
         for column in worksheet.columns:

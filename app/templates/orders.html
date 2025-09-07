@@ -805,7 +805,7 @@ $(document).ready(function () {
     $('input.order-checkbox').on('change', updateDownloadButtonState);
 
     // التهيئة الأولية لحالة الزر
-
+    updateDownloadButtonState();
     
     // ... باقي الكود الحالي ...
 // تأكد من أن هذا الكود يعمل بعد تحميل DOM
@@ -1468,7 +1468,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // تهيئة زر القائمة السريعة
     toggleQuickListButton();
-    updateDownloadButtonState();
 });
 </script>
 
