@@ -691,8 +691,13 @@ def download_excel_template():
     # جلب الطلبات المحددة من المعامل
     selected_orders_param = request.args.get('selected_orders', '')
     selected_orders = selected_orders_param.split(',') if selected_orders_param else []
-
-    custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(Employee.store_id == user.store_id).all()
+    
+    # جلب الحالات المخصصة المتاحة - فقط "قيد التنفيذ" و "تم التنفيذ"
+    custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(
+        Employee.store_id == user.store_id,
+        EmployeeCustomStatus.name.in_(["قيد التنفيذ", "تم التنفيذ"])
+    ).all()
+    
     status_names = [status.name for status in custom_statuses]
     
     # جلب الطلبات المطلوبة حسب الصلاحيات والطلبات المحددة
@@ -768,9 +773,8 @@ def download_excel_template():
             'order_type': order_type,
             'customer_name': order.customer_name,
             'current_status': order.status.name if order.status else 'غير محدد',
-            'custom_status': custom_status_name,
+            'custom_status': custom_status_name,  # هذا العمود سيكون به القائمة المنسدلة
             'product_image': product_image,
-            'new_status': '',
             'notes': ''
         })
     
@@ -786,7 +790,7 @@ def download_excel_template():
         workbook = writer.book
         worksheet = writer.sheets['الطلبات']
         
-        # إضافة قائمة منسدلة للحالات في عمود new_status
+        # إضافة قائمة منسدلة للحالات في عمود custom_status (العمود E)
         if status_names:
             # إنشاء ورقة مخفية للحالات
             status_sheet = workbook.create_sheet("الحالات المخفية")
@@ -796,16 +800,16 @@ def download_excel_template():
             # إضافة قائمة منسدلة باستخدام Data Validation
             from openpyxl.worksheet.datavalidation import DataValidation
             
-            # تحديد نطاق الخلايا التي ستتضمن القائمة المنسدلة (عمود new_status)
+            # تحديد نطاق الخلايا التي ستتضمن القائمة المنسدلة (عمود custom_status)
             dv = DataValidation(type="list", formula1='=الحالات_المخفية!$A$1:$A$' + str(len(status_names)))
             dv.error = 'القيمة غير صحيحة'
             dv.errorTitle = 'قيمة غير صالحة'
             dv.prompt = 'يرجى اختيار حالة من القائمة'
             dv.promptTitle = 'اختيار الحالة'
             
-            # تطبيق التحقق على العمود G (عمود new_status)
+            # تطبيق التحقق على العمود E (عمود custom_status)
             for row in range(2, len(df) + 2):  # بدءًا من الصف الثاني
-                dv.add(worksheet.cell(row=row, column=7))  # العمود 7 هو new_status
+                dv.add(worksheet.cell(row=row, column=5))  # العمود 5 هو custom_status
             
             worksheet.add_data_validation(dv)
             
