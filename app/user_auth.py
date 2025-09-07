@@ -191,15 +191,15 @@ def resend_verification(user_id):
 
     try:
         msg = Message(
-                    subject="رمز تحقق جديد",
-                    recipients=[user.email],
-                    body=f"رمز التحقق الخاص بك هو: {user.otp_code}\nصالح لمدة 10 دقائق."
-                )
-                mail.send(msg)  # Use mail directly
-                return {"success": True, "message": "تم إرسال رمز جديد"}
-            except Exception as e:
-                logger.error(f"فشل إعادة إرسال البريد: {str(e)}")
-                return {"success": False, "message": f"فشل إرسال البريد: {str(e)}"}
+            subject="رمز تحقق جديد",
+            recipients=[user.email],
+            body=f"رمز التحقق الخاص بك هو: {user.otp_code}\nصالح لمدة 10 دقائق."
+        )
+        mail.send(msg)  # Use mail directly
+        return {"success": True, "message": "تم إرسال رمز جديد"}
+    except Exception as e:
+        logger.error(f"فشل إعادة إرسال البريد: {str(e)}")
+        return {"success": False, "message": f"فشل إرسال البريد: {str(e)}"}
 # تسجيل الخروج
 @user_auth_bp.route('/logout')
 def logout():
