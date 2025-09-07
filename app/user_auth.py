@@ -126,7 +126,6 @@ def register():
         email = form.email.data
         password = form.password.data
         
-        # إزالة with current_app.app_context() غير الضروري
         if User.query.filter_by(email=email).first():
             flash('البريد الإلكتروني مسجل مسبقاً', 'danger')
             return redirect(url_for('user_auth.register'))
@@ -144,23 +143,25 @@ def register():
         db.session.add(new_user)
         db.session.commit()
 
-        # إرسال الإيميل
+        # إرسال الإيميل مع معالجة الأخطاء
         try:
-            msg = Message("رمز التحقق من البريد", recipients=[email])
-            msg.body = f"رمز التحقق الخاص بك هو: {new_user.otp_code}\nصالح لمدة 10 دقائق."
+            msg = Message(
+                subject="رمز التحقق من البريد",
+                recipients=[email],
+                body=f"رمز التحقق الخاص بك هو: {new_user.otp_code}\nصالح لمدة 10 دقائق."
+            )
             current_app.mail.send(msg)
+            flash('تم إنشاء الحساب! تحقق من بريدك وأدخل الرمز', 'info')
         except Exception as e:
-            flash('حدث خطأ في إرسال البريد الإلكتروني', 'danger')
-            logger.error(f"خطأ في إرسال البريد: {str(e)}")
+            # في حالة فشل الإرسال، نعرض الرمز للمستخدم مباشرة للتطوير
+            logger.error(f"فشل إرسال البريد: {str(e)}")
+            flash(f'تم إنشاء الحساب! لكن حدث خطأ في إرسال البريد. رمز التحقق هو: {new_user.otp_code}', 'warning')
 
-        flash('تم إنشاء الحساب! تحقق من بريدك وأدخل الرمز', 'info')
         return redirect(url_for('user_auth.verify_otp', user_id=new_user.id))
     
     return render_template('auth/register.html', form=form)
 
-# ... الكود اللاحق ...
 
-# التحقق من الكود
 @user_auth_bp.route('/verify/<int:user_id>', methods=['GET', 'POST'])
 def verify_otp(user_id):
     user = User.query.get_or_404(user_id)
@@ -179,23 +180,28 @@ def verify_otp(user_id):
 
     # Pass the user object to the template
     return render_template('auth/verify_otp.html', form=form, user=user)
+
 @user_auth_bp.route('/resend_verification/<int:user_id>', methods=['POST'])
 def resend_verification(user_id):
     user = User.query.get_or_404(user_id)
     if user.is_verified:
         return {"success": False, "message": "الحساب مفعل بالفعل"}
 
-    # توليد كود جديد
     user.otp_code = str(random.randint(100000, 999999))
     user.otp_expiration = datetime.utcnow() + timedelta(minutes=10)
     db.session.commit()
 
-    # إرسال الإيميل
-    msg = Message("رمز تحقق جديد", recipients=[user.email])
-    msg.body = f"رمز التحقق الخاص بك هو: {user.otp_code}\nصالح لمدة 10 دقائق."
-    current_app.mail.send(msg)
-
-    return {"success": True, "message": "تم إرسال رمز جديد"}
+    try:
+        msg = Message(
+            subject="رمز تحقق جديد",
+            recipients=[user.email],
+            body=f"رمز التحقق الخاص بك هو: {user.otp_code}\nصالح لمدة 10 دقائق."
+        )
+        current_app.mail.send(msg)
+        return {"success": True, "message": "تم إرسال رمز جديد"}
+    except Exception as e:
+        logger.error(f"فشل إعادة إرسال البريد: {str(e)}")
+        return {"success": False, "message": f"فشل إرسال البريد: {str(e)}"}
 # تسجيل الخروج
 @user_auth_bp.route('/logout')
 def logout():
