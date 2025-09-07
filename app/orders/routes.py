@@ -691,9 +691,8 @@ def download_excel_template():
     # جلب الطلبات المحددة من المعامل
     selected_orders_param = request.args.get('selected_orders', '')
     selected_orders = selected_orders_param.split(',') if selected_orders_param else []
-    
-    # جلب الحالات المخصصة المتاحة
-    custom_statuses = EmployeeCustomStatus.query.filter_by(store_id=user.store_id).all()
+
+    custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(Employee.store_id == user.store_id).all()
     status_names = [status.name for status in custom_statuses]
     
     # جلب الطلبات المطلوبة حسب الصلاحيات والطلبات المحددة
