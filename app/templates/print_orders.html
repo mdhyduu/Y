@@ -306,21 +306,13 @@
                         </div>
                         
                         <div class="product-details">
-                            <div class="product-name">{{ item.name }}</div>
+
                             <div class="product-info">
                                 <strong>الكمية:</strong> {{ item.quantity }}
                             </div>
-                            {% if item.price %}
-                            <div class="product-info">
-                                <strong>السعر:</strong> {{ item.price }} ر.س
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    
-                    {% if item.options %}
+                                         {% if item.options %}
                     <div class="product-options">
-                        <div class="options-title">خيارات المنتج</div>
+
                         {% for option in item.options %}
                         <div class="option">
                             <span class="option-name">{{ option.name }}:</span>
@@ -329,6 +321,10 @@
                         {% endfor %}
                     </div>
                     {% endif %}
+                        </div>
+                    </div>
+                    
+
                 </div>
                 {% endfor %}
                 
