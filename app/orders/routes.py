@@ -691,14 +691,14 @@ def download_excel_template():
     # جلب الطلبات المحددة من المعامل
     selected_orders_param = request.args.get('selected_orders', '')
     selected_orders = selected_orders_param.split(',') if selected_orders_param else []
-    
-    # جلب الحالات المخصصة المتاحة - فقط "قيد التنفيذ" و "تم التنفيذ"
+  # جلب الحالات المخصصة المتاحة - فقط "قيد التنفيذ" و "تم التنفيذ"
     custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(
         Employee.store_id == user.store_id,
         EmployeeCustomStatus.name.in_(["قيد التنفيذ", "تم التنفيذ"])
     ).all()
     
-    status_names = [status.name for status in custom_statuses]
+    # إزالة التكرارات مع الحفاظ على الترتيب
+    status_names = list(dict.fromkeys([status.name for status in custom_statuses]))
     
     # جلب الطلبات المطلوبة حسب الصلاحيات والطلبات المحددة
     if selected_orders:
