@@ -803,7 +803,7 @@ def download_excel_template():
     df = pd.DataFrame(data)
     
     # إنشاء Excel في الذاكرة
-    output = BytesIO()
+    output = BytesIo()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name='الطلبات', index=False)
         
