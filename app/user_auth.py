@@ -210,6 +210,8 @@ def logout():
     response.delete_cookie('store_id')
     response.delete_cookie('salla_access_token')
     response.delete_cookie('salla_refresh_token')
+    # Delete the additional cookies that were set in token_utils.py
+    response.delete_cookie('token_expires_at')
+    response.delete_cookie('store_linked')
     flash('تم تسجيل الخروج بنجاح', 'success')
     return response
-    
