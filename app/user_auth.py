@@ -219,12 +219,23 @@ def logout():
     # حذف جميع الكوكيز المعروفة
     for cookie_name in cookies_to_delete:
         response.delete_cookie(cookie_name, path='/')
+        response.delete_cookie(cookie_name, path='/auth')  # إذا كانت محددة المسار
+        response.delete_cookie(cookie_name, path='/orders') # إذا كانت محددة المسار
     
-    # حذف أي كوكيز إضافية قد تكون كبيرة
-    # يمكنك إضافة أي كوكيز أخرى تجدها كبيرة
-    additional_cookies = ['large_data_cookie', 'other_large_cookie']
-    for cookie_name in additional_cookies:
-        response.delete_cookie(cookie_name, path='/')
+    # إضافة رأس لمنع التخزين المؤقت
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
     
     flash('تم تسجيل الخروج بنجاح', 'success')
     return response
+@user_auth_bp.before_request
+def cleanup_old_cookies():
+    # تحقق من وجود كوكيز كبيرة
+    large_cookies = ['large_data_cookie', 'other_large_cookie']
+    for cookie_name in large_cookies:
+        if request.cookies.get(cookie_name):
+            # إذا كان الكوكي كبيراً، احذفه
+            response = make_response()
+            response.delete_cookie(cookie_name, path='/')
+            return response
