@@ -74,7 +74,7 @@ class Config:
     COOKIE_HTTPONLY = True
     COOKIE_SAMESITE = 'Lax'
     COOKIE_LIFETIME = timedelta(days=30)
-    COOKIE_REFRESH_EACH_REQUEST = True
+    COOKIE_REFRESH_EACH_REQUEST = False
     SESSION_COOKIE_SECURE = True
     
     # ------ إعدادات CSRF ------
