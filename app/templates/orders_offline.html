@@ -25,7 +25,7 @@
             padding: 15px;
             border-radius: 5px;
         }
-        .order-header { 
+        .order-header {
             background-color: #f8f9fa;
             padding: 10px;
             border-radius: 5px;
@@ -109,15 +109,11 @@
         <div class="order-details">
             <div>
                 <strong>العميل:</strong>
-                {% if order.customer %}
-                    {{ order.customer.name }} - {{ order.customer.mobile }}
-                {% else %}
-                    غير متوفر
-                {% endif %}
+                {{ order.customer.name }} - {{ order.customer.mobile }}
             </div>
             <div>
                 <strong>العنوان:</strong>
-                {% if order.customer and order.customer.addresses %}
+                {% if order.customer.addresses and order.customer.addresses is iterable and order.customer.addresses|length > 0 %}
                     {{ order.customer.addresses[0].city }}, {{ order.customer.addresses[0].street }}
                 {% else %}
                     غير متوفر
@@ -129,8 +125,8 @@
             <h3>المنتجات</h3>
             {% for item in order.items %}
             <div class="item">
-                {% if item.main_image %}
-                <img src="{{ item.main_image }}" alt="{{ item.name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                {% if item.product_thumbnail %}
+                <img src="{{ item.product_thumbnail }}" alt="{{ item.name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                 <div class="no-image" style="display: none;">لا توجد صورة</div>
                 {% else %}
                 <div class="no-image">لا توجد صورة</div>
@@ -156,23 +152,37 @@
             const images = document.querySelectorAll('img');
             images.forEach(img => {
                 if (img.src && img.src.startsWith('http')) {
-                    fetch(img.src)
-                        .then(response => response.blob())
-                        .then(blob => {
-                            const reader = new FileReader();
-                            reader.onload = function(e) {
-                                img.src = e.target.result;
-                            };
-                            reader.readAsDataURL(blob);
-                        })
-                        .catch(error => {
-                            console.error('Error converting image:', error);
-                            img.style.display = 'none';
-                            const noImageDiv = document.createElement('div');
-                            noImageDiv.className = 'no-image';
-                            noImageDiv.textContent = 'لا توجد صورة';
-                            img.parentNode.insertBefore(noImageDiv, img.nextSibling);
-                        });
+                    // إنشاء صورة جديدة للتحقق من وجودها
+                    const testImage = new Image();
+                    testImage.onload = function() {
+                        // الصورة موجودة، تحويلها إلى base64
+                        fetch(img.src)
+                            .then(response => response.blob())
+                            .then(blob => {
+                                const reader = new FileReader();
+                                reader.onload = function(e) {
+                                    img.src = e.target.result;
+                                };
+                                reader.readAsDataURL(blob);
+                            })
+                            .catch(error => {
+                                console.error('Error converting image:', error);
+                                img.style.display = 'none';
+                                const noImageDiv = img.nextElementSibling;
+                                if (noImageDiv && noImageDiv.classList.contains('no-image')) {
+                                    noImageDiv.style.display = 'block';
+                                }
+                            });
+                    };
+                    testImage.onerror = function() {
+                        // الصورة غير موجودة، إظهار بديل
+                        img.style.display = 'none';
+                        const noImageDiv = img.nextElementSibling;
+                        if (noImageDiv && noImageDiv.classList.contains('no-image')) {
+                            noImageDiv.style.display = 'block';
+                        }
+                    };
+                    testImage.src = img.src;
                 }
             });
         });

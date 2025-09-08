@@ -8,9 +8,6 @@ from app.utils import get_user_from_cookies, process_order_data, format_date
 from app.config import Config
 
 
-# orders/print_utils.py
-
- 
 @orders_bp.route('/download_orders_html')
 def download_orders_html():
     user, employee = get_user_from_cookies()
@@ -62,12 +59,34 @@ def download_orders_html():
                 # معالجة بيانات الطلب
                 processed_order = process_order_data(order_id, items_data)
                 
-                # إضافة معلومات إضافية
-                processed_order['reference_id'] = order_data.get('reference_id', order_id)
-                processed_order['customer'] = order_data.get('customer', {})
-                processed_order['created_at'] = format_date(order_data.get('created_at', ''))
+                # إضافة معلومات إضافية مع التأكد من أن البيانات قابلة للتكرار
+                order_dict = {
+                    'id': order_id,
+                    'reference_id': order_data.get('reference_id', order_id),
+                    'created_at': format_date(order_data.get('created_at', '')),
+                    'items': items_data  # استخدام items_data مباشرة
+                }
                 
-                orders.append(processed_order)
+                # معالجة بيانات العميل بشكل صحيح
+                customer_data = order_data.get('customer', {})
+                if customer_data and hasattr(customer_data, 'get'):
+                    # تحويل customer_data إلى قاموس إذا كان كائنًا
+                    if not isinstance(customer_data, dict):
+                        customer_data = customer_data.__dict__
+                    
+                    order_dict['customer'] = {
+                        'name': customer_data.get('name', 'غير معروف'),
+                        'mobile': customer_data.get('mobile', 'غير متوفر'),
+                        'addresses': customer_data.get('addresses', [])
+                    }
+                else:
+                    order_dict['customer'] = {
+                        'name': 'غير معروف',
+                        'mobile': 'غير متوفر',
+                        'addresses': []
+                    }
+                
+                orders.append(order_dict)
                 
             except Exception as e:
                 current_app.logger.error(f"Error fetching order {order_id}: {str(e)}")
