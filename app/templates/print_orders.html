@@ -293,14 +293,16 @@
                     <div class="order-id">الطلب #{{ order.reference_id }}</div>
                     <div class="order-date">تاريخ الطلب: {{ order.created_at }}</div>
                 </div>
-                   <div class="custom-status-dropdown">
-        <label>الحالة المخصصة:</label>
-        <select class="custom-status-select">
-            <option value="{{ order.custom_status }}" selected>{{ order.custom_status }}</option>
-            <!-- يمكن إضافة خيارات أخرى هنا إذا لزم الأمر -->
-        </select>
-    </div>
-    
+                       <div class="custom-status-section">
+                    <label class="custom-status-label">حالة التنفيذ:</label>
+                    <select class="custom-status-select" data-order-id="{{ order.id }}">
+                        <option value="لم يبدأ">لم يبدأ</option>
+                        <option value="قيد التنفيذ">قيد التنفيذ</option>
+                        <option value="تم التنفيذ">تم التنفيذ</option>
+                        <option value="ملغى">ملغى</option>
+                    </select>
+                    <button class="save-status-btn" data-order-id="{{ order.id }}">حفظ الحالة</button>
+                </div>
                 {% for item in order.order_items %}
                 <div class="product">
                     <div class="product-content">
@@ -377,6 +379,133 @@
                 compactButton.style.background = '#7f8c8d';
             }
         }
+        
+        function checkOnlineStatus() {
+            if (!navigator.onLine) {
+                const offlineIndicator = document.createElement('div');
+                offlineIndicator.className = 'offline-indicator';
+                offlineIndicator.textContent = 'أنت تعمل دون اتصال بالإنترنت';
+                document.body.appendChild(offlineIndicator);
+            }
+            return navigator.onLine;
+        }
+        
+        // تهيئة الحالة المحلية عند تحميل الصفحة
+        document.addEventListener('DOMContentLoaded', function() {
+            // التحقق من حالة الاتصال
+            checkOnlineStatus();
+            
+            // تحميل الحالات المحفوظة مسبقاً
+            loadSavedStatuses();
+            
+            // إضافة مستمعين للأزرار
+            document.querySelectorAll('.save-status-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const orderId = this.dataset.orderId;
+                    const statusSelect = document.querySelector(`.custom-status-select[data-order-id="${orderId}"]`);
+                    const status = statusSelect.value;
+                    
+                    saveStatusLocally(orderId, status);
+                });
+            });
+            
+            // تحديث الحالة تلقائياً عند التغيير (اختياري)
+            document.querySelectorAll('.custom-status-select').forEach(select => {
+                select.addEventListener('change', function() {
+                    const orderId = this.dataset.orderId;
+                    const status = this.value;
+                    
+                    // تحديث الزر للإشارة إلى الحاجة للحفظ
+                    const saveBtn = document.querySelector(`.save-status-btn[data-order-id="${orderId}"]`);
+                    saveBtn.classList.remove('saved');
+                    saveBtn.textContent = 'حفظ الحالة';
+                });
+            });
+        });
+        
+        // دالة لتحميل الحالات المحفوظة
+        function loadSavedStatuses() {
+            const savedStatuses = JSON.parse(localStorage.getItem('orderStatuses') || '{}');
+            
+            for (const orderId in savedStatuses) {
+                const select = document.querySelector(`.custom-status-select[data-order-id="${orderId}"]`);
+                if (select) {
+                    select.value = savedStatuses[orderId];
+                    
+                    // تحديث الزر للإشارة إلى أن الحالة محفوظة
+                    const saveBtn = document.querySelector(`.save-status-btn[data-order-id="${orderId}"]`);
+                    saveBtn.classList.add('saved');
+                    saveBtn.textContent = 'تم الحفظ';
+                }
+            }
+        }
+        
+        // دالة لحفظ الحالة محلياً
+        function saveStatusLocally(orderId, status) {
+            // تحميل الحالات الحالية
+            const savedStatuses = JSON.parse(localStorage.getItem('orderStatuses') || '{}');
+            
+            // تحديث الحالة
+            savedStatuses[orderId] = status;
+            
+            // حفظ التغييرات
+            localStorage.setItem('orderStatuses', JSON.stringify(savedStatuses));
+            
+            // تحديث الواجهة
+            const saveBtn = document.querySelector(`.save-status-btn[data-order-id="${orderId}"]`);
+            saveBtn.classList.add('saved');
+            saveBtn.textContent = 'تم الحفظ';
+            
+            // محاولة المزامنة مع الخادم إذا كان هناك اتصال
+            if (navigator.onLine) {
+                syncStatusWithServer(orderId, status);
+            }
+        }
+        
+        // دلة لمزامنة الحالة مع الخادم (للتطوير المستقبلي)
+        function syncStatusWithServer(orderId, status) {
+            // سيتم تنفيذ هذه الوظيفة عندما يكون هناك اتصال بالإنترنت
+            // يمكنك إضافة كود AJAX هنا لإرسال البيانات إلى الخادم
+            console.log(`مزامنة حالة الطلب ${orderId}: ${status}`);
+            
+            // مثال على استخدام API افتراضي:
+            /*
+            fetch('/api/update-order-status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    orderId: orderId,
+                    status: status
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('تم مزامنة الحالة مع الخادم');
+                }
+            })
+            .catch(error => {
+                console.error('خطأ في المزامنة:', error);
+            });
+            */
+        }
+        
+        // الاستماع لتغيرات حالة الاتصال
+        window.addEventListener('online', function() {
+            document.querySelector('.offline-indicator')?.remove();
+            
+            // محاولة مزامنة جميع الحالات المحفوظة عند العودة للاتصال
+            const savedStatuses = JSON.parse(localStorage.getItem('orderStatuses') || '{}');
+            for (const orderId in savedStatuses) {
+                syncStatusWithServer(orderId, savedStatuses[orderId]);
+            }
+        });
+        
+        window.addEventListener('offline', function() {
+            checkOnlineStatus();
+        });
     </script>
     
     <!-- Font Awesome for icons -->
