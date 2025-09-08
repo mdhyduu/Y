@@ -862,10 +862,9 @@ def download_excel_template():
             for cell in row:
                 cell.protection = Protection(locked=True)
         
-        # جعل الخلايا التي نريدها قابلة للتعديل غير محمية
-        # في حالتنا، نريد جعل عمود "الحالة المخصصة" (العمود D) قابلاً للتعديل فقط
+        # جعل خلايا الحالات فقط (العمود D) قابلة للتعديل
+        # فقط الخلايا التي تحتوي على رقم طلب (الصف الأول من كل مجموعة) ستكون قابلة للتعديل
         for row in range(2, len(df) + 2):
-            # فقط الخلايا التي تحتوي على رقم طلب (الصف الأول من كل مجموعة) ستكون قابلة للتعديل في عمود الحالة
             if worksheet.cell(row=row, column=1).value:  # إذا كانت الخلية تحتوي على رقم طلب
                 worksheet.cell(row=row, column=4).protection = Protection(locked=False)  # العمود 4 هو الحالة المخصصة
         
@@ -910,16 +909,12 @@ def download_excel_template():
             
             current_row += product_count
         
-        # إضافة قائمة منسدلة للحالات
+        # إضافة قائمة منسدلة للحالات (قابلة للتعديل)
         if custom_statuses:
             status_names = [status.name for status in custom_statuses]
             status_sheet = workbook.create_sheet("الحالات المخفية")
             for i, status in enumerate(status_names, 1):
                 status_sheet.cell(row=i, column=1, value=status)
-            
-            # حماية ورقة الحالات المخفية أيضًا
-            status_sheet.protection.sheet = True
-            status_sheet.protection.password = 'ProtectedExcel2024!'
             
             # إضافة قائمة منسدلة باستخدام Data Validation
             from openpyxl.worksheet.datavalidation import DataValidation
@@ -956,6 +951,11 @@ def download_excel_template():
         # تمكين التفاف النص للأعمدة
         for row in range(2, len(df) + 2):
             worksheet.cell(row=row, column=3).alignment = Alignment(wrap_text=True)
+        
+        # إضافة رسالة توضيحية
+        worksheet.cell(row=1, column=5, value="ملاحظة: يمكنك تعديل الحالة المخصصة فقط")
+        worksheet.merge_cells(f'E1:G1')
+        worksheet.cell(row=1, column=5).alignment = Alignment(horizontal='center')
     
     output.seek(0)
     
