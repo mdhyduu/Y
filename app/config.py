@@ -22,13 +22,12 @@ class Config:
         raise ValueError("يجب تعيين ENCRYPTION_KEY في متغيرات البيئة للإنتاج")
 
     # ------ إعدادات قاعدة البيانات ------
-        # في class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or os.environ.get('SQLALCHEMY_DATABASE_URI')
     if not SQLALCHEMY_DATABASE_URI:
         raise ValueError("يجب تعيين DATABASE_URL أو SQLALCHEMY_DATABASE_URI في متغيرات البيئة")
     
     # استبدال بداية الرابط إذا كان من Heroku (لتوافقية مع DigitalOcean)
-    if SQLALCHEMY_DATABASE_URI.startswith("postgres://"):
+    if SQLALCHEMY_DATABASE_URI and SQLALCHEMY_DATABASE_URI.startswith("postgres://"):
         SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace("postgres://", "postgresql://", 1)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
@@ -68,14 +67,20 @@ class Config:
     # ... الإعدادات الأخرى
     UPLOAD_FOLDER = 'static/uploads/custom_orders'
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
+    
     # ------ إعدادات الكوكيز والأمان ------
     COOKIE_NAME = 'app_session'
-    COOKIE_SECURE = True  # ضروري للإنتاج
+    COOKIE_SECURE = os.environ.get('COOKIE_SECURE', 'True').lower() == 'true'
     COOKIE_HTTPONLY = True
     COOKIE_SAMESITE = 'Lax'
     COOKIE_LIFETIME = timedelta(days=30)
     COOKIE_REFRESH_EACH_REQUEST = False
-    SESSION_COOKIE_SECURE = True
+    COOKIE_PATH = '/'
+    COOKIE_DOMAIN = os.environ.get('COOKIE_DOMAIN', None)
+    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'True').lower() == 'true'
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    PERMANENT_SESSION_LIFETIME = timedelta(days=30)
     
     # ------ إعدادات CSRF ------
     WTF_CSRF_ENABLED = True
@@ -91,8 +96,8 @@ class Config:
     }
     
     # ------ إعدادات التطوير ------
-    DEBUG = True
-    TESTING = True
+    DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
+    TESTING = os.environ.get('TESTING', 'False').lower() == 'true'
     
     # ------ إعدادات البريد الإلكتروني ------
     MAIL_SERVER = os.environ.get('MAIL_SERVER')
@@ -103,11 +108,18 @@ class Config:
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER')
     ADMINS = [email.strip() for email in os.environ.get('ADMINS', '').split(',') if email.strip()]
     
+    # ------ إعدادات الجلسات ------
+    SESSION_TYPE = 'filesystem'
+    SESSION_FILE_DIR = basedir / 'flask_session'
+    SESSION_PERMANENT = False
+    SESSION_USE_SIGNER = True
+    SESSION_KEY_PREFIX = 'session:'
+    
     @staticmethod
     def init_app(app):
         """تهيئة إضافية للتطبيق"""
         # إنشاء مجلدات ضرورية إذا لم تكن موجودة
-        required_folders = [Config.BARCODE_FOLDER]
+        required_folders = [Config.BARCODE_FOLDER, Config.SESSION_FILE_DIR]
         
         for folder in required_folders:
             if not folder.exists():
@@ -137,6 +149,13 @@ class Config:
             response.headers['Content-Security-Policy'] = csp
             response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
             response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+            
+            # رؤوس لمنع التخزين المؤقت للصفحات الحساسة
+            if request.path.startswith(('/auth/', '/logout')):
+                response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+                response.headers['Pragma'] = 'no-cache'
+                response.headers['Expires'] = '0'
+            
             return response
 
 
@@ -159,6 +178,8 @@ class TestingConfig(Config):
 class ProductionConfig(Config):
     """إعدادات بيئة الإنتاج"""
     PREFERRED_URL_SCHEME = 'https'
+    DEBUG = False
+    TESTING = False
     
     @classmethod
     def init_app(cls, app):
@@ -168,6 +189,10 @@ class ProductionConfig(Config):
         import logging
         from logging.handlers import SMTPHandler, RotatingFileHandler
         
+        # إنشاء مجلد السجلات إذا لم يكن موجوداً
+        if not os.path.exists('logs'):
+            os.makedirs('logs')
+            
         # تسجيل الأخطاء في ملف
         file_handler = RotatingFileHandler(
             'logs/app.log',
@@ -179,7 +204,12 @@ class ProductionConfig(Config):
         ))
         file_handler.setLevel(logging.INFO)
         app.logger.addHandler(file_handler)
+        
+        # إعدادات الجلسة للإنتاج
         app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+        app.config['SESSION_COOKIE_SECURE'] = True
+        app.config['SESSION_COOKIE_HTTPONLY'] = True
+        
         # إرسال الأخطاء بالبريد
         if app.config.get('MAIL_SERVER') and app.config.get('ADMINS'):
             credentials = None
