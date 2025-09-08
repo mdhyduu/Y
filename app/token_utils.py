@@ -44,15 +44,15 @@ def get_store_info(access_token):
 def set_token_cookies(response, access_token, refresh_token, expires_at):
     """تعيين كوكيز التوكنات في الرد"""
     response.set_cookie('salla_access_token', access_token, 
-                      max_age=timedelta(days=30).total_seconds(), 
+                      max_age=timedelta(days=14).total_seconds(), 
                       httponly=True, secure=True)
     response.set_cookie('salla_refresh_token', refresh_token, 
-                       max_age=timedelta(days=30).total_seconds(), 
+                       max_age=timedelta(days=14).total_seconds(), 
                        httponly=True, secure=True)
     response.set_cookie('token_expires_at', expires_at.isoformat(), 
-                       max_age=timedelta(days=30).total_seconds())
+                       max_age=timedelta(days=14).total_seconds())
     response.set_cookie('store_linked', 'true', 
-                       max_age=timedelta(days=30).total_seconds())
+                       max_age=timedelta(days=14).total_seconds())
     return response
 
 def refresh_salla_token(user):
@@ -80,7 +80,7 @@ def refresh_salla_token(user):
             Config.SALLA_TOKEN_URL,  # Changed from API_BASE_URL to TOKEN_URL
             data=data,
             headers={'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'},
-            timeout=30
+            timeout=14
         )
         
         logger.info("Refresh token response status: %s", response.status_code)
