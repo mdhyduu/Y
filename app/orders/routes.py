@@ -941,9 +941,7 @@ def download_excel_template():
             from openpyxl.worksheet.datavalidation import DataValidation
             dv = DataValidation(
                 type="list",
-                formula1="='الحالات المخفية'!$A$1:$A$" + str(len(status_names)),
-                allow_blank=True,
-                showDropDown=True  # التأكد من إظهار القائمة المنسدلة
+                formula1="='الحالات المخفية'!$A$1:$A$" + str(len(status_names))
             )
             dv.error = 'القيمة غير صحيحة'
             dv.errorTitle = 'قيمة غير صالحة'
@@ -979,13 +977,6 @@ def download_excel_template():
         worksheet.cell(row=1, column=5, value="ملاحظة: يمكنك تعديل الحالة المخصصة فقط")
         worksheet.merge_cells(f'E1:G1')
         worksheet.cell(row=1, column=5).alignment = Alignment(horizontal='center')
-        
-        # ضبط إعدادات الحماية للسماح بتحديد الخلايا غير المقفلة
-        worksheet.protection.enable()
-        worksheet.protection.sheet = True
-        worksheet.protection.password = 'ProtectedExcel2024!'
-        worksheet.protection.selectLockedCells = False
-        worksheet.protection.selectUnlockedCells = True  # السماح بتحديد الخلايا غير المقفلة
     
     output.seek(0)
     
