@@ -859,12 +859,17 @@ def download_excel_template():
         worksheet = writer.sheets['الطلبات']
         
         # إزالة حماية الورقة لجعلها قابلة للتعديل
-        # worksheet.protection.sheet = False  # تعليق حماية الورقة
+        worksheet.protection.sheet = False
         
-        # جعل جميع الخلايا قابلة للتعديل
+        # جعل جميع الخلايا مقفولة أولاً
         for row in worksheet.iter_rows():
             for cell in row:
-                cell.protection = Protection(locked=False)
+                cell.protection = Protection(locked=True)
+        
+        # فتح خلايا الحالة المخصصة (العمود D) فقط للتعديل
+        for row in range(2, len(df) + 2):
+            # فتح خلية الحالة المخصصة فقط
+            worksheet.cell(row=row, column=4).protection = Protection(locked=False)
         
         # إضافة عمود للصور يدويًا
         worksheet.insert_cols(2)  # إدراج عمود جديد في الموضع الثاني (لصور المنتجات)
@@ -910,7 +915,6 @@ def download_excel_template():
                     logger.error(f"Error loading image: {str(e)}")
                     # وضع رابط الصورة كنص إذا فشل تحميل الصورة
                     worksheet.cell(row=row_idx, column=2, value=img_url)
-        
         # دمج خلايا رقم الطلب للمنتجات المنتمية لنفس الطلب
         from openpyxl.styles import Alignment
         current_row = 2
@@ -957,8 +961,8 @@ def download_excel_template():
                     dv.add(worksheet.cell(row=row, column=4))
             
             worksheet.add_data_validation(dv)
-            # إبقاء ورقة الحالات مرئية بدلاً من إخفائها
-            # status_sheet.sheet_state = 'visible'  # يمكنك إلغاء التعليق إذا أردت إظهارها
+            # إبقاء ورقة الحالات مرئية
+            status_sheet.sheet_state = 'visible'
         
         # تنسيق الأعمدة
         column_widths = {
