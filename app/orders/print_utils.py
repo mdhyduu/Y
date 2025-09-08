@@ -10,7 +10,7 @@ from app.config import Config
 
 # orders/print_utils.py
 
-
+ 
 @orders_bp.route('/download_orders_html')
 def download_orders_html():
     user, employee = get_user_from_cookies()
