@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>كشف الطلبات - {{ current_time }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            background-color: #fff;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+        }
+        .order {
+            page-break-inside: avoid;
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .order-header {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .order-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .order-items {
+            margin-top: 15px;
+        }
+        .item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+        }
+        .item img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            margin-left: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .item-details {
+            flex: 1;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .no-image {
+            width: 80px;
+            height: 80px;
+            background-color: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            color: #999;
+            font-size: 12px;
+        }
+        @media print {
+            body {
+                padding: 0;
+            }
+            .order {
+                page-break-inside: avoid;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>كشف الطلبات</h1>
+        <p>تاريخ التصدير: {{ current_time }}</p>
+        <button class="no-print" onclick="window.print()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
+            طباعة الصفحة
+        </button>
+    </div>
+
+    {% for order in orders %}
+    <div class="order">
+        <div class="order-header">
+            <h2>الطلب #{{ order.reference_id }}</h2>
+            <p>تاريخ الطلب: {{ order.created_at }}</p>
+        </div>
+
+        <div class="order-details">
+            <div>
+                <strong>العميل:</strong>
+                {% if order.customer %}
+                    {{ order.customer.name }} - {{ order.customer.mobile }}
+                {% else %}
+                    غير متوفر
+                {% endif %}
+            </div>
+            <div>
+                <strong>العنوان:</strong>
+                {% if order.customer and order.customer.addresses %}
+                    {{ order.customer.addresses[0].city }}, {{ order.customer.addresses[0].street }}
+                {% else %}
+                    غير متوفر
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="order-items">
+            <h3>المنتجات</h3>
+            {% for item in order.items %}
+            <div class="item">
+                {% if item.main_image %}
+                <img src="{{ item.main_image }}" alt="{{ item.name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <div class="no-image" style="display: none;">لا توجد صورة</div>
+                {% else %}
+                <div class="no-image">لا توجد صورة</div>
+                {% endif %}
+                <div class="item-details">
+                    <div><strong>{{ item.name }}</strong></div>
+                    <div>الكمية: {{ item.quantity }}</div>
+                    <div>السعر: {{ item.price }} ر.س</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <div class="footer">
+        <p>تم الإنشاء في {{ current_time }}</p>
+    </div>
+
+    <script>
+        // تحويل الصور إلى بيانات مضمنة لتضمن عملها بدون اتصال
+        document.addEventListener('DOMContentLoaded', function() {
+            const images = document.querySelectorAll('img');
+            images.forEach(img => {
+                if (img.src && img.src.startsWith('http')) {
+                    fetch(img.src)
+                        .then(response => response.blob())
+                        .then(blob => {
+                            const reader = new FileReader();
+                            reader.onload = function(e) {
+                                img.src = e.target.result;
+                            };
+                            reader.readAsDataURL(blob);
+                        })
+                        .catch(error => {
+                            console.error('Error converting image:', error);
+                            img.style.display = 'none';
+                            const noImageDiv = document.createElement('div');
+                            noImageDiv.className = 'no-image';
+                            noImageDiv.textContent = 'لا توجد صورة';
+                            img.parentNode.insertBefore(noImageDiv, img.nextSibling);
+                        });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

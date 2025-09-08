@@ -483,6 +483,9 @@
                                 <i class="fas fa-print me-1"></i> طباعة الطلبات المحددة
                             </button>
                         </div>
+                            <button type="button" class="btn btn-info" id="download-html-btn">
+        <i class="fas fa-file-code"></i> تحميل HTML
+    </button>
                         <div class="col-md-6 mb-2">
                             <button type="button" class="btn btn-info w-100" id="quickListChangeStatusBtn">
                                 <i class="fas fa-tag me-1"></i> تغيير حالة الطلبات
@@ -1459,6 +1462,68 @@ document.getElementById('quickListAssignBtn').addEventListener('click', function
         });
     });
 });
+// معالج حدث لزر تحميل HTML
+$(document).on('click', '#download-html-btn', function() {
+    const selectedOrders = [];
+    
+    // جمع الطلبات المحددة
+    $('input.order-checkbox:checked').each(function() {
+        selectedOrders.push($(this).val());
+    });
+    
+    if (selectedOrders.length === 0) {
+        showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للتحميل');
+        return;
+    }
+    
+    // إظهار نافذة تأكيد
+    Swal.fire({
+        title: 'تحميل الطلبات',
+        html: `سيتم تحميل <span class="fw-bold text-primary">${selectedOrders.length}</span> طلب كملف HTML يعمل بدون اتصال`,
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'موافق، تحميل HTML',
+        cancelButtonText: 'إلغاء',
+        customClass: {
+            confirmButton: 'btn btn-primary',
+            cancelButton: 'btn btn-outline-secondary ms-2'
+        },
+        buttonsStyling: false
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // إظهار مؤشر التحميل
+            const downloadBtn = $('#download-html-btn');
+            const originalText = downloadBtn.html();
+            downloadBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
+            
+            // إنشاء رابط تحميل خفي
+            const downloadLink = document.createElement('a');
+            downloadLink.href = `{{ url_for('orders.download_orders_html') }}?order_ids=${selectedOrders.join(',')}`;
+            downloadLink.style.display = 'none';
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            
+            // استعادة حالة الزر بعد ثانية
+            setTimeout(() => {
+                downloadBtn.prop('disabled', false).html(originalText);
+            }, 2000);
+        }
+    });
+});
+
+// تحديث حالة زر تحميل HTML عند تغيير التحديدات
+function updateDownloadButtonsState() {
+    const checkedCount = $('input.order-checkbox:checked').length;
+    $('#download-excel-btn').prop('disabled', checkedCount === 0);
+    $('#download-html-btn').prop('disabled', checkedCount === 0);
+}
+
+// إضافة مستمعي الأحداث لجميع صناديق التحديد
+$('input.order-checkbox').on('change', updateDownloadButtonsState);
+
+// التهيئة الأولية لحالة الأزرار
+updateDownloadButtonsState();
 // إضافة event listeners لتفعيل الزر عند تحديد الطلبات
 document.addEventListener('DOMContentLoaded', function() {
     const checkboxes = document.querySelectorAll('input.order-checkbox');
