@@ -293,7 +293,14 @@
                     <div class="order-id">الطلب #{{ order.reference_id }}</div>
                     <div class="order-date">تاريخ الطلب: {{ order.created_at }}</div>
                 </div>
-                
+                   <div class="custom-status-dropdown">
+        <label>الحالة المخصصة:</label>
+        <select class="custom-status-select">
+            <option value="{{ order.custom_status }}" selected>{{ order.custom_status }}</option>
+            <!-- يمكن إضافة خيارات أخرى هنا إذا لزم الأمر -->
+        </select>
+    </div>
+    
                 {% for item in order.order_items %}
                 <div class="product">
                     <div class="product-content">
