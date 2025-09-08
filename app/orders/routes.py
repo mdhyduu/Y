@@ -741,6 +741,7 @@ def download_excel_template():
     data = []
     image_urls = []  # لتخزين روابط الصور لكل صف (كل منتج)
     order_id_map = {}  # لتتبع رقم الطلب الأول لكل مجموعة منتجات
+    order_custom_status_map = {}  # لتخزين الحالة المخصصة لكل طلب
     
     for order in salla_orders + custom_orders:
         order_type = 'salla' if isinstance(order, SallaOrder) else 'custom'
@@ -754,6 +755,7 @@ def download_excel_template():
             last_emp_status = OrderEmployeeStatus.query.filter_by(custom_order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
         
         custom_status_name = last_emp_status.status.name if last_emp_status and last_emp_status.status else ''
+        order_custom_status_map[order_id] = custom_status_name
 
         # استخراج بيانات المنتجات وخياراتها (لطلبات سلة فقط)
         if order_type == 'salla' and order.raw_data:
@@ -807,10 +809,13 @@ def download_excel_template():
                     # فقط أول منتج في الطلب يعرض رقم الطلب
                     display_order_id = order_id if item_index == 0 else ""
                     
+                    # الحالة المخصصة ستظهر فقط في الصف الأول للطلب
+                    display_custom_status = custom_status_name if item_index == 0 else ""
+                    
                     data.append({
                         'order_id': display_order_id,
                         'product_options': product_info,
-                        'custom_status': custom_status_name if item_index == 0 else ""
+                        'custom_status': display_custom_status
                     })
                     
                     # تخزين معلومات لدمج الخلايا لاحقاً
@@ -874,6 +879,7 @@ def download_excel_template():
         
         # إضافة الصور إلى الخلايا
         from openpyxl.drawing.image import Image
+        from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, OneCellAnchor
         import requests
 
         # إضافة الصور لكل منتج
@@ -884,11 +890,20 @@ def download_excel_template():
                     if response.status_code == 200:
                         img_data = BytesIO(response.content)
                         img = Image(img_data)
-                        img.width = 120
-                        img.height = 120
+                        
+                        # تكبير حجم الصورة
+                        img.width = 180  # زيادة حجم الصورة
+                        img.height = 180
+                        
+                        # تحديد موضع الصورة وتثبيتها
                         cell_ref = f'B{row_idx}'
-                        worksheet.add_image(img, cell_ref)
-                        worksheet.row_dimensions[row_idx].height = 90
+                        
+                        # إضافة الصورة مع تثبيت الموضع
+                        img.anchor = cell_ref
+                        worksheet.add_image(img)
+                        
+                        # زيادة ارتفاع الصف لاستيعاب الصورة الكبيرة
+                        worksheet.row_dimensions[row_idx].height = 135
                 except Exception as e:
                     logger.error(f"Error loading image: {str(e)}")
                     # وضع رابط الصورة كنص إذا فشل تحميل الصورة
@@ -904,8 +919,14 @@ def download_excel_template():
                 end_cell = f'A{current_row + product_count - 1}'
                 worksheet.merge_cells(f'{start_cell}:{end_cell}')
                 
+                # دمج الخلايا العمودية للحالة المخصصة
+                status_start_cell = f'D{current_row}'
+                status_end_cell = f'D{current_row + product_count - 1}'
+                worksheet.merge_cells(f'{status_start_cell}:{status_end_cell}')
+                
                 # محاذاة النص في منتصف الخلية المدمجة
                 worksheet[start_cell].alignment = Alignment(vertical='center', horizontal='center')
+                worksheet[status_start_cell].alignment = Alignment(vertical='center', horizontal='center')
             
             current_row += product_count
         
@@ -940,9 +961,9 @@ def download_excel_template():
         # تنسيق الأعمدة
         column_widths = {
             'A': 15,  # رقم الطلب
-            'B': 15,  # صورة المنتج
+            'B': 20,  # صورة المنتج (تم زيادة العرض لاستيعاب الصور الكبيرة)
             'C': 40,  # خيارات المنتج
-            'D': 15   # الحالة المخصصة
+            'D': 20   # الحالة المخصصة
         }
         
         for col_letter, width in column_widths.items():
