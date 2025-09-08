@@ -12,6 +12,8 @@ import random
 from . import mail
 user_auth_bp = Blueprint('user_auth', __name__)
 logger = logging.getLogger(__name__)
+# تسجيل الخروج
+from flask import session, g  # g لتمرير المستخدم
 
 # فلتر حماية يمنع الوصول إذا المستخدم مسجل دخول
 def redirect_if_authenticated(view_func):
@@ -200,25 +202,39 @@ def resend_verification(user_id):
     except Exception as e:
         logger.error(f"فشل إعادة إرسال البريد: {str(e)}")
         return {"success": False, "message": f"فشل إرسال البريد: {str(e)}"}
-# تسجيل الخروج
+
 @user_auth_bp.route('/logout')
 def logout():
-    # مسح بيانات الجلسة أولاً
-    from flask import session
+    # افتراض أن لديك طريقة للحصول على المستخدم الحالي قبل مسح الكوكيز
+    # مثلاً من g object أو session
+    user_id = request.cookies.get('user_id')
+    is_admin = request.cookies.get('is_admin') == 'true'
+
+    if user_id and is_admin:
+        user = User.query.get(user_id)
+        if user:
+            # مسح التوكنات من قاعدة البيانات
+            user._salla_access_token = None
+            user._salla_refresh_token = None
+            user.token_expires_at = None
+            db.session.commit()
+            logger.info(f"تم مسح توكنات سلة للمستخدم {user.email} عند الخروج.")
+
     session.clear()
-    
     response = make_response(redirect(url_for('user_auth.login')))
     
-    # قائمة بجميع الكوكيز المعروفة
     cookies_to_delete = [
         'user_id', 'is_admin', 'employee_role', 'store_id',
         'salla_access_token', 'salla_refresh_token',
         'token_expires_at', 'store_linked', 'oauth_state'
     ]
     
-    # حذف جميع الكوكيز المعروفة
     for cookie_name in cookies_to_delete:
         response.delete_cookie(cookie_name, path='/')
+
+
+
+
         response.delete_cookie(cookie_name, path='/auth')  # إذا كانت محددة المسار
         response.delete_cookie(cookie_name, path='/orders') # إذا كانت محددة المسار
     
