@@ -691,16 +691,13 @@ def download_excel_template():
         flash('الرجاء تسجيل الدخول أولاً', 'error')
         return redirect(url_for('user_auth.login'))
     
-    # جلب الطلبات المحددة من المعامل
     selected_orders_param = request.args.get('selected_orders', '')
     selected_orders = selected_orders_param.split(',') if selected_orders_param else []
     
-    # جلب الحالات المخصصة المتاحة
     custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(
         Employee.store_id == user.store_id
     ).all()
     
-    # جلب الطلبات المطلوبة
     if selected_orders:
         salla_order_ids = []
         custom_order_ids = []
@@ -737,10 +734,10 @@ def download_excel_template():
                 CustomOrder.store_id == user.store_id
             ).all()
     
-    # تحضير البيانات ل Excel - كل منتج في صف منفصل
+    # تحضير البيانات ل Excel
     data = []
-    image_urls = []  # لتخزين روابط الصور لكل صف (كل منتج)
-    order_id_map = {}  # لتتبع رقم الطلب الأول لكل مجموعة منتجات
+    image_urls = []
+    order_id_map = {}
     
     for order in salla_orders + custom_orders:
         order_type = 'salla' if isinstance(order, SallaOrder) else 'custom'
@@ -755,7 +752,7 @@ def download_excel_template():
         
         custom_status_name = last_emp_status.status.name if last_emp_status and last_emp_status.status else ''
 
-        # استخراج بيانات المنتجات وخياراتها (لطلبات سلة فقط)
+        # استخراج بيانات المنتجات وخياراتها
         if order_type == 'salla' and order.raw_data:
             try:
                 raw_data = json.loads(order.raw_data)
@@ -767,9 +764,11 @@ def download_excel_template():
                     
                     # استخراج صورة المنتج
                     main_image = ''
-                    thumbnail_url = item.get('product_thumbnail') or item.get('thumbnail')
-                    if thumbnail_url and isinstance(thumbnail_url, str):
-                        main_image = thumbnail_url
+                    images = item.get('images', [])
+                    if images and isinstance(images, list) and len(images) > 0:
+                        main_image = images[0].get('url', '') if isinstance(images[0], dict) else str(images[0])
+                    elif item.get('product_thumbnail'):
+                        main_image = item.get('product_thumbnail')
                     
                     # استخراج الخيارات بشكل مفصل
                     options_text = ""
@@ -780,11 +779,9 @@ def download_excel_template():
                             option_name = option.get('name', '')
                             option_value = option.get('value', '')
                             
-                            # معالجة القيم المعقدة (قاموس أو قائمة)
                             if isinstance(option_value, dict):
                                 option_value = option_value.get('name', '') or option_value.get('value', '') or str(option_value)
                             elif isinstance(option_value, list):
-                                # إذا كانت القيمة قائمة، نعالج كل عنصر
                                 values_list = []
                                 for val in option_value:
                                     if isinstance(val, dict):
@@ -803,14 +800,14 @@ def download_excel_template():
                     if options_text:
                         product_info += f" - {options_text}"
                     
-                    # إضافة صف لكل منتج
-                    # فقط أول منتج في الطلب يعرض رقم الطلب
+                    # فقط أول منتج في الطلب يعرض رقم الطلب والحالة
                     display_order_id = order_id if item_index == 0 else ""
+                    display_custom_status = custom_status_name if item_index == 0 else ""
                     
                     data.append({
                         'order_id': display_order_id,
                         'product_options': product_info,
-                        'custom_status': custom_status_name if item_index == 0 else ""
+                        'custom_status': display_custom_status
                     })
                     
                     # تخزين معلومات لدمج الخلايا لاحقاً
@@ -822,23 +819,22 @@ def download_excel_template():
                     
             except Exception as e:
                 logger.error(f"Error parsing order data: {str(e)}")
-                # إضافة صف للخطأ
                 data.append({
                     'order_id': order_id,
                     'product_options': "خطأ في تحليل البيانات",
                     'custom_status': custom_status_name
                 })
                 image_urls.append("")
-                order_id_map[len(data)] = 1  # طلب به خطأ
+                order_id_map[len(data)] = 1
         else:
-            # للطلبات المخصصة أو إذا لم يكن هناك منتجات
+            # للطلبات المخصصة
             data.append({
                 'order_id': order_id,
                 'product_options': "لا توجد منتجات",
                 'custom_status': custom_status_name
             })
             image_urls.append("")
-            order_id_map[len(data)] = 1  # طلب بدون منتجات
+            order_id_map[len(data)] = 1
     
     # إنشاء DataFrame
     df = pd.DataFrame(data)
@@ -848,50 +844,59 @@ def download_excel_template():
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name='الطلبات', index=False)
         
-        # الحصول على ورقة العمل للتنسيق
         workbook = writer.book
         worksheet = writer.sheets['الطلبات']
         
         # إضافة عمود للصور يدويًا
-        worksheet.insert_cols(2)  # إدراج عمود جديد في الموضع الثاني (لصور المنتجات)
+        worksheet.insert_cols(2)
         worksheet.cell(row=1, column=2, value='صورة المنتج')
         
         # إضافة الصور إلى الخلايا
         from openpyxl.drawing.image import Image
-        from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, OneCellAnchor
-        from openpyxl.utils import get_column_letter
         import requests
+        from io import BytesIO
 
-        # إضافة الصور لكل منتج
         for row_idx, img_url in enumerate(image_urls, start=2):
-            if img_url and isinstance(img_url, str):
+            if img_url and isinstance(img_url, str) and img_url.startswith('http'):
                 try:
                     response = requests.get(img_url, timeout=10)
                     if response.status_code == 200:
                         img_data = BytesIO(response.content)
                         img = Image(img_data)
-                        img.width = 120
-                        img.height = 120
+                        
+                        # زيادة حجم الصورة
+                        img.width = 150
+                        img.height = 150
+                        
                         cell_ref = f'B{row_idx}'
                         worksheet.add_image(img, cell_ref)
-                        worksheet.row_dimensions[row_idx].height = 90
+                        
+                        # زيادة ارتفاع الصف لاستيعاب الصورة الكبيرة
+                        worksheet.row_dimensions[row_idx].height = 120
                 except Exception as e:
                     logger.error(f"Error loading image: {str(e)}")
-                    # وضع رابط الصورة كنص إذا فشل تحميل الصورة
                     worksheet.cell(row=row_idx, column=2, value=img_url)
         
-        # دمج خلايا رقم الطلب للمنتجات المنتمية لنفس الطلب
+        # دمج خلايا رقم الطلب والحالة للمنتجات المنتمية لنفس الطلب
         from openpyxl.styles import Alignment
         current_row = 2
-        for row_num, product_count in order_id_map.items():
+        
+        # ترتيب order_id_map حسب المفتاح (رقم الصف)
+        sorted_order_ids = sorted(order_id_map.items())
+        
+        for row_num, product_count in sorted_order_ids:
             if product_count > 1:
-                # دمج الخلايا العمودية لرقم الطلب
+                # دمج خلايا رقم الطلب (العمود A)
                 start_cell = f'A{current_row}'
                 end_cell = f'A{current_row + product_count - 1}'
                 worksheet.merge_cells(f'{start_cell}:{end_cell}')
-                
-                # محاذاة النص في منتصف الخلية المدمجة
                 worksheet[start_cell].alignment = Alignment(vertical='center', horizontal='center')
+                
+                # دمج خلايا الحالة المخصصة (العمود D)
+                status_start_cell = f'D{current_row}'
+                status_end_cell = f'D{current_row + product_count - 1}'
+                worksheet.merge_cells(f'{status_start_cell}:{status_end_cell}')
+                worksheet[status_start_cell].alignment = Alignment(vertical='center', horizontal='center')
             
             current_row += product_count
         
@@ -902,7 +907,6 @@ def download_excel_template():
             for i, status in enumerate(status_names, 1):
                 status_sheet.cell(row=i, column=1, value=status)
             
-            # إضافة قائمة منسدلة باستخدام Data Validation
             dv = DataValidation(
                 type="list",
                 formula1="='الحالات المخفية'!$A$1:$A$" + str(len(status_names))
@@ -912,200 +916,48 @@ def download_excel_template():
             dv.prompt = 'يرجى اختيار حالة من القائمة'
             dv.promptTitle = 'اختيار الحالة'
             
-            # تطبيق التحقق على عمود الحالة المخصصة (العمود 4)
+            # تطبيق التحقق على عمود الحالة المخصصة (العمود D)
             for row in range(2, len(df) + 2):
-                # فقط الصف الأول من كل طلب يحتوي على قائمة منسدلة للحالة
                 cell_value = worksheet.cell(row=row, column=1).value
-                if cell_value:  # إذا كانت الخلية تحتوي على رقم طلب (أي هي الصف الأول للطلب)
+                if cell_value:
                     dv.add(worksheet.cell(row=row, column=4))
             
             worksheet.add_data_validation(dv)
             status_sheet.sheet_state = 'hidden'
         
-        # تنسيق الأعمدة
+        # تحسين تنسيق الأعمدة
         column_widths = {
-            'A': 15,  # رقم الطلب
-            'B': 15,  # صورة المنتج
-            'C': 40,  # خيارات المنتج
-            'D': 15   # الحالة المخصصة
+            'A': 20,  # رقم الطلب
+            'B': 20,  # صورة المنتج
+            'C': 50,  # خيارات المنتج
+            'D': 20   # الحالة المخصصة
         }
         
         for col_letter, width in column_widths.items():
             worksheet.column_dimensions[col_letter].width = width
         
-        # تمكين التفاف النص للأعمدة
-        for row in range(2, len(df) + 2):
-            worksheet.cell(row=row, column=3).alignment = Alignment(wrap_text=True)
+        # تحسين محاذاة النص
+        for row in worksheet.iter_rows(min_row=2, max_row=len(df)+1, min_col=1, max_col=4):
+            for cell in row:
+                cell.alignment = Alignment(vertical='center', horizontal='center', wrap_text=True)
+        
+        # إضافة فواصل بين الخلايا
+        for row in range(1, len(df) + 2):
+            for col in range(1, 5):
+                cell = worksheet.cell(row=row, column=col)
+                cell.border = openpyxl.styles.Border(
+                    left=openpyxl.styles.Side(style='thin'),
+                    right=openpyxl.styles.Side(style='thin'),
+                    top=openpyxl.styles.Side(style='thin'),
+                    bottom=openpyxl.styles.Side(style='thin')
+                )
     
     output.seek(0)
     
-    # إرسال الملف
     filename = f"orders_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     return send_file(
         output,
         as_attachment=True,
         download_name=filename,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-@orders_bp.route('/download_pwa_orders', methods=['GET'])
-def download_pwa_orders():
-    user, employee = get_user_from_cookies()
-    
-    if not user:
-        flash('الرجاء تسجيل الدخول أولاً', 'error')
-        return redirect(url_for('user_auth.login'))
-    
-    # جلب الطلبات المحددة من المعامل
-    selected_orders_param = request.args.get('selected_orders', '')
-    selected_orders = selected_orders_param.split(',') if selected_orders_param else []
-    
-    # جلب الطلبات المطلوبة
-    if selected_orders:
-        salla_order_ids = []
-        custom_order_ids = []
-        
-        for order_str in selected_orders:
-            if ':' in order_str:
-                order_type, order_id = order_str.split(':', 1)
-                if order_type == 'salla':
-                    salla_order_ids.append(order_id)
-                elif order_type == 'custom':
-                    custom_order_ids.append(order_id)
-        
-        salla_orders = SallaOrder.query.filter(
-            SallaOrder.id.in_(salla_order_ids),
-            SallaOrder.store_id == user.store_id
-        ).all() if salla_order_ids else []
-        
-        custom_orders = CustomOrder.query.filter(
-            CustomOrder.id.in_(custom_order_ids),
-            CustomOrder.store_id == user.store_id
-        ).all() if custom_order_ids else []
-        
-    else:
-        flash('لم يتم تحديد أي طلبات', 'error')
-        return redirect(url_for('orders.index'))
-    
-    # تجهيز بيانات الطلبات للتخزين بدون اتصال
-    offline_data = {
-        'orders': [],
-        'images': {}  # لتخزين الصور ك base64
-    }
-    
-    # دالة مساعدة لتحميل الصورة وتحويلها إلى base64
-    def image_to_base64(url):
-        try:
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                return base64.b64encode(response.content).decode('utf-8')
-        except:
-            return None
-        return None
-    
-    # معالجة طلبات سلة
-    for order in salla_orders:
-        if order.raw_data:
-            try:
-                raw_data = json.loads(order.raw_data)
-                items = raw_data.get('items', [])
-                
-                # معالجة كل منتج في الطلب
-                order_products = []
-                for item in items:
-                    product_name = item.get('name', '')
-                    quantity = item.get('quantity', 0)
-                    price = item.get('price', {}).get('amount', 0) if isinstance(item.get('price'), dict) else item.get('price', 0)
-                    sku = item.get('sku', '')
-                    
-                    # استخراج صورة المنتج
-                    main_image = ''
-                    thumbnail_url = item.get('product_thumbnail') or item.get('thumbnail')
-                    if thumbnail_url and isinstance(thumbnail_url, str):
-                        main_image = thumbnail_url
-                    
-                    # استخراج الخيارات
-                    options_text = ""
-                    options = item.get('options', [])
-                    if options:
-                        option_details = []
-                        for option in options:
-                            option_name = option.get('name', '')
-                            option_value = option.get('value', '')
-                            
-                            if isinstance(option_value, dict):
-                                option_value = option_value.get('name', '') or option_value.get('value', '') or str(option_value)
-                            elif isinstance(option_value, list):
-                                values_list = []
-                                for val in option_value:
-                                    if isinstance(val, dict):
-                                        val_str = val.get('name', '') or val.get('value', '') or str(val)
-                                        values_list.append(val_str)
-                                    else:
-                                        values_list.append(str(val))
-                                option_value = ', '.join(values_list)
-                            
-                            option_details.append(f"{option_name}: {option_value}")
-                        
-                        options_text = " | ".join(option_details)
-                    
-                    # تحويل الصورة إلى base64 إذا كانت موجودة
-                    image_base64 = None
-                    if main_image:
-                        image_base64 = image_to_base64(main_image)
-                        if image_base64:
-                            offline_data['images'][main_image] = image_base64
-                    
-                    order_products.append({
-                        'product_name': product_name,
-                        'quantity': quantity,
-                        'price': price,
-                        'sku': sku,
-                        'options': options_text,
-                        'image_url': main_image,
-                        'image_base64': image_base64
-                    })
-                
-                # جلب الحالة المخصصة (آخر حالة)
-                last_emp_status = OrderEmployeeStatus.query.filter_by(order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
-                custom_status = last_emp_status.status.name if last_emp_status and last_emp_status.status else ''
-                
-                # إضافة الطلب إلى البيانات
-                offline_data['orders'].append({
-                    'order_id': order.id,
-                    'order_type': 'salla',
-                    'customer_name': order.customer_name,
-                    'created_at': order.created_at.isoformat() if order.created_at else '',
-                    'custom_status': custom_status,
-                    'products': order_products
-                })
-                
-            except Exception as e:
-                logger.error(f"Error parsing order data for PWA: {str(e)}")
-    
-    # معالجة الطلبات المخصصة
-    for order in custom_orders:
-        # جلب الحالة المخصصة (آخر حالة)
-        last_emp_status = OrderEmployeeStatus.query.filter_by(custom_order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
-        custom_status = last_emp_status.status.name if last_emp_status and last_emp_status.status else ''
-        
-        offline_data['orders'].append({
-            'order_id': order.id,
-            'order_type': 'custom',
-            'customer_name': order.customer_name,
-            'created_at': order.created_at.isoformat() if order.created_at else '',
-            'custom_status': custom_status,
-            'products': []  # الطلبات المخصصة ليس لها منتجات
-        })
-    
-    # تحويل البيانات إلى JSON وإرجاعها كملف للتحميل
-    output = BytesIO()
-    output.write(json.dumps(offline_data, ensure_ascii=False).encode('utf-8'))
-    output.seek(0)
-    
-    filename = f"pwa_orders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    return send_file(
-        output,
-        as_attachment=True,
-        download_name=filename,
-        mimetype='application/json'
     )
