@@ -740,6 +740,7 @@ def download_excel_template():
     # تحضير البيانات ل Excel - كل منتج في صف منفصل
     data = []
     image_urls = []  # لتخزين روابط الصور لكل صف (كل منتج)
+    order_id_map = {}  # لتتبع رقم الطلب الأول لكل مجموعة منتجات
     
     for order in salla_orders + custom_orders:
         order_type = 'salla' if isinstance(order, SallaOrder) else 'custom'
@@ -803,11 +804,18 @@ def download_excel_template():
                         product_info += f" - {options_text}"
                     
                     # إضافة صف لكل منتج
+                    # فقط أول منتج في الطلب يعرض رقم الطلب
+                    display_order_id = order_id if item_index == 0 else ""
+                    
                     data.append({
-                        'order_id': order_id,
+                        'order_id': display_order_id,
                         'product_options': product_info,
-                        'custom_status': custom_status_name
+                        'custom_status': custom_status_name if item_index == 0 else ""
                     })
+                    
+                    # تخزين معلومات لدمج الخلايا لاحقاً
+                    if item_index == 0:
+                        order_id_map[len(data)] = len(items)  # حفظ عدد المنتجات لهذا الطلب
                     
                     # إضافة صورة هذا المنتج
                     image_urls.append(main_image)
@@ -821,6 +829,7 @@ def download_excel_template():
                     'custom_status': custom_status_name
                 })
                 image_urls.append("")
+                order_id_map[len(data)] = 1  # طلب به خطأ
         else:
             # للطلبات المخصصة أو إذا لم يكن هناك منتجات
             data.append({
@@ -829,6 +838,7 @@ def download_excel_template():
                 'custom_status': custom_status_name
             })
             image_urls.append("")
+            order_id_map[len(data)] = 1  # طلب بدون منتجات
     
     # إنشاء DataFrame
     df = pd.DataFrame(data)
@@ -870,6 +880,21 @@ def download_excel_template():
                     # وضع رابط الصورة كنص إذا فشل تحميل الصورة
                     worksheet.cell(row=row_idx, column=2, value=img_url)
         
+        # دمج خلايا رقم الطلب للمنتجات المنتمية لنفس الطلب
+        from openpyxl.styles import Alignment
+        current_row = 2
+        for row_num, product_count in order_id_map.items():
+            if product_count > 1:
+                # دمج الخلايا العمودية لرقم الطلب
+                start_cell = f'A{current_row}'
+                end_cell = f'A{current_row + product_count - 1}'
+                worksheet.merge_cells(f'{start_cell}:{end_cell}')
+                
+                # محاذاة النص في منتصف الخلية المدمجة
+                worksheet[start_cell].alignment = Alignment(vertical='center', horizontal='center')
+            
+            current_row += product_count
+        
         # إضافة قائمة منسدلة للحالات
         if custom_statuses:
             status_names = [status.name for status in custom_statuses]
@@ -889,7 +914,10 @@ def download_excel_template():
             
             # تطبيق التحقق على عمود الحالة المخصصة (العمود 4)
             for row in range(2, len(df) + 2):
-                dv.add(worksheet.cell(row=row, column=4))
+                # فقط الصف الأول من كل طلب يحتوي على قائمة منسدلة للحالة
+                cell_value = worksheet.cell(row=row, column=1).value
+                if cell_value:  # إذا كانت الخلية تحتوي على رقم طلب (أي هي الصف الأول للطلب)
+                    dv.add(worksheet.cell(row=row, column=4))
             
             worksheet.add_data_validation(dv)
             status_sheet.sheet_state = 'hidden'
@@ -907,7 +935,7 @@ def download_excel_template():
         
         # تمكين التفاف النص للأعمدة
         for row in range(2, len(df) + 2):
-            worksheet.cell(row=row, column=3).alignment = openpyxl.styles.Alignment(wrap_text=True)
+            worksheet.cell(row=row, column=3).alignment = Alignment(wrap_text=True)
     
     output.seek(0)
     
