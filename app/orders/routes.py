@@ -683,37 +683,29 @@ def upload_updated_excel():
 
 # routes.py - إضافة endpoint جديد
 
-
-from openpyxl.drawing.image import Image
-from openpyxl.drawing.xdr import XDRPoint2D, XDRPositiveSize2D
-from openpyxl.utils.units import pixels_to_EMU
-from openpyxl.drawing.spreadsheet_drawing import TwoCellAnchor
-from openpyxl.worksheet.datavalidation import DataValidation
-
-logger = logging.getLogger(__name__)
-
+# routes.py - تعديل جزء تحميل القالب
 @orders_bp.route('/download_excel_template')
 def download_excel_template():
     user, employee = get_user_from_cookies()
-
+    
     if not user:
         flash('الرجاء تسجيل الدخول أولاً', 'error')
         return redirect(url_for('user_auth.login'))
-
+    
     # جلب الطلبات المحددة من المعامل
     selected_orders_param = request.args.get('selected_orders', '')
     selected_orders = selected_orders_param.split(',') if selected_orders_param else []
-
+    
     # جلب الحالات المخصصة المتاحة
     custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(
         Employee.store_id == user.store_id
     ).all()
-
+    
     # جلب الطلبات المطلوبة
     if selected_orders:
         salla_order_ids = []
         custom_order_ids = []
-
+        
         for order_str in selected_orders:
             if ':' in order_str:
                 order_type, order_id = order_str.split(':', 1)
@@ -721,17 +713,17 @@ def download_excel_template():
                     salla_order_ids.append(order_id)
                 elif order_type == 'custom':
                     custom_order_ids.append(order_id)
-
+        
         salla_orders = SallaOrder.query.filter(
             SallaOrder.id.in_(salla_order_ids),
             SallaOrder.store_id == user.store_id
         ).all() if salla_order_ids else []
-
+        
         custom_orders = CustomOrder.query.filter(
             CustomOrder.id.in_(custom_order_ids),
             CustomOrder.store_id == user.store_id
         ).all() if custom_order_ids else []
-
+        
     else:
         if request.cookies.get('is_admin') == 'true' or (employee and employee.role in ['reviewer', 'manager']):
             salla_orders = SallaOrder.query.filter_by(store_id=user.store_id).all()
@@ -745,34 +737,44 @@ def download_excel_template():
                 OrderAssignment.employee_id == employee.id,
                 CustomOrder.store_id == user.store_id
             ).all()
-
+    
     # تحضير البيانات ل Excel - كل منتج في صف منفصل
     data = []
-    image_urls = []
-    order_id_map = {}
-
+    image_urls = []  # لتخزين روابط الصور لكل صف (كل منتج)
+    order_id_map = {}  # لتتبع رقم الطلب الأول لكل مجموعة منتجات
+    order_custom_status_map = {}  # لتخزين الحالة المخصصة لكل طلب
+    
     for order in salla_orders + custom_orders:
         order_type = 'salla' if isinstance(order, SallaOrder) else 'custom'
         order_id = order.id if order_type == 'salla' else order.order_number
-
+        
+        # جلب الحالة المخصصة (آخر حالة)
         last_emp_status = None
         if order_type == 'salla':
             last_emp_status = OrderEmployeeStatus.query.filter_by(order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
         else:
             last_emp_status = OrderEmployeeStatus.query.filter_by(custom_order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
-
+        
         custom_status_name = last_emp_status.status.name if last_emp_status and last_emp_status.status else ''
+        order_custom_status_map[order_id] = custom_status_name
 
+        # استخراج بيانات المنتجات وخياراتها (لطلبات سلة فقط)
         if order_type == 'salla' and order.raw_data:
             try:
                 raw_data = json.loads(order.raw_data)
                 items = raw_data.get('items', [])
-
+                
                 for item_index, item in enumerate(items):
                     product_name = item.get('name', '')
                     quantity = item.get('quantity', 0)
-                    main_image = item.get('product_thumbnail') or item.get('thumbnail') or ''
-
+                    
+                    # استخراج صورة المنتج
+                    main_image = ''
+                    thumbnail_url = item.get('product_thumbnail') or item.get('thumbnail')
+                    if thumbnail_url and isinstance(thumbnail_url, str):
+                        main_image = thumbnail_url
+                    
+                    # استخراج الخيارات بشكل مفصل
                     options_text = ""
                     options = item.get('options', [])
                     if options:
@@ -780,80 +782,101 @@ def download_excel_template():
                         for option in options:
                             option_name = option.get('name', '')
                             option_value = option.get('value', '')
+                            
+                            # معالجة القيم المعقدة (قاموس أو قائمة)
                             if isinstance(option_value, dict):
-                                option_value = option_value.get('name', '') or str(option_value)
+                                option_value = option_value.get('name', '') or option_value.get('value', '') or str(option_value)
                             elif isinstance(option_value, list):
-                                values_list = [str(val.get('name', '')) if isinstance(val, dict) else str(val) for val in option_value]
+                                # إذا كانت القيمة قائمة، نعالج كل عنصر
+                                values_list = []
+                                for val in option_value:
+                                    if isinstance(val, dict):
+                                        val_str = val.get('name', '') or val.get('value', '') or str(val)
+                                        values_list.append(val_str)
+                                    else:
+                                        values_list.append(str(val))
                                 option_value = ', '.join(values_list)
+                            
                             option_details.append(f"{option_name}: {option_value}")
+                        
                         options_text = " | ".join(option_details)
-
+                    
+                    # إضافة المنتج مع خياراته
                     product_info = f"{product_name} (×{quantity})"
                     if options_text:
                         product_info += f" - {options_text}"
-
+                    
+                    # إضافة صف لكل منتج
+                    # فقط أول منتج في الطلب يعرض رقم الطلب
                     display_order_id = order_id if item_index == 0 else ""
+                    
+                    # الحالة المخصصة ستظهر فقط في الصف الأول للطلب
                     display_custom_status = custom_status_name if item_index == 0 else ""
-
+                    
                     data.append({
                         'order_id': display_order_id,
                         'product_options': product_info,
                         'custom_status': display_custom_status
                     })
-
+                    
+                    # تخزين معلومات لدمج الخلايا لاحقاً
                     if item_index == 0:
-                        order_id_map[len(data)] = len(items)
-
+                        order_id_map[len(data)] = len(items)  # حفظ عدد المنتجات لهذا الطلب
+                    
+                    # إضافة صورة هذا المنتج
                     image_urls.append(main_image)
-
+                    
             except Exception as e:
-                logger.error(f"Error parsing order data for order {order_id}: {str(e)}")
+                logger.error(f"Error parsing order data: {str(e)}")
+                # إضافة صف للخطأ
                 data.append({
                     'order_id': order_id,
                     'product_options': "خطأ في تحليل البيانات",
                     'custom_status': custom_status_name
                 })
                 image_urls.append("")
-                order_id_map[len(data)] = 1
+                order_id_map[len(data)] = 1  # طلب به خطأ
         else:
+            # للطلبات المخصصة أو إذا لم يكن هناك منتجات
             data.append({
                 'order_id': order_id,
-                'product_options': "لا توجد منتجات" if order_type == 'salla' else order.details or "تفاصيل غير متوفرة",
+                'product_options': "لا توجد منتجات",
                 'custom_status': custom_status_name
             })
-            image_urls.append(order.image_url if order_type == 'custom' else "")
-            order_id_map[len(data)] = 1
+            image_urls.append("")
+            order_id_map[len(data)] = 1  # طلب بدون منتجات
     
-    # إنشاء DataFrame وإعادة تسمية الأعمدة
+    # إنشاء DataFrame
     df = pd.DataFrame(data)
-    df.rename(columns={
-        'order_id': 'رقم الطلب',
-        'product_options': 'تفاصيل المنتج',
-        'custom_status': 'الحالة المخصصة'
-    }, inplace=True)
-
+    
+    # إنشاء Excel في الذاكرة
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name='الطلبات', index=False)
         
+        # الحصول على ورقة العمل للتنسيق
         workbook = writer.book
         worksheet = writer.sheets['الطلبات']
         
-        worksheet.protection.sheet = True
-        worksheet.protection.password = 'ProtectedExcel2024!'
+        # إزالة حماية الورقة لجعلها قابلة للتعديل
+        # worksheet.protection.sheet = False  # تعليق حماية الورقة
         
+        # جعل جميع الخلايا قابلة للتعديل
         for row in worksheet.iter_rows():
             for cell in row:
-                cell.protection = Protection(locked=True)
-                
-        # جعل العمود الرابع (الحالة المخصصة) قابلاً للتعديل للصفوف الأولى من كل طلب
-        for row in range(2, len(df) + 2):
-            if worksheet.cell(row=row, column=1).value:
-                worksheet.cell(row=row, column=4).protection = Protection(locked=False)
+                cell.protection = Protection(locked=False)
         
-        worksheet.insert_cols(2)
+        # إضافة عمود للصور يدويًا
+        worksheet.insert_cols(2)  # إدراج عمود جديد في الموضع الثاني (لصور المنتجات)
         worksheet.cell(row=1, column=2, value='صورة المنتج')
+        
+        # إضافة الصور إلى الخلايا باستخدام TwoCellAnchor مع editAs='absolute'
+        from openpyxl.drawing.image import Image
+        from openpyxl.drawing.spreadsheet_drawing import TwoCellAnchor, AnchorMarker
+        from openpyxl.utils.units import pixels_to_EMU
+        import requests
 
+        # إضافة الصور لكل منتج
         for row_idx, img_url in enumerate(image_urls, start=2):
             if img_url and isinstance(img_url, str):
                 try:
@@ -862,77 +885,104 @@ def download_excel_template():
                         img_data = BytesIO(response.content)
                         img = Image(img_data)
                         
-                        img.width = 180
+                        # تكبير حجم الصورة
+                        img.width = 180  # زيادة حجم الصورة
                         img.height = 180
                         
-                        worksheet.row_dimensions[row_idx].height = 135
+                        # حساب الأبعاد بوحدة EMU
+                        width_emu = pixels_to_EMU(img.width)
+                        height_emu = pixels_to_EMU(img.height)
                         
-                        # استخدام TwoCellAnchor لتثبيت الصورة بشكل مطلق
-                        cell = worksheet.cell(row=row_idx, column=2)
-                        p2e = pixels_to_EMU
-                        position = XDRPoint2D(p2e(5), p2e(5))
-                        size = XDRPositiveSize2D(p2e(img.width), p2e(img.height))
-                        img.anchor = TwoCellAnchor(editAs='absolute', _from=cell, to=cell)
-                        img.anchor.pos = position
-                        img.anchor.ext = size
+                        # تحديد موضع الصورة باستخدام TwoCellAnchor مع editAs='absolute'
+                        col_idx = 1  # العمود B (الفهرس 1 في 0-based)
+                        from_anchor = AnchorMarker(col=col_idx, row=row_idx-1, colOff=0, rowOff=0)
+                        to_anchor = AnchorMarker(col=col_idx+1, row=row_idx, colOff=0, rowOff=0)
+                        
+                        img.anchor = TwoCellAnchor(editAs="absolute", 
+                                                _from=from_anchor, 
+                                                to=to_anchor)
+                        
                         worksheet.add_image(img)
                         
+                        # زيادة ارتفاع الصف لاستيعاب الصورة الكبيرة
+                        worksheet.row_dimensions[row_idx].height = 135
                 except Exception as e:
                     logger.error(f"Error loading image: {str(e)}")
+                    # وضع رابط الصورة كنص إذا فشل تحميل الصورة
                     worksheet.cell(row=row_idx, column=2, value=img_url)
-
+        
+        # دمج خلايا رقم الطلب للمنتجات المنتمية لنفس الطلب
+        from openpyxl.styles import Alignment
         current_row = 2
-        for start_row_in_df, product_count in order_id_map.items():
-            actual_start_row = start_row_in_df + 1
+        for row_num, product_count in order_id_map.items():
             if product_count > 1:
-                # دمج خلايا رقم الطلب
-                worksheet.merge_cells(start_row=actual_start_row, start_column=1, end_row=actual_start_row + product_count - 1, end_column=1)
-                # دمج خلايا الحالة المخصصة
-                worksheet.merge_cells(start_row=actual_start_row, start_column=4, end_row=actual_start_row + product_count - 1, end_column=4)
+                # دمج الخلايا العمودية لرقم الطلب
+                start_cell = f'A{current_row}'
+                end_cell = f'A{current_row + product_count - 1}'
+                worksheet.merge_cells(f'{start_cell}:{end_cell}')
                 
-                alignment = Alignment(vertical='center', horizontal='center')
-                worksheet[f'A{actual_start_row}'].alignment = alignment
-                worksheet[f'D{actual_start_row}'].alignment = alignment
-
+                # دمج الخلايا العمودية للحالة المخصصة
+                status_start_cell = f'D{current_row}'
+                status_end_cell = f'D{current_row + product_count - 1}'
+                worksheet.merge_cells(f'{status_start_cell}:{status_end_cell}')
+                
+                # محاذاة النص في منتصف الخلية المدمجة
+                worksheet[start_cell].alignment = Alignment(vertical='center', horizontal='center')
+                worksheet[status_start_cell].alignment = Alignment(vertical='center', horizontal='center')
+            
+            current_row += product_count
+        
+        # إضافة قائمة منسدلة للحالات (قابلة للتعديل)
         if custom_statuses:
             status_names = [status.name for status in custom_statuses]
             status_sheet = workbook.create_sheet("الحالات المخفية")
-            for i, status_name in enumerate(status_names, 1):
-                status_sheet.cell(row=i, column=1, value=status_name)
+            for i, status in enumerate(status_names, 1):
+                status_sheet.cell(row=i, column=1, value=status)
             
+            # إضافة قائمة منسدلة باستخدام Data Validation
             dv = DataValidation(
                 type="list",
-                formula1=f"='الحالات المخفية'!$A$1:$A${len(status_names)}"
+                formula1="='الحالات المخفية'!$A$1:$A$" + str(len(status_names))
             )
-            
-            # السماح بإدخال قيم جديدة مع إظهار تحذير
-            dv.allow_blank = True
-            dv.showDropDown = True
-            dv.errorStyle = 'warning' 
-            dv.errorTitle = 'قيمة مخصصة'
-            dv.error = 'لقد أدخلت حالة غير موجودة في القائمة. هل تريد المتابعة؟'
+            dv.error = 'القيمة غير صحيحة'
+            dv.errorTitle = 'قيمة غير صالحة'
+            dv.prompt = 'يرجى اختيار حالة من القائمة'
             dv.promptTitle = 'اختيار الحالة'
-            dv.prompt = 'يرجى اختيار حالة من القائمة أو كتابة حالة جديدة.'
+            
+            # تطبيق التحقق على عمود الحالة المخصصة (العمود 4)
+            for row in range(2, len(df) + 2):
+                # فقط الصف الأول من كل طلب يحتوي على قائمة منسدلة للحالة
+                cell_value = worksheet.cell(row=row, column=1).value
+                if cell_value:  # إذا كانت الخلية تحتوي على رقم طلب (أي هي الصف الأول للطلب)
+                    dv.add(worksheet.cell(row=row, column=4))
             
             worksheet.add_data_validation(dv)
-            
-            for row in range(2, len(df) + 2):
-                if worksheet.cell(row=row, column=1).value:
-                    dv.add(worksheet.cell(row=row, column=4))
-
-            status_sheet.sheet_state = 'hidden'
-
-        column_widths = {'A': 15, 'B': 25, 'C': 50, 'D': 25}
-        for col, width in column_widths.items():
-            worksheet.column_dimensions[col].width = width
-            
-        for row in worksheet.iter_rows(min_row=2, max_col=worksheet.max_column, max_row=worksheet.max_row):
-            for cell in row:
-                if cell.column == 3: # عمود تفاصيل المنتج
-                    cell.alignment = Alignment(wrap_text=True, vertical='center')
-
+            # إبقاء ورقة الحالات مرئية بدلاً من إخفائها
+            # status_sheet.sheet_state = 'visible'  # يمكنك إلغاء التعليق إذا أردت إظهارها
+        
+        # تنسيق الأعمدة
+        column_widths = {
+            'A': 15,  # رقم الطلب
+            'B': 20,  # صورة المنتج (تم زيادة العرض لاستيعاب الصور الكبيرة)
+            'C': 40,  # خيارات المنتج
+            'D': 20   # الحالة المخصصة
+        }
+        
+        for col_letter, width in column_widths.items():
+            worksheet.column_dimensions[col_letter].width = width
+        
+        # تمكين التفاف النص للأعمدة
+        for row in range(2, len(df) + 2):
+            worksheet.cell(row=row, column=3).alignment = Alignment(wrap_text=True)
+        
+        # إضافة رسالة توضيحية
+        worksheet.cell(row=1, column=5, value="ملاحظة: يمكنك تعديل الحالة المخصصة فقط")
+        worksheet.merge_cells(f'E1:G1')
+        worksheet.cell(row=1, column=5).alignment = Alignment(horizontal='center')
+    
     output.seek(0)
     
+    # إرسال الملف
     filename = f"orders_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     return send_file(
         output,
