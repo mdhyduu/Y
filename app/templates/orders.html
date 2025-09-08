@@ -1462,6 +1462,16 @@ document.getElementById('quickListAssignBtn').addEventListener('click', function
         });
     });
 });
+function getSelectedOrders() {
+    const selected = [];
+    document.querySelectorAll('input.order-checkbox:checked').forEach(checkbox => {
+        selected.push(checkbox.value);
+    });
+    return selected;
+}
+$(document).on('click', '#downloadPWA', function() {
+    downloadForPWA();
+});
 function downloadForPWA() {
     const selectedOrders = getSelectedOrders();
     if (selectedOrders.length === 0) {
