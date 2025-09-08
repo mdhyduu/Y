@@ -682,8 +682,7 @@ def upload_updated_excel():
 
 
 # routes.py - إضافة endpoint جديد
-
-# routes.py - تعديل جزء تحميل القالب
+# routes.py - تعديل كامل لوظيفة تحميل القالب
 @orders_bp.route('/download_excel_template')
 def download_excel_template():
     user, employee = get_user_from_cookies()
@@ -915,6 +914,7 @@ def download_excel_template():
                     logger.error(f"Error loading image: {str(e)}")
                     # وضع رابط الصورة كنص إذا فشل تحميل الصورة
                     worksheet.cell(row=row_idx, column=2, value=img_url)
+        
         # دمج خلايا رقم الطلب للمنتجات المنتمية لنفس الطلب
         from openpyxl.styles import Alignment
         current_row = 2
