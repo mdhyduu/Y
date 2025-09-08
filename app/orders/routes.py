@@ -874,7 +874,7 @@ def download_excel_template():
                         img.height = 120
                         cell_ref = f'B{row_idx}'
                         worksheet.add_image(img, cell_ref)
-                        worksheet.row_dimensions[row_idx].height = 60
+                        worksheet.row_dimensions[row_idx].height = 90
                 except Exception as e:
                     logger.error(f"Error loading image: {str(e)}")
                     # وضع رابط الصورة كنص إذا فشل تحميل الصورة
