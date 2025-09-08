@@ -25,7 +25,7 @@ from openpyxl.styles import Alignment
 from openpyxl.worksheet.datavalidation import DataValidation
 # إعداد الـ logger
 logger = logging.getLogger(__name__)
-
+from openpyxl.styles import Protection
 @orders_bp.route('/')
 def index():
     """عرض قائمة الطلبات (سلة + مخصصة) مع نظام الترحيل الكامل
@@ -852,14 +852,29 @@ def download_excel_template():
         workbook = writer.book
         worksheet = writer.sheets['الطلبات']
         
+        # إضافة حماية للورقة
+        from openpyxl.styles import Protection
+        worksheet.protection.sheet = True
+        worksheet.protection.password = 'ProtectedExcel2024!'  # كلمة سر قوية للحماية
+        
+        # جعل جميع الخلايا محمية ضد التعديل افتراضيًا
+        for row in worksheet.iter_rows():
+            for cell in row:
+                cell.protection = Protection(locked=True)
+        
+        # جعل الخلايا التي نريدها قابلة للتعديل غير محمية
+        # في حالتنا، نريد جعل عمود "الحالة المخصصة" (العمود D) قابلاً للتعديل فقط
+        for row in range(2, len(df) + 2):
+            # فقط الخلايا التي تحتوي على رقم طلب (الصف الأول من كل مجموعة) ستكون قابلة للتعديل في عمود الحالة
+            if worksheet.cell(row=row, column=1).value:  # إذا كانت الخلية تحتوي على رقم طلب
+                worksheet.cell(row=row, column=4).protection = Protection(locked=False)  # العمود 4 هو الحالة المخصصة
+        
         # إضافة عمود للصور يدويًا
         worksheet.insert_cols(2)  # إدراج عمود جديد في الموضع الثاني (لصور المنتجات)
         worksheet.cell(row=1, column=2, value='صورة المنتج')
         
         # إضافة الصور إلى الخلايا
         from openpyxl.drawing.image import Image
-        from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, OneCellAnchor
-        from openpyxl.utils import get_column_letter
         import requests
 
         # إضافة الصور لكل منتج
@@ -902,7 +917,12 @@ def download_excel_template():
             for i, status in enumerate(status_names, 1):
                 status_sheet.cell(row=i, column=1, value=status)
             
+            # حماية ورقة الحالات المخفية أيضًا
+            status_sheet.protection.sheet = True
+            status_sheet.protection.password = 'ProtectedExcel2024!'
+            
             # إضافة قائمة منسدلة باستخدام Data Validation
+            from openpyxl.worksheet.datavalidation import DataValidation
             dv = DataValidation(
                 type="list",
                 formula1="='الحالات المخفية'!$A$1:$A$" + str(len(status_names))
