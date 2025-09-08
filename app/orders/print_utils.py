@@ -8,6 +8,9 @@ from app.utils import get_user_from_cookies, process_order_data, format_date
 from app.config import Config
 
 
+# orders/print_utils.py
+
+
 @orders_bp.route('/download_orders_html')
 def download_orders_html():
     user, employee = get_user_from_cookies()
@@ -56,37 +59,15 @@ def download_orders_html():
                 
                 items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
                 
-                # معالجة بيانات الطلب
+                # معالجة بيانات الطلب بنفس طريقة PDF
                 processed_order = process_order_data(order_id, items_data)
                 
-                # إضافة معلومات إضافية مع التأكد من أن البيانات قابلة للتكرار
-                order_dict = {
-                    'id': order_id,
-                    'reference_id': order_data.get('reference_id', order_id),
-                    'created_at': format_date(order_data.get('created_at', '')),
-                    'items': items_data  # استخدام items_data مباشرة
-                }
+                # إضافة معلومات إضافية بنفس طريقة PDF
+                processed_order['reference_id'] = order_data.get('reference_id', order_id)
+                processed_order['customer'] = order_data.get('customer', {})
+                processed_order['created_at'] = format_date(order_data.get('created_at', ''))
                 
-                # معالجة بيانات العميل بشكل صحيح
-                customer_data = order_data.get('customer', {})
-                if customer_data and hasattr(customer_data, 'get'):
-                    # تحويل customer_data إلى قاموس إذا كان كائنًا
-                    if not isinstance(customer_data, dict):
-                        customer_data = customer_data.__dict__
-                    
-                    order_dict['customer'] = {
-                        'name': customer_data.get('name', 'غير معروف'),
-                        'mobile': customer_data.get('mobile', 'غير متوفر'),
-                        'addresses': customer_data.get('addresses', [])
-                    }
-                else:
-                    order_dict['customer'] = {
-                        'name': 'غير معروف',
-                        'mobile': 'غير متوفر',
-                        'addresses': []
-                    }
-                
-                orders.append(order_dict)
+                orders.append(processed_order)
                 
             except Exception as e:
                 current_app.logger.error(f"Error fetching order {order_id}: {str(e)}")
@@ -99,8 +80,8 @@ def download_orders_html():
         # إضافة الوقت الحالي للقالب
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # إنشاء HTML من template مخصص للطباعة بدون اتصال
-        html_content = render_template('orders_offline.html', 
+        # استخدام نفس قالب PDF لضمان التماثل في التصميم
+        html_content = render_template('print_orders.html', 
                                      orders=orders, 
                                      current_time=current_time)
         
@@ -118,6 +99,8 @@ def download_orders_html():
         current_app.logger.error(f"Error generating HTML: {str(e)}")
         flash(f'حدث خطأ أثناء إنشاء الملف: {str(e)}', 'error')
         return redirect(url_for('orders.index'))
+
+# باقي الكود يبقى كما هو...
 @orders_bp.route('/print_orders')
 def print_orders():
     user, employee = get_user_from_cookies()
