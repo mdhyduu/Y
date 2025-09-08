@@ -447,9 +447,7 @@
                 <div id="quickListContent">
                     <!-- سيتم ملء المحتوى هنا عبر JavaScript -->
                 </div>
-                                            <button type="button" class="btn btn-info" id="download-html-btn">
-        <i class="fas fa-file-code"></i> تحميل HTML
-    </button>
+                
                 <!-- قسم إسناد الطلبات (يظهر فقط للمراجع) -->
                 {% if is_reviewer and employees %}
                 <div class="mt-4 pt-3 border-top">
@@ -471,6 +469,10 @@
                                 <i class="fas fa-user-plus me-1"></i> إسناد الطلبات المحددة
                             </button>
                         </div>
+                        <button type="button" class="btn btn-primary rounded-pill px-3 me-2" id="download-html-btn" disabled>
+        <i class="fas fa-download me-1"></i> 
+        <span id="selected-orders-count-html">0</span> تحميل HTML
+    </button>
                     </div>
                 </div>
                 {% endif %}
@@ -485,7 +487,6 @@
                                 <i class="fas fa-print me-1"></i> طباعة الطلبات المحددة
                             </button>
                         </div>
-
                         <div class="col-md-6 mb-2">
                             <button type="button" class="btn btn-info w-100" id="quickListChangeStatusBtn">
                                 <i class="fas fa-tag me-1"></i> تغيير حالة الطلبات
@@ -573,24 +574,25 @@ $(document).ready(function () {
     }
     
     // تحديث دالة updateAssignButtonState
-    function updateAssignButtonState() {
-        const checkedCount = $('.order-checkbox:checked').length;
-        $('#selected-orders-count').text(checkedCount);
-        $('#selected-orders-count-2').text(checkedCount);
-        $('#selected-orders-count-print').text(checkedCount);
-        $('#assign-orders-btn').prop('disabled', checkedCount === 0);
-        $('#change-status-btn').prop('disabled', checkedCount === 0);
-        $('#print-orders-btn').prop('disabled', checkedCount === 0);
-        $('#quickListViewBtn').prop('disabled', checkedCount === 0);
+function updateAssignButtonState() {
+    const checkedCount = $('.order-checkbox:checked').length;
+    $('#selected-orders-count').text(checkedCount);
+    $('#selected-orders-count-2').text(checkedCount);
+    $('#selected-orders-count-print').text(checkedCount);
+    $('#selected-orders-count-html').text(checkedCount); // إضافة هذا السطر
+    $('#assign-orders-btn').prop('disabled', checkedCount === 0);
+    $('#change-status-btn').prop('disabled', checkedCount === 0);
+    $('#print-orders-btn').prop('disabled', checkedCount === 0);
+    $('#download-html-btn').prop('disabled', checkedCount === 0); // إضافة هذا السطر
+    $('#quickListViewBtn').prop('disabled', checkedCount === 0);
 
-        if (checkedCount > 0) {
-            $('#assign-orders-btn, #change-status-btn, #print-orders-btn, #quickListViewBtn').addClass('pulse-effect');
-            setTimeout(() => {
-                $('#assign-orders-btn, #change-status-btn, #print-orders-btn, #quickListViewBtn').removeClass('pulse-effect');
-            }, 1000);
-        }
+    if (checkedCount > 0) {
+        $('#assign-orders-btn, #change-status-btn, #print-orders-btn, #download-html-btn, #quickListViewBtn').addClass('pulse-effect');
+        setTimeout(() => {
+            $('#assign-orders-btn, #change-status-btn, #print-orders-btn, #download-html-btn, #quickListViewBtn').removeClass('pulse-effect');
+        }, 1000);
     }
-    
+}
     // إضافة معالج الحدث للزر الجديد
     $(document).on('click', '#print-orders-btn', function() {
         const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
@@ -1511,19 +1513,6 @@ $(document).on('click', '#download-html-btn', function() {
         }
     });
 });
-
-// تحديث حالة زر تحميل HTML عند تغيير التحديدات
-function updateDownloadButtonsState() {
-    const checkedCount = $('input.order-checkbox:checked').length;
-    $('#download-excel-btn').prop('disabled', checkedCount === 0);
-    $('#download-html-btn').prop('disabled', checkedCount === 0);
-}
-
-// إضافة مستمعي الأحداث لجميع صناديق التحديد
-$('input.order-checkbox').on('change', updateDownloadButtonsState);
-
-// التهيئة الأولية لحالة الأزرار
-updateDownloadButtonsState();
 // إضافة event listeners لتفعيل الزر عند تحديد الطلبات
 document.addEventListener('DOMContentLoaded', function() {
     const checkboxes = document.querySelectorAll('input.order-checkbox');
