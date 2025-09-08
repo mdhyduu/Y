@@ -737,9 +737,10 @@ def download_excel_template():
                 CustomOrder.store_id == user.store_id
             ).all()
     
-    # تحضير البيانات ل Excel
+    # تحضير البيانات ل Excel - كل منتج في صف منفصل
     data = []
-    image_urls = []  # لتخزين روابط الصور لكل صف
+    image_urls = []  # لتخزين روابط الصور لكل صف (كل منتج)
+    
     for order in salla_orders + custom_orders:
         order_type = 'salla' if isinstance(order, SallaOrder) else 'custom'
         order_id = order.id if order_type == 'salla' else order.order_number
@@ -754,16 +755,12 @@ def download_excel_template():
         custom_status_name = last_emp_status.status.name if last_emp_status and last_emp_status.status else ''
 
         # استخراج بيانات المنتجات وخياراتها (لطلبات سلة فقط)
-    # بـ:
-        products_info = []
-        all_product_images = []  # لتخزين صور جميع المنتجات
-        
         if order_type == 'salla' and order.raw_data:
             try:
                 raw_data = json.loads(order.raw_data)
                 items = raw_data.get('items', [])
                 
-                for item in items:
+                for item_index, item in enumerate(items):
                     product_name = item.get('name', '')
                     quantity = item.get('quantity', 0)
                     
@@ -805,29 +802,37 @@ def download_excel_template():
                     if options_text:
                         product_info += f" - {options_text}"
                     
-                    products_info.append(product_info)
-                    all_product_images.append(main_image)  # إضافة صورة هذا المنتج
+                    # إضافة صف لكل منتج
+                    data.append({
+                        'order_id': order_id,
+                        'product_options': product_info,
+                        'custom_status': custom_status_name
+                    })
+                    
+                    # إضافة صورة هذا المنتج
+                    image_urls.append(main_image)
                     
             except Exception as e:
                 logger.error(f"Error parsing order data: {str(e)}")
-                products_info = ["خطأ في تحليل البيانات"]
-                all_product_images = [""]
-        
-        # جمع كل بيانات المنتجات في خلية واحدة
-        products_text = "\n".join(products_info) if products_info else "لا توجد منتجات"
-        
-        # تخزين جميع صور المنتجات لهذا الطلب
-        image_urls.append(all_product_images)  # الآن 
-
-        data.append({
-            'order_id': order_id,
-            'product_options': products_text,
-            'custom_status': custom_status_name
-        })
+                # إضافة صف للخطأ
+                data.append({
+                    'order_id': order_id,
+                    'product_options': "خطأ في تحليل البيانات",
+                    'custom_status': custom_status_name
+                })
+                image_urls.append("")
+        else:
+            # للطلبات المخصصة أو إذا لم يكن هناك منتجات
+            data.append({
+                'order_id': order_id,
+                'product_options': "لا توجد منتجات",
+                'custom_status': custom_status_name
+            })
+            image_urls.append("")
     
     # إنشاء DataFrame
     df = pd.DataFrame(data)
-     
+    
     # إنشاء Excel في الذاكرة
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -839,7 +844,7 @@ def download_excel_template():
         
         # إضافة عمود للصور يدويًا
         worksheet.insert_cols(2)  # إدراج عمود جديد في الموضع الثاني (لصور المنتجات)
-        worksheet.cell(row=1, column=2, value='صور المنتجات')
+        worksheet.cell(row=1, column=2, value='صورة المنتج')
         
         # إضافة الصور إلى الخلايا
         from openpyxl.drawing.image import Image
@@ -847,60 +852,23 @@ def download_excel_template():
         from openpyxl.utils import get_column_letter
         import requests
 
-        
-                # في جزء إضافة الصور إلى Excel، استبدل:
-        for row_idx, images in enumerate(image_urls, start=2):
-            if images and images[0]:  # إذا كانت هناك صور
+        # إضافة الصور لكل منتج
+        for row_idx, img_url in enumerate(image_urls, start=2):
+            if img_url and isinstance(img_url, str):
                 try:
-                    response = requests.get(images[0], timeout=10)
+                    response = requests.get(img_url, timeout=10)
                     if response.status_code == 200:
                         img_data = BytesIO(response.content)
                         img = Image(img_data)
-                        
-                        # تغيير حجم الصورة لتناسب الخلية
                         img.width = 80
                         img.height = 80
-                        
-                        # تحديد موقع الخلية
                         cell_ref = f'B{row_idx}'
-                        
-                        # إضافة الصورة إلى الخلية
                         worksheet.add_image(img, cell_ref)
-                        
-                        # ضبط ارتفاع الصف لاستيعاب الصورة
                         worksheet.row_dimensions[row_idx].height = 60
-                        
                 except Exception as e:
                     logger.error(f"Error loading image: {str(e)}")
-                    worksheet.cell(row=row_idx, column=2, value=images[0])  # وضع الرابط كنص إذا فشل تحميل الصورة
-        # بـ:
-        for row_idx, images in enumerate(image_urls, start=2):
-            if images:  # إذا كانت هناك صور
-                # جمع جميع روابط الصور في خلية واحدة
-                image_links = []
-                for img_url in images:
-                    if img_url and isinstance(img_url, str):
-                        image_links.append(img_url)
-                
-                if image_links:
-                    # إذا أردت إضافة أول صورة فقط:
-                    try:
-                        response = requests.get(image_links[0], timeout=10)
-                        if response.status_code == 200:
-                            img_data = BytesIO(response.content)
-                            img = Image(img_data)
-                            img.width = 80
-                            img.height = 80
-                            cell_ref = f'B{row_idx}'
-                            worksheet.add_image(img, cell_ref)
-                            worksheet.row_dimensions[row_idx].height = 60
-                    except Exception as e:
-                        logger.error(f"Error loading image: {str(e)}")
-                        # وضع جميع روابط الصور كنص إذا فشل تحميل الصورة
-                        worksheet.cell(row=row_idx, column=2, value=", ".join(image_links))
-        
-        # إذا أردت إضافة جميع الصور (سيحتاج إلى تعديل إضافي):
-        # هذا الجزء أكثر تعقيداً ويتطلب ترتيب الصور بشكل أفقي أو رأسي
+                    # وضع رابط الصورة كنص إذا فشل تحميل الصورة
+                    worksheet.cell(row=row_idx, column=2, value=img_url)
         
         # إضافة قائمة منسدلة للحالات
         if custom_statuses:
@@ -929,7 +897,7 @@ def download_excel_template():
         # تنسيق الأعمدة
         column_widths = {
             'A': 15,  # رقم الطلب
-            'B': 15,  # صور المنتجات
+            'B': 15,  # صورة المنتج
             'C': 40,  # خيارات المنتج
             'D': 15   # الحالة المخصصة
         }
