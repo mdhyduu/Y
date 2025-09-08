@@ -8,7 +8,6 @@ from app.utils import get_user_from_cookies, process_order_data, format_date
 from app.config import Config
 
 
-# orders/print_utils.py
 @orders_bp.route('/download_orders_html')
 def download_orders_html():
     user, employee = get_user_from_cookies()
@@ -65,16 +64,6 @@ def download_orders_html():
                 processed_order['customer'] = order_data.get('customer', {})
                 processed_order['created_at'] = format_date(order_data.get('created_at', ''))
                 
-                # جلب الحالة المخصصة للطلب
-                latest_status = OrderEmployeeStatus.query.filter_by(
-                    order_id=str(order_id)
-                ).order_by(OrderEmployeeStatus.created_at.desc()).first()
-                
-                if latest_status:
-                    processed_order['custom_status'] = latest_status.status.name
-                else:
-                    processed_order['custom_status'] = 'لا توجد حالة مخصصة'
-                
                 orders.append(processed_order)
                 
             except Exception as e:
@@ -107,6 +96,10 @@ def download_orders_html():
         current_app.logger.error(f"Error generating HTML: {str(e)}")
         flash(f'حدث خطأ أثناء إنشاء الملف: {str(e)}', 'error')
         return redirect(url_for('orders.index'))
+
+# باقي الكود يبقى كما هو...
+
+
 @orders_bp.route('/print_orders')
 def print_orders():
     user, employee = get_user_from_cookies()
