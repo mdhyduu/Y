@@ -947,7 +947,7 @@ def download_excel_template():
         download_name=filename,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-@orders_bp.route('/download_pwa_orders')
+@orders_bp.route('/download_pwa_orders', methods=['GET'])
 def download_pwa_orders():
     user, employee = get_user_from_cookies()
     
