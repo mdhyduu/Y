@@ -870,8 +870,8 @@ def download_excel_template():
                     if response.status_code == 200:
                         img_data = BytesIO(response.content)
                         img = Image(img_data)
-                        img.width = 80
-                        img.height = 80
+                        img.width = 120
+                        img.height = 120
                         cell_ref = f'B{row_idx}'
                         worksheet.add_image(img, cell_ref)
                         worksheet.row_dimensions[row_idx].height = 60
