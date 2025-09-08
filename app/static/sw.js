@@ -1,8 +1,9 @@
-const CACHE_NAME = "pwa-cache-v10";  // زيادة رقم الإصدار لتحديث التخزين
+const CACHE_NAME = "pwa-cache-v11";  // زيادة رقم الإصدار لتحديث التخزين
+const OFFLINE_DATA_CACHE = "offline-orders-data";
 const urlsToCache = [
   "/",
   "/static/css/main.css",
-    "/static/css/orders.css",
+  "/static/css/orders.css",
   "/static/icons/icon-192x192.png",
   "/static/icons/s.png",
   
@@ -32,6 +33,10 @@ self.addEventListener("install", (event) => {
           })
         );
       })
+      .then(() => {
+        // إنشاء مخزن للبيانات غير المتصلة
+        return caches.open(OFFLINE_DATA_CACHE);
+      })
   );
   self.skipWaiting();
 });
@@ -41,7 +46,7 @@ self.addEventListener("activate", (event) => {
     caches.keys().then(cacheNames =>
       Promise.all(
         cacheNames.map(cache => {
-          if (cache !== CACHE_NAME) {
+          if (cache !== CACHE_NAME && cache !== OFFLINE_DATA_CACHE) {
             console.log("Deleting old cache: ", cache);
             return caches.delete(cache);
           }
@@ -55,6 +60,18 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   // تجاهل طلبات غير GET
   if (event.request.method !== 'GET') return;
+  
+  // إذا كان الطلب لبيانات الطلبات المخزنة محلياً
+  if (event.request.url.includes('/offline-data/')) {
+    event.respondWith(
+      caches.open(OFFLINE_DATA_CACHE).then(cache => {
+        return cache.match(event.request).then(response => {
+          return response || fetch(event.request);
+        });
+      })
+    );
+    return;
+  }
   
   event.respondWith(
     caches.match(event.request)
@@ -74,6 +91,28 @@ self.addEventListener("fetch", (event) => {
         return caches.match('/');
       })
   );
+});
+
+// تخزين بيانات الطلبات للعمل بدون إنترنت
+self.addEventListener("message", (event) => {
+  if (event.data.type === "STORE_OFFLINE_ORDERS") {
+    const { ordersData } = event.data;
+    event.waitUntil(
+      caches.open(OFFLINE_DATA_CACHE).then(cache => {
+        const response = new Response(JSON.stringify(ordersData), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+        return cache.put('/offline-data/orders', response);
+      })
+    );
+  }
+  
+  if (event.data.type === "GET_OFFLINE_ORDERS") {
+    event.ports[0].postMessage({ 
+      success: true, 
+      data: event.data.ordersData 
+    });
+  }
 });
 
 function fetchAndCache(request) {
