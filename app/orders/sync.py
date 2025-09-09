@@ -426,32 +426,29 @@ def verify_webhook_signature(payload, signature):
 def handle_order_status_webhook():
     """معالجة Webhook لتحديثات حالة الطلب من Salla"""
     try:
+        # تسجيل تفصيلي للطلب الوارد
+        current_app.logger.info(f"طلب Webhook وارد: {request.method} {request.path}")
+        current_app.logger.info(f"الرؤوس: {dict(request.headers)}")
+        
         # التحقق من صحة التوقيع
         signature = request.headers.get('X-Salla-Signature')
+        if not signature:
+            current_app.logger.warning("طلب Webhook بدون توقيع")
+            return jsonify({'success': False, 'error': 'Missing signature'}), 401
+            
         if not verify_webhook_signature(request.get_data(), signature):
             current_app.logger.warning("طلب Webhook غير موثوق - توقيع غير صالح")
             return jsonify({'success': False, 'error': 'Invalid signature'}), 401
         
         data = request.get_json()
-        current_app.logger.info(f"تم استقبال Webhook: {data.get('event')}")
-        
-        # معالجة أنواع الأحداث المختلفة
-        event_type = data.get('event')
-        
-        if event_type == 'order.status.updated':
-            return handle_order_status_update(data)
-        elif event_type == 'order.created':
-            return handle_order_created(data)
-        elif event_type == 'order.updated':
-            return handle_order_updated(data)
-        else:
-            current_app.logger.info(f"تم استقبال حدث غير معالج: {event_type}")
-            return jsonify({'success': True, 'message': 'Event received but not processed'})
+        if not data:
+            current_app.logger.error("طلب Webhook بدون بيانات JSON")
+            return jsonify({'success': False, 'error': 'No JSON data'}), 400
             
-    except Exception as e:
-        current_app.logger.error(f"خطأ في معالجة Webhook: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'error': 'Internal server error'}), 500
-
+        current_app.logger.info(f"تم استقبال Webhook: {data.get('event')}")
+        current_app.logger.debug(f"بيانات Webhook كاملة: {json.dumps(data, ensure_ascii=False)}")
+        
+        # باقي الكود...
 def handle_order_status_update(data):
     """معالجة تحديث حالة الطلب"""
     try:
@@ -496,6 +493,7 @@ def handle_order_created(data):
         order_id = str(order_data.get('id'))
         
         if not order_id:
+            current_app.logger.error("بيانات الطلب لا تحتوي على ID")
             return jsonify({'success': False, 'error': 'Missing order ID'}), 400
         
         # التحقق إذا كان الطلب موجودًا بالفعل
@@ -504,10 +502,35 @@ def handle_order_created(data):
             current_app.logger.info(f"الطلب موجود بالفعل: {order_id}")
             return jsonify({'success': True, 'message': 'Order already exists'})
         
-        # إنشاء طلب جديد
-        store_id = extract_store_id_from_webhook(data)  # تحتاج لتنفيذ هذه الدالة
+        # استخراج معرف المتجر
+        store_id = extract_store_id_from_webhook(data)
+        if not store_id:
+            current_app.logger.error(f"تعذر استخراج store_id للطلب {order_id}")
+            return jsonify({'success': False, 'error': 'Cannot determine store ID'}), 400
         
-        # معالجة بيانات الطلب (مشابه لما في sync_orders)
+        # البحث عن حالة الطلب الافتراضية إذا لم يتم تحديدها
+        status_id = None
+        status_info = order_data.get('status', {})
+        if status_info and 'id' in status_info:
+            status_id = str(status_info['id'])
+            # التحقق من وجود الحالة في قاعدة البيانات
+            status = OrderStatus.query.filter_by(id=status_id, store_id=store_id).first()
+            if not status:
+                status_id = None
+        
+        # إذا لم يكن هناك حالة، نستخدم الحالة الافتراضية
+        if not status_id:
+            default_status = OrderStatus.query.filter_by(
+                store_id=store_id, 
+                is_active=True
+            ).order_by(OrderStatus.sort).first()
+            
+            if default_status:
+                status_id = default_status.id
+            else:
+                current_app.logger.warning(f"لا توجد حالات طلب للمتجر {store_id}")
+        
+        # معالجة بيانات الطلب
         created_at = None
         date_info = order_data.get('date', {})
         if date_info and 'date' in date_info:
@@ -516,6 +539,7 @@ def handle_order_created(data):
                 created_at = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
             except Exception:
                 created_at = datetime.utcnow()
+                current_app.logger.warning(f"تعذر تحليل تاريخ الإنشاء للطلب {order_id}")
         
         total_info = order_data.get('total', {})
         total_amount = float(total_info.get('amount', 0))
@@ -523,6 +547,8 @@ def handle_order_created(data):
         
         customer = order_data.get('customer', {})
         customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip()
+        if not customer_name:
+            customer_name = order_data.get('customer_name', 'عميل غير معروف')
         
         new_order = SallaOrder(
             id=order_id,
@@ -533,13 +559,13 @@ def handle_order_created(data):
             currency=currency,
             payment_method=order_data.get('payment_method', ''),
             raw_data=json.dumps(order_data, ensure_ascii=False),
-            status_id=None  # سيتم تحديثه لاحقًا
+            status_id=status_id
         )
         
         db.session.add(new_order)
         db.session.commit()
         
-        current_app.logger.info(f"تم إنشاء طلب جديد: {order_id}")
+        current_app.logger.info(f"تم إنشاء طلب جديد: {order_id} للمتجر {store_id}")
         return jsonify({'success': True, 'message': 'Order created'})
         
     except Exception as e:
@@ -672,14 +698,18 @@ def register_webhook_route():
 def extract_store_id_from_webhook(webhook_data):
     """استخراج معرف المتجر من بيانات Webhook"""
     try:
-        # محاولة استخراج معرف المتجر من البيانات المرسلة
-        merchant = webhook_data.get('merchant', {})
-        if merchant and 'id' in merchant:
-            return str(merchant.get('id'))
+        # الطريقة الصحيحة لاستخراج معرف المتجر من webhook Salla
+        merchant = webhook_data.get('merchant')
+        if merchant:
+            return str(merchant)
         
-        # إذا لم يتوفر، نستخدم وسائل أخرى مثل التحقق من التوكن
-        # هذه دالة تحتاج للتخصيص حسب هيكل بيانات Salla
-        return None
+        # إذا لم يتوفر، نبحث في مكان آخر في البيانات
+        data = webhook_data.get('data', {})
+        if 'store_id' in data:
+            return str(data['store_id'])
+        
+        # كحل أخير، نستخدم merchant من البيانات العلوية
+        return str(webhook_data.get('merchant'))
         
     except Exception as e:
         current_app.logger.error(f"خطأ في استخراج معرف المتجر: {str(e)}")
