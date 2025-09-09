@@ -8,7 +8,7 @@ from flask_wtf.csrf import CSRFProtect
 from .config import Config
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
-from flask import session
+from flask import session, request
 import webcolors
 from flask import jsonify, render_template_string
 from flask_mail import Mail  # إضافة استيراد Flask-Mail
