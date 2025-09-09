@@ -615,25 +615,30 @@ csrf = CSRFProtect()
 
 
 
-
 @orders_bp.route('/webhook/order_status', methods=['POST'])
 def order_status_webhook():
-    # تعطيل CSRF لهذا الراوت فقط
+    """
+    Webhook عام من سلة:
+    - يطبع كل البيانات القادمة مهما كان شكلها
+    - يطبع الـ headers
+    - يعطل CSRF فقط لهذا الراوت
+    """
+    # تعطيل CSRF فقط لهذا الراوت
     setattr(request, "_dont_enforce_csrf", True)
 
     try:
-        # طباعة البيانات القادمة من سلة
+        # طباعة البيانات الخام
         raw_body = request.data
         print("🔹 Raw body from Salla Webhook:", raw_body)
 
-        # طباعة الـ headers بالكامل
-        print("🔹 Headers:", dict(request.headers))
-
         # محاولة قراءة JSON بصمت
         data = request.get_json(silent=True)
-        print("🔹 Parsed JSON:", data)
+        print("🔹 Parsed JSON (if valid):", data)
 
-        # الرد 200 OK مؤقتًا لتجنب إعادة الإرسال من سلة
+        # طباعة كل الـ headers
+        print("🔹 Headers:", dict(request.headers))
+
+        # الرد 200 OK لتجنب إعادة الإرسال من سلة
         return jsonify({'success': True, 'message': 'تم استقبال البيانات'}), 200
 
     except Exception as e:
