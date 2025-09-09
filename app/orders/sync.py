@@ -404,3 +404,72 @@ def sync_orders():
         error_msg = f"خطأ غير متوقع: {str(e)}"
         current_app.logger.error(error_msg, exc_info=True)
         return jsonify({'success': False,'error': error_msg,'code': 'INTERNAL_ERROR'}), 500
+        
+
+def register_webhook(user, event_type='order.status.updated'):
+    """تسجيل webhook في سلة لاستقبال تحديثات الحالات"""
+    try:
+        access_token = user.salla_access_token
+        if not access_token:
+            return False, "لا يوجد توكن وصول"
+        
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+        
+        webhook_url = f"{Config.BASE_URL}/orders/webhook/order_status"
+        
+        payload = {
+            "url": webhook_url,
+            "event": event_type,
+            "secret": Config.WEBHOOK_SECRET
+        }
+        
+        response = requests.post(
+            f"{Config.SALLA_API_BASE_URL}/webhooks",
+            headers=headers,
+            json=payload,
+            timeout=30
+        )
+        
+        if response.status_code in [200, 201]:
+            return True, "تم تسجيل webhook بنجاح"
+        else:
+            return False, f"فشل في تسجيل webhook: {response.text}"
+            
+    except Exception as e:
+        return False, f"خطأ في تسجيل webhook: {str(e)}"
+
+
+@orders_bp.route('/register_webhook', methods=['POST'])
+def register_webhook_route():
+    """تسجيل webhook في سلة لاستقبال تحديثات الحالات"""
+    try:
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            return jsonify({
+                'success': False, 
+                'error': 'الرجاء تسجيل الدخول أولاً'
+            }), 401
+        
+        success, message = register_webhook(user)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': message
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': message
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'خطأ غير متوقع: {str(e)}'
+        }), 500
