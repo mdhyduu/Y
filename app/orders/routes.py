@@ -4,7 +4,7 @@ import json
 import logging
 from math import ceil
 from datetime import datetime, timedelta
-from flask import (render_template, request, flash, redirect, url_for, 
+from flask import (render_template, request, flash, redirect, url_for, jsonify, 
                    make_response, current_app)
 import requests
 from sqlalchemy import nullslast, or_, and_, func
