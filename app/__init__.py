@@ -1,7 +1,6 @@
 from flask import Flask
 import os 
 from flask import current_app
-
 from PIL import Image
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -13,11 +12,13 @@ from flask import session
 import webcolors
 from flask import jsonify, render_template_string
 from flask_mail import Mail  # إضافة استيراد Flask-Mail
+
 # إنشاء كائنات الإضافات
 db = SQLAlchemy()
 migrate = Migrate()
 csrf = CSRFProtect()
 mail = Mail()
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -29,7 +30,18 @@ def create_app():
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     
     app.config['WTF_CSRF_CHECK_DEFAULTS'] = False
-    migrate.init_app(app, db)  # هذه السطر با
+    
+    # إعداد CSRF مع استثناءات للـ Webhooks
+    csrf.init_app(app)
+    
+    # استثناء endpoint الـ Webhooks من CSRF
+    @app.before_request
+    def check_csrf_exemptions():
+        # استثناء Webhook endpoints من CSRF
+        if request.path.startswith('/webhook/'):
+            return None  # تخطي CSRF protection لهذه المسارات
+    
+    migrate.init_app(app, db)
     
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(
@@ -41,11 +53,11 @@ def create_app():
     
     # تهيئة الإضافات مع التطبيق
     db.init_app(app)
-    csrf.init_app(app)
     mail.init_app(app)
  
     app.mail = mail  # Attach the mail instance to the app for use in blueprints
-        # تسجيل النماذج مع سياق التطبيق
+    
+    # تسجيل النماذج مع سياق التطبيق
     with app.app_context():
         from . import models
         db.create_all()
@@ -67,12 +79,14 @@ def create_app():
     from .delivery_orders import delivery_bp
 
     app.register_blueprint(employees_bp)
-
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(user_auth_bp)
     app.register_blueprint(auth_bp)
-    csrf.exempt(orders_bp)
+    
+
+
     app.register_blueprint(orders_bp)
+    
     app.register_blueprint(categories_bp)
     app.register_blueprint(permissions_bp)
     app.register_blueprint(products_bp)
@@ -155,8 +169,6 @@ def create_app():
         return mapping.get(status_slug, 'light text-dark')
     
     # Register the filters with Jinja2 environment
-    # ... (near your other filters)
-
     def hex_to_rgb(hex_code):
         """Converts a HEX color string to an RGB string 'R, G, B'."""
         hex_code = hex_code.lstrip('#')
@@ -170,7 +182,7 @@ def create_app():
     # Register the new filter along with the old ones
     app.jinja_env.filters['get_text_color'] = get_text_color
     app.jinja_env.filters['get_status_badge'] = get_status_badge
-    app.jinja_env.filters['hex_to_rgb'] = hex_to_rgb # <-- أضف هذا السطر
+    app.jinja_env.filters['hex_to_rgb'] = hex_to_rgb
 
  
     def generate_pwa_icons(base_icon_path):
@@ -241,6 +253,4 @@ def create_app():
         '''
         return render_template_string(manifest_json), 200, {'Content-Type': 'application/json'}
     
-
     return app
-    
