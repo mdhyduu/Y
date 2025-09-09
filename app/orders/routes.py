@@ -656,7 +656,3 @@ def order_status_webhook():
         logger.error(f'خطأ في معالجة webhook: {str(e)}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@orders_bp.route('/')
-def index():
-    """عرض قائمة الطلبات (سلة + مخصصة) مع نظام الترحيل الكامل"""
-    # ... [الكود الحالي بدون تغيير] ...
