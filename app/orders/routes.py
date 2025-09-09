@@ -609,12 +609,18 @@ def order_details(order_id):
 # orders/routes.py
 import hmac
 import hashlib
+from flask_wtf.csrf import CSRFProtect
+
+csrf = CSRFProtect()
+
 
 # ... الكود الحالي ...
 
 @orders_bp.route('/webhook/order_status', methods=['POST'])
 def order_status_webhook():
     """Webhook لاستقبال تحديثات حالة الطلبات من سلة - متوافق مع الإصدار v2"""
+    setattr(request, "_dont_enforce_csrf", True)
+
     try:
         # التحقق من إصدار Webhook
         webhook_version = request.headers.get('X-Salla-Webhook-Version', '1')
