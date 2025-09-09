@@ -649,16 +649,16 @@ def order_status_webhook():
 
         # معالجة البيانات حسب إصدار Webhook
         if webhook_version == '2':
-            # هيكل الإصدار v2
+            # هيكل الإصدار v2 - كما في البيانات التي أرسلتها
             event = data.get('event')
             webhook_data = data.get('data', {})
-            merchant_id = data.get('merchant_id')
+            merchant_id = data.get('merchant')  # ملاحظة: المفتاح هو merchant وليس merchant_id
             
             # تسجيل معلومات التصحيح
             logger.info(f"📥 Webhook v2 received: {event} for merchant {merchant_id}")
             
             # التأكد من أن الحدث مخصص لهذا المتجر
-            user = User.query.filter_by(store_id=merchant_id).first()
+            user = User.query.filter_by(store_id=str(merchant_id)).first()
             if not user:
                 logger.warning(f"⚠️ Webhook for unknown merchant: {merchant_id}")
                 return jsonify({'success': False, 'error': 'متجر غير معروف'}), 404
@@ -698,9 +698,11 @@ def order_status_webhook():
                         logger.info(f'✅ تم تحديث حالة الطلب {order_id} إلى {status_slug}')
                     else:
                         logger.warning(f'⚠️ لم يتم العثور على الحالة {status_slug} للطلب {order_id}')
+                else:
+                    logger.warning(f'⚠️ لم يتم العثور على الطلب {order_id} في قاعدة البيانات')
 
         return jsonify({'success': True, 'message': 'تم استقبال البيانات بنجاح'}), 200
 
     except Exception as e:
-        logger.error(f'❌ خطأ في معالجة webhook: {str(e)}')
+        logger.error(f'❌ خطأ في معالجة webhook: {str(e)}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
