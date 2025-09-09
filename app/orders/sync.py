@@ -9,7 +9,9 @@ from app.models import db, SallaOrder, OrderStatus, User
 from app.utils import get_user_from_cookies
 from app.config import Config
 from app.token_utils import refresh_salla_token
-
+# orders/sync.py - إضافة الواردات الجديدة
+import hmac
+import hashlib
 
 def sync_order_statuses_internal(user, access_token, store_id):
     """دالة مساعدة لمزامنة حالات الطلبات (يمكن استدعاؤها داخلياً)"""
@@ -404,7 +406,183 @@ def sync_orders():
         error_msg = f"خطأ غير متوقع: {str(e)}"
         current_app.logger.error(error_msg, exc_info=True)
         return jsonify({'success': False,'error': error_msg,'code': 'INTERNAL_ERROR'}), 500
+# orders/sync.py - إضافة الدوال التالية
+
+def verify_webhook_signature(payload, signature):
+    """التحقق من توقيع Webhook باستخدام السر السري"""
+    try:
+        computed_signature = hmac.new(
+            Config.WEBHOOK_SECRET.encode('utf-8'),
+            payload,
+            hashlib.sha256
+        ).hexdigest()
         
+        return hmac.compare_digest(computed_signature, signature)
+    except Exception as e:
+        current_app.logger.error(f"خطأ في التحقق من التوقيع: {str(e)}")
+        return False
+
+@orders_bp.route('/webhook/order_status', methods=['POST'])
+def handle_order_status_webhook():
+    """معالجة Webhook لتحديثات حالة الطلب من Salla"""
+    try:
+        # التحقق من صحة التوقيع
+        signature = request.headers.get('X-Salla-Signature')
+        if not verify_webhook_signature(request.get_data(), signature):
+            current_app.logger.warning("طلب Webhook غير موثوق - توقيع غير صالح")
+            return jsonify({'success': False, 'error': 'Invalid signature'}), 401
+        
+        data = request.get_json()
+        current_app.logger.info(f"تم استقبال Webhook: {data.get('event')}")
+        
+        # معالجة أنواع الأحداث المختلفة
+        event_type = data.get('event')
+        
+        if event_type == 'order.status.updated':
+            return handle_order_status_update(data)
+        elif event_type == 'order.created':
+            return handle_order_created(data)
+        elif event_type == 'order.updated':
+            return handle_order_updated(data)
+        else:
+            current_app.logger.info(f"تم استقبال حدث غير معالج: {event_type}")
+            return jsonify({'success': True, 'message': 'Event received but not processed'})
+            
+    except Exception as e:
+        current_app.logger.error(f"خطأ في معالجة Webhook: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+def handle_order_status_update(data):
+    """معالجة تحديث حالة الطلب"""
+    try:
+        order_data = data.get('data', {})
+        order_id = str(order_data.get('id'))
+        
+        if not order_id:
+            return jsonify({'success': False, 'error': 'Missing order ID'}), 400
+        
+        # البحث عن الطلب في قاعدة البيانات
+        order = SallaOrder.query.get(order_id)
+        if not order:
+            current_app.logger.warning(f"طلب غير موجود لتحديث الحالة: {order_id}")
+            return jsonify({'success': False, 'error': 'Order not found'}), 404
+        
+        # تحديث حالة الطلب
+        status_info = order_data.get('status', {})
+        status_id = str(status_info.get('id')) if status_info.get('id') else None
+        
+        if status_id:
+            # البحث عن الحالة في قاعدة البيانات
+            status = OrderStatus.query.filter_by(id=status_id, store_id=order.store_id).first()
+            if status:
+                order.status_id = status.id
+                order.updated_at = datetime.utcnow()
+                db.session.commit()
+                
+                current_app.logger.info(f"تم تحديث حالة الطلب {order_id} إلى {status_id}")
+                return jsonify({'success': True, 'message': 'Order status updated'})
+        
+        return jsonify({'success': False, 'error': 'Status not found'}), 404
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"خطأ في تحديث حالة الطلب: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to update order status'}), 500
+
+def handle_order_created(data):
+    """معالجة إنشاء طلب جديد"""
+    try:
+        order_data = data.get('data', {})
+        order_id = str(order_data.get('id'))
+        
+        if not order_id:
+            return jsonify({'success': False, 'error': 'Missing order ID'}), 400
+        
+        # التحقق إذا كان الطلب موجودًا بالفعل
+        existing_order = SallaOrder.query.get(order_id)
+        if existing_order:
+            current_app.logger.info(f"الطلب موجود بالفعل: {order_id}")
+            return jsonify({'success': True, 'message': 'Order already exists'})
+        
+        # إنشاء طلب جديد
+        store_id = extract_store_id_from_webhook(data)  # تحتاج لتنفيذ هذه الدالة
+        
+        # معالجة بيانات الطلب (مشابه لما في sync_orders)
+        created_at = None
+        date_info = order_data.get('date', {})
+        if date_info and 'date' in date_info:
+            try:
+                date_str = date_info['date'].split('.')[0]
+                created_at = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+            except Exception:
+                created_at = datetime.utcnow()
+        
+        total_info = order_data.get('total', {})
+        total_amount = float(total_info.get('amount', 0))
+        currency = total_info.get('currency', 'SAR')
+        
+        customer = order_data.get('customer', {})
+        customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip()
+        
+        new_order = SallaOrder(
+            id=order_id,
+            store_id=store_id,
+            customer_name=customer_name,
+            created_at=created_at or datetime.utcnow(),
+            total_amount=total_amount,
+            currency=currency,
+            payment_method=order_data.get('payment_method', ''),
+            raw_data=json.dumps(order_data, ensure_ascii=False),
+            status_id=None  # سيتم تحديثه لاحقًا
+        )
+        
+        db.session.add(new_order)
+        db.session.commit()
+        
+        current_app.logger.info(f"تم إنشاء طلب جديد: {order_id}")
+        return jsonify({'success': True, 'message': 'Order created'})
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"خطأ في إنشاء الطلب: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to create order'}), 500
+
+def handle_order_updated(data):
+    """معالجة تحديث الطلب"""
+    try:
+        order_data = data.get('data', {})
+        order_id = str(order_data.get('id'))
+        
+        if not order_id:
+            return jsonify({'success': False, 'error': 'Missing order ID'}), 400
+        
+        # البحث عن الطلب وتحديثه
+        order = SallaOrder.query.get(order_id)
+        if not order:
+            current_app.logger.warning(f"طلب غير موجود للتحديث: {order_id}")
+            return jsonify({'success': False, 'error': 'Order not found'}), 404
+        
+        # تحديث بيانات الطلب
+        total_info = order_data.get('total', {})
+        if total_info:
+            order.total_amount = float(total_info.get('amount', order.total_amount))
+            order.currency = total_info.get('currency', order.currency)
+        
+        order.payment_method = order_data.get('payment_method', order.payment_method)
+        order.raw_data = json.dumps(order_data, ensure_ascii=False)
+        order.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        current_app.logger.info(f"تم تحديث الطلب: {order_id}")
+        return jsonify({'success': True, 'message': 'Order updated'})
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"خطأ في تحديث الطلب: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to update order'}), 500      
+
+# orders/sync.py - تعديل دالة register_webhook
 
 def register_webhook(user, event_type='order.status.updated'):
     """تسجيل webhook في سلة لاستقبال تحديثات الحالات - متوافق مع v2"""
@@ -421,34 +599,44 @@ def register_webhook(user, event_type='order.status.updated'):
         
         webhook_url = f"{Config.BASE_URL}/webhook/order_status"
         
-        # استخدام الإصدار v2 كافتراضي
-        payload = {
-            "url": webhook_url,
-            "event": event_type,
-            "secret": Config.WEBHOOK_SECRET,
-            "version": 2,  # تحديد الإصدار v2
-            "security_strategy": "signature"  # استخدام التوقيع كاستراتيجية أمان
-        }
+        # الأحداث المهمة التي نريد متابعتها
+        important_events = [
+            'order.status.updated',
+            'order.created',
+            'order.updated',
+            'order.cancelled'
+        ]
         
-        response = requests.post(
-            f"{Config.SALLA_API_BASE_URL}/webhooks",
-            headers=headers,
-            json=payload,
-            timeout=30
-        )
+        # تسجيل جميع الأحداث المهمة
+        results = []
+        for event in important_events:
+            payload = {
+                "url": webhook_url,
+                "event": event,
+                "secret": Config.WEBHOOK_SECRET,
+                "version": 2,
+                "security_strategy": "signature"
+            }
+            
+            response = requests.post(
+                f"{Config.SALLA_API_BASE_URL}/webhooks",
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+            
+            if response.status_code in [200, 201]:
+                results.append(f"تم تسجيل {event} بنجاح")
+            else:
+                error_details = response.text
+                results.append(f"فشل في تسجيل {event}: {error_details}")
+                current_app.logger.error(f"فشل في تسجيل webhook للحدث {event}: {error_details}")
         
-        if response.status_code in [200, 201]:
-            return True, "تم تسجيل webhook بنجاح"
-        else:
-            error_details = response.text
-            logger.error(f"فشل في تسجيل webhook: {error_details}")
-            return False, f"فشل في تسجيل webhook: {error_details}"
+        return True, " | ".join(results)
             
     except Exception as e:
-        logger.error(f"خطأ في تسجيل webhook: {str(e)}")
+        current_app.logger.error(f"خطأ في تسجيل webhook: {str(e)}")
         return False, f"خطأ في تسجيل webhook: {str(e)}"
-
-
 @orders_bp.route('/register_webhook', methods=['POST'])
 def register_webhook_route():
     """تسجيل webhook في سلة لاستقبال تحديثات الحالات"""
@@ -479,3 +667,20 @@ def register_webhook_route():
             'success': False,
             'error': f'خطأ غير متوقع: {str(e)}'
         }), 500
+# orders/sync.py - إضافة دالة مساعدة
+
+def extract_store_id_from_webhook(webhook_data):
+    """استخراج معرف المتجر من بيانات Webhook"""
+    try:
+        # محاولة استخراج معرف المتجر من البيانات المرسلة
+        merchant = webhook_data.get('merchant', {})
+        if merchant and 'id' in merchant:
+            return str(merchant.get('id'))
+        
+        # إذا لم يتوفر، نستخدم وسائل أخرى مثل التحقق من التوكن
+        # هذه دالة تحتاج للتخصيص حسب هيكل بيانات Salla
+        return None
+        
+    except Exception as e:
+        current_app.logger.error(f"خطأ في استخراج معرف المتجر: {str(e)}")
+        return None
