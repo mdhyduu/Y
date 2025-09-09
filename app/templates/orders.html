@@ -562,49 +562,7 @@ function updateAssignButtonState() {
     }
 }
     // إضافة معالج الحدث للزر الجديد
-    $(document).on('click', '#print-orders-btn', function() {
-        const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
-        
-        if (orderIds.length === 0) {
-            showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للطباعة');
-            return;
-        }
-        
-        Swal.fire({
-            title: 'تحميل الطلبات',
-            html: `سيتم تحميل <span class="fw-bold text-primary">${orderIds.length}</span> طلب كملف PDF`,
-            icon: 'info',
-            showCancelButton: true,
-            confirmButtonText: 'موافق، تحميل PDF',
-            cancelButtonText: 'إلغاء',
-            customClass: {
-                confirmButton: 'btn btn-primary',
-                cancelButton: 'btn btn-outline-secondary ms-2'
-            },
-            buttonsStyling: false
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // إظهار مؤشر التحميل
-                const printBtn = $('#print-orders-btn');
-                const originalText = printBtn.html();
-                printBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
-                
-                // إنشاء رابط تحميل خفي
-                const downloadLink = document.createElement('a');
-                downloadLink.href = `{{ url_for('orders.print_orders') }}?order_ids=${orderIds.join(',')}`;
-                downloadLink.style.display = 'none';
-                document.body.appendChild(downloadLink);
-                downloadLink.click();
-                document.body.removeChild(downloadLink);
-                
-                // استعادة حالة الزر بعد ثانية
-                setTimeout(() => {
-                    printBtn.prop('disabled', false).html(originalText);
-                }, 2000);
-            }
-        });
-    });
-
+    
     function buildQueryParams() {
         const params = new URLSearchParams();
         
@@ -851,22 +809,7 @@ function updateAssignButtonState() {
         });
     });
     // معالج حدث الطباعة من القائمة السريعة (للموظفين العاديين)
-document.addEventListener('click', function(e) {
-    if (e.target && e.target.id === 'quickListPrintBtn') {
-        const selectedOrders = [];
-        document.querySelectorAll('#quickListContent input.quick-list-order:checked').forEach(checkbox => {
-            selectedOrders.push(checkbox.value);
-        });
 
-        if (selectedOrders.length === 0) {
-            showSweetAlert('warning', 'تحذير', 'يرجى تحديد طلب واحد على الأقل للطباعة');
-            return;
-        }
-
-        // فتح نافذة الطباعة
-        window.open(`{{ url_for('orders.print_orders') }}?order_ids=${selectedOrders.join(',')}`, '_blank');
-    }
-}); 
 document.addEventListener('click', function(e) {
     if (e.target && e.target.id === 'quickListChangeStatusBtn') {
         const selectedOrders = [];
