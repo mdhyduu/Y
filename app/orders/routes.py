@@ -609,38 +609,66 @@ def order_details(order_id):
 # orders/routes.py
 import hmac
 import hashlib
-from flask_wtf.csrf import CSRFProtect
 
-csrf = CSRFProtect()
-
-
+# ... الكود الحالي ...
 
 @orders_bp.route('/webhook/order_status', methods=['POST'])
 def order_status_webhook():
-    """
-    Webhook عام من سلة:
-    - يطبع كل البيانات القادمة مهما كان شكلها
-    - يطبع الـ headers
-    - يعطل CSRF فقط لهذا الراوت
-    """
-    # تعطيل CSRF فقط لهذا الراوت
-    setattr(request, "_dont_enforce_csrf", True)
-
+    """Webhook لاستقبال تحديثات حالة الطلبات من سلة"""
     try:
-        # طباعة البيانات الخام
+        # التحقق من التوقيع
+        signature = request.headers.get('X-Salla-Signature')
         raw_body = request.data
-        print("🔹 Raw body from Salla Webhook:", raw_body)
 
-        # محاولة قراءة JSON بصمت
-        data = request.get_json(silent=True)
-        print("🔹 Parsed JSON (if valid):", data)
+        if signature and Config.WEBHOOK_SECRET:
+            expected_sig = hmac.new(
+                Config.WEBHOOK_SECRET.encode(),
+                raw_body,
+                hashlib.sha256
+            ).hexdigest()
+            if not hmac.compare_digest(signature, expected_sig):
+                logger.warning("❌ Webhook رفض بسبب توقيع غير صحيح")
+                return jsonify({'success': False, 'error': 'توقيع غير صحيح'}), 403
 
-        # طباعة كل الـ headers
-        print("🔹 Headers:", dict(request.headers))
+        # قراءة البيانات
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'لا يوجد بيانات'}), 400
 
-        # الرد 200 OK لتجنب إعادة الإرسال من سلة
-        return jsonify({'success': True, 'message': 'تم استقبال البيانات'}), 200
+        event = data.get('event')
+        order_data = data.get('data', {})
+
+        # معالجة كلا النوعين من الأحداث
+        if event in ['order.status.updated', 'order.updated'] and order_data:
+            order_id = str(order_data.get('id'))
+            
+            # استخراج بيانات الحالة بناءً على نوع الحدث
+            if event == 'order.status.updated':
+                status_data = order_data.get('status', {})
+            else:  # order.updated
+                status_data = order_data.get('status', {}) or order_data.get('current_status', {})
+            
+            if order_id and status_data:
+                order = SallaOrder.query.get(order_id)
+                if order:
+                    status_slug = status_data.get('slug', '').lower().replace('-', '_')
+                    if not status_slug and status_data.get('name'):
+                        status_slug = status_data['name'].lower().replace(' ', '_')
+                    
+                    status = OrderStatus.query.filter_by(
+                        slug=status_slug,
+                        store_id=order.store_id
+                    ).first()
+
+                    if status:
+                        order.status_id = status.id
+                        db.session.commit()
+                        logger.info(f'✅ تم تحديث حالة الطلب {order_id} إلى {status_slug}')
+                    else:
+                        logger.warning(f'⚠️ لم يتم العثور على الحالة {status_slug} للطلب {order_id}')
+
+        return jsonify({'success': True, 'message': 'تم استقبال البيانات بنجاح'}), 200
 
     except Exception as e:
-        print(f"❌ خطأ في Webhook: {str(e)}")
+        logger.error(f'❌ خطأ في معالجة webhook: {str(e)}')
         return jsonify({'success': False, 'error': str(e)}), 500
