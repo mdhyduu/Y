@@ -611,7 +611,6 @@ def order_details(order_id):
 def order_status_webhook():
     """Webhook لاستقبال تحديثات حالة الطلبات من سلة"""
     try:
-        # التحقق من التوقيع
         signature = request.headers.get('X-Salla-Signature')
         raw_body = request.data
 
@@ -624,6 +623,7 @@ def order_status_webhook():
             if not hmac.compare_digest(signature, expected_sig):
                 logger.warning("❌ Webhook رفض بسبب توقيع غير صحيح")
                 return jsonify({'success': False, 'error': 'توقيع غير صحيح'}), 403
+        # ... [الكود الحالي للتحقق من التوقيع] ...
 
         # قراءة البيانات
         data = request.get_json()
@@ -633,8 +633,8 @@ def order_status_webhook():
         event = data.get('event')
         order_data = data.get('data', {})
 
-        # معالجة فقط لو الحدث تحديث حالة طلب
-        if event == 'order.status.updated' and order_data:
+        # معالجة أحداث تحديث حالة الطلب
+        if event in ['order.status.updated', 'order.updated'] and order_data:
             order_id = str(order_data.get('id'))
             status_data = order_data.get('status', {})
 
