@@ -407,7 +407,7 @@ def sync_orders():
         
 
 def register_webhook(user, event_type='order.status.updated'):
-    """تسجيل webhook في سلة لاستقبال تحديثات الحالات"""
+    """تسجيل webhook في سلة لاستقبال تحديثات الحالات - متوافق مع v2"""
     try:
         access_token = user.salla_access_token
         if not access_token:
@@ -421,10 +421,13 @@ def register_webhook(user, event_type='order.status.updated'):
         
         webhook_url = f"{Config.BASE_URL}/webhook/order_status"
         
+        # استخدام الإصدار v2 كافتراضي
         payload = {
             "url": webhook_url,
             "event": event_type,
-            "secret": Config.WEBHOOK_SECRET
+            "secret": Config.WEBHOOK_SECRET,
+            "version": 2,  # تحديد الإصدار v2
+            "security_strategy": "signature"  # استخدام التوقيع كاستراتيجية أمان
         }
         
         response = requests.post(
@@ -437,9 +440,12 @@ def register_webhook(user, event_type='order.status.updated'):
         if response.status_code in [200, 201]:
             return True, "تم تسجيل webhook بنجاح"
         else:
-            return False, f"فشل في تسجيل webhook: {response.text}"
+            error_details = response.text
+            logger.error(f"فشل في تسجيل webhook: {error_details}")
+            return False, f"فشل في تسجيل webhook: {error_details}"
             
     except Exception as e:
+        logger.error(f"خطأ في تسجيل webhook: {str(e)}")
         return False, f"خطأ في تسجيل webhook: {str(e)}"
 
 

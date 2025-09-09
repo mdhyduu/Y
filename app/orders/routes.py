@@ -614,29 +614,61 @@ import hashlib
 
 @orders_bp.route('/webhook/order_status', methods=['POST'])
 def order_status_webhook():
-    """Webhook لاستقبال تحديثات حالة الطلبات من سلة"""
+    """Webhook لاستقبال تحديثات حالة الطلبات من سلة - متوافق مع الإصدار v2"""
     try:
-        # التحقق من التوقيع
-        signature = request.headers.get('X-Salla-Signature')
-        raw_body = request.data
-
-        if signature and Config.WEBHOOK_SECRET:
+        # التحقق من إصدار Webhook
+        webhook_version = request.headers.get('X-Salla-Webhook-Version', '1')
+        security_strategy = request.headers.get('X-Salla-Security-Strategy', 'signature')
+        
+        # التحقق من التوقيع حسب الاستراتيجية
+        if security_strategy == 'signature' and Config.WEBHOOK_SECRET:
+            signature = request.headers.get('X-Salla-Signature')
+            raw_body = request.data
+            
             expected_sig = hmac.new(
                 Config.WEBHOOK_SECRET.encode(),
                 raw_body,
                 hashlib.sha256
             ).hexdigest()
+            
             if not hmac.compare_digest(signature, expected_sig):
                 logger.warning("❌ Webhook رفض بسبب توقيع غير صحيح")
                 return jsonify({'success': False, 'error': 'توقيع غير صحيح'}), 403
+        
+        elif security_strategy == 'token':
+            token = request.headers.get('Authorization')
+            # التحقق من التوكن إذا لزم الأمر
+            if not token or token != f"Bearer {Config.WEBHOOK_SECRET}":
+                logger.warning("❌ Webhook رفض بسبب توكن غير صحيح")
+                return jsonify({'success': False, 'error': 'توكن غير صحيح'}), 403
 
-        # قراءة البيانات
+        # قراءة البيانات ومعالجتها حسب الإصدار
         data = request.get_json()
         if not data:
             return jsonify({'success': False, 'error': 'لا يوجد بيانات'}), 400
 
-        event = data.get('event')
-        order_data = data.get('data', {})
+        # معالجة البيانات حسب إصدار Webhook
+        if webhook_version == '2':
+            # هيكل الإصدار v2
+            event = data.get('event')
+            webhook_data = data.get('data', {})
+            merchant_id = data.get('merchant_id')
+            
+            # تسجيل معلومات التصحيح
+            logger.info(f"📥 Webhook v2 received: {event} for merchant {merchant_id}")
+            
+            # التأكد من أن الحدث مخصص لهذا المتجر
+            user = User.query.filter_by(store_id=merchant_id).first()
+            if not user:
+                logger.warning(f"⚠️ Webhook for unknown merchant: {merchant_id}")
+                return jsonify({'success': False, 'error': 'متجر غير معروف'}), 404
+                
+            order_data = webhook_data
+        else:
+            # هيكل الإصدار v1
+            event = data.get('event')
+            order_data = data.get('data', {})
+            logger.info(f"📥 Webhook v1 received: {event}")
 
         # معالجة كلا النوعين من الأحداث
         if event in ['order.status.updated', 'order.updated'] and order_data:
