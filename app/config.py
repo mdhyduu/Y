@@ -17,7 +17,7 @@ class Config:
     if not SECRET_KEY:
         raise ValueError("يجب تعيين SECRET_KEY في متغيرات البيئة للإنتاج")
     WEBHOOK_SECRET = os.environ.get('WEBHOOK_SECRET', 'd69d5c5f0748cee7e7bf51eaccb51502')
-    BASE_URL = os.environ.get('BASE_URL', 'https://plankton-app-9im8u.ondigitalocean.app/callback/103527223')   
+    BASE_URL = os.environ.get('BASE_URL', 'https://plankton-app-9im8u.ondigitalocean.app')   
     ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')
     if not ENCRYPTION_KEY:
         raise ValueError("يجب تعيين ENCRYPTION_KEY في متغيرات البيئة للإنتاج")
