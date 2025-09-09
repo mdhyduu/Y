@@ -609,12 +609,14 @@ def order_details(order_id):
 # orders/routes.py
 import hmac
 import hashlib
-from flask_wtf.csrf import csrf_exempt
+from flask_wtf.csrf import CSRFProtect
+
+csrf = CSRFProtect()
 
 @orders_bp.route('/webhook/order_status', methods=['POST'])
-@csrf.exempt  # تعطيل CSRF فقط لهذا الراوت
 def order_status_webhook():
-    """Webhook لاستقبال تحديثات حالة الطلبات من سلة"""
+    # تعطيل CSRF يدويًا لهذا الراوت
+    setattr(request, "_dont_enforce_csrf", True)
     try:
         # التحقق من التوقيع
         signature = request.headers.get('X-Salla-Signature')
