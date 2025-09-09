@@ -614,25 +614,26 @@ from flask_wtf.csrf import CSRFProtect
 csrf = CSRFProtect()
 
 
+
+
 @orders_bp.route('/webhook/order_status', methods=['POST'])
 def order_status_webhook():
     # تعطيل CSRF لهذا الراوت فقط
     setattr(request, "_dont_enforce_csrf", True)
 
     try:
-        # طباعة البيانات الخام القادمة
+        # طباعة البيانات القادمة من سلة
         raw_body = request.data
         print("🔹 Raw body from Salla Webhook:", raw_body)
 
-        # محاولة قراءة JSON
+        # طباعة الـ headers بالكامل
+        print("🔹 Headers:", dict(request.headers))
+
+        # محاولة قراءة JSON بصمت
         data = request.get_json(silent=True)
         print("🔹 Parsed JSON:", data)
 
-        # طباعة التوقيع المرسل
-        signature = request.headers.get('X-Salla-Signature')
-        print("🔹 Webhook signature:", signature)
-
-        # الرد بس برسالة نجاح حتى لا تعيد سلة الإرسال
+        # الرد 200 OK مؤقتًا لتجنب إعادة الإرسال من سلة
         return jsonify({'success': True, 'message': 'تم استقبال البيانات'}), 200
 
     except Exception as e:
