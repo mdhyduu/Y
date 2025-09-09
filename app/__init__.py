@@ -118,7 +118,14 @@ def create_app():
                 except Exception as e:
                     app.logger.error(f"فشل تجديد التوكن للمستخدم {user.id}: {str(e)}")
     
-
+    @app.before_request
+    def bypass_csrf_for_webhook():
+        if request.path == '/webhook/order_status':
+            # تعطيل CSRF بشكل كامل لهذا المسار
+            from flask import _request_ctx_stack
+            ctx = _request_ctx_stack.top
+            if hasattr(ctx, 'csrf_token'):
+                setattr(ctx, '_csrf_token', None)
     def get_text_color(hex_color):
         """
         Determines if text should be black or white based on background hex color.
@@ -239,7 +246,7 @@ def create_app():
         }
         '''
         return render_template_string(manifest_json), 200, {'Content-Type': 'application/json'}
-    
+
 
     return app
     
