@@ -425,7 +425,7 @@ def verify_webhook_signature(payload, signature):
 @orders_bp.route('/webhook/order_status', methods=['POST'])
 def handle_order_status_webhook():
     """معالجة Webhook لتحديثات حالة الطلب من Salla"""
-    try:
+    try: 
         # تسجيل تفصيلي للطلب الوارد
         current_app.logger.info(f"طلب Webhook وارد: {request.method} {request.path}")
         current_app.logger.info(f"الرؤوس: {dict(request.headers)}")
@@ -448,7 +448,25 @@ def handle_order_status_webhook():
         current_app.logger.info(f"تم استقبال Webhook: {data.get('event')}")
         current_app.logger.debug(f"بيانات Webhook كاملة: {json.dumps(data, ensure_ascii=False)}")
         
-        # باقي الكود...
+        # باقي الكود...     current_app.logger.info(f"تم استقبال Webhook: {data.get('event')}")
+        
+        # معالجة أنواع الأحداث المختلفة
+        event_type = data.get('event')
+        
+        if event_type == 'order.status.updated':
+            return handle_order_status_update(data)
+        elif event_type == 'order.created':
+            return handle_order_created(data)
+        elif event_type == 'order.updated':
+            return handle_order_updated(data)
+        else:
+            current_app.logger.info(f"تم استقبال حدث غير معالج: {event_type}")
+            return jsonify({'success': True, 'message': 'Event received but not processed'})
+            
+    except Exception as e:
+        current_app.logger.error(f"خطأ في معالجة Webhook: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
 def handle_order_status_update(data):
     """معالجة تحديث حالة الطلب"""
     try:
