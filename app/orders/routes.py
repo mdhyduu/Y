@@ -619,6 +619,9 @@ csrf = CSRFProtect()
 @orders_bp.route('/webhook/order_status', methods=['POST'])
 def order_status_webhook():
     """Webhook لاستقبال تحديثات حالة الطلبات من سلة - متوافق مع الإصدار v2"""
+    # إضافة في بداية الدالة
+    logger.info(f"📨 Webhook received - Headers: {dict(request.headers)}")
+    logger.info(f"📨 Webhook received - Body: {request.get_data(as_text=True)}")
     setattr(request, "_dont_enforce_csrf", True)
 
     try:
