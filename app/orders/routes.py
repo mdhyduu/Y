@@ -607,10 +607,16 @@ def order_details(order_id):
         return redirect(url_for('orders.index'))
 
 # orders/routes.py
+import hmac
+import hashlib
+
+# ... الكود الحالي ...
+
 @orders_bp.route('/webhook/order_status', methods=['POST'])
 def order_status_webhook():
     """Webhook لاستقبال تحديثات حالة الطلبات من سلة"""
     try:
+        # التحقق من التوقيع
         signature = request.headers.get('X-Salla-Signature')
         raw_body = request.data
 
@@ -623,7 +629,6 @@ def order_status_webhook():
             if not hmac.compare_digest(signature, expected_sig):
                 logger.warning("❌ Webhook رفض بسبب توقيع غير صحيح")
                 return jsonify({'success': False, 'error': 'توقيع غير صحيح'}), 403
-        # ... [الكود الحالي للتحقق من التوقيع] ...
 
         # قراءة البيانات
         data = request.get_json()
@@ -633,15 +638,23 @@ def order_status_webhook():
         event = data.get('event')
         order_data = data.get('data', {})
 
-        # معالجة أحداث تحديث حالة الطلب
+        # معالجة كلا النوعين من الأحداث
         if event in ['order.status.updated', 'order.updated'] and order_data:
             order_id = str(order_data.get('id'))
-            status_data = order_data.get('status', {})
-
+            
+            # استخراج بيانات الحالة بناءً على نوع الحدث
+            if event == 'order.status.updated':
+                status_data = order_data.get('status', {})
+            else:  # order.updated
+                status_data = order_data.get('status', {}) or order_data.get('current_status', {})
+            
             if order_id and status_data:
                 order = SallaOrder.query.get(order_id)
                 if order:
                     status_slug = status_data.get('slug', '').lower().replace('-', '_')
+                    if not status_slug and status_data.get('name'):
+                        status_slug = status_data['name'].lower().replace(' ', '_')
+                    
                     status = OrderStatus.query.filter_by(
                         slug=status_slug,
                         store_id=order.store_id
