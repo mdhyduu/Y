@@ -609,10 +609,10 @@ def order_details(order_id):
 # orders/routes.py
 import hmac
 import hashlib
-
-# ... الكود الحالي ...
+from flask_wtf.csrf import csrf_exempt
 
 @orders_bp.route('/webhook/order_status', methods=['POST'])
+@csrf.exempt  # تعطيل CSRF فقط لهذا الراوت
 def order_status_webhook():
     """Webhook لاستقبال تحديثات حالة الطلبات من سلة"""
     try:
@@ -631,9 +631,10 @@ def order_status_webhook():
                 return jsonify({'success': False, 'error': 'توقيع غير صحيح'}), 403
 
         # قراءة البيانات
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data:
-            return jsonify({'success': False, 'error': 'لا يوجد بيانات'}), 400
+            logger.warning("⚠️ لا يوجد بيانات JSON في Webhook")
+            return jsonify({'success': False, 'error': 'لا يوجد بيانات'}), 200  # نعيد 200 لتوقف إعادة الإرسال
 
         event = data.get('event')
         order_data = data.get('data', {})
