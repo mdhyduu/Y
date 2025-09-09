@@ -472,8 +472,6 @@
     </div>
 </div>
 {% block scripts %}
-
-
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/locale/ar.js"></script>
@@ -481,8 +479,11 @@
 <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
 
 <script>
-// استخدم $(document).ready() بدلاً من DOMContentLoaded
 $(document).ready(function () {
+    // --- المتغيرات العامة ---
+    const csrfToken = "{{ csrf_token() }}";
+    let currentSelectedOrders = [];
+    
     // --- تهيئة المكتبات ---
     dayjs.extend(dayjs_plugin_relativeTime);
     dayjs.locale('ar');
@@ -541,27 +542,21 @@ $(document).ready(function () {
         });
     }
     
-    // تحديث دالة updateAssignButtonState
-function updateAssignButtonState() {
-    const checkedCount = $('.order-checkbox:checked').length;
-    $('#selected-orders-count').text(checkedCount);
-    $('#selected-orders-count-2').text(checkedCount);
-    $('#selected-orders-count-print').text(checkedCount);
-    $('#selected-orders-count-html').text(checkedCount); // إضافة هذا السطر
-    $('#assign-orders-btn').prop('disabled', checkedCount === 0);
-    $('#change-status-btn').prop('disabled', checkedCount === 0);
-    $('#print-orders-btn').prop('disabled', checkedCount === 0);
-    $('#download-html-btn').prop('disabled', checkedCount === 0); // إضافة هذا السطر
-    $('#quickListViewBtn').prop('disabled', checkedCount === 0);
-
-    if (checkedCount > 0) {
-        $('#assign-orders-btn, #change-status-btn, #print-orders-btn, #download-html-btn, #quickListViewBtn').addClass('pulse-effect');
-        setTimeout(() => {
-            $('#assign-orders-btn, #change-status-btn, #print-orders-btn, #download-html-btn, #quickListViewBtn').removeClass('pulse-effect');
-        }, 1000);
+    function updateAssignButtonState() {
+        const checkedCount = $('.order-checkbox:checked').length;
+        $('#selected-orders-count').text(checkedCount);
+        $('#selected-orders-count-2').text(checkedCount);
+        $('#selected-orders-count-print').text(checkedCount);
+        $('#selected-orders-count-html').text(checkedCount);
+        
+        const buttons = $('#assign-orders-btn, #change-status-btn, #print-orders-btn, #download-html-btn, #quickListViewBtn');
+        buttons.prop('disabled', checkedCount === 0);
+        
+        if (checkedCount > 0) {
+            buttons.addClass('pulse-effect');
+            setTimeout(() => buttons.removeClass('pulse-effect'), 1000);
+        }
     }
-}
-    // إضافة معالج الحدث للزر الجديد
     
     function buildQueryParams() {
         const params = new URLSearchParams();
@@ -602,12 +597,30 @@ function updateAssignButtonState() {
         const queryParams = buildQueryParams();
         window.location.href = `?${queryParams}`;
     }
-
-    // --- معالجات الأحداث ---
-    const csrfToken = "{{ csrf_token() }}";
     
-    // استخدم event delegation لجميع الأحداث
-    $(document).on('click', '#sync-orders-btn', function() {
+    function toggleQuickListButton() {
+        const selectedOrders = document.querySelectorAll('input.order-checkbox:checked');
+        document.getElementById('quickListViewBtn').disabled = selectedOrders.length === 0;
+    }
+    
+    function updateQuickListSelectionCount() {
+        const selectedCount = document.querySelectorAll('#quickListContent input.quick-list-order:checked').length;
+        document.getElementById('selectedOrdersCountQuick').textContent = `${selectedCount} طلب محدد`;
+
+        const assignBtn = document.getElementById('quickListAssignBtn');
+        if (assignBtn) {
+            assignBtn.disabled = selectedCount === 0;
+        }
+
+        const totalOrders = document.querySelectorAll('#quickListContent input.quick-list-order').length;
+        const selectAll = document.getElementById('selectAllQuickList');
+        if (selectAll && totalOrders > 0) {
+            selectAll.checked = selectedCount === totalOrders;
+            selectAll.indeterminate = selectedCount > 0 && selectedCount < totalOrders;
+        }
+    }
+    
+    function syncData(url, successMessage, errorMessage) {
         const btn = $(this);
         const icon = btn.find('i');
         const progressContainer = $('#sync-progress');
@@ -616,16 +629,14 @@ function updateAssignButtonState() {
 
         btn.prop('disabled', true);
         icon.addClass('fa-spin');
-        btn.find('.sync-text').text('جاري المزامنة...');
         progressContainer.removeClass('d-none');
         progressBar.css('width', '10%');
         detailsText.text('جاري الاتصال بالخادم...');
 
-        // محاكاة التقدم
         progressBar.animate({ width: "70%" }, 1500);
 
         $.ajax({
-            url: "{{ url_for('orders.sync_orders') }}",
+            url: url,
             type: "POST",
             contentType: "application/json",
             data: JSON.stringify({}),
@@ -635,13 +646,12 @@ function updateAssignButtonState() {
             progressBar.css('width', '100%');
             if (response.success) {
                 detailsText.text(response.message);
-                showSweetAlert('success', 'نجحت المزامنة!', response.message);
+                showSweetAlert('success', successMessage, response.message);
                 setTimeout(() => location.reload(), 2000);
             } else {
-                showSweetAlert('error', 'فشلت المزامنة', response.error, 5000);
+                showSweetAlert('error', errorMessage, response.error, 5000);
                 btn.prop('disabled', false);
                 icon.removeClass('fa-spin');
-                btn.find('.sync-text').text('مزامنة الطلبات');
                 progressContainer.addClass('d-none');
             }
         })
@@ -651,47 +661,86 @@ function updateAssignButtonState() {
             showSweetAlert('error', 'حدث خطأ فادح', errorMsg, 5000);
             btn.prop('disabled', false);
             icon.removeClass('fa-spin');
-            btn.find('.sync-text').text('مزامنة الطلبات');
             progressContainer.addClass('d-none');
         });
-    });
+    }
+    
+    function assignOrders(employeeId, orders) {
+        return $.ajax({
+            url: "{{ url_for('orders.assign_orders') }}",
+            type: "POST",
+            contentType: "application/json",
+            headers: { 'X-CSRFToken': csrfToken },
+            data: JSON.stringify({
+                employee_id: employeeId,
+                orders: orders,
+                current_user_id: "{{ session.get('user_id') }}"
+            })
+        });
+    }
+    
+    function getSelectedOrders() {
+        return $('.order-checkbox:checked').map((_, el) => {
+            const row = $(el).closest('tr');
+            return {
+                id: row.data('order-id'),
+                type: row.data('order-type')
+            };
+        }).get();
+    }
 
+    // --- معالجات الأحداث ---
+    
+    // 1. مزامنة الطلبات والحالات
+    $(document).on('click', '#sync-orders-btn', function() {
+        syncData.call(
+            this, 
+            "{{ url_for('orders.sync_orders') }}", 
+            'نجحت المزامنة!', 
+            'فشلت المزامنة'
+        );
+    });
+    
+    $(document).on('click', '#sync-statuses-btn', function() {
+        syncData.call(
+            this, 
+            "{{ url_for('orders.sync_order_statuses') }}", 
+            'نجحت مزامنة الحالات!', 
+            'فشلت مزامنة الحالات'
+        );
+    });
+    
     // 2. تحديد الطلبات (الكل أو فردي)
     $(document).on('change', '#select-all, #select-all-header', function() {
-        $('.order-checkbox').prop('checked', this.checked);
-        updateAssignButtonState();
+        const isChecked = this.checked;
+        $('.order-checkbox').prop('checked', isChecked);
         
-        // إضافة تأثير عند التحديد
-        if (this.checked) {
+        if (isChecked) {
             $('.order-checkbox').closest('tr').addClass('selected-row');
         } else {
             $('.order-checkbox').closest('tr').removeClass('selected-row');
         }
+        
+        updateAssignButtonState();
     });
 
     $(document).on('change', '.order-checkbox', function() {
-        $('#select-all, #select-all-header').prop('checked', $('.order-checkbox:checked').length === $('.order-checkbox').length);
-        updateAssignButtonState();
+        const allChecked = $('.order-checkbox:checked').length === $('.order-checkbox').length;
+        $('#select-all, #select-all-header').prop('checked', allChecked);
         
-        // إضافة تأثير عند التحديد
         if ($(this).is(':checked')) {
             $(this).closest('tr').addClass('selected-row');
         } else {
             $(this).closest('tr').removeClass('selected-row');
         }
+        
+        updateAssignButtonState();
+        toggleQuickListButton();
     });
-
-
 
     // 3. إسناد الطلبات المحددة
     $(document).on('click', '#assign-orders-btn', function() {
-        const selectedOrders = $('.order-checkbox:checked').map((_, el) => {
-            const row = $(el).closest('tr');
-            return {
-                id: row.data('order-id'),
-                type: row.data('order-type')   // ← النوع (salla/custom)
-            };
-        }).get();
+        const selectedOrders = getSelectedOrders();
         
         const employeeOptions = {
             '': 'اختر موظفًا...'
@@ -721,36 +770,23 @@ function updateAssignButtonState() {
                 if (!value) return 'يجب اختيار موظف للإسناد';
             },
             preConfirm: (employeeId) => {
-                return $.ajax({
-                    url: "{{ url_for('orders.assign_orders') }}",
-                    type: "POST",
-                    contentType: "application/json",
-                    headers: { 'X-CSRFToken': csrfToken },
-                    data: JSON.stringify({
-                        employee_id: employeeId,
-                        orders: selectedOrders,   // ← هنا الفرق
-                        current_user_id: "{{ session.get('user_id') }}"
-                    }),
-                }).fail((xhr) => {
-                    const errorMsg = xhr.responseJSON?.error || 'فشل الإسناد لسبب غير معروف.';
-                    Swal.showValidationMessage(`فشل الطلب: ${errorMsg}`);
-                });
+                return assignOrders(employeeId, selectedOrders)
+                    .fail((xhr) => {
+                        const errorMsg = xhr.responseJSON?.error || 'فشل الإسناد لسبب غير معروف.';
+                        Swal.showValidationMessage(`فشل الطلب: ${errorMsg}`);
+                    });
             },
             allowOutsideClick: () => !Swal.isLoading()
         }).then((result) => {
-            if (result.isConfirmed) {
-                if (result.value.success) {
-                    showSweetAlert('success', 'تم الإسناد بنجاح!', result.value.message);
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    showSweetAlert('error', 'فشل الإسناد', result.value.error, 4000);
-                }
+            if (result.isConfirmed && result.value.success) {
+                showSweetAlert('success', 'تم الإسناد بنجاح!', result.value.message);
+                setTimeout(() => location.reload(), 1500);
             }
         });
     });
     
     $(document).on('click', '.assign-single-btn', function(e) {
-        e.stopPropagation(); // منع انتشار الحدث إلى الصف
+        e.stopPropagation();
         const orderId = $(this).data('order-id');
         const orderType = $(this).data('order-type');
         
@@ -781,67 +817,29 @@ function updateAssignButtonState() {
                 if (!value) return 'يجب اختيار موظف للإسناد';
             },
             preConfirm: (employeeId) => {
-                return $.ajax({
-                    url: "{{ url_for('orders.assign_orders') }}",
-                    type: "POST",
-                    contentType: "application/json",
-                    headers: { 'X-CSRFToken': csrfToken },
-                    data: JSON.stringify({
-                        employee_id: employeeId,
-                        orders: [{ id: orderId, type: orderType }],   // ← الشكل الجديد
-                        current_user_id: "{{ session.get('user_id') }}"
-                    }),
-                }).fail((xhr) => {
-                    const errorMsg = xhr.responseJSON?.error || 'فشل الإسناد لسبب غير معروف.';
-                    Swal.showValidationMessage(`فشل الطلب: ${errorMsg}`);
-                });
+                return assignOrders(employeeId, [{ id: orderId, type: orderType }])
+                    .fail((xhr) => {
+                        const errorMsg = xhr.responseJSON?.error || 'فشل الإسناد لسبب غير معروف.';
+                        Swal.showValidationMessage(`فشل الطلب: ${errorMsg}`);
+                    });
             },
             allowOutsideClick: () => !Swal.isLoading()
         }).then((result) => {
-            if (result.isConfirmed) {
-                if (result.value.success) {
-                    showSweetAlert('success', 'تم الإسناد بنجاح!', result.value.message);
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    showSweetAlert('error', 'فشل الإسناد', result.value.error, 4000);
-                }
+            if (result.isConfirmed && result.value.success) {
+                showSweetAlert('success', 'تم الإسناد بنجاح!', result.value.message);
+                setTimeout(() => location.reload(), 1500);
             }
         });
     });
-    // معالج حدث الطباعة من القائمة السريعة (للموظفين العاديين)
-
-document.addEventListener('click', function(e) {
-    if (e.target && e.target.id === 'quickListChangeStatusBtn') {
-        const selectedOrders = [];
-        document.querySelectorAll('#quickListContent input.quick-list-order:checked').forEach(checkbox => {
-            selectedOrders.push(checkbox.value);
-        });
-
-        if (selectedOrders.length === 0) {
-            showSweetAlert('warning', 'تحذير', 'يرجى تحديد طلب واحد على الأقل لتغيير الحالة');
-            return;
-        }
-
-        // إغلاق نافذة القائمة السريعة أولاً
-        $('#quickListModal').modal('hide');
-        
-        // ثم فتح نافذة تغيير الحالة بعد تأخير بسيط
-        setTimeout(() => {
-            $('#selected-count-modal').text(selectedOrders.length);
-            $('#changeStatusModal').data('selected-orders', selectedOrders);
-            $('#changeStatusModal').modal('show');
-        }, 300);
-    }
-});
-
-// تعديل معالج تأكيد تغيير الحال
-    // 5. تغيير حالة الطلبات
+    
+    // 4. تغيير حالة الطلبات
     $(document).on('click', '#change-status-btn', function() {
         const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
         $('#selected-count-modal').text(orderIds.length);
         $('#changeStatusModal').modal('show');
     });
-   $(document).on('click', '#confirm-status-change', function() {
+    
+    $(document).on('click', '#confirm-status-change', function() {
         const orderIds = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
         const statusId = $('#status-select').val();
         const note = $('#status-note').val();
@@ -877,131 +875,28 @@ document.addEventListener('click', function(e) {
             showSweetAlert('error', 'حدث خطأ', errorMsg);
         });
     });
- $(document).on('input', '#search-order-id', _.debounce(function() {
-        reloadOrders();
-    }, 500));
     
-    $(document).on('click', '#sync-statuses-btn', function() {
-        const btn = $(this);
-        const icon = btn.find('i');
-        const progressContainer = $('#sync-progress');
-        const progressBar = progressContainer.find('.progress-bar');
-        const detailsText = progressContainer.find('.sync-details');
-
-        btn.prop('disabled', true);
-        icon.addClass('fa-spin');
-        btn.find('.sync-text').text('جاري مزامنة الحالات...');
-        progressContainer.removeClass('d-none');
-        progressBar.css('width', '10%');
-        detailsText.text('جاري الاتصال بالخادم...');
-
-        // محاكاة التقدم
-        progressBar.animate({ width: "70%" }, 1500);
-
-        $.ajax({
-            url: "{{ url_for('orders.sync_order_statuses') }}",
-            type: "POST",
-            contentType: "application/json",
-            data: JSON.stringify({}),
-            headers: { 'X-CSRFToken': csrfToken }
-        })
-        .done(function(response) {
-            progressBar.css('width', '100%');
-            if (response.success) {
-                detailsText.text(response.message);
-                showSweetAlert('success', 'نجحت مزامنة الحالات!', response.message);
-                setTimeout(() => location.reload(), 2000);
-            } else {
-                showSweetAlert('error', 'فشلت مزامنة الحالات', response.error, 5000);
-                btn.prop('disabled', false);
-                icon.removeClass('fa-spin');
-                btn.find('.sync-text').text('مزامنة الحالات');
-                progressContainer.addClass('d-none');
-            }
-        })
-        .fail(function(xhr) {
-            progressBar.css('width', '100%');
-            const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم. تحقق من الشبكة.';
-            showSweetAlert('error', 'حدث خطأ فادح', errorMsg, 5000);
-            btn.prop('disabled', false);
-            icon.removeClass('fa-spin');
-            btn.find('.sync-text').text('مزامنة الحالات');
-            progressContainer.addClass('d-none');
-        });
-    }); 
-    // 6. تطبيق الفلاتر مع تأخير للبحث
+    // 5. الفلاتر والبحث
     $(document).on('submit', '#advanced-filters', function(e) {
         e.preventDefault();
         reloadOrders();
     });
     
-    // البحث مع تأخير لمنع طلبات متعددة
     $(document).on('input', '#search-order-id', _.debounce(function() {
         reloadOrders();
     }, 500));
     
-    $(document).on('click', '#sync-statuses-btn', function() {
-        const btn = $(this);
-        const icon = btn.find('i');
-        const progressContainer = $('#sync-progress');
-        const progressBar = progressContainer.find('.progress-bar');
-        const detailsText = progressContainer.find('.sync-details');
-
-        btn.prop('disabled', true);
-        icon.addClass('fa-spin');
-        btn.find('.sync-text').text('جاري مزامنة الحالات...');
-        progressContainer.removeClass('d-none');
-        progressBar.css('width', '10%');
-        detailsText.text('جاري الاتصال بالخادم...');
-
-        // محاكاة التقدم
-        progressBar.animate({ width: "70%" }, 1500);
-
-        $.ajax({
-            url: "{{ url_for('orders.sync_order_statuses') }}",
-            type: "POST",
-            contentType: "application/json",
-            data: JSON.stringify({}),
-            headers: { 'X-CSRFToken': csrfToken }
-        })
-        .done(function(response) {
-            progressBar.css('width', '100%');
-            if (response.success) {
-                detailsText.text(response.message);
-                showSweetAlert('success', 'نجحت مزامنة الحالات!', response.message);
-                setTimeout(() => location.reload(), 2000);
-            } else {
-                showSweetAlert('error', 'فشلت مزامنة الحالات', response.error, 5000);
-                btn.prop('disabled', false);
-                icon.removeClass('fa-spin');
-                btn.find('.sync-text').text('مزامنة الحالات');
-                progressContainer.addClass('d-none');
-            }
-        })
-        .fail(function(xhr) {
-            progressBar.css('width', '100%');
-            const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم. تحقق من الشبكة.';
-            showSweetAlert('error', 'حدث خطأ فادح', errorMsg, 5000);
-            btn.prop('disabled', false);
-            icon.removeClass('fa-spin');
-            btn.find('.sync-text').text('مزامنة الحالات');
-            progressContainer.addClass('d-none');
-        });
-    });
-    
-    // تغيير الفلاتر مع تأخير
     $(document).on('change', '#filter-order-status, #filter-employee, #filter-custom-status, #filter-special-status, #per-page-select', _.debounce(function() {
         reloadOrders();
     }, 300));
     
-    // 7. إعادة تعيين الفلاتر
+    // 6. إعادة تعيين الفلاتر
     $(document).on('click', '#reset-filters, #reset-filters-btn', function() {
         window.location.href = "{{ url_for('orders.index') }}";
     });
 
-    // 8. النقر على صف الجدول للانتقال إلى التفاصيل
+    // 7. النقر على صف الجدول للانتقال إلى التفاصيل
     $(document).on('click', '.clickable-row', function(e) {
-        // تجاهل النقر على عناصر الإدخال أو الأزرار
         if ($(e.target).is('input, button, a, i') || $(e.target).closest('button, a, .actions-cell').length) {
             return;
         }
@@ -1018,107 +913,43 @@ document.addEventListener('click', function(e) {
         
         window.location.href = url;
     });
-
-    // --- التشغيل عند تحميل الصفحة ---
-    updateTimestamps();
-    updateAssignButtonState();
     
-    // تحديث التواريخ كل دقيقة
-    setInterval(updateTimestamps, 60000);
-    
-    // تحسين تجربة الجوال
-    if (window.innerWidth < 768) {
-        $('.sidebar').removeClass('show');
-        $('.sidebar__backdrop').removeClass('show');
-    }
-});
+    // 8. القائمة السريعة
+    $(document).on('click', '#quickListViewBtn', function() {
+        const selectedOrders = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
+        
+        if (selectedOrders.length === 0) {
+            showSweetAlert('warning', 'تحذير', 'يرجى تحديد طلب واحد على الأقل');
+            return;
+        }
 
-// تفعيل/تعطيل زر القائمة السريعة بناءً على الطلبات المحددة
-function toggleQuickListButton() {
-    const selectedOrders = document.querySelectorAll('input.order-checkbox:checked');
-    document.getElementById('quickListViewBtn').disabled = selectedOrders.length === 0;
-}
+        currentSelectedOrders = selectedOrders;
 
-// تحديث عدد الطلبات المحددة في القائمة السريعة
-function updateQuickListSelectionCount() {
-    const selectedCount = document.querySelectorAll('#quickListContent input.quick-list-order:checked').length;
-    document.getElementById('selectedOrdersCountQuick').textContent = `${selectedCount} طلب محدد`;
-
-    // تحديث زر الإسناد
-    const assignBtn = document.getElementById('quickListAssignBtn');
-    if (assignBtn) {
-        assignBtn.disabled = selectedCount === 0;
-    }
-
-    // تحديث خانة تحديد الكل
-    const totalOrders = document.querySelectorAll('#quickListContent input.quick-list-order').length;
-    const selectAll = document.getElementById('selectAllQuickList');
-    if (selectAll && totalOrders > 0) {
-        selectAll.checked = selectedCount === totalOrders;
-        selectAll.indeterminate = selectedCount > 0 && selectedCount < totalOrders;
-    }
-}
-// معالج حدث تحديد/إلغاء تحديد الكل في القائمة السريعة
-document.addEventListener('click', function(e) {
-    if (e.target && e.target.id === 'selectAllQuickList') {
-        const isChecked = e.target.checked;
-        document.querySelectorAll('#quickListContent input.quick-list-order').forEach(checkbox => {
-            checkbox.checked = isChecked;
-        });
-        updateQuickListSelectionCount();
-    }
-});
-
-// استخدام event delegation للتعامل مع التغييرات في القائمة السريعة
-document.addEventListener('change', function(e) {
-    if (e.target && e.target.classList.contains('quick-list-order')) {
-        updateQuickListSelectionCount();
-    }
-});
-
-// عرض القائمة السريعة
-document.getElementById('quickListViewBtn').addEventListener('click', function() {
-    const selectedOrders = [];
-    document.querySelectorAll('input.order-checkbox:checked').forEach(checkbox => {
-        selectedOrders.push(checkbox.value);
-    });
-
-    if (selectedOrders.length === 0) {
-        showSweetAlert('warning', 'تحذير', 'يرجى تحديد طلب واحد على الأقل');
-        return;
-    }
-
-    // حفظ الطلبات المحددة في متغير عام للاستخدام لاحقاً
-    window.currentSelectedOrders = selectedOrders;
-
-    // إظهار مؤشر التحميل
-    document.getElementById('quickListContent').innerHTML = `
-        <div class="text-center py-4">
-            <div class="spinner-border text-primary" role="status">
-                <span class="sr-only">جاري التحميل...</span>
+        $('#quickListContent').html(`
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">جاري التحميل...</span>
+                </div>
+                <p class="mt-2">جاري تحميل بيانات الطلبات...</p>
             </div>
-            <p class="mt-2">جاري تحميل بيانات الطلبات...</p>
-        </div>
-    `;
+        `);
 
-    // فتح النافذة المنبثقة
-    $('#quickListModal').modal('show');
+        $('#quickListModal').modal('show');
 
-    // جلب بيانات الطلبات المحددة
-    fetch("{{ url_for('orders.get_quick_list_data') }}", {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify({ order_ids: selectedOrders })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            let html = '';
-            data.orders.forEach(order => {
-                html += `
+        $.ajax({
+            url: "{{ url_for('orders.get_quick_list_data') }}",
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            data: JSON.stringify({ order_ids: selectedOrders })
+        })
+        .done(function(data) {
+            if (data.success) {
+                let html = '';
+                data.orders.forEach(order => {
+                    html += `
 <div class="card mb-3" data-order-id="${order.id}" data-order-type="${order.type}">
     <div class="card-header d-flex justify-content-between align-items-center">
         <div class="form-check">
@@ -1130,193 +961,199 @@ document.getElementById('quickListViewBtn').addEventListener('click', function()
         </div>
         <span class="badge bg-${order.status_class || 'secondary'}">${order.status_text || 'غير معروف'}</span>
     </div>
-    ...
-</div>
-`;
-                
-                if (order.items && order.items.length > 0) {
-                    order.items.forEach((item, index) => {
-                        html += `
-                            <div class="col-3 mb-3 text-center">
-                                <img src="${item.main_image || '/static/images/no-image.png'}" 
-                                     alt="${item.name}" 
-                                     class="img-fluid rounded border" 
-                                     style="max-height: 100px; object-fit: cover;">
-                                <p class="mt-1 small text-truncate">${item.name}</p>
-                                <p class="text-muted small">الكمية: ${item.quantity}</p>
-                            </div>
-                        `;
-                    });
-                } else {
-                    html += `<div class="col-12"><p class="text-muted text-center">لا توجد منتجات في هذا الطلب</p></div>`;
-                }
-                
-                html += `
+    <div class="card-body">
+        <div class="row">
+    `;
+                    
+                    if (order.items && order.items.length > 0) {
+                        order.items.forEach((item, index) => {
+                            html += `
+                                <div class="col-3 mb-3 text-center">
+                                    <img src="${item.main_image || '/static/images/no-image.png'}" 
+                                         alt="${item.name}" 
+                                         class="img-fluid rounded border" 
+                                         style="max-height: 100px; object-fit: cover;">
+                                    <p class="mt-1 small text-truncate">${item.name}</p>
+                                    <p class="text-muted small">الكمية: ${item.quantity}</p>
+                                </div>
+                            `;
+                        });
+                    } else {
+                        html += `<div class="col-12"><p class="text-muted text-center">لا توجد منتجات في هذا الطلب</p></div>`;
+                    }
+                    
+                    html += `
                         </div>
                     </div>
                 </div>
                 `;
-            });
-            
-            document.getElementById('quickListContent').innerHTML = html;
-            
-            // تحديث عدد الطلبات المحددة بعد تحميل المحتوى
-            updateQuickListSelectionCount();
-        } else {
-            document.getElementById('quickListContent').innerHTML = `
-                <div class="alert alert-danger">${data.error || 'حدث خطأ أثناء جلب البيانات'}</div>
-            `;
-        }
-    })
-    .catch(error => {
-        document.getElementById('quickListContent').innerHTML = `
-            <div class="alert alert-danger">حدث خطأ في الاتصال: ${error}</div>
-        `;
-    });
-});
-
-// معالج حدث إسناد الطلبات من القائمة السريعة
-document.getElementById('quickListAssignBtn').addEventListener('click', function() {
-    const employeeId = document.getElementById('quickListAssignSelect').value;
-
-    // الحصول على الطلبات المحددة في القائمة السريعة مع النوع
-    const selectedOrders = [];
-    document.querySelectorAll('#quickListContent input.quick-list-order:checked').forEach(checkbox => {
-        const row = checkbox.closest('tr');
-        selectedOrders.push({
-            id: row.dataset.orderId,
-            type: row.dataset.orderType   // <-- مهم جداً (salla/custom)
+                });
+                
+                $('#quickListContent').html(html);
+                updateQuickListSelectionCount();
+            } else {
+                $('#quickListContent').html(`
+                    <div class="alert alert-danger">${data.error || 'حدث خطأ أثناء جلب البيانات'}</div>
+                `);
+            }
+        })
+        .fail(function(error) {
+            $('#quickListContent').html(`
+                <div class="alert alert-danger">حدث خطأ في الاتصال: ${error.statusText}</div>
+            `);
         });
     });
-
-    if (!employeeId) {
-        showSweetAlert('warning', 'تحذير', 'يرجى اختيار موظف للإسناد');
-        return;
-    }
-
-    if (selectedOrders.length === 0) {
-        showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للإسناد');
-        return;
-    }
-
-    // تعطيل الزر أثناء المعالجة
-    const assignBtn = document.getElementById('quickListAssignBtn');
-    const originalText = assignBtn.innerHTML;
-    assignBtn.disabled = true;
-    assignBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> جاري الإسناد';
-
-    // إرسال طلب الإسناد
-    fetch("{{ url_for('orders.assign_orders') }}", {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify({
-            employee_id: employeeId,
-            orders: selectedOrders,   // ✅ الشكل الجديد
-            current_user_id: "{{ session.get('user_id') }}"
-        })
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`خطأ في الشبكة: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.success) {
-            Swal.fire({
-                icon: 'success',
-                title: 'تم الإسناد بنجاح',
-                text: data.message || 'تم إسناد الطلبات إلى الموظف المحدد',
-                confirmButtonText: 'موافق',
-                customClass: {
-                    confirmButton: 'btn btn-success'
-                }
-            }).then(() => {
-                $('#quickListModal').modal('hide');
-                location.reload();
+    
+    // 9. تحديد الكل في القائمة السريعة
+    $(document).on('change', '#selectAllQuickList', function() {
+        const isChecked = this.checked;
+        $('#quickListContent input.quick-list-order').prop('checked', isChecked);
+        updateQuickListSelectionCount();
+    });
+    
+    // 10. تحديث عدد التحديدات في القائمة السريعة
+    $(document).on('change', '#quickListContent input.quick-list-order', function() {
+        updateQuickListSelectionCount();
+    });
+    
+    // 11. إسناد الطلبات من القائمة السريعة
+    $(document).on('click', '#quickListAssignBtn', function() {
+        const employeeId = $('#quickListAssignSelect').val();
+        const selectedOrders = [];
+        
+        $('#quickListContent input.quick-list-order:checked').each(function() {
+            const card = $(this).closest('.card');
+            selectedOrders.push({
+                id: card.data('order-id'),
+                type: card.data('order-type')
             });
-        } else {
-            throw new Error(data.error || 'حدث خطأ غير متوقع أثناء الإسناد');
-        }
-    })
-    .catch(error => {
-        assignBtn.disabled = false;
-        assignBtn.innerHTML = originalText;
+        });
 
+        if (!employeeId) {
+            showSweetAlert('warning', 'تحذير', 'يرجى اختيار موظف للإسناد');
+            return;
+        }
+
+        if (selectedOrders.length === 0) {
+            showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للإسناد');
+            return;
+        }
+
+        const assignBtn = $('#quickListAssignBtn');
+        const originalText = assignBtn.html();
+        assignBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري الإسناد');
+
+        assignOrders(employeeId, selectedOrders)
+            .done(function(data) {
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'تم الإسناد بنجاح',
+                        text: data.message || 'تم إسناد الطلبات إلى الموظف المحدد',
+                        confirmButtonText: 'موافق',
+                        customClass: {
+                            confirmButton: 'btn btn-success'
+                        }
+                    }).then(() => {
+                        $('#quickListModal').modal('hide');
+                        location.reload();
+                    });
+                } else {
+                    throw new Error(data.error || 'حدث خطأ غير متوقع أثناء الإسناد');
+                }
+            })
+            .fail(function(error) {
+                assignBtn.prop('disabled', false).html(originalText);
+                const errorMsg = error.responseJSON?.error || error.statusText || 'حدث خطأ أثناء محاولة الإسناد';
+                
+                Swal.fire({
+                    icon: 'error',
+                    title: 'فشل الإسناد',
+                    text: errorMsg,
+                    confirmButtonText: 'موافق',
+                    customClass: {
+                        confirmButton: 'btn btn-danger'
+                    }
+                });
+            });
+    });
+    
+    // 12. تحميل HTML
+    $(document).on('click', '#download-html-btn', function() {
+        const selectedOrders = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
+        
+        if (selectedOrders.length === 0) {
+            showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للتحميل');
+            return;
+        }
+        
         Swal.fire({
-            icon: 'error',
-            title: 'فشل الإسناد',
-            text: error.message || 'حدث خطأ أثناء محاولة الإسناد',
-            confirmButtonText: 'موافق',
+            title: 'تحميل الطلبات',
+            html: `سيتم تحميل <span class="fw-bold text-primary">${selectedOrders.length}</span> طلب كملف HTML يعمل بدون اتصال`,
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'موافق، تحميل HTML',
+            cancelButtonText: 'إلغاء',
             customClass: {
-                confirmButton: 'btn btn-danger'
+                confirmButton: 'btn btn-primary',
+                cancelButton: 'btn btn-outline-secondary ms-2'
+            },
+            buttonsStyling: false
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const downloadBtn = $('#download-html-btn');
+                const originalText = downloadBtn.html();
+                downloadBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
+                
+                const downloadLink = document.createElement('a');
+                downloadLink.href = `{{ url_for('orders.download_orders_html') }}?order_ids=${selectedOrders.join(',')}`;
+                downloadLink.style.display = 'none';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                
+                setTimeout(() => {
+                    downloadBtn.prop('disabled', false).html(originalText);
+                }, 2000);
             }
         });
     });
-});
-// معالج حدث لزر تحميل HTML
-$(document).on('click', '#download-html-btn', function() {
-    const selectedOrders = [];
     
-    // جمع الطلبات المحددة
-    $('input.order-checkbox:checked').each(function() {
-        selectedOrders.push($(this).val());
-    });
-    
-    if (selectedOrders.length === 0) {
-        showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للتحميل');
-        return;
-    }
-    
-    // إظهار نافذة تأكيد
-    Swal.fire({
-        title: 'تحميل الطلبات',
-        html: `سيتم تحميل <span class="fw-bold text-primary">${selectedOrders.length}</span> طلب كملف HTML يعمل بدون اتصال`,
-        icon: 'info',
-        showCancelButton: true,
-        confirmButtonText: 'موافق، تحميل HTML',
-        cancelButtonText: 'إلغاء',
-        customClass: {
-            confirmButton: 'btn btn-primary',
-            cancelButton: 'btn btn-outline-secondary ms-2'
-        },
-        buttonsStyling: false
-    }).then((result) => {
-        if (result.isConfirmed) {
-            // إظهار مؤشر التحميل
-            const downloadBtn = $('#download-html-btn');
-            const originalText = downloadBtn.html();
-            downloadBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
-            
-            // إنشاء رابط تحميل خفي
-            const downloadLink = document.createElement('a');
-            downloadLink.href = `{{ url_for('orders.download_orders_html') }}?order_ids=${selectedOrders.join(',')}`;
-            downloadLink.style.display = 'none';
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
-            
-            // استعادة حالة الزر بعد ثانية
-            setTimeout(() => {
-                downloadBtn.prop('disabled', false).html(originalText);
-            }, 2000);
+    // 13. تغيير الحالة من القائمة السريعة
+    $(document).on('click', '#quickListChangeStatusBtn', function() {
+        const selectedOrders = [];
+        $('#quickListContent input.quick-list-order:checked').each(function() {
+            selectedOrders.push($(this).val());
+        });
+
+        if (selectedOrders.length === 0) {
+            showSweetAlert('warning', 'تحذير', 'يرجى تحديد طلب واحد على الأقل لتغيير الحالة');
+            return;
         }
+
+        $('#quickListModal').modal('hide');
+        
+        setTimeout(() => {
+            $('#selected-count-modal').text(selectedOrders.length);
+            $('#changeStatusModal').data('selected-orders', selectedOrders);
+            $('#changeStatusModal').modal('show');
+        }, 300);
     });
-});
-// إضافة event listeners لتفعيل الزر عند تحديد الطلبات
-document.addEventListener('DOMContentLoaded', function() {
-    const checkboxes = document.querySelectorAll('input.order-checkbox');
-    checkboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', toggleQuickListButton);
-    });
-    
-    // تهيئة زر القائمة السريعة
+
+    // --- التشغيل عند تحميل الصفحة ---
+    updateTimestamps();
+    updateAssignButtonState();
     toggleQuickListButton();
+    
+    // تحديث التواريخ كل دقيقة
+    setInterval(updateTimestamps, 60000);
+    
+    // تحسين تجربة الجوال
+    if (window.innerWidth < 768) {
+        $('.sidebar').removeClass('show');
+        $('.sidebar__backdrop').removeClass('show');
+    }
 });
 </script>
-
 {% endblock %}
 {% endblock %}
