@@ -609,24 +609,23 @@ def order_details(order_id):
 # orders/routes.py
 import hmac
 import hashlib
-from flask_wtf.csrf import CSRFProtect
+
+# ... الكود الحالي ...
+from flask_wtf.csrf import CSRFProtect, CSRFError
 
 csrf = CSRFProtect()
 
-
-# ... الكود الحالي ...
 @orders_bp.route('/webhook/order_status', methods=['POST'])
+@csrf.exempt  # هذا هو الحل المباشر
 def order_status_webhook():
+    # ... الكود السابق
     """Webhook لاستقبال تحديثات حالة الطلبات من سلة - متوافق مع الإصدار v2"""
-    # تعطيل التحقق من CSRF لهذا المسار تحديداً
-    from flask import request
-    setattr(request, '_bypass_csrf', True)
-    
+    # إضافة في بداية الدالة
+    logger.info(f"📨 Webhook received - Headers: {dict(request.headers)}")
+    logger.info(f"📨 Webhook received - Body: {request.get_data(as_text=True)}")
+    setattr(request, "_dont_enforce_csrf", True)
+
     try:
-        # تسجيل معلومات التصحيح
-        logger.info(f"📨 Webhook received - Headers: {dict(request.headers)}")
-        logger.info(f"📨 Webhook received - Body: {request.get_data(as_text=True)[:500]}...")
-        
         # التحقق من إصدار Webhook
         webhook_version = request.headers.get('X-Salla-Webhook-Version', '1')
         security_strategy = request.headers.get('X-Salla-Security-Strategy', 'signature')
@@ -644,32 +643,35 @@ def order_status_webhook():
             
             if not hmac.compare_digest(signature, expected_sig):
                 logger.warning("❌ Webhook رفض بسبب توقيع غير صحيح")
-                logger.warning(f"التوقيع المتوقع: {expected_sig}")
-                logger.warning(f"التوقيع المستلم: {signature}")
                 return jsonify({'success': False, 'error': 'توقيع غير صحيح'}), 403
         
+        elif security_strategy == 'token':
+            token = request.headers.get('Authorization')
+            # التحقق من التوكن إذا لزم الأمر
+            if not token or token != f"Bearer {Config.WEBHOOK_SECRET}":
+                logger.warning("❌ Webhook رفض بسبب توكن غير صحيح")
+                return jsonify({'success': False, 'error': 'توكن غير صحيح'}), 403
+
         # قراءة البيانات ومعالجتها حسب الإصدار
         data = request.get_json()
         if not data:
-            logger.warning("❌ لا يوجد بيانات في طلب Webhook")
             return jsonify({'success': False, 'error': 'لا يوجد بيانات'}), 400
-
-        logger.info(f"📊 Webhook data: {json.dumps(data, ensure_ascii=False)[:300]}...")
 
         # معالجة البيانات حسب إصدار Webhook
         if webhook_version == '2':
-            # هيكل الإصدار v2
+            # هيكل الإصدار v2 - كما في البيانات التي أرسلتها
             event = data.get('event')
             webhook_data = data.get('data', {})
-            merchant_id = data.get('merchant')
+            merchant_id = data.get('merchant')  # ملاحظة: المفتاح هو merchant وليس merchant_id
             
+            # تسجيل معلومات التصحيح
             logger.info(f"📥 Webhook v2 received: {event} for merchant {merchant_id}")
             
             # التأكد من أن الحدث مخصص لهذا المتجر
             user = User.query.filter_by(store_id=str(merchant_id)).first()
             if not user:
                 logger.warning(f"⚠️ Webhook for unknown merchant: {merchant_id}")
-                return jsonify({'success': True, 'message': 'تم الاستلام (متجر غير معروف)'}), 200
+                return jsonify({'success': False, 'error': 'متجر غير معروف'}), 404
                 
             order_data = webhook_data
         else:
@@ -682,10 +684,11 @@ def order_status_webhook():
         if event in ['order.status.updated', 'order.updated'] and order_data:
             order_id = str(order_data.get('id'))
             
-            logger.info(f"🔄 معالجة حدث {event} للطلب {order_id}")
-            
-            # استخراج بيانات الحالة
-            status_data = order_data.get('status', {})
+            # استخراج بيانات الحالة بناءً على نوع الحدث
+            if event == 'order.status.updated':
+                status_data = order_data.get('status', {})
+            else:  # order.updated
+                status_data = order_data.get('status', {}) or order_data.get('current_status', {})
             
             if order_id and status_data:
                 order = SallaOrder.query.get(order_id)
@@ -693,8 +696,6 @@ def order_status_webhook():
                     status_slug = status_data.get('slug', '').lower().replace('-', '_')
                     if not status_slug and status_data.get('name'):
                         status_slug = status_data['name'].lower().replace(' ', '_')
-                    
-                    logger.info(f"🔍 البحث عن الحالة: {status_slug}")
                     
                     status = OrderStatus.query.filter_by(
                         slug=status_slug,
