@@ -609,7 +609,7 @@ def order_details(order_id):
 # orders/routes.py
 
 # إضافة route للـ webhook
-@orders_bp.route('/webhook/order_status', methods=['POST'])
+@orders_bp.route('/webhook/order_status', methods=['GET', 'POST'])
 def order_status_webhook():
     """Webhook لاستقبال تحديثات حالة الطلبات من سلة"""
     try:
