@@ -9,7 +9,7 @@ from flask_wtf.csrf import CSRFProtect
 from .config import Config
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
-from flask import session, request
+from flask import session
 import webcolors
 from flask import jsonify, render_template_string
 from flask_mail import Mail  # إضافة استيراد Flask-Mail
@@ -53,7 +53,7 @@ def create_app():
     # استيراد الوظائف المطلوبة
     from .token_utils import refresh_salla_token
     from .models import User
-
+    
     # تسجيل البلوبيرنتات
     from .employees import employees_bp
     from .dashboard import dashboard_bp
@@ -71,6 +71,7 @@ def create_app():
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(user_auth_bp)
     app.register_blueprint(auth_bp)
+    csrf.exempt(orders_bp)
     app.register_blueprint(orders_bp)
     app.register_blueprint(categories_bp)
     app.register_blueprint(permissions_bp)
@@ -118,14 +119,7 @@ def create_app():
                 except Exception as e:
                     app.logger.error(f"فشل تجديد التوكن للمستخدم {user.id}: {str(e)}")
     
-    @app.before_request
-    def bypass_csrf_for_webhook():
-        if request.path == '/webhook/order_status':
-            # تعطيل CSRF بشكل كامل لهذا المسار
-            from flask import _request_ctx_stack
-            ctx = _request_ctx_stack.top
-            if hasattr(ctx, 'csrf_token'):
-                setattr(ctx, '_csrf_token', None)
+
     def get_text_color(hex_color):
         """
         Determines if text should be black or white based on background hex color.
@@ -246,7 +240,7 @@ def create_app():
         }
         '''
         return render_template_string(manifest_json), 200, {'Content-Type': 'application/json'}
-
+    
 
     return app
     
