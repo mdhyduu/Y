@@ -614,7 +614,99 @@ import hashlib
 from flask_wtf.csrf import CSRFProtect, CSRFError
 
 csrf = CSRFProtect()
-
+# إضافة هذه الدالة في بداية الملف بعد الواردات
+def handle_order_creation(data, webhook_version='2'):
+    """معالجة إنشاء طلب جديد من Webhook"""
+    try:
+        if webhook_version == '2':
+            order_data = data.get('data', {})
+            merchant_id = data.get('merchant')
+        else:
+            order_data = data
+            merchant_id = data.get('merchant_id')
+        
+        order_id = str(order_data.get('id'))
+        if not order_id:
+            logger.error("بيانات الطلب لا تحتوي على ID")
+            return False
+        
+        # التحقق من وجود الطلب مسبقاً
+        existing_order = SallaOrder.query.get(order_id)
+        if existing_order:
+            logger.info(f"الطلب موجود بالفعل: {order_id}")
+            return True
+        
+        # البحث عن المستخدم بناءً على merchant_id
+        user = User.query.filter_by(store_id=str(merchant_id)).first()
+        if not user:
+            logger.error(f"لم يتم العثور على مستخدم للمتجر: {merchant_id}")
+            return False
+        
+        # استخراج بيانات الطلب
+        created_at = None
+        date_info = order_data.get('date', {})
+        if date_info and 'date' in date_info:
+            try:
+                date_str = date_info['date'].split('.')[0]
+                created_at = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+            except Exception:
+                created_at = datetime.utcnow()
+                logger.warning(f"تعذر تحليل تاريخ الإنشاء للطلب {order_id}")
+        
+        total_info = order_data.get('total', {})
+        total_amount = float(total_info.get('amount', 0))
+        currency = total_info.get('currency', 'SAR')
+        
+        customer = order_data.get('customer', {})
+        customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip()
+        if not customer_name:
+            customer_name = order_data.get('customer_name', 'عميل غير معروف')
+        
+        # البحث عن حالة الطلب الافتراضية
+        status_id = None
+        status_info = order_data.get('status', {})
+        if status_info and 'id' in status_info:
+            status_id = str(status_info['id'])
+            # التحقق من وجود الحالة في قاعدة البيانات
+            status = OrderStatus.query.filter_by(id=status_id, store_id=user.store_id).first()
+            if not status:
+                status_id = None
+        
+        # إذا لم يكن هناك حالة، نستخدم الحالة الافتراضية
+        if not status_id:
+            default_status = OrderStatus.query.filter_by(
+                store_id=user.store_id, 
+                is_active=True
+            ).order_by(OrderStatus.sort).first()
+            
+            if default_status:
+                status_id = default_status.id
+            else:
+                logger.warning(f"لا توجد حالات طلب للمتجر {user.store_id}")
+        
+        # إنشاء الطلب الجديد
+        new_order = SallaOrder(
+            id=order_id,
+            store_id=user.store_id,
+            customer_name=customer_name,
+            created_at=created_at or datetime.utcnow(),
+            total_amount=total_amount,
+            currency=currency,
+            payment_method=order_data.get('payment_method', ''),
+            raw_data=json.dumps(order_data, ensure_ascii=False),
+            status_id=status_id
+        )
+        
+        db.session.add(new_order)
+        db.session.commit()
+        
+        logger.info(f"تم إنشاء طلب جديد: {order_id} للمتجر {user.store_id}")
+        return True
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"خطأ في إنشاء الطلب من Webhook: {str(e)}", exc_info=True)
+        return False
 @orders_bp.route('/webhook/order_status', methods=['POST'])
 @csrf.exempt  # هذا هو الحل المباشر
 def order_status_webhook():
