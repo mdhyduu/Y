@@ -741,3 +741,96 @@ def check_status_conflict(order_id, new_status_type, custom_status_id=None):
     except Exception as e:
         current_app.logger.error(f"Error in check_status_conflict: {str(e)}", exc_info=True)
         return True, f"حدث خطأ في التحقق من التعارض: {str(e)}"
+
+
+@orders_bp.route('/<order_id>/update_print_status', methods=['POST'])
+def update_print_status(order_id):
+    """تحديث حالة الطلب من نسخة الطباعة (للموظفين)"""
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
+    
+    # للموظفين فقط
+    if request.cookies.get('is_admin') == 'true':
+        return jsonify({'success': False, 'error': 'هذه الخدمة للموظفين فقط'}), 403
+    
+    if not employee:
+        return jsonify({'success': False, 'error': 'غير مصرح لك بهذا الإجراء'}), 403
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'بيانات غير صالحة'}), 400
+        
+    status = data.get('status')
+    
+    if not status:
+        return jsonify({'success': False, 'error': 'يجب تحديد حالة'}), 400
+    
+    # البحث عن حالة "تم التنفيذ" الافتراضية للموظف
+    if status == "تم التنفيذ":
+        done_status = EmployeeCustomStatus.query.filter_by(
+            name="تم التنفيذ",
+            employee_id=employee.id
+        ).first()
+        
+        if not done_status:
+            # إنشاء حالة "تم التنفيذ" إذا لم توجد
+            done_status = EmployeeCustomStatus(
+                name="تم التنفيذ",
+                color="#28a745",
+                employee_id=employee.id
+            )
+            db.session.add(done_status)
+            db.session.commit()
+        
+        # إضافة/تحديث حالة الطلب
+        existing_status = OrderEmployeeStatus.query.filter_by(
+            order_id=str(order_id),
+            status_id=done_status.id
+        ).first()
+        
+        if existing_status:
+            existing_status.updated_at = datetime.utcnow()
+        else:
+            new_status = OrderEmployeeStatus(
+                order_id=str(order_id),
+                status_id=done_status.id,
+                note="تم التحديث من نسخة الطباعة"
+            )
+            db.session.add(new_status)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'تم تحديث الحالة بنجاح'})
+    
+    # للحالات الأخرى، نستخدم نظام الملاحظات
+    status_mapping = {
+        "قيد التنفيذ": "قيد التنفيذ",
+        "ملغى": "ملغى",
+        "لم يبدأ": "لم يبدأ"
+    }
+    
+    if status in status_mapping:
+        status_flag = status_mapping[status]
+        
+        # البحث عن ملاحظة موجودة أو إنشاء جديدة
+        existing_note = OrderStatusNote.query.filter_by(
+            order_id=str(order_id),
+            status_flag=status_flag
+        ).first()
+        
+        if existing_note:
+            existing_note.updated_at = datetime.utcnow()
+        else:
+            new_note = OrderStatusNote(
+                order_id=str(order_id),
+                status_flag=status_flag,
+                note="تم التحديث من نسخة الطباعة",
+                employee_id=employee.id
+            )
+            db.session.add(new_note)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'تم تحديث الحالة بنجاح'})
+    
+    return jsonify({'success': False, 'error': 'حالة غير معروفة'}), 400

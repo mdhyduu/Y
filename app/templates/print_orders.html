@@ -399,16 +399,30 @@
             loadSavedStatuses();
             
             // إضافة مستمعين للأزرار
-            document.querySelectorAll('.save-status-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const orderId = this.dataset.orderId;
-                    const statusSelect = document.querySelector(`.custom-status-select[data-order-id="${orderId}"]`);
-                    const status = statusSelect.value;
-                    
+
+document.querySelectorAll('.save-status-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const orderId = this.dataset.orderId;
+        const statusSelect = document.querySelector(`.custom-status-select[data-order-id="${orderId}"]`);
+        const status = statusSelect.value;
+        
+        if (navigator.onLine) {
+            // إذا كان هناك اتصال، أرسل إلى الخادم مباشرة
+            syncStatusWithServer(orderId, status)
+                .then(() => {
+                    const saveBtn = document.querySelector(`.save-status-btn[data-order-id="${orderId}"]`);
+                    saveBtn.textContent = 'تم المزامنة';
+                })
+                .catch(error => {
+                    // إذا فشلت المحاولة، احفظ محلياً
                     saveStatusLocally(orderId, status);
                 });
-            });
-            
+        } else {
+            // إذا لم يكن هناك اتصال، احفظ محلياً
+            saveStatusLocally(orderId, status);
+        }
+    });
+});
             // تحديث الحالة تلقائياً عند التغيير (اختياري)
             document.querySelectorAll('.custom-status-select').forEach(select => {
                 select.addEventListener('change', function() {
@@ -441,72 +455,81 @@
         }
         
         // دالة لحفظ الحالة محلياً
-        function saveStatusLocally(orderId, status) {
-            // تحميل الحالات الحالية
+
+// دالة لحفظ الحالة محلياً
+function saveStatusLocally(orderId, status) {
+    const savedStatuses = JSON.parse(localStorage.getItem('orderStatuses') || '{}');
+    savedStatuses[orderId] = status;
+    localStorage.setItem('orderStatuses', JSON.stringify(savedStatuses));
+    
+    // تحديث الواجهة
+    const saveBtn = document.querySelector(`.save-status-btn[data-order-id="${orderId}"]`);
+    saveBtn.classList.add('saved');
+    saveBtn.textContent = 'تم الحفظ';
+}
+
+// دالة لمزامنة الحالة مع الخادم
+function syncStatusWithServer(orderId, status) {
+    return fetch(`/orders/${orderId}/update_print_status`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            status: status
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // إزالة الحالة من التخزين المحلي بعد المزامنة الناجحة
             const savedStatuses = JSON.parse(localStorage.getItem('orderStatuses') || '{}');
-            
-            // تحديث الحالة
-            savedStatuses[orderId] = status;
-            
-            // حفظ التغييرات
+            delete savedStatuses[orderId];
             localStorage.setItem('orderStatuses', JSON.stringify(savedStatuses));
             
-            // تحديث الواجهة
-            const saveBtn = document.querySelector(`.save-status-btn[data-order-id="${orderId}"]`);
-            saveBtn.classList.add('saved');
-            saveBtn.textContent = 'تم الحفظ';
-            
-            // محاولة المزامنة مع الخادم إذا كان هناك اتصال
-            if (navigator.onLine) {
-                syncStatusWithServer(orderId, status);
-            }
+            return true;
         }
-        
-        // دلة لمزامنة الحالة مع الخادم (للتطوير المستقبلي)
-        function syncStatusWithServer(orderId, status) {
-            // سيتم تنفيذ هذه الوظيفة عندما يكون هناك اتصال بالإنترنت
-            // يمكنك إضافة كود AJAX هنا لإرسال البيانات إلى الخادم
-            console.log(`مزامنة حالة الطلب ${orderId}: ${status}`);
-            
-            // مثال على استخدام API افتراضي:
-            /*
-            fetch('/api/update-order-status', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    orderId: orderId,
-                    status: status
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    console.log('تم مزامنة الحالة مع الخادم');
-                }
+        throw new Error(data.error);
+    });
+}
+
+// مزامنة جميع الحالات المحفوظة عند الاتصال بالإنترنت
+function syncAllStatuses() {
+    const savedStatuses = JSON.parse(localStorage.getItem('orderStatuses') || '{}');
+    
+    Object.entries(savedStatuses).forEach(([orderId, status]) => {
+        syncStatusWithServer(orderId, status)
+            .then(() => {
+                console.log(`تم مزامنة حالة الطلب ${orderId}`);
             })
             .catch(error => {
-                console.error('خطأ في المزامنة:', error);
+                console.error(`فشل مزامنة الطلب ${orderId}:`, error);
             });
-            */
+    });
+}
+
+// الاستماع لتغيرات حالة الاتصال
+window.addEventListener('online', function() {
+    console.log('تم الاتصال بالإنترنت، جاري مزامنة الحالات...');
+    syncAllStatuses();
+});
+
+// تحميل الحالات المحفوظة عند بدء التشغيل
+document.addEventListener('DOMContentLoaded', function() {
+    const savedStatuses = JSON.parse(localStorage.getItem('orderStatuses') || '{}');
+    for (const orderId in savedStatuses) {
+        const select = document.querySelector(`.custom-status-select[data-order-id="${orderId}"]`);
+        if (select) {
+            select.value = savedStatuses[orderId];
         }
-        
-        // الاستماع لتغيرات حالة الاتصال
-        window.addEventListener('online', function() {
-            document.querySelector('.offline-indicator')?.remove();
-            
-            // محاولة مزامنة جميع الحالات المحفوظة عند العودة للاتصال
-            const savedStatuses = JSON.parse(localStorage.getItem('orderStatuses') || '{}');
-            for (const orderId in savedStatuses) {
-                syncStatusWithServer(orderId, savedStatuses[orderId]);
-            }
-        });
-        
-        window.addEventListener('offline', function() {
-            checkOnlineStatus();
-        });
-    </script>
+    }
+    
+    // إذا كان هناك اتصال بالإنترنت، قم بالمزامنة فوراً
+    if (navigator.onLine) {
+        syncAllStatuses();
+    }
+});
+</script>
     
     <!-- Font Awesome for icons -->
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
