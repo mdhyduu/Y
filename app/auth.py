@@ -40,11 +40,8 @@ def link_store():
     return response
 
 @auth_bp.route('/callback')
-@auth_bp.route('/callback/<int:store_id>')  # Add this line
 @login_required
-def callback(store_id=None):  # Add optional parameter
-    """معالجة رد سلة بعد المصادقة"""
-    # باقي الكود يبقى كما هو
+def callback():
     """معالجة رد سلة بعد المصادقة"""
     expected_state = request.cookies.get('oauth_state')
     state = request.args.get('state')
