@@ -609,7 +609,25 @@ def order_details(order_id):
 # orders/routes.py
 import hmac
 import hashlib
-
+def extract_store_id_from_webhook(webhook_data, webhook_version='2'):
+    """استخراج معرف المتجر من بيانات Webhook"""
+    try:
+        # الطريقة الصحيحة لاستخراج معرف المتجر من webhook Salla
+        merchant = webhook_data.get('merchant')
+        if merchant:
+            return str(merchant)
+        
+        # إذا لم يتوفر، نبحث في مكان آخر في البيانات
+        data = webhook_data.get('data', {}) if webhook_version == '2' else webhook_data
+        if 'store_id' in data:
+            return str(data['store_id'])
+        
+        # كحل أخير، نستخدم merchant من البيانات العلوية
+        return str(webhook_data.get('merchant'))
+        
+    except Exception as e:
+        current_app.logger.error(f"خطأ في استخراج معرف المتجر: {str(e)}")
+        return None
 # ... الكود الحالي ...
 from flask_wtf.csrf import CSRFProtect, CSRFError
 
@@ -620,10 +638,10 @@ def handle_order_creation(data, webhook_version='2'):
     try:
         if webhook_version == '2':
             order_data = data.get('data', {})
-            merchant_id = data.get('merchant')
+            merchant_id = extract_store_id_from_webhook(data, webhook_version)
         else:
             order_data = data
-            merchant_id = data.get('merchant_id')
+            merchant_id = extract_store_id_from_webhook(data, webhook_version)
         
         # تسجيل تفصيلي للبيانات الواردة للتصحيح
         logger.info(f"📋 بيانات Webhook الواردة: merchant_id={merchant_id}, order_data={order_data}")
@@ -637,12 +655,7 @@ def handle_order_creation(data, webhook_version='2'):
                 logger.error("❌ لا يمكن العثور على merchant_id في أي مكان في البيانات")
                 return False
         
-        # التحقق من أن merchant_id ليس سلسلة 'None'
-        if merchant_id == 'None':
-            logger.error("❌ merchant_id هو سلسلة 'None' غير صالحة")
-            return False
-            
-        # تحويل merchant_id إلى integer مع التعامل مع الأخطاء
+        # الباقي من الكود الأصلي...
         try:
             merchant_id_int = int(merchant_id)
         except (ValueError, TypeError) as e:
