@@ -632,7 +632,6 @@ def extract_store_id_from_webhook(webhook_data, webhook_version='2'):
 from flask_wtf.csrf import CSRFProtect, CSRFError
 
 csrf = CSRFProtect()
-# إضافة هذه الدالة في بداية الملف بعد الواردات
 def handle_order_creation(data, webhook_version='2'):
     """معالجة إنشاء طلب جديد من Webhook"""
     try:
@@ -651,9 +650,9 @@ def handle_order_creation(data, webhook_version='2'):
             logger.error("❌ قيمة merchant_id غير موجودة أو غير صالحة في بيانات Webhook")
             
             # البحث عن أي مستخدم مرتبط بسلة له store_id
-            # التصحيح: استخدام العمود الحقيقي في قاعدة البيانات بدلاً من الخاصية
+            # التصحيح: استخدام العمود الحقيقي _salla_access_token بدلاً من الخاصية
             user_with_salla = User.query.filter(
-                User._salla_access_token.isnot(None),  # استخدام العمود الحقيقي
+                User._salla_access_token.isnot(None),
                 User.store_id.isnot(None)
             ).first()
             
@@ -672,7 +671,7 @@ def handle_order_creation(data, webhook_version='2'):
             
             # البحث عن أي مستخدم مرتبط بسلة
             user_with_salla = User.query.filter(
-                User._salla_access_token.isnot(None),  # استخدام العمود الحقيقي
+                User._salla_access_token.isnot(None),
                 User.store_id.isnot(None)
             ).first()
             
@@ -702,7 +701,7 @@ def handle_order_creation(data, webhook_version='2'):
             
             # استخدام أول مستخدم مرتبط بسلة كبديل
             user_with_salla = User.query.filter(
-                User._salla_access_token.isnot(None),  # استخدام العمود الحقيقي
+                User._salla_access_token.isnot(None),
                 User.store_id.isnot(None)
             ).first()
             
