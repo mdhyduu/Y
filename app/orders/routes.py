@@ -707,12 +707,11 @@ def handle_order_creation(data, webhook_version='2'):
         db.session.rollback()
         logger.error(f"خطأ في إنشاء الطلب من Webhook: {str(e)}", exc_info=True)
         return False
+        
 @orders_bp.route('/webhook/order_status', methods=['POST'])
-@csrf.exempt  # هذا هو الحل المباشر
+@csrf.exempt
 def order_status_webhook():
-    # ... الكود السابق
     """Webhook لاستقبال تحديثات حالة الطلبات من سلة - متوافق مع الإصدار v2"""
-    # إضافة في بداية الدالة
     logger.info(f"📨 Webhook received - Headers: {dict(request.headers)}")
     logger.info(f"📨 Webhook received - Body: {request.get_data(as_text=True)}")
     setattr(request, "_dont_enforce_csrf", True)
@@ -754,7 +753,7 @@ def order_status_webhook():
             # هيكل الإصدار v2 - كما في البيانات التي أرسلتها
             event = data.get('event')
             webhook_data = data.get('data', {})
-            merchant_id = data.get('merchant')  # ملاحظة: المفتاح هو merchant وليس merchant_id
+            merchant_id = data.get('merchant')
             
             # تسجيل معلومات التصحيح
             logger.info(f"📥 Webhook v2 received: {event} for merchant {merchant_id}")
@@ -770,10 +769,19 @@ def order_status_webhook():
             # هيكل الإصدار v1
             event = data.get('event')
             order_data = data.get('data', {})
+            merchant_id = order_data.get('merchant_id')
             logger.info(f"📥 Webhook v1 received: {event}")
 
-        # معالجة كلا النوعين من الأحداث
-        if event in ['order.status.updated', 'order.updated'] and order_data:
+        # معالجة الأحداث المختلفة
+        if event == 'order.created' and order_data:
+            # معالجة إنشاء طلب جديد
+            success = handle_order_creation(data if webhook_version == '2' else order_data, webhook_version)
+            if success:
+                logger.info(f'✅ تم إنشاء الطلب {order_data.get("id")} من Webhook')
+            else:
+                logger.error(f'❌ فشل في إنشاء الطلب {order_data.get("id")} من Webhook')
+            
+        elif event in ['order.status.updated', 'order.updated'] and order_data:
             order_id = str(order_data.get('id'))
             
             # استخراج بيانات الحالة بناءً على نوع الحدث
