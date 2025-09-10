@@ -643,12 +643,17 @@ def handle_order_creation(data, webhook_version='2'):
             order_data = data
             merchant_id = data.get('merchant_id')
         
-        # إذا لم يكن merchant_id موجوداً، نستخدم store_id من المستخدم الرئيسي
+        # تسجيل تفصيلي للبيانات الواردة للتصحيح
+        logger.info(f"📋 بيانات Webhook الواردة: merchant_id={merchant_id}, order_data={order_data}")
+        
+        # إذا لم يكن merchant_id موجوداً أو غير صالح
         if merchant_id is None or str(merchant_id).lower() in ['none', 'null', 'undefined']:
-            # البحث عن أي مستخدم مرتبط بسلة
+            logger.error("❌ قيمة merchant_id غير موجودة أو غير صالحة في بيانات Webhook")
+            
+            # البحث عن أي مستخدم مرتبط بسلة له store_id
             user_with_salla = User.query.filter(
-                User.salla_access_token.isnot(None),
-                User.store_id.isnot(None)
+                User.salla_access_token.isnot(None),  # التصحيح هنا: استخدام None بدلاً من null()
+                User.store_id.isnot(None)  # التصحيح هنا أيضاً
             ).first()
             
             if user_with_salla:
@@ -663,9 +668,20 @@ def handle_order_creation(data, webhook_version='2'):
             store_id = int(merchant_id)
         except (ValueError, TypeError) as e:
             logger.error(f"❌ لا يمكن تحويل merchant_id إلى store_id: {merchant_id}, الخطأ: {e}")
-            return False
+            
+            # البحث عن أي مستخدم مرتبط بسلة
+            user_with_salla = User.query.filter(
+                User.salla_access_token.isnot(None),
+                User.store_id.isnot(None)
+            ).first()
+            
+            if user_with_salla:
+                store_id = user_with_salla.store_id
+                logger.info(f"⚠️ استخدام store_id من المستخدم بعد فشل التحويل: {store_id}")
+            else:
+                logger.error("❌ لا يوجد مستخدمين مرتبطين بسلة")
+                return False
         
-        # الباقي من الكود مع استخدام store_id بدلاً من merchant_id
         order_id = str(order_data.get('id'))
         if not order_id:
             logger.error("❌ بيانات الطلب لا تحتوي على ID")
@@ -743,7 +759,7 @@ def handle_order_creation(data, webhook_version='2'):
         # إنشاء الطلب الجديد
         new_order = SallaOrder(
             id=order_id,
-            store_id=store_id,  # استخدام store_id هنا
+            store_id=store_id,
             customer_name=customer_name,
             created_at=created_at or datetime.utcnow(),
             total_amount=total_amount,
