@@ -612,11 +612,23 @@ import hashlib
 def extract_store_id_from_webhook(webhook_data):
     """استخراج معرف المتجر من Webhook (خاص بسلة)"""
     try:
+        logger.info(f"📦 بيانات Webhook كاملة: {webhook_data}")
+        
+        # الأولوية للمفتاح الأساسي
         store_id = webhook_data.get("merchant")
         if store_id:
+            logger.info(f"✅ تم العثور على معرف المتجر من 'merchant': {store_id}")
             return str(store_id)
         
-        # لو صار أي شيء غير متوقع
+        # fallback داخل data.store
+        data_obj = webhook_data.get("data", {})
+        store_obj = data_obj.get("store", {}) if isinstance(data_obj, dict) else {}
+        
+        for key in ["id", "store_id"]:
+            if key in store_obj and store_obj[key]:
+                logger.info(f"✅ تم العثور على معرف المتجر من 'data.store.{key}': {store_obj[key]}")
+                return str(store_obj[key])
+        
         logger.warning("❌ لم يتم العثور على معرف المتجر في Webhook من سلة")
         return None
     except Exception as e:
