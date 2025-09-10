@@ -610,49 +610,24 @@ def order_details(order_id):
 import hmac
 import hashlib
 def extract_store_id_from_webhook(webhook_data):
-    """
-    استخراج store_id من بيانات الويب هوك مع دعم متعدد للمصادر
-    وتحويل جميع القيم إلى string لتتوافق مع نظامنا
-    """
-    logger.info(f"🔍 تحليل بيانات الويب هوك لاستخراج store_id")
-    
-    # المحاولة 1: من merchant المباشر (الإصدار v2)
-    merchant_id = webhook_data.get('merchant')
-    if merchant_id is not None:
-        logger.info(f"✅ تم العثور على merchant مباشر: {merchant_id}")
-        return str(merchant_id)  # تحويل إلى string
-
-    # المحاولة 2: من داخل data.merchant (بعض الإصدارات)
-    data = webhook_data.get('data', {})
-    merchant_id = data.get('merchant')
-    if merchant_id is not None:
-        logger.info(f"✅ تم العثور على merchant داخل data: {merchant_id}")
-        return str(merchant_id)  # تحويل إلى string
-
-    # المحاولة 3: من data.store_id
-    store_id = data.get('store_id')
-    if store_id is not None:
-        logger.info(f"✅ تم العثور على store_id داخل data: {store_id}")
-        return str(store_id)  # تأكد أنه string
-
-    # المحاولة 4: من data.merchant_id (للإصدارات القديمة)
-    merchant_id = data.get('merchant_id')
-    if merchant_id is not None:
-        logger.info(f"✅ تم العثور على merchant_id داخل data: {merchant_id}")
-        return str(merchant_id)  # تحويل إلى string
-
-    # Fallback: استخدام أول متجر مرتبط بسلة
-    user_with_salla = User.query.filter(
-        User._salla_access_token.isnot(None),
-        User.store_id.isnot(None)
-    ).first()
-    
-    if user_with_salla:
-        logger.warning(f"⚠️ استخدام store_id من المستخدم الرئيسي: {user_with_salla.store_id}")
-        return str(user_with_salla.store_id)  # تأكد أنه string
-
-    logger.error("❌ فشل في استخراج store_id من أي مصدر")
-    return None
+    """استخراج معرف المتجر من بيانات Webhook"""
+    try:
+        # الطريقة الصحيحة لاستخراج معرف المتجر من webhook Salla
+        merchant = webhook_data.get('merchant')
+        if merchant:
+            return str(merchant)
+        
+        # إذا لم يتوفر، نبحث في مكان آخر في البيانات
+        data = webhook_data.get('data', {})
+        if 'store_id' in data:
+            return str(data['store_id'])
+        
+        # كحل أخير، نستخدم merchant من البيانات العلوية
+        return str(webhook_data.get('merchant'))
+        
+    except Exception as e:
+        current_app.logger.error(f"خطأ في استخراج معرف المتجر: {str(e)}")
+        return None
 from flask_wtf.csrf import CSRFProtect, CSRFError
 
 csrf = CSRFProtect()
