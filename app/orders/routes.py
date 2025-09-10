@@ -612,18 +612,35 @@ import hashlib
 def extract_store_id_from_webhook(webhook_data):
     """استخراج معرف المتجر من بيانات Webhook"""
     try:
-        # الطريقة الصحيحة لاستخراج معرف المتجر من webhook Salla
+        # حاول استخراج المعرف من أماكن متعددة
         merchant = webhook_data.get('merchant')
         if merchant:
             return str(merchant)
         
-        # إذا لم يتوفر، نبحث في مكان آخر في البيانات
+        merchant_id = webhook_data.get('merchant_id')
+        if merchant_id:
+            return str(merchant_id)
+        
+        # بحث في nested data
         data = webhook_data.get('data', {})
         if 'store_id' in data:
             return str(data['store_id'])
         
-        # كحل أخير، نستخدم merchant من البيانات العلوية
-        return str(webhook_data.get('merchant'))
+        merchant_in_data = data.get('merchant')
+        if merchant_in_data:
+            return str(merchant_in_data)
+        
+        merchant_id_in_data = data.get('merchant_id')
+        if merchant_id_in_data:
+            return str(merchant_id_in_data)
+        
+        # كحل أخير، ابحث في أي مكان محتمل
+        for key in ['store_id', 'merchant', 'merchant_id']:
+            if key in webhook_data:
+                return str(webhook_data[key])
+                
+        logger.warning("⚠️ لم يتم العثور على معرف المتجر في بيانات الويب هوك")
+        return None
         
     except Exception as e:
         current_app.logger.error(f"خطأ في استخراج معرف المتجر: {str(e)}")
