@@ -610,30 +610,80 @@ def order_details(order_id):
 import hmac
 import hashlib
 def extract_store_id_from_webhook(webhook_data):
-    """استخراج معرف المتجر من Webhook (خاص بسلة)"""
+    """استخراج معرف المتجر من بيانات Webhook - الإصدار النهائي"""
     try:
-        logger.info(f"📦 بيانات Webhook كاملة: {webhook_data}")
+        # تسجيل بنية البيانات للتصحيح
+        logger.info(f"🔍 تحليل بنية Webhook: المفاتيح الموجودة: {list(webhook_data.keys())}")
         
-        # الأولوية للمفتاح الأساسي
-        store_id = webhook_data.get("merchant")
-        if store_id:
-            logger.info(f"✅ تم العثور على معرف المتجر من 'merchant': {store_id}")
-            return str(store_id)
+        # البحث في المواقع الأكثر شيوعاً أولاً
+        if 'merchant' in webhook_data and webhook_data['merchant'] is not None:
+            store_id = str(webhook_data['merchant'])
+            logger.info(f"✅ تم العثور على معرف المتجر في 'merchant': {store_id}")
+            return store_id
+            
+        if 'merchant_id' in webhook_data and webhook_data['merchant_id'] is not None:
+            store_id = str(webhook_data['merchant_id'])
+            logger.info(f"✅ تم العثور على معرف المتجر في 'merchant_id': {store_id}")
+            return store_id
+            
+        if 'store_id' in webhook_data and webhook_data['store_id'] is not None:
+            store_id = str(webhook_data['store_id'])
+            logger.info(f"✅ تم العثور على معرف المتجر في 'store_id': {store_id}")
+            return store_id
         
-        # fallback داخل data.store
-        data_obj = webhook_data.get("data", {})
-        store_obj = data_obj.get("store", {}) if isinstance(data_obj, dict) else {}
+        # البحث داخل كائن data إذا وجد
+        if 'data' in webhook_data and isinstance(webhook_data['data'], dict):
+            data_obj = webhook_data['data']
+            
+            if 'merchant' in data_obj and data_obj['merchant'] is not None:
+                store_id = str(data_obj['merchant'])
+                logger.info(f"✅ تم العثور على معرف المتجر في 'data.merchant': {store_id}")
+                return store_id
+                
+            if 'merchant_id' in data_obj and data_obj['merchant_id'] is not None:
+                store_id = str(data_obj['merchant_id'])
+                logger.info(f"✅ تم العثور على معرف المتجر في 'data.merchant_id': {store_id}")
+                return store_id
+                
+            if 'store_id' in data_obj and data_obj['store_id'] is not None:
+                store_id = str(data_obj['store_id'])
+                logger.info(f"✅ تم العثور على معرف المتجر في 'data.store_id': {store_id}")
+                return store_id
         
-        for key in ["id", "store_id"]:
-            if key in store_obj and store_obj[key]:
-                logger.info(f"✅ تم العثور على معرف المتجر من 'data.store.{key}': {store_obj[key]}")
-                return str(store_obj[key])
+        # إذا لم نجد في أي مكان، نبحث بشكل متعمق
+        def deep_find(obj, key):
+            """الببحث المتعمق عن مفتاح في أي مستوى من الكائن"""
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    if k == key and v is not None:
+                        return v
+                    if isinstance(v, (dict, list)):
+                        result = deep_find(v, key)
+                        if result is not None:
+                            return result
+            elif isinstance(obj, list):
+                for item in obj:
+                    result = deep_find(item, key)
+                    if result is not None:
+                        return result
+            return None
         
-        logger.warning("❌ لم يتم العثور على معرف المتجر في Webhook من سلة")
+        # البحث عن أي من المفاتيح المحتملة
+        for key in ['merchant', 'merchant_id', 'store_id']:
+            value = deep_find(webhook_data, key)
+            if value is not None:
+                store_id = str(value)
+                logger.info(f"✅ تم العثور على معرف المتجر بالبحث المتعمق في '{key}': {store_id}")
+                return store_id
+        
+        logger.warning("❌ لم يتم العثور على معرف المتجر في أي من المواقع المتوقعة")
+        logger.debug(f"بيانات الويب هوك كاملة: {json.dumps(webhook_data, ensure_ascii=False)}")
         return None
+        
     except Exception as e:
-        logger.error(f"❌ خطأ في استخراج معرف المتجر من Webhook سلة: {str(e)}", exc_info=True)
+        logger.error(f"❌ خطأ في استخراج معرف المتجر: {str(e)}", exc_info=True)
         return None
+        
 from flask_wtf.csrf import CSRFProtect, CSRFError
 
 csrf = CSRFProtect()
