@@ -625,6 +625,11 @@ def handle_order_creation(data, webhook_version='2'):
             order_data = data
             merchant_id = data.get('merchant_id')
         
+        # التحقق من وجود merchant_id صالح
+        if merchant_id is None:
+            logger.error("قيمة merchant_id غير موجودة في بيانات Webhook")
+            return False
+            
         order_id = str(order_data.get('id'))
         if not order_id:
             logger.error("بيانات الطلب لا تحتوي على ID")
@@ -636,11 +641,27 @@ def handle_order_creation(data, webhook_version='2'):
             logger.info(f"الطلب موجود بالفعل: {order_id}")
             return True
         
-        # البحث عن المستخدم بناءً على merchant_id
-        user = User.query.filter_by(store_id=str(merchant_id)).first()
+        # البحث عن المستخدم بناءً على merchant_id - التأكد من أن merchant_id صالح
+        try:
+            merchant_id_int = int(merchant_id)
+            user = User.query.filter_by(store_id=merchant_id_int).first()
+        except (ValueError, TypeError):
+            logger.error(f"قيمة merchant_id غير صالحة: {merchant_id}")
+            return False
+        
         if not user:
             logger.error(f"لم يتم العثور على مستخدم للمتجر: {merchant_id}")
-            return False
+            
+            # الطريقة البديلة: جلب أول مستخدم مرتبط بـ Salla
+            user = User.query.filter(
+                User.salla_access_token.isnot(None)
+            ).first()
+            
+            if not user:
+                logger.error("لا يوجد مستخدمين مرتبطين بـ Salla")
+                return False
+                
+            logger.info(f"تم استخدام مستخدم بديل: {user.id}")
         
         # استخراج بيانات الطلب
         created_at = None
@@ -711,7 +732,7 @@ def handle_order_creation(data, webhook_version='2'):
 @orders_bp.route('/webhook/order_status', methods=['POST'])
 @csrf.exempt
 def order_status_webhook():
-    """Webhook لاستقبال تحديثات حالة الطلبات من سلة - متوافق مع الإصدار v2"""
+    """Webhook لاستقبال تحديثات حالة الطلبات من سلة"""
     logger.info(f"📨 Webhook received - Headers: {dict(request.headers)}")
     logger.info(f"📨 Webhook received - Body: {request.get_data(as_text=True)}")
     setattr(request, "_dont_enforce_csrf", True)
@@ -755,11 +776,22 @@ def order_status_webhook():
             webhook_data = data.get('data', {})
             merchant_id = data.get('merchant')
             
+            # التحقق من وجود merchant_id
+            if merchant_id is None:
+                logger.error("Webhook لا يحتوي على merchant_id")
+                return jsonify({'success': False, 'error': 'لا يوجد معرف متجر'}), 400
+            
             # تسجيل معلومات التصحيح
             logger.info(f"📥 Webhook v2 received: {event} for merchant {merchant_id}")
             
             # التأكد من أن الحدث مخصص لهذا المتجر
-            user = User.query.filter_by(store_id=str(merchant_id)).first()
+            try:
+                merchant_id_int = int(merchant_id)
+                user = User.query.filter_by(store_id=merchant_id_int).first()
+            except (ValueError, TypeError):
+                logger.error(f"قيمة merchant_id غير صالحة: {merchant_id}")
+                return jsonify({'success': False, 'error': 'معرف متجر غير صالح'}), 400
+                
             if not user:
                 logger.warning(f"⚠️ Webhook for unknown merchant: {merchant_id}")
                 return jsonify({'success': False, 'error': 'متجر غير معروف'}), 404
@@ -814,5 +846,5 @@ def order_status_webhook():
         return jsonify({'success': True, 'message': 'تم استقبال البيانات بنجاح'}), 200
 
     except Exception as e:
-        logger.error(f'❌ خطأ في معالجة webhook: {str(e)}', exc_info=True)
+        logger.error(f'❌ خطأ في معالجة webhook: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
