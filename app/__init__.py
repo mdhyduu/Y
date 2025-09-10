@@ -84,7 +84,7 @@ def create_app():
     app.register_blueprint(auth_bp)
     
 
-    csrf.exempt(orders_bp)
+
     app.register_blueprint(orders_bp)
     
     app.register_blueprint(categories_bp)
