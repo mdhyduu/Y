@@ -638,30 +638,58 @@ def handle_order_creation(data, webhook_version='2'):
     try:
         if webhook_version == '2':
             order_data = data.get('data', {})
-            merchant_id = extract_store_id_from_webhook(data, webhook_version)
+            merchant_id = data.get('merchant')
         else:
             order_data = data
-            merchant_id = extract_store_id_from_webhook(data, webhook_version)
+            merchant_id = data.get('merchant_id')
         
         # تسجيل تفصيلي للبيانات الواردة للتصحيح
         logger.info(f"📋 بيانات Webhook الواردة: merchant_id={merchant_id}, order_data={order_data}")
         
-        # التحقق من وجود merchant_id صالح
-        if merchant_id is None:
-            logger.error("❌ قيمة merchant_id غير موجودة في بيانات Webhook")
+        # التحقق من وجود merchant_id صالح (ليس None وليس سلسلة 'None')
+        if merchant_id is None or str(merchant_id).lower() == 'none':
+            logger.error("❌ قيمة merchant_id غير موجودة أو غير صالحة في بيانات Webhook")
+            
             # محاولة استخراج merchant_id من مصادر بديلة
             merchant_id = order_data.get('merchant') or order_data.get('store_id')
-            if merchant_id is None:
+            
+            # إذا كان لا يزال غير صالح، نستخدم المستخدم البديل
+            if merchant_id is None or str(merchant_id).lower() == 'none':
                 logger.error("❌ لا يمكن العثور على merchant_id في أي مكان في البيانات")
-                return False
+                
+                # الطريقة البديلة: جلب أول مستخدم مرتبط بـ Salla
+                user = User.query.filter(
+                    User.salla_access_token.isnot(None),
+                    User.store_id.isnot(None)
+                ).first()
+                
+                if not user:
+                    logger.error("❌ لا يوجد مستخدمين مرتبطين بـ Salla")
+                    return False
+                    
+                logger.info(f"⚠️ تم استخدام مستخدم بديل: {user.id} للمتجر {user.store_id}")
+                merchant_id = user.store_id  # استخدام store_id الخاص بالمستخدم البديل
         
-        # الباقي من الكود الأصلي...
+        # تحويل merchant_id إلى integer مع التعامل مع الأخطاء
         try:
             merchant_id_int = int(merchant_id)
         except (ValueError, TypeError) as e:
             logger.error(f"❌ لا يمكن تحويل merchant_id إلى integer: {merchant_id}, الخطأ: {e}")
-            return False
+            
+            # الطريقة البديلة: جلب أول مستخدم مرتبط بـ Salla
+            user = User.query.filter(
+                User.salla_access_token.isnot(None),
+                User.store_id.isnot(None)
+            ).first()
+            
+            if not user:
+                logger.error("❌ لا يوجد مستخدمين مرتبطين بـ Salla")
+                return False
+                
+            logger.info(f"⚠️ تم استخدام مستخدم بديل بعد فشل التحويل: {user.id} للمتجر {user.store_id}")
+            merchant_id_int = user.store_id  # استخدام store_id الخاص بالمستخدم البديل
         
+        # الباقي من الكود الأصلي...
         order_id = str(order_data.get('id'))
         if not order_id:
             logger.error("❌ بيانات الطلب لا تحتوي على ID")
@@ -692,6 +720,7 @@ def handle_order_creation(data, webhook_version='2'):
             logger.info(f"⚠️ تم استخدام مستخدم بديل: {user.id} للمتجر {user.store_id}")
             merchant_id_int = user.store_id  # استخدام store_id الخاص بالمستخدم البديل
         
+        # الباقي من الكود الأصلي...        
         # استخراج بيانات الطلب
         created_at = None
         date_info = order_data.get('date', {})
