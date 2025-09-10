@@ -927,3 +927,6 @@ def order_status_webhook():
     except Exception as e:
         logger.error(f'❌ خطأ في معالجة webhook: {str(e)}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        # إغلاق اتصال قاعدة البيانات
+        db.session.close()

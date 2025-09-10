@@ -466,7 +466,9 @@ def handle_order_status_webhook():
     except Exception as e:
         current_app.logger.error(f"خطأ في معالجة Webhook: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': 'Internal server error'}), 500
-
+    finally:
+        # إغلاق اتصال قاعدة البيانات
+        db.session.close()
 def handle_order_status_update(data):
     """معالجة تحديث حالة الطلب"""
     try:
