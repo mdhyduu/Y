@@ -651,9 +651,10 @@ def handle_order_creation(data, webhook_version='2'):
             logger.error("❌ قيمة merchant_id غير موجودة أو غير صالحة في بيانات Webhook")
             
             # البحث عن أي مستخدم مرتبط بسلة له store_id
+            # التصحيح: استخدام العمود الحقيقي في قاعدة البيانات بدلاً من الخاصية
             user_with_salla = User.query.filter(
-                User.salla_access_token.isnot(None),  # التصحيح هنا: استخدام None بدلاً من null()
-                User.store_id.isnot(None)  # التصحيح هنا أيضاً
+                User._salla_access_token.isnot(None),  # استخدام العمود الحقيقي
+                User.store_id.isnot(None)
             ).first()
             
             if user_with_salla:
@@ -671,7 +672,7 @@ def handle_order_creation(data, webhook_version='2'):
             
             # البحث عن أي مستخدم مرتبط بسلة
             user_with_salla = User.query.filter(
-                User.salla_access_token.isnot(None),
+                User._salla_access_token.isnot(None),  # استخدام العمود الحقيقي
                 User.store_id.isnot(None)
             ).first()
             
@@ -701,7 +702,7 @@ def handle_order_creation(data, webhook_version='2'):
             
             # استخدام أول مستخدم مرتبط بسلة كبديل
             user_with_salla = User.query.filter(
-                User.salla_access_token.isnot(None),
+                User._salla_access_token.isnot(None),  # استخدام العمود الحقيقي
                 User.store_id.isnot(None)
             ).first()
             
