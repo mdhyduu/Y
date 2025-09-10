@@ -610,36 +610,18 @@ def order_details(order_id):
 import hmac
 import hashlib
 def extract_store_id_from_webhook(webhook_data):
-    """إصدار محسن لأداء أفضل"""
-    # تحقق من المسارات الشائعة أولاً بشكل سريع
-    paths_to_check = [
-        ['merchant'],
-        ['merchant_id'],
-        ['store_id'],
-        ['data', 'merchant'],
-        ['data', 'merchant_id'],
-        ['data', 'store_id']
-    ]
-    
-    for path in paths_to_check:
-        value = get_nested_value(webhook_data, path)
-        if value is not None:
-            current_app.logger.info(f"✅ Found store ID at {path}: {value}")
-            return str(value)
-    
-    # إذا لم يتم العثور، نعيد None بدلاً من البحث المتعمق المكلف
-    current_app.logger.warning("❌ Store ID not found in common paths")
-    return None
-
-def get_nested_value(data, path):
-    """الحصول على قيمة متداخلة بأقل تكلفة"""
-    current = data
-    for key in path:
-        if isinstance(current, dict) and key in current:
-            current = current[key]
-        else:
-            return None
-    return current        
+    """استخراج معرف المتجر من Webhook (خاص بسلة)"""
+    try:
+        store_id = webhook_data.get("merchant")
+        if store_id:
+            return str(store_id)
+        
+        # لو صار أي شيء غير متوقع
+        logger.warning("❌ لم يتم العثور على معرف المتجر في Webhook من سلة")
+        return None
+    except Exception as e:
+        logger.error(f"❌ خطأ في استخراج معرف المتجر من Webhook سلة: {str(e)}", exc_info=True)
+        return None
 from flask_wtf.csrf import CSRFProtect, CSRFError
 
 csrf = CSRFProtect()
