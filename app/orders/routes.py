@@ -612,6 +612,7 @@ import hashlib
 def extract_store_id_from_webhook(webhook_data):
     """
     استخراج store_id من بيانات الويب هوك مع دعم متعدد للمصادر
+    وتحويله إلى string لتتوافق مع نظامنا
     """
     logger.info(f"🔍 تحليل بيانات الويب هوك لاستخراج store_id: {webhook_data}")
     
@@ -619,26 +620,26 @@ def extract_store_id_from_webhook(webhook_data):
     merchant_id = webhook_data.get('merchant')
     if merchant_id and str(merchant_id).isdigit():
         logger.info(f"✅ تم العثور على merchant مباشر: {merchant_id}")
-        return int(merchant_id)
+        return str(merchant_id)  # تحويل إلى string
 
     # المحاولة 2: من داخل data.merchant (بعض الإصدارات)
     data = webhook_data.get('data', {})
     merchant_id = data.get('merchant')
     if merchant_id and str(merchant_id).isdigit():
         logger.info(f"✅ تم العثور على merchant داخل data: {merchant_id}")
-        return int(merchant_id)
+        return str(merchant_id)  # تحويل إلى string
 
     # المحاولة 3: من data.store_id
     store_id = data.get('store_id')
-    if store_id and str(store_id).isdigit():
+    if store_id:
         logger.info(f"✅ تم العثور على store_id داخل data: {store_id}")
-        return int(store_id)
+        return str(store_id)  # تأكد أنه string
 
     # المحاولة 4: من data.merchant_id (للإصدارات القديمة)
     merchant_id = data.get('merchant_id')
     if merchant_id and str(merchant_id).isdigit():
         logger.info(f"✅ تم العثور على merchant_id داخل data: {merchant_id}")
-        return int(merchant_id)
+        return str(merchant_id)  # تحويل إلى string
 
     # المحاولة 5: من order_data itself (للإصدارات القديمة)
     order_data = data.get('order', {})
@@ -646,7 +647,7 @@ def extract_store_id_from_webhook(webhook_data):
         merchant_id = order_data.get('merchant_id')
         if merchant_id and str(merchant_id).isdigit():
             logger.info(f"✅ تم العثور على merchant_id داخل order: {merchant_id}")
-            return int(merchant_id)
+            return str(merchant_id)  # تحويل إلى string
 
     # Fallback: استخدام أول متجر مرتبط بسلة
     user_with_salla = User.query.filter(
@@ -656,7 +657,7 @@ def extract_store_id_from_webhook(webhook_data):
     
     if user_with_salla:
         logger.warning(f"⚠️ استخدام store_id من المستخدم الرئيسي: {user_with_salla.store_id}")
-        return user_with_salla.store_id
+        return str(user_with_salla.store_id)  # تأكد أنه string
 
     logger.error("❌ فشل في استخراج store_id من أي مصدر")
     return None
@@ -679,7 +680,7 @@ def handle_order_creation(data, webhook_version='2'):
         logger.info(f"📋 بيانات Webhook الواردة: merchant_id={merchant_id}, order_data={order_data}")
 
         # استخراج store_id باستخدام الدالة المحسنة
-        store_id = extract_store_id_from_webhook(data if webhook_version == '2' else order_data)
+        store_id = extract_store_id_from_webhook(data)
         
         if store_id is None:
             logger.error("❌ لا يمكن تحديد متجر من بيانات Webhook")
