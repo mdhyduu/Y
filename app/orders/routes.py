@@ -643,53 +643,29 @@ def handle_order_creation(data, webhook_version='2'):
             order_data = data
             merchant_id = data.get('merchant_id')
         
-        # تسجيل تفصيلي للبيانات الواردة للتصحيح
-        logger.info(f"📋 بيانات Webhook الواردة: merchant_id={merchant_id}, order_data={order_data}")
-        
-        # التحقق من وجود merchant_id صالح (ليس None وليس سلسلة 'None')
-        if merchant_id is None or str(merchant_id).lower() == 'none':
-            logger.error("❌ قيمة merchant_id غير موجودة أو غير صالحة في بيانات Webhook")
-            
-            # محاولة استخراج merchant_id من مصادر بديلة
-            merchant_id = order_data.get('merchant') or order_data.get('store_id')
-            
-            # إذا كان لا يزال غير صالح، نستخدم المستخدم البديل
-            if merchant_id is None or str(merchant_id).lower() == 'none':
-                logger.error("❌ لا يمكن العثور على merchant_id في أي مكان في البيانات")
-                
-                # الطريقة البديلة: جلب أول مستخدم مرتبط بـ Salla
-                user = User.query.filter(
-                    User.salla_access_token.isnot(None),
-                    User.store_id.isnot(None)
-                ).first()
-                
-                if not user:
-                    logger.error("❌ لا يوجد مستخدمين مرتبطين بـ Salla")
-                    return False
-                    
-                logger.info(f"⚠️ تم استخدام مستخدم بديل: {user.id} للمتجر {user.store_id}")
-                merchant_id = user.store_id  # استخدام store_id الخاص بالمستخدم البديل
-        
-        # تحويل merchant_id إلى integer مع التعامل مع الأخطاء
-        try:
-            merchant_id_int = int(merchant_id)
-        except (ValueError, TypeError) as e:
-            logger.error(f"❌ لا يمكن تحويل merchant_id إلى integer: {merchant_id}, الخطأ: {e}")
-            
-            # الطريقة البديلة: جلب أول مستخدم مرتبط بـ Salla
-            user = User.query.filter(
+        # إذا لم يكن merchant_id موجوداً، نستخدم store_id من المستخدم الرئيسي
+        if merchant_id is None or str(merchant_id).lower() in ['none', 'null', 'undefined']:
+            # البحث عن أي مستخدم مرتبط بسلة
+            user_with_salla = User.query.filter(
                 User.salla_access_token.isnot(None),
                 User.store_id.isnot(None)
             ).first()
             
-            if not user:
-                logger.error("❌ لا يوجد مستخدمين مرتبطين بـ Salla")
+            if user_with_salla:
+                merchant_id = user_with_salla.store_id
+                logger.info(f"⚠️ استخدام store_id من المستخدم الرئيسي: {merchant_id}")
+            else:
+                logger.error("❌ لا يوجد مستخدمين مرتبطين بسلة في النظام")
                 return False
-                
-            logger.info(f"⚠️ تم استخدام مستخدم بديل بعد فشل التحويل: {user.id} للمتجر {user.store_id}")
-            merchant_id_int = user.store_id  # استخدام store_id الخاص بالمستخدم البديل
         
-        # الباقي من الكود الأصلي...
+        # تحويل merchant_id إلى integer (store_id)
+        try:
+            store_id = int(merchant_id)
+        except (ValueError, TypeError) as e:
+            logger.error(f"❌ لا يمكن تحويل merchant_id إلى store_id: {merchant_id}, الخطأ: {e}")
+            return False
+        
+        # الباقي من الكود مع استخدام store_id بدلاً من merchant_id
         order_id = str(order_data.get('id'))
         if not order_id:
             logger.error("❌ بيانات الطلب لا تحتوي على ID")
@@ -701,27 +677,26 @@ def handle_order_creation(data, webhook_version='2'):
             logger.info(f"✅ الطلب موجود بالفعل: {order_id}")
             return True
         
-        # البحث عن المستخدم بناءً على merchant_id
-        user = User.query.filter_by(store_id=merchant_id_int).first()
+        # البحث عن المستخدم بناءً على store_id
+        user = User.query.filter_by(store_id=store_id).first()
         
         if not user:
-            logger.error(f"❌ لم يتم العثور على مستخدم للمتجر: {merchant_id_int}")
+            logger.warning(f"⚠️ لم يتم العثور على مستخدم للمتجر: {store_id}")
             
-            # الطريقة البديلة: جلب أول مستخدم مرتبط بـ Salla
-            user = User.query.filter(
+            # استخدام أول مستخدم مرتبط بسلة كبديل
+            user_with_salla = User.query.filter(
                 User.salla_access_token.isnot(None),
                 User.store_id.isnot(None)
             ).first()
             
-            if not user:
-                logger.error("❌ لا يوجد مستخدمين مرتبطين بـ Salla")
+            if not user_with_salla:
+                logger.error("❌ لا يوجد مستخدمين مرتبطين بسلة")
                 return False
                 
-            logger.info(f"⚠️ تم استخدام مستخدم بديل: {user.id} للمتجر {user.store_id}")
-            merchant_id_int = user.store_id  # استخدام store_id الخاص بالمستخدم البديل
+            logger.info(f"⚠️ تم استخدام مستخدم بديل: {user_with_salla.id} للمتجر {user_with_salla.store_id}")
+            store_id = user_with_salla.store_id
         
-        # الباقي من الكود الأصلي...        
-        # استخراج بيانات الطلب
+        # الباقي من الكود مع استخدام store_id
         created_at = None
         date_info = order_data.get('date', {})
         if date_info and 'date' in date_info:
@@ -747,15 +722,15 @@ def handle_order_creation(data, webhook_version='2'):
         if status_info and 'id' in status_info:
             status_id = str(status_info['id'])
             # التحقق من وجود الحالة في قاعدة البيانات
-            status = OrderStatus.query.filter_by(id=status_id, store_id=merchant_id_int).first()
+            status = OrderStatus.query.filter_by(id=status_id, store_id=store_id).first()
             if not status:
                 status_id = None
-                logger.warning(f"⚠️ لم يتم العثور على الحالة {status_id} للمتجر {merchant_id_int}")
+                logger.warning(f"⚠️ لم يتم العثور على الحالة {status_id} للمتجر {store_id}")
         
         # إذا لم يكن هناك حالة، نستخدم الحالة الافتراضية
         if not status_id:
             default_status = OrderStatus.query.filter_by(
-                store_id=merchant_id_int, 
+                store_id=store_id, 
                 is_active=True
             ).order_by(OrderStatus.sort).first()
             
@@ -763,12 +738,12 @@ def handle_order_creation(data, webhook_version='2'):
                 status_id = default_status.id
                 logger.info(f"✅ استخدام الحالة الافتراضية: {status_id} للطلب {order_id}")
             else:
-                logger.warning(f"⚠️ لا توجد حالات طلب للمتجر {merchant_id_int}")
+                logger.warning(f"⚠️ لا توجد حالات طلب للمتجر {store_id}")
         
         # إنشاء الطلب الجديد
         new_order = SallaOrder(
             id=order_id,
-            store_id=merchant_id_int,
+            store_id=store_id,  # استخدام store_id هنا
             customer_name=customer_name,
             created_at=created_at or datetime.utcnow(),
             total_amount=total_amount,
@@ -781,13 +756,13 @@ def handle_order_creation(data, webhook_version='2'):
         db.session.add(new_order)
         db.session.commit()
         
-        logger.info(f"✅ تم إنشاء طلب جديد: {order_id} للمتجر {merchant_id_int}")
+        logger.info(f"✅ تم إنشاء طلب جديد: {order_id} للمتجر {store_id}")
         return True
         
     except Exception as e:
         db.session.rollback()
         logger.error(f"❌ خطأ في إنشاء الطلب من Webhook: {str(e)}", exc_info=True)
-        return False        
+        return False
 @orders_bp.route('/webhook/order_status', methods=['POST'])
 @csrf.exempt
 def order_status_webhook():
