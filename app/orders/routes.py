@@ -612,42 +612,34 @@ import hashlib
 def extract_store_id_from_webhook(webhook_data):
     """
     استخراج store_id من بيانات الويب هوك مع دعم متعدد للمصادر
-    وتحويله إلى string لتتوافق مع نظامنا
+    وتحويل جميع القيم إلى string لتتوافق مع نظامنا
     """
-    logger.info(f"🔍 تحليل بيانات الويب هوك لاستخراج store_id: {webhook_data}")
+    logger.info(f"🔍 تحليل بيانات الويب هوك لاستخراج store_id")
     
     # المحاولة 1: من merchant المباشر (الإصدار v2)
     merchant_id = webhook_data.get('merchant')
-    if merchant_id and str(merchant_id).isdigit():
+    if merchant_id is not None:
         logger.info(f"✅ تم العثور على merchant مباشر: {merchant_id}")
         return str(merchant_id)  # تحويل إلى string
 
     # المحاولة 2: من داخل data.merchant (بعض الإصدارات)
     data = webhook_data.get('data', {})
     merchant_id = data.get('merchant')
-    if merchant_id and str(merchant_id).isdigit():
+    if merchant_id is not None:
         logger.info(f"✅ تم العثور على merchant داخل data: {merchant_id}")
         return str(merchant_id)  # تحويل إلى string
 
     # المحاولة 3: من data.store_id
     store_id = data.get('store_id')
-    if store_id:
+    if store_id is not None:
         logger.info(f"✅ تم العثور على store_id داخل data: {store_id}")
         return str(store_id)  # تأكد أنه string
 
     # المحاولة 4: من data.merchant_id (للإصدارات القديمة)
     merchant_id = data.get('merchant_id')
-    if merchant_id and str(merchant_id).isdigit():
+    if merchant_id is not None:
         logger.info(f"✅ تم العثور على merchant_id داخل data: {merchant_id}")
         return str(merchant_id)  # تحويل إلى string
-
-    # المحاولة 5: من order_data itself (للإصدارات القديمة)
-    order_data = data.get('order', {})
-    if order_data:
-        merchant_id = order_data.get('merchant_id')
-        if merchant_id and str(merchant_id).isdigit():
-            logger.info(f"✅ تم العثور على merchant_id داخل order: {merchant_id}")
-            return str(merchant_id)  # تحويل إلى string
 
     # Fallback: استخدام أول متجر مرتبط بسلة
     user_with_salla = User.query.filter(
