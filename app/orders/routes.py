@@ -763,14 +763,21 @@ def handle_order_creation(data, webhook_version='2'):
         # البحث عن حالة الطلب الافتراضية
         status_id = None
         status_info = order_data.get('status', {})
-        if status_info and 'id' in status_info:
-            status_id = str(status_info['id'])
-            # التحقق من وجود الحالة في قاعدة البيانات
-            status = OrderStatus.query.filter_by(id=status_id, store_id=store_id).first()
-            if not status:
-                status_id = None
-                logger.warning(f"⚠️ لم يتم العثور على الحالة {status_id} للمتجر {store_id}")
-        
+        if status_info:
+            status_slug = status_info.get('slug', '').lower().replace('-', '_')
+            if not status_slug and status_info.get('name'):
+                status_slug = status_info['name'].lower().replace(' ', '_')
+            
+            status = OrderStatus.query.filter_by(
+                slug=status_slug,
+                store_id=store_id
+            ).first()
+            
+            if status:
+                status_id = status.id
+            else:
+                logger.warning(f"⚠️ لم يتم العثور على الحالة {status_slug} للمتجر {store_id}")
+                
         # إذا لم يكن هناك حالة، نستخدم الحالة الافتراضية
         if not status_id:
             default_status = OrderStatus.query.filter_by(
