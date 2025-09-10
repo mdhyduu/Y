@@ -610,74 +610,82 @@ def order_details(order_id):
 import hmac
 import hashlib
 def extract_store_id_from_webhook(webhook_data):
+    """
+    استخراج store_id من بيانات الويب هوك مع دعم متعدد للمصادر
+    """
+    logger.info(f"🔍 تحليل بيانات الويب هوك لاستخراج store_id: {webhook_data}")
+    
+    # المحاولة 1: من merchant المباشر (الإصدار v2)
     merchant_id = webhook_data.get('merchant')
     if merchant_id and str(merchant_id).isdigit():
+        logger.info(f"✅ تم العثور على merchant مباشر: {merchant_id}")
         return int(merchant_id)
 
+    # المحاولة 2: من داخل data.merchant (بعض الإصدارات)
     data = webhook_data.get('data', {})
-    if 'store_id' in data and str(data['store_id']).isdigit():
-        return int(data['store_id'])
+    merchant_id = data.get('merchant')
+    if merchant_id and str(merchant_id).isdigit():
+        logger.info(f"✅ تم العثور على merchant داخل data: {merchant_id}")
+        return int(merchant_id)
 
-    # fallback على المستخدم الرئيسي (لكن سجلها في الـ log)
+    # المحاولة 3: من data.store_id
+    store_id = data.get('store_id')
+    if store_id and str(store_id).isdigit():
+        logger.info(f"✅ تم العثور على store_id داخل data: {store_id}")
+        return int(store_id)
+
+    # المحاولة 4: من data.merchant_id (للإصدارات القديمة)
+    merchant_id = data.get('merchant_id')
+    if merchant_id and str(merchant_id).isdigit():
+        logger.info(f"✅ تم العثور على merchant_id داخل data: {merchant_id}")
+        return int(merchant_id)
+
+    # المحاولة 5: من order_data itself (للإصدارات القديمة)
+    order_data = data.get('order', {})
+    if order_data:
+        merchant_id = order_data.get('merchant_id')
+        if merchant_id and str(merchant_id).isdigit():
+            logger.info(f"✅ تم العثور على merchant_id داخل order: {merchant_id}")
+            return int(merchant_id)
+
+    # Fallback: استخدام أول متجر مرتبط بسلة
     user_with_salla = User.query.filter(
         User._salla_access_token.isnot(None),
         User.store_id.isnot(None)
     ).first()
-    return user_with_salla.store_id if user_with_salla else None
-# ... الكود الحالي ...
+    
+    if user_with_salla:
+        logger.warning(f"⚠️ استخدام store_id من المستخدم الرئيسي: {user_with_salla.store_id}")
+        return user_with_salla.store_id
+
+    logger.error("❌ فشل في استخراج store_id من أي مصدر")
+    return None
 from flask_wtf.csrf import CSRFProtect, CSRFError
 
 csrf = CSRFProtect()
 def handle_order_creation(data, webhook_version='2'):
     """معالجة إنشاء طلب جديد من Webhook"""
     try:
+        logger.info(f"🔍 بدء معالجة إنشاء طلب، الإصدار: {webhook_version}")
+
         if webhook_version == '2':
             order_data = data.get('data', {})
             merchant_id = data.get('merchant')
         else:
             order_data = data
             merchant_id = data.get('merchant_id')
-        
+
         # تسجيل تفصيلي للبيانات الواردة للتصحيح
         logger.info(f"📋 بيانات Webhook الواردة: merchant_id={merchant_id}, order_data={order_data}")
+
+        # استخراج store_id باستخدام الدالة المحسنة
+        store_id = extract_store_id_from_webhook(data if webhook_version == '2' else order_data)
         
-        # إذا لم يكن merchant_id موجوداً أو غير صالح
-        if merchant_id is None or str(merchant_id).lower() in ['none', 'null', 'undefined']:
-            logger.error("❌ قيمة merchant_id غير موجودة أو غير صالحة في بيانات Webhook")
-            
-            # البحث عن أي مستخدم مرتبط بسلة له store_id
-            # التصحيح: استخدام العمود الحقيقي _salla_access_token بدلاً من الخاصية
-            user_with_salla = User.query.filter(
-                User._salla_access_token.isnot(None),
-                User.store_id.isnot(None)
-            ).first()
-            
-            if user_with_salla:
-                merchant_id = user_with_salla.store_id
-                logger.info(f"⚠️ استخدام store_id من المستخدم الرئيسي: {merchant_id}")
-            else:
-                logger.error("❌ لا يوجد مستخدمين مرتبطين بسلة في النظام")
-                return False
+        if store_id is None:
+            logger.error("❌ لا يمكن تحديد متجر من بيانات Webhook")
+            return False
         
-        # تحويل merchant_id إلى integer (store_id)
-        try:
-            store_id = int(merchant_id)
-        except (ValueError, TypeError) as e:
-            logger.error(f"❌ لا يمكن تحويل merchant_id إلى store_id: {merchant_id}, الخطأ: {e}")
-            
-            # البحث عن أي مستخدم مرتبط بسلة
-            user_with_salla = User.query.filter(
-                User._salla_access_token.isnot(None),
-                User.store_id.isnot(None)
-            ).first()
-            
-            if user_with_salla:
-                store_id = user_with_salla.store_id
-                logger.info(f"⚠️ استخدام store_id من المستخدم بعد فشل التحويل: {store_id}")
-            else:
-                logger.error("❌ لا يوجد مستخدمين مرتبطين بسلة")
-                return False
-        
+        # الباقي من الكود كما هو...
         order_id = str(order_data.get('id'))
         if not order_id:
             logger.error("❌ بيانات الطلب لا تحتوي على ID")
@@ -708,6 +716,7 @@ def handle_order_creation(data, webhook_version='2'):
             logger.info(f"⚠️ تم استخدام مستخدم بديل: {user_with_salla.id} للمتجر {user_with_salla.store_id}")
             store_id = user_with_salla.store_id
         
+        # الباقي من الكود...
         # الباقي من الكود مع استخدام store_id
         created_at = None
         date_info = order_data.get('date', {})

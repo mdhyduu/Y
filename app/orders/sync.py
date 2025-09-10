@@ -714,17 +714,21 @@ def register_webhook_route():
 # orders/sync.py - إضافة دالة مساعدة
 
 def extract_store_id_from_webhook(webhook_data):
-    merchant_id = webhook_data.get('merchant')
-    if merchant_id and str(merchant_id).isdigit():
-        return int(merchant_id)
-
-    data = webhook_data.get('data', {})
-    if 'store_id' in data and str(data['store_id']).isdigit():
-        return int(data['store_id'])
-
-    # fallback على المستخدم الرئيسي (لكن سجلها في الـ log)
-    user_with_salla = User.query.filter(
-        User._salla_access_token.isnot(None),
-        User.store_id.isnot(None)
-    ).first()
-    return user_with_salla.store_id if user_with_salla else None
+    """استخراج معرف المتجر من بيانات Webhook"""
+    try:
+        # الطريقة الصحيحة لاستخراج معرف المتجر من webhook Salla
+        merchant = webhook_data.get('merchant')
+        if merchant:
+            return str(merchant)
+        
+        # إذا لم يتوفر، نبحث في مكان آخر في البيانات
+        data = webhook_data.get('data', {})
+        if 'store_id' in data:
+            return str(data['store_id'])
+        
+        # كحل أخير، نستخدم merchant من البيانات العلوية
+        return str(webhook_data.get('merchant'))
+        
+    except Exception as e:
+        current_app.logger.error(f"خطأ في استخراج معرف المتجر: {str(e)}")
+        return None
