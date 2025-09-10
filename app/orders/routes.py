@@ -10,7 +10,7 @@ import requests
 from sqlalchemy import nullslast, or_, and_, func
 from sqlalchemy.orm import selectinload
 from . import orders_bp
-from app.models import (db, SallaOrder, CustomOrder, OrderStatus, Employee, 
+from app.models import (db, SallaOrder, CustomOrder, OrderStatus,User, Employee, 
                      OrderAssignment, EmployeeCustomStatus, OrderStatusNote, 
                      OrderEmployeeStatus, OrderProductStatus, CustomNoteStatus)
 from app.utils import get_user_from_cookies, process_order_data, format_date, generate_barcode, humanize_time
