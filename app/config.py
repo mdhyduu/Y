@@ -162,7 +162,7 @@ class Config:
 
 class DevelopmentConfig(Config):
     """إعدادات بيئة التطوير"""
-    DEBUG = True
+    DEBUG = False
     SQLALCHEMY_ECHO = False
     COOKIE_SECURE = False
     WTF_CSRF_ENABLED = True
@@ -170,7 +170,7 @@ class DevelopmentConfig(Config):
 
 class TestingConfig(Config):
     """إعدادات بيئة الاختبار"""
-    TESTING = True
+    TESTING = False
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     WTF_CSRF_ENABLED = False
     COOKIE_SECURE = False
