@@ -370,7 +370,7 @@ class SallaOrder(db.Model):
     total_amount = db.Column(db.Float)
     currency = db.Column(db.String(10), default='SAR')
     payment_method = db.Column(db.String(100))
-
+    last_synced = db.Column(db.DateTime, nullable=True)
     # العمود الأساسي للربط
     status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'), nullable=True)
     
