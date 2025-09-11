@@ -677,7 +677,6 @@ def extract_store_id_from_webhook(webhook_data):
                 return store_id
         
         logger.warning("❌ لم يتم العثور على معرف المتجر في أي من المواقع المتوقعة")
-        logger.debug(f"بيانات الويب هوك كاملة: {json.dumps(webhook_data, ensure_ascii=False)}")
         return None
         
     except Exception as e:
@@ -699,10 +698,6 @@ def handle_order_creation(data, webhook_version='2'):
             order_data = data
             merchant_id = data.get('merchant_id')
 
-        # تسجيل تفصيلي للبيانات الواردة للتصحيح
-        logger.info(f"📋 بيانات Webhook الواردة: merchant_id={merchant_id}, order_data={order_data}")
-
-        # استخراج store_id باستخدام الدالة المحسنة
         store_id = extract_store_id_from_webhook(data)
         
         if store_id is None:
