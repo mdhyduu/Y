@@ -65,7 +65,7 @@ def login():
             # تسجيل دخول كمشرف
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
-                # طلب التحقق برمز OTP في كل مرة
+                # إنشاء كود تحقق جديد في كل مرة
                 user.otp_code = str(random.randint(100000, 999999))
                 user.otp_expiration = datetime.utcnow() + timedelta(minutes=10)
                 db.session.commit()
@@ -93,21 +93,25 @@ def login():
                     logger.warning(f"محاولة تسجيل دخول لحساب موقوف: {email}")
                     return redirect(url_for('user_auth.login'))
                 
-                # طلب التحقق برمز OTP في كل مرة للموظفين أيضاً
-                # (هنا تحتاج إلى تطبيق آلية OTP للموظفين إذا كانت مطلوبة)
-                flash('تم تسجيل دخول الموظف بنجاح!', 'success')
-                response = make_response(redirect(url_for('dashboard.index')))
-                response.set_cookie('user_id', str(employee.id), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
-                response.set_cookie('is_admin', 'false', max_age=timedelta(days=14).total_seconds())
-                response.set_cookie('employee_role', employee.role, max_age=timedelta(days=14).total_seconds())
-                response.set_cookie('store_id', str(employee.store_id), max_age=timedelta(days=14).total_seconds())
+                # للموظفين أيضاً ننشئ كود تحقق
+                employee.otp_code = str(random.randint(100000, 999999))
+                employee.otp_expiration = datetime.utcnow() + timedelta(minutes=10)
+                db.session.commit()
                 
-                store_admin = User.query.filter_by(store_id=employee.store_id).first()
-                if store_admin and store_admin.salla_access_token:
-                    response.set_cookie('salla_access_token', store_admin.get_access_token(), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
-                    response.set_cookie('salla_refresh_token', store_admin.get_refresh_token(), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
+                # إرسال الرمز للموظف
+                try:
+                    msg = Message(
+                        subject="رمز التحقق لتسجيل الدخول",
+                        recipients=[email],
+                        body=f"رمز التحقق الخاص بك هو: {employee.otp_code}\nصالح لمدة 10 دقائق."
+                    )
+                    mail.send(msg)
+                    flash('تم إرسال رمز التحقق إلى بريدك الإلكتروني', 'info')
+                except Exception as e:
+                    logger.error(f"فشل إرسال البريد: {str(e)}")
+                    flash(f'حدث خطأ في إرسال البريد. رمز التحقق هو: {employee.otp_code}', 'warning')
                 
-                return response
+                return redirect(url_for('user_auth.verify_employee_otp', employee_id=employee.id))
             
             # إذا البيانات غير صحيحة
             flash('بيانات الدخول غير صحيحة', 'danger')
@@ -119,9 +123,6 @@ def login():
             logger.error(f"خطأ في تسجيل الدخول: {str(e)}", exc_info=True)
 
     return render_template('auth/login.html', form=form)
-
-# تسجيل حساب جديد
-# ... الكود السابق ...
 
 @user_auth_bp.route('/register', methods=['GET', 'POST'])
 @redirect_if_authenticated
@@ -180,14 +181,24 @@ def verify_otp(user_id):
             user.otp_code = None
             user.otp_expiration = None
             db.session.commit()
-            flash('تم تفعيل حسابك بنجاح! يمكنك تسجيل الدخول الآن', 'success')
-            return redirect(url_for('user_auth.login'))
+            
+            # تسجيل دخول المستخدم مباشرة بعد التحقق
+            response = make_response(redirect(url_for('dashboard.index')))
+            response.set_cookie('user_id', str(user.id), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
+            response.set_cookie('is_admin', 'true', max_age=timedelta(days=14).total_seconds())
+            response.set_cookie('employee_role', '', max_age=timedelta(days=14).total_seconds())
+            
+            if user.salla_access_token:
+                response.set_cookie('salla_access_token', user.get_access_token(), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
+                response.set_cookie('salla_refresh_token', user.salla_refresh_token, max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
+            
+            flash('تم تفعيل حسابك وتسجيل الدخول بنجاح!', 'success')
+            logger.info(f"تم تفعيل وتسجيل دخول المستخدم: {user.email}")
+            return response
         else:
             flash('رمز غير صحيح أو منتهي الصلاحية', 'danger')
 
-    # Pass the user object to the template
     return render_template('auth/verify_otp.html', form=form, user=user)
-
 @user_auth_bp.route('/resend_verification/<int:user_id>', methods=['POST'])
 def resend_verification(user_id):
     user = User.query.get_or_404(user_id)
