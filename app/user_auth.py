@@ -65,22 +65,25 @@ def login():
             # تسجيل دخول كمشرف
             user = User.query.filter_by(email=email).first()
             if user and user.check_password(password):
-                if not user.is_verified:
-                    flash('يجب تفعيل بريدك الإلكتروني أولاً باستخدام رمز التحقق', 'warning')
-                    return redirect(url_for('user_auth.verify_otp', user_id=user.id))
-
-                response = make_response(redirect(url_for('dashboard.index')))
-                response.set_cookie('user_id', str(user.id), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
-                response.set_cookie('is_admin', 'true', max_age=timedelta(days=14).total_seconds())
-                response.set_cookie('employee_role', '', max_age=timedelta(days=14).total_seconds())
+                # طلب التحقق برمز OTP في كل مرة
+                user.otp_code = str(random.randint(100000, 999999))
+                user.otp_expiration = datetime.utcnow() + timedelta(minutes=10)
+                db.session.commit()
                 
-                if user.salla_access_token:
-                    response.set_cookie('salla_access_token', user.get_access_token(), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
-                    response.set_cookie('salla_refresh_token', user.salla_refresh_token, max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
+                # إرسال الرمز الجديد
+                try:
+                    msg = Message(
+                        subject="رمز التحقق لتسجيل الدخول",
+                        recipients=[email],
+                        body=f"رمز التحقق الخاص بك هو: {user.otp_code}\nصالح لمدة 10 دقائق."
+                    )
+                    mail.send(msg)
+                    flash('تم إرسال رمز التحقق إلى بريدك الإلكتروني', 'info')
+                except Exception as e:
+                    logger.error(f"فشل إرسال البريد: {str(e)}")
+                    flash(f'حدث خطأ في إرسال البريد. رمز التحقق هو: {user.otp_code}', 'warning')
                 
-                flash('تم تسجيل دخول المشرف بنجاح!', 'success')
-                logger.info(f"تم تسجيل دخول المشرف: {user.email}, is_admin: {user.is_admin}")
-                return response
+                return redirect(url_for('user_auth.verify_otp', user_id=user.id))
             
             # تسجيل دخول كموظف
             employee = Employee.query.filter_by(email=email).first()
@@ -90,6 +93,9 @@ def login():
                     logger.warning(f"محاولة تسجيل دخول لحساب موقوف: {email}")
                     return redirect(url_for('user_auth.login'))
                 
+                # طلب التحقق برمز OTP في كل مرة للموظفين أيضاً
+                # (هنا تحتاج إلى تطبيق آلية OTP للموظفين إذا كانت مطلوبة)
+                flash('تم تسجيل دخول الموظف بنجاح!', 'success')
                 response = make_response(redirect(url_for('dashboard.index')))
                 response.set_cookie('user_id', str(employee.id), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
                 response.set_cookie('is_admin', 'false', max_age=timedelta(days=14).total_seconds())
@@ -101,11 +107,9 @@ def login():
                     response.set_cookie('salla_access_token', store_admin.get_access_token(), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
                     response.set_cookie('salla_refresh_token', store_admin.get_refresh_token(), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
                 
-                flash('تم تسجيل دخول الموظف بنجاح!', 'success')
-                logger.info(f"تم تسجيل دخول الموظف: {employee.email} - المتجر: {employee.store_id}")
                 return response
             
-            # إذا البيانات غلط
+            # إذا البيانات غير صحيحة
             flash('بيانات الدخول غير صحيحة', 'danger')
             logger.warning(f"محاولة تسجيل دخول فاشلة للبريد: {email}")
             
@@ -115,7 +119,6 @@ def login():
             logger.error(f"خطأ في تسجيل الدخول: {str(e)}", exc_info=True)
 
     return render_template('auth/login.html', form=form)
-
 
 # تسجيل حساب جديد
 # ... الكود السابق ...
@@ -128,10 +131,12 @@ def register():
         email = form.email.data
         password = form.password.data
         
+        # التحقق من وجود البريد الإلكتروني مسبقاً
         if User.query.filter_by(email=email).first():
             flash('البريد الإلكتروني مسجل مسبقاً', 'danger')
             return redirect(url_for('user_auth.register'))
 
+        # إنشاء مستخدم جديد
         new_user = User(email=email)
         new_user.set_password(password)
         new_user.store_id = User.query.count() + 1
@@ -139,29 +144,31 @@ def register():
         if User.query.count() == 0:
             new_user.is_admin = True
 
+        # إنشاء كود تحقق جديد في كل مرة
         new_user.otp_code = str(random.randint(100000, 999999))
         new_user.otp_expiration = datetime.utcnow() + timedelta(minutes=10)
+        new_user.is_verified = False  # التأكد من أن الحساب غير مفعل حتى التحقق
 
         db.session.add(new_user)
         db.session.commit()
 
-        # إرسال الإيميل مع معالجة الأخطاء
+        # إرسال كود التحقق
         try:
             msg = Message(
                 subject="رمز التحقق من البريد",
                 recipients=[email],
                 body=f"رمز التحقق الخاص بك هو: {new_user.otp_code}\nصالح لمدة 10 دقائق."
             )
-            mail.send(msg)  # Use mail directly instead of current_app.mail
+            mail.send(msg)
             flash('تم إنشاء الحساب! تحقق من بريدك وأدخل الرمز', 'info')
         except Exception as e:
             logger.error(f"فشل إرسال البريد: {str(e)}")
-            flash(f'تم إنشاء الحساب! لكن حدث خطأ في إرسال البريد. رمز التحقق هو: {new_user.otp_code}', 'warning')                  
+            # في حالة فشل الإرسال، نعرض الرمز للمستخدم مباشرة (لأغراض التطوير فقط)
+            flash(f'تم إنشاء الحساب! لكن حدث خطأ في إرسال البريد. رمز التحقق هو: {new_user.otp_code}', 'warning')
+        
         return redirect(url_for('user_auth.verify_otp', user_id=new_user.id))
     
     return render_template('auth/register.html', form=form)
-
-
 @user_auth_bp.route('/verify/<int:user_id>', methods=['GET', 'POST'])
 def verify_otp(user_id):
     user = User.query.get_or_404(user_id)
