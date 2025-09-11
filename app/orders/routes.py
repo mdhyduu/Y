@@ -387,8 +387,26 @@ def order_details(order_id):
             response.set_cookie('user_id', '', expires=0)
             response.set_cookie('is_admin', '', expires=0)
             return response
-
-        # ========== [3] جلب بيانات الطلب من قاعدة البيانات أولاً ==========
+        headers = {
+                            'Authorization': f'Bearer {access_token}',
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        }
+        def make_salla_api_request(url, params=None):
+                        try:
+                            response = requests.get(url, headers=headers, params=params, timeout=10)
+                            if response.status_code == 401:
+                                new_token = refresh_and_get_token()
+                                if isinstance(new_token, str):
+                                    headers['Authorization'] = f'Bearer {new_token}'
+                                    response = requests.get(url, headers=headers, params=params, timeout=10)
+                                else:
+                                    return new_token
+                            response.raise_for_status()
+                            return response
+                        except requests.exceptions.RequestException as e:
+                            logger.warning(f"Failed to refresh order data: {e}")
+                            return None
         salla_order = SallaOrder.query.get(str(order_id))
         
         # إذا كان الطلب موجوداً في قاعدة البيانات، استخدم البيانات المحفوظة
@@ -401,27 +419,9 @@ def order_details(order_id):
             )
             
             if needs_refresh:
-                headers = {
-                    'Authorization': f'Bearer {access_token}',
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
+                
 
-                def make_salla_api_request(url, params=None):
-                    try:
-                        response = requests.get(url, headers=headers, params=params, timeout=10)
-                        if response.status_code == 401:
-                            new_token = refresh_and_get_token()
-                            if isinstance(new_token, str):
-                                headers['Authorization'] = f'Bearer {new_token}'
-                                response = requests.get(url, headers=headers, params=params, timeout=10)
-                            else:
-                                return new_token
-                        response.raise_for_status()
-                        return response
-                    except requests.exceptions.RequestException as e:
-                        logger.warning(f"Failed to refresh order data: {e}")
-                        return None
+          
 
                 # محاولة تحديث البيانات
                 order_response = make_salla_api_request(f"{Config.SALLA_ORDERS_API}/{order_id}")
