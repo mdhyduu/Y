@@ -258,6 +258,10 @@ class Employee(db.Model):
     deactivated_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    otp_code = db.Column(db.String(6), nullable=True)
+    otp_expiration = db.Column(db.DateTime, nullable=True)
+    
+    # باقي الحقول...
     remember_token = db.Column(db.String(100))  # New field for remember me functionality
     status_notes = relationship('OrderStatusNote', back_populates='employee', 
                               foreign_keys='OrderStatusNote.employee_id',

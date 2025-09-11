@@ -273,3 +273,34 @@ def cleanup_old_cookies():
             response = make_response()
             response.delete_cookie(cookie_name, path='/')
             return response
+            
+@user_auth_bp.route('/verify_employee/<int:employee_id>', methods=['GET', 'POST'])
+def verify_employee_otp(employee_id):
+    employee = Employee.query.get_or_404(employee_id)
+    form = VerifyOTPForm()
+
+    if form.validate_on_submit():
+        if employee.otp_code == form.otp_code.data and employee.otp_expiration > datetime.utcnow():
+            employee.otp_code = None
+            employee.otp_expiration = None
+            db.session.commit()
+            
+            # تسجيل دخول الموظف مباشرة بعد التحقق
+            response = make_response(redirect(url_for('dashboard.index')))
+            response.set_cookie('user_id', str(employee.id), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
+            response.set_cookie('is_admin', 'false', max_age=timedelta(days=14).total_seconds())
+            response.set_cookie('employee_role', employee.role, max_age=timedelta(days=14).total_seconds())
+            response.set_cookie('store_id', str(employee.store_id), max_age=timedelta(days=14).total_seconds())
+            
+            store_admin = User.query.filter_by(store_id=employee.store_id).first()
+            if store_admin and store_admin.salla_access_token:
+                response.set_cookie('salla_access_token', store_admin.get_access_token(), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
+                response.set_cookie('salla_refresh_token', store_admin.get_refresh_token(), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
+            
+            flash('تم تسجيل الدخول بنجاح!', 'success')
+            logger.info(f"تم تسجيل دخول الموظف: {employee.email} - المتجر: {employee.store_id}")
+            return response
+        else:
+            flash('رمز غير صحيح أو منتهي الصلاحية', 'danger')
+
+    return render_template('auth/verify_otp.html', form=form, user=employee)
