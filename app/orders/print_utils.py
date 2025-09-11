@@ -18,11 +18,11 @@ def download_orders_html():
     
     order_ids = request.args.get('order_ids', '').split(',')
     if not order_ids or order_ids == ['']:
-        flash('لم يتم تحديد أي طلبات للتحميل', 'error')
+        flash('لم يتم تحديد أي طلبات للمعاينة', 'error')
         return redirect(url_for('orders.index'))
     
     try:
-        # جلب بيانات الطلبات المحددة
+        # جلب بيانات الطلبات المحددة (نفس الكود السابق)
         orders = []
         access_token = user.salla_access_token
         
@@ -71,31 +71,21 @@ def download_orders_html():
                 continue
         
         if not orders:
-            flash('لم يتم العثور على أي طلبات للتحميل', 'error')
+            flash('لم يتم العثور على أي طلبات للمعاينة', 'error')
             return redirect(url_for('orders.index'))
         
         # إضافة الوقت الحالي للقالب
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
         # استخدام نفس قالب PDF لضمان التماثل في التصميم
-        html_content = render_template('print_orders.html', 
-                                     orders=orders, 
-                                     current_time=current_time)
-        
-        # إنشاء اسم ملف فريد
-        filename = f"orders_{'_'.join(order_ids)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
-        
-        # إعداد response مع HTML للتحميل
-        response = make_response(html_content)
-        response.headers['Content-Type'] = 'text/html; charset=utf-8'
-        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
-        
-        return response
+        return render_template('print_orders.html', 
+                             orders=orders, 
+                             current_time=current_time)
         
     except Exception as e:
         current_app.logger.error(f"Error generating HTML: {str(e)}")
-        flash(f'حدث خطأ أثناء إنشاء الملف: {str(e)}', 'error')
-        return redirect(url_for('orders.index'))
+        flash(f'حدث خطأ أثناء إنشاء المعاينة: {str(e)}', 'error')
+        return redirect(url_for('orders.index'))    
 
 @orders_bp.route('/get_quick_list_data', methods=['POST'])
 def get_quick_list_data():
