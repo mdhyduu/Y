@@ -387,104 +387,61 @@ def order_details(order_id):
             response.set_cookie('user_id', '', expires=0)
             response.set_cookie('is_admin', '', expires=0)
             return response
+
         headers = {
-                            'Authorization': f'Bearer {access_token}',
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json'
-                        }
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+
         def make_salla_api_request(url, params=None):
-                        try:
-                            response = requests.get(url, headers=headers, params=params, timeout=10)
-                            if response.status_code == 401:
-                                new_token = refresh_and_get_token()
-                                if isinstance(new_token, str):
-                                    headers['Authorization'] = f'Bearer {new_token}'
-                                    response = requests.get(url, headers=headers, params=params, timeout=10)
-                                else:
-                                    return new_token
-                            response.raise_for_status()
-                            return response
-                        except requests.exceptions.RequestException as e:
-                            logger.warning(f"Failed to refresh order data: {e}")
-                            return None
-        salla_order = SallaOrder.query.get(str(order_id))
-        
-        # إذا كان الطلب موجوداً في قاعدة البيانات، استخدم البيانات المحفوظة
-        if salla_order and salla_order.raw_data:
-            order_data = json.loads(salla_order.raw_data)
-            
-            # تحديث البيانات من API فقط إذا كانت قديمة (أكثر من 30 دقيقة)
-            needs_refresh = not salla_order.last_synced or (
-                datetime.utcnow() - salla_order.last_synced > timedelta(minutes=30)
-            )
-            
-            if needs_refresh:
-                
+            try:
+                response = requests.get(url, headers=headers, params=params, timeout=15)
+                if response.status_code == 401:
+                    new_token = refresh_and_get_token()
+                    if isinstance(new_token, str):
+                        headers['Authorization'] = f'Bearer {new_token}'
+                        response = requests.get(url, headers=headers, params=params, timeout=15)
+                    else:
+                        return new_token
+                response.raise_for_status()
+                return response
+            except requests.exceptions.RequestException as e:
+                raise e
 
-          
+        # ========== [3] جلب بيانات الطلب ==========
+        order_response = make_salla_api_request(f"{Config.SALLA_ORDERS_API}/{order_id}")
+        if not isinstance(order_response, requests.Response):
+            return order_response
+        order_data = order_response.json().get('data', {})
 
-                # محاولة تحديث البيانات
-                order_response = make_salla_api_request(f"{Config.SALLA_ORDERS_API}/{order_id}")
-                if isinstance(order_response, requests.Response):
-                    order_data = order_response.json().get('data', {})
-                    salla_order.raw_data = json.dumps(order_data, ensure_ascii=False)
-                    salla_order.last_synced = datetime.utcnow()
-                    db.session.commit()
-        else:
-            # إذا لم يكن الطلب في قاعدة البيانات، جلب البيانات من API
-            headers = {
-                'Authorization': f'Bearer {access_token}',
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
+        # جلب عناصر الطلب
+        items_response = make_salla_api_request(
+            f"{Config.SALLA_BASE_URL}/orders/items",
+            params={'order_id': order_id, 'include': 'images'}
+        )
+        if not isinstance(items_response, requests.Response):
+            return items_response
+        items_data = items_response.json().get('data', [])
 
-            def make_salla_api_request(url, params=None):
-                try:
-                    response = requests.get(url, headers=headers, params=params, timeout=10)
-                    if response.status_code == 401:
-                        new_token = refresh_and_get_token()
-                        if isinstance(new_token, str):
-                            headers['Authorization'] = f'Bearer {new_token}'
-                            response = requests.get(url, headers=headers, params=params, timeout=10)
-                        else:
-                            return new_token
-                    response.raise_for_status()
-                    return response
-                except requests.exceptions.RequestException as e:
-                    raise e
-
-            order_response = make_salla_api_request(f"{Config.SALLA_ORDERS_API}/{order_id}")
-            if not isinstance(order_response, requests.Response):
-                return order_response
-            order_data = order_response.json().get('data', {})
-
-        # ========== [4] جلب عناصر الطلب ==========
-        items_data = []
-        if 'items' in order_data and order_data['items']:
-            items_data = order_data['items']
-        else:
-            # جلب العناصر من API منفصل إذا لم تكن موجودة في البيانات الأساسية
-            items_response = make_salla_api_request(
-                f"{Config.SALLA_BASE_URL}/orders/items",
-                params={'order_id': order_id, 'include': 'images'}
-            )
-            if isinstance(items_response, requests.Response):
-                items_data = items_response.json().get('data', [])
-
-        # ========== [5] معالجة بيانات الطلب ==========
+        # ========== [4] معالجة بيانات الطلب ==========
         processed_order = process_order_data(order_id, items_data)
 
-        # ========== [6] استخراج بيانات العنوان ==========
+        # ========== [5] استخراج بيانات العنوان ==========
         address_data = {}
         full_address = 'لم يتم تحديد العنوان'
 
-        # استخدام البيانات الموجودة في order_data بدلاً من إعادة جلبها
+        # المحاولة 1: من shipping.address
         shipping_data = order_data.get('shipping', {})
         if shipping_data and 'address' in shipping_data:
             address_data = shipping_data.get('address', {})
-        elif 'ship_to' in order_data:
+
+        # المحاولة 2: من ship_to
+        if not address_data and 'ship_to' in order_data:
             address_data = order_data.get('ship_to', {})
-        elif 'customer' in order_data:
+
+        # المحاولة 3: fallback على customer
+        if not address_data and 'customer' in order_data:
             customer = order_data.get('customer', {})
             address_data = {
                 'country': customer.get('country', ''),
@@ -579,24 +536,21 @@ def order_details(order_id):
             if barcode_filename:
                 processed_order['barcode'] = barcode_filename
 
-        # ========== [7] جلب البيانات الإضافية باستخدام استعلامات أكثر كفاءة ==========
-        # استخدام selectinload لتحميل العلاقات مسبقاً
+        # ========== [6] جلب البيانات الإضافية ==========
         custom_note_statuses = CustomNoteStatus.query.filter_by(
             store_id=user.store_id
         ).all()
 
-        # استعلام واحد لجميع status_notes مع العلاقات
         status_notes = OrderStatusNote.query.filter_by(
             order_id=str(order_id)
         ).options(
-            selectinload(OrderStatusNote.admin),
-            selectinload(OrderStatusNote.employee),
-            selectinload(OrderStatusNote.custom_status)
+            db.joinedload(OrderStatusNote.admin),
+            db.joinedload(OrderStatusNote.employee),
+            db.joinedload(OrderStatusNote.custom_status)
         ).order_by(
             OrderStatusNote.created_at.desc()
         ).all()
 
-        # استعلام واحد لجميع employee_statuses مع العلاقات
         employee_statuses = db.session.query(
             OrderEmployeeStatus,
             EmployeeCustomStatus,
@@ -613,9 +567,8 @@ def order_details(order_id):
             OrderEmployeeStatus.created_at.desc()
         ).all()
 
-        # استعلام واحد لجميع product_statuses
-        status_records = OrderProductStatus.query.filter_by(order_id=str(order_id)).all()
         product_statuses = {}
+        status_records = OrderProductStatus.query.filter_by(order_id=str(order_id)).all()
         for status in status_records:
             product_statuses[status.product_id] = {
                 'status': status.status,
@@ -652,6 +605,8 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
+
+
 # orders/routes.py
 import hmac
 import hashlib
