@@ -184,13 +184,13 @@ def verify_otp(user_id):
             
             # تسجيل دخول المستخدم مباشرة بعد التحقق
             response = make_response(redirect(url_for('dashboard.index')))
-            response.set_cookie('user_id', str(user.id), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
-            response.set_cookie('is_admin', 'true', max_age=timedelta(days=14).total_seconds())
-            response.set_cookie('employee_role', '', max_age=timedelta(days=14).total_seconds())
+            response.set_cookie('user_id', str(user.id), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+            response.set_cookie('is_admin', 'true', max_age=timedelta(days=30).total_seconds())
+            response.set_cookie('employee_role', '', max_age=timedelta(days=30).total_seconds())
             
             if user.salla_access_token:
-                response.set_cookie('salla_access_token', user.get_access_token(), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
-                response.set_cookie('salla_refresh_token', user.salla_refresh_token, max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
+                response.set_cookie('salla_access_token', user.get_access_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+                response.set_cookie('salla_refresh_token', user.salla_refresh_token, max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
             
             flash('تم تفعيل حسابك وتسجيل الدخول بنجاح!', 'success')
             logger.info(f"تم تفعيل وتسجيل دخول المستخدم: {user.email}")
@@ -275,15 +275,15 @@ def verify_employee_otp(employee_id):
             
             # تسجيل دخول الموظف مباشرة بعد التحقق
             response = make_response(redirect(url_for('dashboard.index')))
-            response.set_cookie('user_id', str(employee.id), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
-            response.set_cookie('is_admin', 'false', max_age=timedelta(days=14).total_seconds())
-            response.set_cookie('employee_role', employee.role, max_age=timedelta(days=14).total_seconds())
-            response.set_cookie('store_id', str(employee.store_id), max_age=timedelta(days=14).total_seconds())
+            response.set_cookie('user_id', str(employee.id), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+            response.set_cookie('is_admin', 'false', max_age=timedelta(days=30).total_seconds())
+            response.set_cookie('employee_role', employee.role, max_age=timedelta(days=30).total_seconds())
+            response.set_cookie('store_id', str(employee.store_id), max_age=timedelta(days=30).total_seconds())
             
             store_admin = User.query.filter_by(store_id=employee.store_id).first()
             if store_admin and store_admin.salla_access_token:
-                response.set_cookie('salla_access_token', store_admin.get_access_token(), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
-                response.set_cookie('salla_refresh_token', store_admin.get_refresh_token(), max_age=timedelta(days=14).total_seconds(), httponly=True, secure=True)
+                response.set_cookie('salla_access_token', store_admin.get_access_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
+                response.set_cookie('salla_refresh_token', store_admin.get_refresh_token(), max_age=timedelta(days=30).total_seconds(), httponly=True, secure=True)
             
             flash('تم تسجيل الدخول بنجاح!', 'success')
             logger.info(f"تم تسجيل دخول الموظف: {employee.email} - المتجر: {employee.store_id}")
