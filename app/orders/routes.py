@@ -540,17 +540,18 @@ def order_details(order_id):
         custom_note_statuses = CustomNoteStatus.query.filter_by(
             store_id=user.store_id
         ).all()
-
+        
         status_notes = OrderStatusNote.query.filter_by(
             order_id=str(order_id)
         ).options(
-            db.joinedload(OrderStatusNote.admin),
-            db.joinedload(OrderStatusNote.employee),
-            db.joinedload(OrderStatusNote.custom_status)
+            selectinload(OrderStatusNote.admin),
+            selectinload(OrderStatusNote.employee),
+            selectinload(OrderStatusNote.custom_status)
         ).order_by(
             OrderStatusNote.created_at.desc()
         ).all()
 
+        # استعلام واحد لجميع employee_statuses مع العلاقات
         employee_statuses = db.session.query(
             OrderEmployeeStatus,
             EmployeeCustomStatus,
@@ -567,14 +568,16 @@ def order_details(order_id):
             OrderEmployeeStatus.created_at.desc()
         ).all()
 
-        product_statuses = {}
+        # استعلام واحد لجميع product_statuses
         status_records = OrderProductStatus.query.filter_by(order_id=str(order_id)).all()
+        product_statuses = {}
         for status in status_records:
             product_statuses[status.product_id] = {
                 'status': status.status,
                 'notes': status.notes,
                 'updated_at': status.updated_at
             }
+        
 
         return render_template('order_details.html', 
             order=processed_order,
