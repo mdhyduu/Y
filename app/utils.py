@@ -81,33 +81,35 @@ def generate_barcode(data):
 def generate_and_store_barcode(order_id, order_type='salla'):
     """إنشاء باركود وحفظه في قاعدة البيانات تلقائيًا"""
     try:
+        # تحويل order_id إلى نص للتأكد من تطابق نوع البيانات
+        order_id_str = str(order_id)
+        
         # إنشاء الباركود
-        barcode_data = generate_barcode(order_id)
+        barcode_data = generate_barcode(order_id_str)
         
         if not barcode_data:
-            logger.error(f"فشل في إنشاء الباركود للطلب {order_id}")
+            logger.error(f"فشل في إنشاء الباركود للطلب {order_id_str}")
             return None
         
         # حفظ الباركود في قاعدة البيانات
         if order_type == 'salla':
-            order = SallaOrder.query.get(order_id)
+            order = SallaOrder.query.get(order_id_str)  # استخدام النصي هنا
         else:
-            order = CustomOrder.query.get(order_id)
+            order = CustomOrder.query.get(order_id_str)  # واستخدام النصي هنا
             
         if order:
             order.barcode_data = barcode_data
             order.barcode_generated_at = datetime.utcnow()
             db.session.commit()
-            logger.info(f"تم حفظ الباركود تلقائيًا للطلب {order_id}")
+            logger.info(f"تم حفظ الباركود تلقائيًا للطلب {order_id_str}")
             return barcode_data
         else:
-            logger.error(f"لم يتم العثور على الطلب {order_id} في قاعدة البيانات")
+            logger.error(f"لم يتم العثور على الطلب {order_id_str} في قاعدة البيانات")
             return None
             
     except Exception as e:
         logger.error(f"خطأ في حفظ الباركود تلقائيًا: {str(e)}")
         return None
-
 def format_date(date_str):
     try:
         # تحويل التاريخ من تنسيق سلة
@@ -118,6 +120,7 @@ def format_date(date_str):
 
 def process_order_data(order_id, items_data):
     """معالجة بيانات الطلب مع استخدام الباركود المخزن في قاعدة البيانات"""
+    order_id = str(order_id)
     items = []
     logger.info(f"Processing order items: {len(items_data)} items")
     
