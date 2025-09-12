@@ -232,21 +232,21 @@ def process_order_data(order_id, items_data):
         items.append(item_data)
         logger.info(f"Processed item: {item_data['name']} (ID: {item_id})")
 
-    order = SallaOrder.query.get(order_id)
+    from app.models import SallaOrder
+        order = SallaOrder.query.get(order_id)
+        
+        barcode_data = None
         if order and order.barcode_data:
             barcode_data = order.barcode_data
         else:
-            # إنشاء باركود جديد وحفظه
-            barcode_data = generate_barcode(order_id)
-            if barcode_data and order:
-                order.barcode_data = barcode_data
-                db.session.commit()
+            # إذا لم يكن الباركود موجودًا، إنشائه تلقائيًا 
+            barcode_data = generate_and_store_barcode(order_id, 'salla')
         
         processed_order = {
             'id': order_id,
             'order_items': items,
-            'barcode': barcode_data  # تخزين كـ base64 بدلاً من اسم ملف
-        }
+            'barcode': barcode_data  # استخدام الباركود المخزن
+    }
     
     logger.info(f"Processed order with {len(items)} items and barcode: {processed_order['barcode']}")
     return processed_order
