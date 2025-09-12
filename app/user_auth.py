@@ -223,20 +223,14 @@ def resend_verification(user_id):
 
 @user_auth_bp.route('/logout')
 def logout():
-    # افتراض أن لديك طريقة للحصول على المستخدم الحالي قبل مسح الكوكيز
-    # مثلاً من g object أو session
+    # احتفظ ببيانات المستخدم للتدوين فقط
     user_id = request.cookies.get('user_id')
     is_admin = request.cookies.get('is_admin') == 'true'
 
     if user_id and is_admin:
         user = User.query.get(user_id)
         if user:
-            # مسح التوكنات من قاعدة البيانات
-            user._salla_access_token = None
-            user._salla_refresh_token = None
-            user.token_expires_at = None
-            db.session.commit()
-            logger.info(f"تم مسح توكنات سلة للمستخدم {user.email} عند الخروج.")
+            logger.info(f"تسجيل خروج المستخدم: {user.email} بدون مسح توكنات سلة")
 
     session.clear()
     response = make_response(redirect(url_for('user_auth.login')))
@@ -250,12 +244,6 @@ def logout():
     for cookie_name in cookies_to_delete:
         response.delete_cookie(cookie_name, path='/')
 
-
-
-
-        response.delete_cookie(cookie_name, path='/auth')  # إذا كانت محددة المسار
-        response.delete_cookie(cookie_name, path='/orders') # إذا كانت محددة المسار
-    
     # إضافة رأس لمنع التخزين المؤقت
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
