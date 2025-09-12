@@ -259,21 +259,21 @@ def process_order_data(order_id, items_data):
         logger.info(f"Processed item: {item_data['name']} (ID: {item_id})")
 
     # البحث عن الباركود المخزن في قاعدة البيانات
-    order = SallaOrder.query.get(order_id)
-    barcode_data = None
-    
-    if order and order.barcode_data:
-        barcode_data = order.barcode_data
-        logger.info(f"Using existing barcode for order {order_id}")
-    else:
-        # إنشاء باركود جديد وحفظه في قاعدة البيانات
-        barcode_data = generate_and_store_barcode(order_id, 'salla')
-        if barcode_data:
-            logger.info(f"Generated and stored new barcode for order {order_id}")
+        order = SallaOrder.query.get(order_id)
+        barcode_data = None
+        
+        if order and order.barcode_data:
+            barcode_data = order.barcode_data
+            logger.info(f"Using existing barcode for order {order_id}")
         else:
-            logger.error(f"Failed to generate barcode for order {order_id}")
-            # إنشاء باركود مؤقت دون تخزينه
-            barcode_data = generate_barcode(order_id)
+            # إنشاء باركود جديد وحفظه في قاعدة البيانات
+            barcode_data = generate_and_store_barcode(order_id, 'salla')
+            if barcode_data:
+                logger.info(f"Generated and stored new barcode for order {order_id}")
+            else:
+                logger.error(f"Failed to generate barcode for order {order_id}")
+                # إنشاء باركود مؤقت دون تخزينه
+                barcode_data = generate_barcode(order_id)
 
     processed_order = {
         'id': order_id,
