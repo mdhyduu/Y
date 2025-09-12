@@ -352,6 +352,8 @@ def index():
         return redirect(url_for('orders.index'))
 
 
+import copy
+
 @orders_bp.route('/<int:order_id>')
 def order_details(order_id):
     """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة (بدون shipments)"""
@@ -428,16 +430,16 @@ def order_details(order_id):
                 return items_response
             return items_response.json().get('data', [])
 
-        def fetch_db_data():
-            # توفير سياق التطبيق يدوياً للخيوط المنفصلة
-            with current_app.app_context():
+        def fetch_db_data(app_context, store_id, order_id_str):
+            # استخدام سياق التطبيق الممرر
+            with app_context:
                 # جلب البيانات من قاعدة البيانات بشكل متوازي
                 custom_note_statuses = CustomNoteStatus.query.filter_by(
-                    store_id=user.store_id
+                    store_id=store_id
                 ).all()
                 
                 status_notes = OrderStatusNote.query.filter_by(
-                    order_id=str(order_id)
+                    order_id=order_id_str
                 ).options(
                     selectinload(OrderStatusNote.admin),
                     selectinload(OrderStatusNote.employee),
@@ -457,12 +459,12 @@ def order_details(order_id):
                     Employee,
                     EmployeeCustomStatus.employee_id == Employee.id
                 ).filter(
-                    OrderEmployeeStatus.order_id == str(order_id)
+                    OrderEmployeeStatus.order_id == order_id_str
                 ).order_by(
                     OrderEmployeeStatus.created_at.desc()
                 ).all()
 
-                status_records = OrderProductStatus.query.filter_by(order_id=str(order_id)).all()
+                status_records = OrderProductStatus.query.filter_by(order_id=order_id_str).all()
                 product_statuses = {}
                 for status in status_records:
                     product_statuses[status.product_id] = {
@@ -478,11 +480,14 @@ def order_details(order_id):
                     'product_statuses': product_statuses
                 }
 
+        # إنشاء سياق تطبيق جديد للخيوط المنفصلة
+        app_context = current_app.app_context()
+        
         # تشغيل جميع المهام بشكل متوازي
         with futures.ThreadPoolExecutor() as executor:
             order_future = executor.submit(fetch_order_data)
             items_future = executor.submit(fetch_order_items)
-            db_future = executor.submit(fetch_db_data)
+            db_future = executor.submit(fetch_db_data, app_context, user.store_id, str(order_id))
             
             # انتظار انتهاء جميع المهام
             order_data = order_future.result()
