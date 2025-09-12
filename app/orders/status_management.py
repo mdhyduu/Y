@@ -226,32 +226,44 @@ def add_status_note(order_id):
             flash(error_msg, "error")
             current_app.logger.error(f"Error adding status note: {str(e)}", exc_info=True)
             return redirect(url_for('orders.order_details', order_id=order_id))
+            
 @orders_bp.route('/<int:order_id>/add_employee_status', methods=['POST'])
 def add_employee_status(order_id):
-    ...
     user, employee = get_user_from_cookies()
 
     if not user:
-        flash('الرجاء تسجيل الدخول أولاً', 'error')
-        response = make_response(redirect(url_for('user_auth.login')))
-        response.set_cookie('user_id', '', expires=0)
-        response.set_cookie('is_admin', '', expires=0)
-        return response
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول أولاً'}), 401
+        else:
+            flash('الرجاء تسجيل الدخول أولاً', 'error')
+            response = make_response(redirect(url_for('user_auth.login')))
+            response.set_cookie('user_id', '', expires=0)
+            response.set_cookie('is_admin', '', expires=0)
+            return response
     
     if request.cookies.get('is_admin') == 'true':
-        flash('هذه الخدمة للموظفين فقط', 'error')
-        return redirect(url_for('orders.order_details', order_id=order_id))
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'هذه الخدمة للموظفين فقط'}), 403
+        else:
+            flash('هذه الخدمة للموظفين فقط', 'error')
+            return redirect(url_for('orders.order_details', order_id=order_id))
     
     if not employee:
-        flash('غير مصرح لك بهذا الإجراء', 'error')
-        return redirect(url_for('orders.order_details', order_id=order_id))
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'غير مصرح لك بهذا الإجراء'}), 403
+        else:
+            flash('غير مصرح لك بهذا الإجراء', 'error')
+            return redirect(url_for('orders.order_details', order_id=order_id))
     
     status_id = request.form.get('status_id')
     note = request.form.get('note', '')
     
     if not status_id:
-        flash('يجب اختيار حالة', 'error')
-        return redirect(url_for('orders.order_details', order_id=order_id))
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'يجب اختيار حالة'}), 400
+        else:
+            flash('يجب اختيار حالة', 'error')
+            return redirect(url_for('orders.order_details', order_id=order_id))
     
     custom_status = EmployeeCustomStatus.query.filter_by(
         id=status_id,
@@ -259,8 +271,11 @@ def add_employee_status(order_id):
     ).first()
     
     if not custom_status:
-        flash('الحالة المحددة غير صالحة', 'error')
-        return redirect(url_for('orders.order_details', order_id=order_id))
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'الحالة المحددة غير صالحة'}), 400
+        else:
+            flash('الحالة المحددة غير صالحة', 'error')
+            return redirect(url_for('orders.order_details', order_id=order_id))
     
     try:
         has_conflict, conflict_message = check_status_conflict(
@@ -268,8 +283,11 @@ def add_employee_status(order_id):
         )
         
         if has_conflict:
-            flash(conflict_message, "error")
-            return redirect(url_for('orders.order_details', order_id=order_id))
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'error': conflict_message}), 400
+            else:
+                flash(conflict_message, "error")
+                return redirect(url_for('orders.order_details', order_id=order_id))
         
         # ✅ تحديث أو إنشاء جديد
         existing_status = OrderEmployeeStatus.query.filter_by(
@@ -281,7 +299,7 @@ def add_employee_status(order_id):
             existing_status.note = note
             existing_status.updated_at = datetime.utcnow()
             db.session.commit()
-            flash("تم تحديث الحالة بنجاح", "success")
+            message = "تم تحديث الحالة بنجاح"
         else:
             new_status = OrderEmployeeStatus(
                 order_id=str(order_id),
@@ -290,15 +308,38 @@ def add_employee_status(order_id):
             )
             db.session.add(new_status)
             db.session.commit()
-            flash('تم إضافة الحالة بنجاح', 'success')
+            message = 'تم إضافة الحالة بنجاح'
         
         handle_status_transitions(order_id, 'custom', status_id)
         
+        # إذا كان الطلب AJAX، نرجع JSON
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            # جلب بيانات الحالة الجديدة لإرجاعها
+            new_status_data = {
+                'name': custom_status.name,
+                'color': custom_status.color,
+                'note': note,
+                'employee_email': employee.email,
+                'created_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M')
+            }
+            return jsonify({
+                'success': True,
+                'message': message,
+                'new_status': new_status_data
+            })
+        else:
+            flash(message, 'success')
+            return redirect(url_for('orders.order_details', order_id=order_id))
+        
     except Exception as e:
         db.session.rollback()
-        flash(f'حدث خطأ: {str(e)}', 'error')
-    
-    return redirect(url_for('orders.order_details', order_id=order_id))
+        error_msg = f'حدث خطأ: {str(e)}'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': error_msg}), 500
+        else:
+            flash(error_msg, 'error')
+            return redirect(url_for('orders.order_details', order_id=order_id))
+
 
 
 @orders_bp.route('/employee_status', methods=['GET', 'POST'])

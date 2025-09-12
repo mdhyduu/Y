@@ -873,66 +873,84 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   // دالة لتحديث قائمة حالات الموظف
-  function updateEmployeeStatusList(newStatus) {
+// ... (الكود السابق يبقى كما هو)
+
+// دالة لتحديث قائمة حالات الموظف
+function updateEmployeeStatusList(newStatus) {
     const statusList = document.querySelector('.employee-status-list');
     
     if (newStatus && statusList) {
-      // إنشاء عنصر جديد
-      const newItem = document.createElement('li');
-      newItem.className = 'list-group-item d-flex justify-content-between py-1 px-0';
-      newItem.innerHTML = `
+        // إنشاء عنصر جديد
+        const newItem = document.createElement('li');
+        newItem.className = 'list-group-item d-flex justify-content-between py-1 px-0';
+        newItem.innerHTML = `
         <div>
-          <span class="badge" style="background-color: ${newStatus.color}; color: white;">
-            ${newStatus.name}
-          </span>
-          ${newStatus.note ? `<span class="ms-2">${newStatus.note}</span>` : ''}
-          <div class="text-muted small mt-1">
-            <i class="fas fa-user me-1"></i>${newStatus.employee_email}
-          </div>
+            <span class="badge" style="background-color: ${newStatus.color}; color: white;">
+                ${newStatus.name}
+            </span>
+            ${newStatus.note ? `<span class="ms-2">${newStatus.note}</span>` : ''}
+            <div class="text-muted small mt-1">
+                <i class="fas fa-user me-1"></i>${newStatus.employee_email}
+            </div>
         </div>
         <div class="text-muted">${newStatus.created_at}</div>
-      `;
-      
-      // إضافة العنصر الجديد في بداية القائمة
-      if (statusList.firstChild && statusList.firstChild.className.includes('text-center')) {
-        statusList.removeChild(statusList.firstChild);
-      }
-      
-      statusList.insertBefore(newItem, statusList.firstChild);
+        `;
+        
+        // التحقق من وجود عناصر وإزالة الرسالة إذا كانت موجودة
+        if (statusList.children.length > 0) {
+            const firstChild = statusList.children[0];
+            // التحقق إذا كان العنصر الأول هو رسالة "لا توجد حالات مسجلة"
+            if (firstChild.classList && 
+                (firstChild.classList.contains('text-center') || 
+                 firstChild.textContent.includes('لا توجد حالات مسجلة'))) {
+                statusList.removeChild(firstChild);
+            }
+        }
+        
+        // إضافة العنصر الجديد في بداية القائمة
+        statusList.insertBefore(newItem, statusList.firstChild);
     }
-  }
-  
-  // دالة لتحديث قائمة الحالات الخاصة
-  function updateSpecialStatusList(newStatus) {
+}
+
+// دالة لتحديث قائمة الحالات الخاصة
+function updateSpecialStatusList(newStatus) {
     const statusList = document.querySelector('.special-status-list');
     
     if (newStatus && statusList) {
-      // إنشاء عنصر جديد
-      const newItem = document.createElement('div');
-      newItem.className = 'list-group-item py-2 px-0';
-      newItem.innerHTML = `
+        // إنشاء عنصر جديد
+        const newItem = document.createElement('div');
+        newItem.className = 'list-group-item py-2 px-0';
+        newItem.innerHTML = `
         <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <span class="badge" style="background-color: ${newStatus.color}; color: white;">
-              ${newStatus.name}
-            </span>
-            ${newStatus.note ? `<p class="mb-0 mt-1 small">${newStatus.note}</p>` : ''}
-          </div>
-          <div class="text-muted small text-end">
-            <div>${newStatus.created_at}</div>
-          </div>
+            <div>
+                <span class="badge" style="background-color: ${newStatus.color}; color: white;">
+                    ${newStatus.name}
+                </span>
+                ${newStatus.note ? `<p class="mb-0 mt-1 small">${newStatus.note}</p>` : ''}
+            </div>
+            <div class="text-muted small text-end">
+                <div>${newStatus.created_at}</div>
+            </div>
         </div>
-      `;
-      
-      // إضافة العنصر الجديد في بداية القائمة
-      if (statusList.firstChild && statusList.firstChild.className.includes('text-center')) {
-        statusList.removeChild(statusList.firstChild);
-      }
-      
-      statusList.insertBefore(newItem, statusList.firstChild);
+        `;
+        
+        // التحقق من وجود عناصر وإزالة الرسالة إذا كانت موجودة
+        if (statusList.children.length > 0) {
+            const firstChild = statusList.children[0];
+            // التحقق إذا كان العنصر الأول هو رسالة "لا توجد حالات مسجلة"
+            if (firstChild.classList && 
+                (firstChild.classList.contains('text-center') || 
+                 firstChild.textContent.includes('لا توجد حالات مسجلة'))) {
+                statusList.removeChild(firstChild);
+            }
+        }
+        
+        // إضافة العنصر الجديد في بداية القائمة
+        statusList.insertBefore(newItem, statusList.firstChild);
     }
-  }
-  
+}
+
+
   // إضافة تحميل متأخر للصور
   const lazyImages = document.querySelectorAll('img[loading="lazy"]');
   
