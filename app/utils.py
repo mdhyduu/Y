@@ -50,42 +50,7 @@ def get_user_from_cookies():
     except (ValueError, TypeError):
         # إذا كان user_id غير رقمي
         return None, None
-def generate_barcode(data, prefix=""):
-    """إنشاء باركود مخصص مع إمكانية إضافة بادئة"""
-    try:
-        # مسار لحفظ صور الباركود
-        barcode_folder = current_app.config['BARCODE_FOLDER']
-        if not os.path.exists(barcode_folder):
-            os.makedirs(barcode_folder)
-        
-        # نستخدم نوع Code128 للباركود
-        writer = ImageWriter()
-        code = barcode.get('code128', str(data), writer=writer)
-        
-        # إنشاء اسم ملف فريد
-        filename = f"{prefix}{data}"
-        filepath = os.path.join(barcode_folder, filename)
-        
-        # حفظ الصورة
-        code.save(filepath, options={
-            'write_text': False,  # عدم عرض النص تحت الباركود
-            'module_width': 0.4,  # عرض العناصر في الباركود
-            'module_height': 15,   # ارتفاع الباركود
-            'quiet_zone': 10       # المساحة الفارغة حول الباركود
-        })
-        
-        return f"{filename}.png"
-    except Exception as e:
-        logger.error(f"Error generating barcode: {str(e)}", exc_info=True)
-        return None
 
-def generate_order_barcode(order_id):
-    """إنشاء باركود للطلب"""
-    return generate_barcode(order_id, prefix="order_")
-
-def generate_item_barcode(order_id, item_id):
-    """إنشاء باركود خاص بكل عنصر في الطلب"""
-    return generate_barcode(f"{order_id}-{item_id}", prefix="item_")
 
 def format_date(date_str):
     try:
@@ -94,6 +59,37 @@ def format_date(date_str):
         return dt.strftime('%Y-%m-%d %H:%M')
     except:
         return date_str if date_str else 'غير معروف'
+def generate_and_store_barcode(order_id, order_type='salla'):
+    """إنشاء باركود وحفظه في قاعدة البيانات تلقائيًا"""
+    try:
+        from app.models import SallaOrder, CustomOrder
+        
+        # إنشاء الباركود
+        barcode_data = generate_barcode(order_id)
+        
+        if not barcode_data:
+            logger.error(f"فشل في إنشاء الباركود للطلب {order_id}")
+            return False
+        
+        # حفظ الباركود في قاعدة البيانات
+        if order_type == 'salla':
+            order = SallaOrder.query.get(order_id)
+        else:
+            order = CustomOrder.query.get(order_id)
+            
+        if order:
+            order.barcode_data = barcode_data
+            order.barcode_generated_at = datetime.utcnow()
+            db.session.commit()
+            logger.info(f"تم حفظ الباركود تلقائيًا للطلب {order_id}")
+            return True
+        else:
+            logger.error(f"لم يتم العثور على الطلب {order_id} في قاعدة البيانات")
+            return False
+            
+    except Exception as e:
+        logger.error(f"خطأ في حفظ الباركود تلقائيًا: {str(e)}")
+        return False
 def process_order_data(order_id, items_data):
     """معالجة بيانات الطلب لتتناسب مع القالب مع إضافة الباركود لكل منتج"""
     items = []
@@ -236,11 +232,21 @@ def process_order_data(order_id, items_data):
         items.append(item_data)
         logger.info(f"Processed item: {item_data['name']} (ID: {item_id})")
 
-    processed_order = {
-        'id': order_id,
-        'order_items': items,
-        'barcode': generate_order_barcode(order_id)  # الباركود الرئيسي للطلب (يبقى كما هو)
-    }
+    order = SallaOrder.query.get(order_id)
+        if order and order.barcode_data:
+            barcode_data = order.barcode_data
+        else:
+            # إنشاء باركود جديد وحفظه
+            barcode_data = generate_barcode(order_id)
+            if barcode_data and order:
+                order.barcode_data = barcode_data
+                db.session.commit()
+        
+        processed_order = {
+            'id': order_id,
+            'order_items': items,
+            'barcode': barcode_data  # تخزين كـ base64 بدلاً من اسم ملف
+        }
     
     logger.info(f"Processed order with {len(items)} items and barcode: {processed_order['barcode']}")
     return processed_order

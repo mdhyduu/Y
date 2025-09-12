@@ -531,10 +531,15 @@ def order_details(order_id):
             }
         })
 
-        if not processed_order.get('barcode'):
-            barcode_filename = generate_barcode(order_id)
-            if barcode_filename:
-                processed_order['barcode'] = barcode_filename
+        order = SallaOrder.query.get(order_id)
+            if order and order.barcode_data:
+                barcode_data = order.barcode_data
+            else:
+                # إنشاء باركود جديد وحفظه
+                barcode_data = generate_barcode(order_id)
+                if barcode_data and order:
+                    order.barcode_data = barcode_data
+                    db.session.commit()
 
         # ========== [6] جلب البيانات الإضافية ==========
         custom_note_statuses = CustomNoteStatus.query.filter_by(
