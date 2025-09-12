@@ -13,7 +13,7 @@ from . import orders_bp
 from app.models import (db, SallaOrder, CustomOrder, OrderStatus,User, Employee, 
                      OrderAssignment, EmployeeCustomStatus, OrderStatusNote, 
                      OrderEmployeeStatus, OrderProductStatus, CustomNoteStatus)
-from app.utils import get_user_from_cookies, process_order_data, format_date, generate_barcode, humanize_time
+from app.utils import get_user_from_cookies, process_order_data, format_date,  humanize_time
 from app.token_utils import refresh_salla_token
 from app.config import Config
 from flask import send_file
@@ -531,15 +531,6 @@ def order_details(order_id):
             }
         })
 
-        order = SallaOrder.query.get(order_id)
-            if order and order.barcode_data:
-                barcode_data = order.barcode_data
-            else:
-                # إنشاء باركود جديد وحفظه
-                barcode_data = generate_barcode(order_id)
-                if barcode_data and order:
-                    order.barcode_data = barcode_data
-                    db.session.commit()
 
         # ========== [6] جلب البيانات الإضافية ==========
         custom_note_statuses = CustomNoteStatus.query.filter_by(
