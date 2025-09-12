@@ -19,6 +19,7 @@ from app.config import Config
 from flask import send_file
 import pandas as pd
 from io import BytesIO
+from concurrent import futures
 import openpyxl
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.styles import Alignment
@@ -349,6 +350,7 @@ def index():
         flash(error_msg, 'error')
         logger.exception(error_msg)
         return redirect(url_for('orders.index'))
+
 @orders_bp.route('/<int:order_id>')
 def order_details(order_id):
     """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة (بدون shipments)"""
@@ -409,20 +411,80 @@ def order_details(order_id):
             except requests.exceptions.RequestException as e:
                 raise e
 
-        # ========== [3] جلب بيانات الطلب ==========
-        order_response = make_salla_api_request(f"{Config.SALLA_ORDERS_API}/{order_id}")
-        if not isinstance(order_response, requests.Response):
-            return order_response
-        order_data = order_response.json().get('data', {})
+        # ========== [3] جلب بيانات الطلب والمنتجات بشكل متوازي ==========
+        def fetch_order_data():
+            order_response = make_salla_api_request(f"{Config.SALLA_ORDERS_API}/{order_id}")
+            if not isinstance(order_response, requests.Response):
+                return order_response
+            return order_response.json().get('data', {})
 
-        # جلب عناصر الطلب
-        items_response = make_salla_api_request(
-            f"{Config.SALLA_BASE_URL}/orders/items",
-            params={'order_id': order_id, 'include': 'images'}
-        )
-        if not isinstance(items_response, requests.Response):
-            return items_response
-        items_data = items_response.json().get('data', [])
+        def fetch_order_items():
+            items_response = make_salla_api_request(
+                f"{Config.SALLA_BASE_URL}/orders/items",
+                params={'order_id': order_id, 'include': 'images'}
+            )
+            if not isinstance(items_response, requests.Response):
+                return items_response
+            return items_response.json().get('data', [])
+
+        def fetch_db_data():
+            # جلب البيانات من قاعدة البيانات بشكل متوازي
+            custom_note_statuses = CustomNoteStatus.query.filter_by(
+                store_id=user.store_id
+            ).all()
+            
+            status_notes = OrderStatusNote.query.filter_by(
+                order_id=str(order_id)
+            ).options(
+                selectinload(OrderStatusNote.admin),
+                selectinload(OrderStatusNote.employee),
+                selectinload(OrderStatusNote.custom_status)
+            ).order_by(
+                OrderStatusNote.created_at.desc()
+            ).all()
+
+            employee_statuses = db.session.query(
+                OrderEmployeeStatus,
+                EmployeeCustomStatus,
+                Employee
+            ).join(
+                EmployeeCustomStatus,
+                OrderEmployeeStatus.status_id == EmployeeCustomStatus.id
+            ).join(
+                Employee,
+                EmployeeCustomStatus.employee_id == Employee.id
+            ).filter(
+                OrderEmployeeStatus.order_id == str(order_id)
+            ).order_by(
+                OrderEmployeeStatus.created_at.desc()
+            ).all()
+
+            status_records = OrderProductStatus.query.filter_by(order_id=str(order_id)).all()
+            product_statuses = {}
+            for status in status_records:
+                product_statuses[status.product_id] = {
+                    'status': status.status,
+                    'notes': status.notes,
+                    'updated_at': status.updated_at
+                }
+            
+            return {
+                'custom_note_statuses': custom_note_statuses,
+                'status_notes': status_notes,
+                'employee_statuses': employee_statuses,
+                'product_statuses': product_statuses
+            }
+
+        # تشغيل جميع المهام بشكل متوازي
+        with futures.ThreadPoolExecutor() as executor:
+            order_future = executor.submit(fetch_order_data)
+            items_future = executor.submit(fetch_order_items)
+            db_future = executor.submit(fetch_db_data)
+            
+            # انتظار انتهاء جميع المهام
+            order_data = order_future.result()
+            items_data = items_future.result()
+            db_data = db_future.result()
 
         # ========== [4] معالجة بيانات الطلب ==========
         processed_order = process_order_data(order_id, items_data)
@@ -531,59 +593,14 @@ def order_details(order_id):
             }
         })
 
-        
-
-        # ========== [6] جلب البيانات الإضافية ==========
-        custom_note_statuses = CustomNoteStatus.query.filter_by(
-            store_id=user.store_id
-        ).all()
-        
-        status_notes = OrderStatusNote.query.filter_by(
-            order_id=str(order_id)
-        ).options(
-            selectinload(OrderStatusNote.admin),
-            selectinload(OrderStatusNote.employee),
-            selectinload(OrderStatusNote.custom_status)
-        ).order_by(
-            OrderStatusNote.created_at.desc()
-        ).all()
-
-        # استعلام واحد لجميع employee_statuses مع العلاقات
-        employee_statuses = db.session.query(
-            OrderEmployeeStatus,
-            EmployeeCustomStatus,
-            Employee
-        ).join(
-            EmployeeCustomStatus,
-            OrderEmployeeStatus.status_id == EmployeeCustomStatus.id
-        ).join(
-            Employee,
-            EmployeeCustomStatus.employee_id == Employee.id
-        ).filter(
-            OrderEmployeeStatus.order_id == str(order_id)
-        ).order_by(
-            OrderEmployeeStatus.created_at.desc()
-        ).all()
-
-        # استعلام واحد لجميع product_statuses
-        status_records = OrderProductStatus.query.filter_by(order_id=str(order_id)).all()
-        product_statuses = {}
-        for status in status_records:
-            product_statuses[status.product_id] = {
-                'status': status.status,
-                'notes': status.notes,
-                'updated_at': status.updated_at
-            }
-        
-
         return render_template('order_details.html', 
             order=processed_order,
-            status_notes=status_notes,
-            employee_statuses=employee_statuses,
-            custom_note_statuses=custom_note_statuses,
+            status_notes=db_data['status_notes'],
+            employee_statuses=db_data['employee_statuses'],
+            custom_note_statuses=db_data['custom_note_statuses'],
             current_employee=current_employee,
             is_reviewer=is_reviewer,
-            product_statuses=product_statuses
+            product_statuses=db_data['product_statuses']
         )
 
     except requests.exceptions.HTTPError as http_err:
@@ -605,8 +622,6 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
-
-
 # orders/routes.py
 import hmac
 import hashlib
