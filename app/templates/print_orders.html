@@ -330,8 +330,7 @@
                 
                 <div class="barcode-section">
                     {% if order.barcode %}
-                    <img src="{{ url_for('orders.serve_barcode', filename=order.barcode, _external=True) }}" 
-                         alt="باركود الطلب" class="barcode-image">
+<img src="data:image/png;base64,{{ order.barcode }}" alt="باركود الطلب">
                     <div class="barcode-number">#{{ order.reference_id }}</div>
                     {% else %}
                     <div class="barcode-number">لا يوجد باركود للطلب #{{ order.reference_id }}</div>
