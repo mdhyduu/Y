@@ -379,6 +379,9 @@ class SallaOrder(db.Model):
 
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     raw_data = db.Column(db.JSON)
+    barcode_data = db.Column(db.Text)  # تخزين الباركود كـ base64
+    barcode_generated_at = db.Column(db.DateTime)  # وقت إنشاء الباركود
+
 
     # العلاقات الأخرى
     status_notes = relationship('OrderStatusNote', back_populates='order')
@@ -392,7 +395,7 @@ class CustomOrder(db.Model):
         db.Index('ix_custom_orders_store_created', 'store_id', 'created_at'),
         db.Index('ix_custom_orders_status', 'status_id'),
     )
-
+    
     id = db.Column(db.Integer, primary_key=True)
     order_number = db.Column(db.String(50), unique=True, nullable=False)
     customer_name = db.Column(db.String(255), nullable=False)
@@ -406,7 +409,8 @@ class CustomOrder(db.Model):
     status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+    barcode_data = db.Column(db.Text)
+    barcode_generated_at = db.Column(db.DateTime)
     # العلاقات
     status = db.relationship('OrderStatus', backref='custom_orders', lazy=True)
     status_notes = relationship('OrderStatusNote', back_populates='custom_order', 
