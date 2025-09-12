@@ -327,15 +327,15 @@
 
                 </div>
                 {% endfor %}
-                
-                <div class="barcode-section">
-                    {% if order.barcode %}
-<img src="data:image/png;base64,{{ order.barcode }}" alt="باركود الطلب">
-                    <div class="barcode-number">#{{ order.reference_id }}</div>
-                    {% else %}
-                    <div class="barcode-number">لا يوجد باركود للطلب #{{ order.reference_id }}</div>
-                    {% endif %}
-                </div>
+              <div class="barcode-section">
+    {% if order.barcode %}
+    <img src="data:image/png;base64,{{ order.barcode }}" 
+         alt="باركود الطلب" class="barcode-image">
+    <div class="barcode-number">#{{ order.reference_id }}</div>
+    {% else %}
+    <div class="barcode-number">لا يوجد باركود للطلب #{{ order.reference_id }}</div>
+    {% endif %}
+</div> 
             </div>
             
             {% if not loop.last and loop.index % 2 == 0 %}
