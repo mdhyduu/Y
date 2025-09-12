@@ -351,6 +351,7 @@ def index():
         logger.exception(error_msg)
         return redirect(url_for('orders.index'))
 
+
 @orders_bp.route('/<int:order_id>')
 def order_details(order_id):
     """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة (بدون shipments)"""
@@ -428,52 +429,54 @@ def order_details(order_id):
             return items_response.json().get('data', [])
 
         def fetch_db_data():
-            # جلب البيانات من قاعدة البيانات بشكل متوازي
-            custom_note_statuses = CustomNoteStatus.query.filter_by(
-                store_id=user.store_id
-            ).all()
-            
-            status_notes = OrderStatusNote.query.filter_by(
-                order_id=str(order_id)
-            ).options(
-                selectinload(OrderStatusNote.admin),
-                selectinload(OrderStatusNote.employee),
-                selectinload(OrderStatusNote.custom_status)
-            ).order_by(
-                OrderStatusNote.created_at.desc()
-            ).all()
+            # توفير سياق التطبيق يدوياً للخيوط المنفصلة
+            with current_app.app_context():
+                # جلب البيانات من قاعدة البيانات بشكل متوازي
+                custom_note_statuses = CustomNoteStatus.query.filter_by(
+                    store_id=user.store_id
+                ).all()
+                
+                status_notes = OrderStatusNote.query.filter_by(
+                    order_id=str(order_id)
+                ).options(
+                    selectinload(OrderStatusNote.admin),
+                    selectinload(OrderStatusNote.employee),
+                    selectinload(OrderStatusNote.custom_status)
+                ).order_by(
+                    OrderStatusNote.created_at.desc()
+                ).all()
 
-            employee_statuses = db.session.query(
-                OrderEmployeeStatus,
-                EmployeeCustomStatus,
-                Employee
-            ).join(
-                EmployeeCustomStatus,
-                OrderEmployeeStatus.status_id == EmployeeCustomStatus.id
-            ).join(
-                Employee,
-                EmployeeCustomStatus.employee_id == Employee.id
-            ).filter(
-                OrderEmployeeStatus.order_id == str(order_id)
-            ).order_by(
-                OrderEmployeeStatus.created_at.desc()
-            ).all()
+                employee_statuses = db.session.query(
+                    OrderEmployeeStatus,
+                    EmployeeCustomStatus,
+                    Employee
+                ).join(
+                    EmployeeCustomStatus,
+                    OrderEmployeeStatus.status_id == EmployeeCustomStatus.id
+                ).join(
+                    Employee,
+                    EmployeeCustomStatus.employee_id == Employee.id
+                ).filter(
+                    OrderEmployeeStatus.order_id == str(order_id)
+                ).order_by(
+                    OrderEmployeeStatus.created_at.desc()
+                ).all()
 
-            status_records = OrderProductStatus.query.filter_by(order_id=str(order_id)).all()
-            product_statuses = {}
-            for status in status_records:
-                product_statuses[status.product_id] = {
-                    'status': status.status,
-                    'notes': status.notes,
-                    'updated_at': status.updated_at
+                status_records = OrderProductStatus.query.filter_by(order_id=str(order_id)).all()
+                product_statuses = {}
+                for status in status_records:
+                    product_statuses[status.product_id] = {
+                        'status': status.status,
+                        'notes': status.notes,
+                        'updated_at': status.updated_at
+                    }
+                
+                return {
+                    'custom_note_statuses': custom_note_statuses,
+                    'status_notes': status_notes,
+                    'employee_statuses': employee_statuses,
+                    'product_statuses': product_statuses
                 }
-            
-            return {
-                'custom_note_statuses': custom_note_statuses,
-                'status_notes': status_notes,
-                'employee_statuses': employee_statuses,
-                'product_statuses': product_statuses
-            }
 
         # تشغيل جميع المهام بشكل متوازي
         with futures.ThreadPoolExecutor() as executor:
@@ -622,7 +625,6 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
-# orders/routes.py
 import hmac
 import hashlib
 def extract_store_id_from_webhook(webhook_data):
