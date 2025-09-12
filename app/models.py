@@ -571,6 +571,11 @@ class OrderDelivery(db.Model):
 
 class OrderEmployeeStatus(db.Model):
     __tablename__ = 'order_employee_status'
+    __table_args__ = (
+        db.Index('ix_order_employee_status_order_id', 'order_id'),
+        db.Index('ix_order_employee_status_created_at', 'created_at'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.String(50), db.ForeignKey('salla_orders.id'), nullable=False)
     status_id = db.Column(db.Integer, db.ForeignKey('employee_custom_statuses.id'), nullable=False)
@@ -605,6 +610,10 @@ class OrderStatus(db.Model):
         return f'<OrderStatus {self.name} ({self.type})>'
 class OrderProductStatus(db.Model):
     __tablename__ = 'order_product_status'
+    __table_args__ = (
+        db.Index('ix_order_product_status_order_id', 'order_id'),
+        db.Index('ix_order_product_status_product_id', 'product_id'),
+    )
     
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.String(50), db.ForeignKey('salla_orders.id'), nullable=False)
