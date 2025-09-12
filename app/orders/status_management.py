@@ -4,7 +4,7 @@ from flask import (jsonify, request, redirect, url_for, flash, render_template,
                    make_response, current_app)  # إضافة make_response و current_app
 from . import orders_bp
 from app.models import (db, OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, 
-                       CustomNoteStatus, OrderProductStatus)
+                       CustomNoteStatus, OrderProductStatus, OrderAssignment)
 from app.utils import get_user_from_cookies
 from app.config import Config
 import requests
@@ -80,16 +80,20 @@ def update_order_status(order_id):
         flash(f"حدث خطأ غير متوقع: {str(e)}", "error")
         return redirect(url_for('orders.order_details', order_id=order_id))
 
+
 @orders_bp.route('/<int:order_id>/add_status_note', methods=['POST'])
 def add_status_note(order_id):
     user, employee = get_user_from_cookies()
     
     if not user:
-        flash("الرجاء تسجيل الدخول أولاً", "error")
-        response = make_response(redirect(url_for('user_auth.login')))
-        response.set_cookie('user_id', '', expires=0)
-        response.set_cookie('is_admin', '', expires=0)
-        return response
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول أولاً'}), 401
+        else:
+            flash("الرجاء تسجيل الدخول أولاً", "error")
+            response = make_response(redirect(url_for('user_auth.login')))
+            response.set_cookie('user_id', '', expires=0)
+            response.set_cookie('is_admin', '', expires=0)
+            return response
     
     # التحقق من الصلاحية: فقط المراجعون والمديرون
     is_reviewer = False
@@ -100,15 +104,21 @@ def add_status_note(order_id):
             is_reviewer = True
     
     if not is_reviewer:
-        flash('غير مصرح لك بهذا الإجراء', 'error')
-        return redirect(url_for('orders.order_details', order_id=order_id))
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'غير مصرح لك بهذا الإجراء'}), 403
+        else:
+            flash('غير مصرح لك هذا الإجراء', 'error')
+            return redirect(url_for('orders.order_details', order_id=order_id))
     
     status_type = request.form.get('status_type')
     note = request.form.get('note', '')
     
     if not status_type:
-        flash("يجب اختيار حالة", "error")
-        return redirect(url_for('orders.order_details', order_id=order_id))
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': 'يجب اختيار حالة'}), 400
+        else:
+            flash("يجب اختيار حالة", "error")
+            return redirect(url_for('orders.order_details', order_id=order_id))
     
     try:
         custom_status_id = None
@@ -125,8 +135,11 @@ def add_status_note(order_id):
         )
         
         if has_conflict:
-            flash(conflict_message, "error")
-            return redirect(url_for('orders.order_details', order_id=order_id))
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'error': conflict_message}), 400
+            else:
+                flash(conflict_message, "error")
+                return redirect(url_for('orders.order_details', order_id=order_id))
         
         # ✅ تحديث أو إنشاء جديد
         existing_note = OrderStatusNote.query.filter_by(
@@ -139,7 +152,7 @@ def add_status_note(order_id):
             existing_note.note = note
             existing_note.updated_at = datetime.utcnow()
             db.session.commit()
-            flash("تم تحديث الملاحظة بنجاح", "success")
+            message = "تم تحديث الملاحظة بنجاح"
         else:
             new_note = OrderStatusNote(
                 order_id=str(order_id),
@@ -154,17 +167,65 @@ def add_status_note(order_id):
             
             db.session.add(new_note)
             db.session.commit()
-            flash("تم حفظ الملاحظة بنجاح", "success")
+            message = "تم حفظ الملاحظة بنجاح"
         
         handle_status_transitions(order_id, status_flag, custom_status_id)
+        
+        # إذا كان الطلب AJAX، نرجع JSON
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            # تحضير بيانات الحالة الجديدة
+            new_status_data = {}
+            if custom_status_id:
+                custom_status = CustomNoteStatus.query.get(custom_status_id)
+                if custom_status:
+                    new_status_data = {
+                        'name': custom_status.name,
+                        'color': custom_status.color,
+                        'note': note,
+                        'created_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M')
+                    }
+            else:
+                # للحالات التلقائية
+                status_name = ''
+                status_color = ''
+                if status_flag == 'late':
+                    status_name = 'متأخر'
+                    status_color = '#ffc107'
+                elif status_flag == 'missing':
+                    status_name = 'واصل ناقص'
+                    status_color = '#dc3545'
+                elif status_flag == 'not_shipped':
+                    status_name = 'لم يتم الشحن'
+                    status_color = '#0dcaf0'
+                elif status_flag == 'refunded':
+                    status_name = 'مرتجع'
+                    status_color = '#6c757d'
+                
+                new_status_data = {
+                    'name': status_name,
+                    'color': status_color,
+                    'note': note,
+                    'created_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M')
+                }
+            
+            return jsonify({
+                'success': True,
+                'message': message,
+                'new_status': new_status_data
+            })
+        else:
+            flash(message, "success")
+            return redirect(url_for('orders.order_details', order_id=order_id))
      
     except Exception as e:
         db.session.rollback()
-        flash(f"حدث خطأ: {str(e)}", "error")
-        current_app.logger.error(f"Error adding status note: {str(e)}", exc_info=True)
-    
-    return redirect(url_for('orders.order_details', order_id=order_id))
-
+        error_msg = f"حدث خطأ: {str(e)}"
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': error_msg}), 500
+        else:
+            flash(error_msg, "error")
+            current_app.logger.error(f"Error adding status note: {str(e)}", exc_info=True)
+            return redirect(url_for('orders.order_details', order_id=order_id))
 @orders_bp.route('/<int:order_id>/add_employee_status', methods=['POST'])
 def add_employee_status(order_id):
     ...

@@ -4,17 +4,18 @@
 
 {% block content %}
 
-
 <div class="container-fluid g-0 m-0 w-100 full-width-container">
   <!-- رأس الصفحة -->
-<div class="bg-light p-3 d-flex justify-content-between align-items-center flex-wrap gap-2"> <h2 class="mb-0 fs-4"> <i class="fas fa-file-invoice ms-2"></i> تفاصيل الطلب #{{  order.reference_id | safe }}
-   </h2> 
+  <div class="bg-light p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h2 class="mb-0 fs-4">
+      <i class="fas fa-file-invoice ms-2"></i> تفاصيل الطلب #{{ order.reference_id | safe }}
+    </h2>
     <div>
       <a href="{{ url_for('orders.index') }}" class="btn btn-outline-secondary btn-sm">
         <i class="fas fa-arrow-left ms-1"></i> العودة للطلبات
       </a>
     </div>
-  </div> 
+  </div>
 
   <div class="row g-0 mx-0">
     <!-- القسم الرئيسي - تفاصيل الطلب -->
@@ -31,85 +32,83 @@
             <i class="fas fa-boxes ms-2"></i>المنتجات ({{ order.order_items | length }})
           </h5>
 
-          <!-- تعديل هنا لعرض المنتجات في صفوف مع تمرير أفقي -->
+          <!-- جدول المنتجات -->
           <div class="table-responsive">
             <table class="table table-borderless">
               <tbody>
                 {% for item in order.order_items %}
-     <tr class="border-bottom">
-  <!-- صورة المنتج -->
-  <td style="width: 120px; min-width: 120px;">
-    <div class="d-flex justify-content-center">
-      {% if item.main_image %}
-      <img src="{{ item.main_image | safe }}" alt="{{ item.name | safe }}"
-           class="img-fluid rounded product-image"
-           style="width: 160px; height: 160px; object-fit: cover;"
-           loading="lazy">
-      {% else %}
-      <div class="bg-light d-flex align-items-center justify-content-center rounded product-image-placeholder" 
-           style="width: 80px; height: 80px;">
-        <i class="fas fa-image fa-lg text-muted"></i>
-      </div>
-      {% endif %}
-    </div>
-    <div class="text-center mt-1 small text-muted">
-      الكمية: {{ item.quantity }}
-    </div>
-  </td>
+                <tr class="border-bottom">
+                  <!-- صورة المنتج -->
+                  <td style="width: 120px; min-width: 120px;">
+                    <div class="d-flex justify-content-center">
+                      {% if item.main_image %}
+                      <img src="{{ item.main_image | safe }}" alt="{{ item.name | safe }}"
+                           class="img-fluid rounded product-image"
+                           style="width: 160px; height: 160px; object-fit: cover;"
+                           loading="lazy">
+                      {% else %}
+                      <div class="bg-light d-flex align-items-center justify-content-center rounded product-image-placeholder" 
+                           style="width: 80px; height: 80px;">
+                        <i class="fas fa-image fa-lg text-muted"></i>
+                      </div>
+                      {% endif %}
+                    </div>
+                    <div class="text-center mt-1 small text-muted">
+                      الكمية: {{ item.quantity }}
+                    </div>
+                  </td>
   
-  <!-- خيارات المنتج -->
-  <td style="min-width: 150px;">
-{% if item.options %}
-<div class="text-start product-options">
-  <h6 class="mb-1 small text-muted">
-    <i class="fas fa-cogs me-1"></i>خيارات
-  </h6>
-  <ul class="list-group list-group-flush small">
-    {% for option in item.options %}
-    <li class="list-group-item d-flex justify-content-between py-1 px-0 option-item">
-      <span class="fw-bold">{{ option.name | safe }}</span>
-      <span class="text-wrap text-end" style="max-width: 60%;">
-        {{ option.value | safe }}
-      </span>
-    </li>
-    {% endfor %}
-  </ul> 
-</div>
-{% else %}
-<div class="alert alert-info p-1 mt-2 small">
-  <i class="fas fa-info-circle me-1"></i>
-  لا توجد خيارات لهذا المنتج
-</div>
-{% endif %}
-  </td>
-<!-- في قسم المنتجات، تأكد من تمرير product_id بشكل صحيح -->
+                  <!-- خيارات المنتج -->
+                  <td style="min-width: 150px;">
+                    {% if item.options %}
+                    <div class="text-start product-options">
+                      <h6 class="mb-1 small text-muted">
+                        <i class="fas fa-cogs me-1"></i>خيارات
+                      </h6>
+                      <ul class="list-group list-group-flush small">
+                        {% for option in item.options %}
+                        <li class="list-group-item d-flex justify-content-between py-1 px-0 option-item">
+                          <span class="fw-bold">{{ option.name | safe }}</span>
+                          <span class="text-wrap text-end" style="max-width: 60%;">
+                            {{ option.value | safe }}
+                          </span>
+                        </li>
+                        {% endfor %}
+                      </ul> 
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info p-1 mt-2 small">
+                      <i class="fas fa-info-circle me-1"></i>
+                      لا توجد خيارات لهذا المنتج
+                    </div>
+                    {% endif %}
+                  </td>
+                  
+                  <!-- حالة المنتج -->
+                  <td class="text-center align-middle">
+                    <div class="product-status-container" data-order-id="{{ order.id | string }}" data-product-id="{{ item.id | string }}">
+                      <!-- زر تم التنفيذ -->
+                      <form class="update-product-status-form d-inline mb-1">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit"
+                                class="btn btn-sm btn-success"
+                                {% if product_statuses[item.id|string] and product_statuses[item.id|string].status == 'تم التنفيذ' %}disabled{% endif %}>
+                          <i class="fas fa-check"></i> تم التنفيذ
+                        </button>
+                      </form>
 
-<td class="text-center align-middle">
-    <div class="product-status-container" data-order-id="{{ order.id | string }}" data-product-id="{{ item.id | string }}">
-        <!-- زر تم التنفيذ -->
-        <form class="update-product-status-form d-inline mb-1">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit"
-                    class="btn btn-sm btn-success"
-                    {% if product_statuses[item.id|string] and product_statuses[item.id|string].status == 'تم التنفيذ' %}disabled{% endif %}>
-                <i class="fas fa-check"></i> تم التنفيذ
-            </button>
-        </form>
-
-        <!-- زر إلغاء الحالة (سيتم إضافته ديناميكيًا) -->
-        {% if product_statuses[item.id|string] and product_statuses[item.id|string].status == 'تم التنفيذ' %}
-        <form class="cancel-product-status-form d-inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-sm btn-outline-danger">
-                <i class="fas fa-undo"></i>
-            </button>
-        </form>
-        {% endif %}
-
-      
-    </div>
-</td>
-</tr>
+                      <!-- زر إلغاء الحالة -->
+                      {% if product_statuses[item.id|string] and product_statuses[item.id|string].status == 'تم التنفيذ' %}
+                      <form class="cancel-product-status-form d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                          <i class="fas fa-undo"></i>
+                        </button>
+                      </form>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
                 {% endfor %}
               </tbody>
             </table>
@@ -127,7 +126,7 @@
         </div>
         <div class="card-body p-2">
           {% if current_employee %}
-          <form action="{{ url_for('orders.add_employee_status', order_id=order.id) }}" method="POST" id="employee-status-form">
+          <form action="{{ url_for('orders.add_employee_status', order_id=order.id) }}" method="POST" id="employee-status-form" class="ajax-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-2">
               <label class="form-label small">اختر حالة</label>
@@ -151,7 +150,7 @@
           
           <div class="mt-3">
             <h6 class="border-bottom pb-1 small">الحالات المسجلة</h6>
-            <ul class="list-group list-group-flush small">
+            <ul class="list-group list-group-flush small employee-status-list">
               {% if employee_statuses %}
                 {% for emp_status, custom_status, employee in employee_statuses %}
                 <li class="list-group-item d-flex justify-content-between py-1 px-0">
@@ -177,117 +176,110 @@
         </div>
       </div>
 
-      <!-- قسم الحالات الخاصة (للمراجعين فقط) -->
-<!-- قسم الحالات الخاصة -->
-<!-- بداية التعديل - قسم الحالات الخاصة -->
-<!-- بداية التعديل - قسم الحالات الخاصة -->
-<!-- بداية التعديل - قسم الحالات الخاصة -->
-{% if is_reviewer %}
-<div class="card shadow-sm mb-3 border-0">
-    <div class="card-header bg-white py-2">
-        <h5 class="mb-0 fs-5"><i class="fas fa-flag ms-2"></i>حالات خاصة</h5>
-    </div>
-    <div class="card-body p-2">
-        <form action="{{ url_for('orders.add_status_note', order_id=order.id) }}" method="POST">
+      <!-- قسم الحالات الخاصة -->
+      {% if is_reviewer %}
+      <div class="card shadow-sm mb-3 border-0">
+        <div class="card-header bg-white py-2">
+          <h5 class="mb-0 fs-5"><i class="fas fa-flag ms-2"></i>حالات خاصة</h5>
+        </div>
+        <div class="card-body p-2">
+          <form action="{{ url_for('orders.add_status_note', order_id=order.id) }}" method="POST" id="special-status-form" class="ajax-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             
             <div class="mb-3">
-                <label class="form-label small fw-bold">اختر حالة</label>
-                <select class="form-select form-select-sm" name="status_type" required>
-                    <option value="">-- اختر حالة --</option>
-                    
-                    <!-- الحالات التلقائية -->
-                    <optgroup label="الحالات التلقائية">
-                        <option value="late">متأخر</option>
-                        <option value="missing">واصل ناقص</option>
-                        <option value="refunded">مرتجع</option>
-                        <option value="not_shipped">لم يتم الشحن</option>
-                    </optgroup>
-                    
-                    <!-- الحالات المخصصة -->
-                    {% if custom_note_statuses %}
-                    <optgroup label="الحالات المخصصة">
-                        {% for status in custom_note_statuses %}
-                        <option value="custom_{{ status.id }}">
-                            {{ status.name }}
-                        </option>
-                        {% endfor %}
-                    </optgroup>
-                    {% endif %}
-                </select>
+              <label class="form-label small fw-bold">اختر حالة</label>
+              <select class="form-select form-select-sm" name="status_type" required>
+                <option value="">-- اختر حالة --</option>
+                
+                <!-- الحالات التلقائية -->
+                <optgroup label="الحالات التلقائية">
+                  <option value="late">متأخر</option>
+                  <option value="missing">واصل ناقص</option>
+                  <option value="refunded">مرتجع</option>
+                  <option value="not_shipped">لم يتم الشحن</option>
+                </optgroup>
+                
+                <!-- الحالات المخصصة -->
+                {% if custom_note_statuses %}
+                <optgroup label="الحالات المخصصة">
+                  {% for status in custom_note_statuses %}
+                  <option value="custom_{{ status.id }}">
+                    {{ status.name }}
+                  </option>
+                  {% endfor %}
+                </optgroup>
+                {% endif %}
+              </select>
             </div>
             
             <div class="mb-3">
-                <label class="form-label small fw-bold">ملاحظات إضافية</label>
-                <textarea class="form-control form-control-sm" name="note" rows="3" 
-                          placeholder="أدخل ملاحظاتك هنا..."></textarea>
+              <label class="form-label small fw-bold">ملاحظات إضافية</label>
+              <textarea class="form-control form-control-sm" name="note" rows="3" 
+                        placeholder="أدخل ملاحظاتك هنا..."></textarea>
             </div>
             
             <button type="submit" class="btn btn-primary btn-sm w-100">
-                <i class="fas fa-save me-1"></i> حفظ الحالة
+              <i class="fas fa-save me-1"></i> حفظ الحالة
             </button>
-        </form>
-{% endif %}
-        <!-- عرض الحالات المسجلة في قائمة واحدة -->
-        <div class="mt-4">
-            <h6 class="border-bottom pb-2 mb-3 small fw-bold">تنبيهات  </h6>
-            {% if status_notes %}
-                <div class="list-group list-group-flush">
-                    {% for note in status_notes %}
-                    <div class="list-group-item py-2 px-0">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <!-- عرض الحالة مع لونها -->
-                                <span class="badge" style="
-                                    {% if note.custom_status %} 
-                                        background-color: {{ note.custom_status.color }};
-                                    {% else %}
-                                        background-color: 
-                                            {% if note.status_flag == 'late' %}#ffc107
-                                            {% elif note.status_flag == 'missing' %}#dc3545
-                                            {% elif note.status_flag == 'not_shipped' %}#0dcaf0
-                                            {% elif note.status_flag == 'refunded' %}#6c757d
-                                            {% else %}#6c757d
-                                            {% endif %};
-                                    {% endif %} 
-                                    color: white;">
-                                    
-                                    {% if note.custom_status %}
-                                        <i class="fas fa-tag me-1"></i>{{ note.custom_status.name }}
-                                    {% else %}
-                                        <i class="fas fa-flag me-1"></i>
-                                        {{ 
-                                            'متأخر' if note.status_flag == 'late'
-                                            else 'واصل ناقص' if note.status_flag == 'missing'
-                                            else 'لم يتم الشحن' if note.status_flag == 'not_shipped'
-                                            else 'مرتجع' if note.status_flag == 'refunded'
-                                            else note.status_flag
-                                        }}
-                                    {% endif %}
-                                </span>
-                                
-                                {% if note.note %}
-                                    <p class="mb-0 mt-1 small">{{ note.note }}</p>
-                                {% endif %}
-                            </div>
-                            <div class="text-muted small text-end">
-                                <div>{{ note.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
-                               
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <p class="text-muted text-center py-3 small">لا توجد حالات مسجلة</p>
-            {% endif %}
-        </div>
-    </div>
-</div>
+          </form>
 
-<!-- نهاية التعديل -->
-<!-- نهاية التعديل -->
-<!-- نهاية التعديل -->
+          <!-- عرض الحالات المسجلة في قائمة واحدة -->
+          <div class="mt-4">
+            <h6 class="border-bottom pb-2 mb-3 small fw-bold">تنبيهات</h6>
+            <div class="list-group list-group-flush special-status-list">
+              {% if status_notes %}
+                {% for note in status_notes %}
+                <div class="list-group-item py-2 px-0">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <!-- عرض الحالة مع لونها -->
+                      <span class="badge" style="
+                        {% if note.custom_status %} 
+                          background-color: {{ note.custom_status.color }};
+                        {% else %}
+                          background-color: 
+                            {% if note.status_flag == 'late' %}#ffc107
+                            {% elif note.status_flag == 'missing' %}#dc3545
+                            {% elif note.status_flag == 'not_shipped' %}#0dcaf0
+                            {% elif note.status_flag == 'refunded' %}#6c757d
+                            {% else %}#6c757d
+                            {% endif %};
+                        {% endif %} 
+                        color: white;">
+                        
+                        {% if note.custom_status %}
+                          <i class="fas fa-tag me-1"></i>{{ note.custom_status.name }}
+                        {% else %}
+                          <i class="fas fa-flag me-1"></i>
+                          {{ 
+                            'متأخر' if note.status_flag == 'late'
+                            else 'واصل ناقص' if note.status_flag == 'missing'
+                            else 'لم يتم الشحن' if note.status_flag == 'not_shipped'
+                            else 'مرتجع' if note.status_flag == 'refunded'
+                            else note.status_flag
+                          }}
+                        {% endif %}
+                      </span>
+                      
+                      {% if note.note %}
+                        <p class="mb-0 mt-1 small">{{ note.note }}</p>
+                      {% endif %}
+                    </div>
+                    <div class="text-muted small text-end">
+                      <div>{{ note.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+              {% else %}
+                <p class="text-muted text-center py-3 small">لا توجد حالات مسجلة</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
       <!-- قسم تحديث حالة الطلب -->
       {% if is_reviewer  %}
       <div class="card shadow-sm mb-3 border-0">
@@ -326,14 +318,14 @@
           </form>
         </div>
       </div>
-{% endif %}
+      {% endif %}
+
       <!-- قسم المعلومات الإضافية -->
       <div class="card shadow-sm border-0">
         <div class="card-header bg-white py-2">
           <h5 class="mb-0 fs-5"><i class="fas fa-info-circle ms-2"></i>معلومات إضافية</h5>
         </div>
         
-     
         <div class="card-body p-2">
           <ul class="list-group list-group-flush small">
             <li class="list-group-item d-flex justify-content-between py-1 px-0">
@@ -349,119 +341,107 @@
               </span>
             </li>
 
-            <!-- معلومات المستلم -->
+            <!-- معلومات العنوان -->
+            <li class="list-group-item py-2 px-0">
+              <div class="fw-bold mb-1">عنوان الشحن الكامل:</div>
+              <div class="text-muted small">
+                {% if order.shipping.address and order.shipping.address != 'لم يتم تحديد العنوان' %}
+                  {{ order.shipping.address }}
+                {% else %}
+                  {% if order.shipping.country %}
+                    <span class="d-block">الدولة: {{ order.shipping.country }}</span>
+                  {% endif %}
+                  {% if order.shipping.city %}
+                    <span class="d-block">المدينة: {{ order.shipping.city }}</span>
+                  {% endif %}
+                  {% if order.shipping.district %}
+                    <span class="d-block">الحي: {{ order.shipping.district }}</span>
+                  {% endif %}
+                  {% if order.shipping.street %}
+                    <span class="d-block">الشارع: {{ order.shipping.street }}</span>
+                  {% endif %}
+                  {% if order.shipping.description %}
+                    <span class="d-block">الوصف: {{ order.shipping.description }}</span>
+                  {% endif %}
+                  {% if order.shipping.postal_code %}
+                    <span class="d-block">الرمز البريدي: {{ order.shipping.postal_code }}</span>
+                  {% endif %}
+                {% endif %}
 
+                {% if not order.shipping.address and not order.shipping.country 
+                      and not order.shipping.city and not order.shipping.district
+                      and not order.shipping.street and not order.shipping.description 
+                      and not order.shipping.postal_code %}
+                  <span class="text-danger">لم يتم تحديد العنوان</span>
+                {% endif %}
+
+                {% if order.shipping.raw_data and order.shipping.raw_data.latitude and order.shipping.raw_data.longitude %}
+                  <span class="d-block mt-1">
+                    <small>الإحداثيات: {{ order.shipping.raw_data.latitude }}, {{ order.shipping.raw_data.longitude }}</small>
+                  </span>
+                {% endif %}
+              </div>
+            </li>
             
-<!-- في القسم الخاص بعرض العنوان، استبدل هذا الكود: -->
- 
+            <li class="list-group-item d-flex justify-content-between py-2 px-0">
+              <span class="fw-bold">اسم المستلم:</span>
+              <span>
+                {% if order.receiver.name %}
+                  {{ order.receiver.name | safe }}
+                {% elif order.shipping.customer_name %}
+                  {{ order.shipping.customer_name | safe }}
+                {% else %}
+                  {{ order.customer.first_name | safe }} {{ order.customer.last_name | safe }}
+                {% endif %}
+              </span>
+            </li>
 
-<li class="list-group-item py-2 px-0">
-    <div class="fw-bold mb-1">عنوان الشحن الكامل:</div>
-    <div class="text-muted small">
-        {# إذا عندنا العنوان الكامل نعرضه #}
-        {% if order.shipping.address and order.shipping.address != 'لم يتم تحديد العنوان' %}
-            {{ order.shipping.address }}
-        {% else %}
-            {# نعرض المكونات بشكل منفصل #}
-            {% if order.shipping.country %}
-                <span class="d-block">الدولة: {{ order.shipping.country }}</span>
+            <li class="list-group-item d-flex justify-content-between py-2 px-0">
+              <span class="fw-bold">هاتف المستلم:</span>
+              <span>
+                {% if order.receiver.phone %}
+                  {{ order.receiver.phone | safe }}
+                {% elif order.shipping.phone %}
+                  {{ order.shipping.phone | safe }}
+                {% else %}
+                  {{ order.customer.phone | safe }}
+                {% endif %}
+              </span>
+            </li>
+
+            <li class="list-group-item d-flex justify-content-between py-2 px-0">
+              <span class="fw-bold">البريد الإلكتروني:</span>
+              <span>
+                {% if order.receiver.email %}
+                  {{ order.receiver.email | safe }}
+                {% else %}
+                  {{ order.customer.email | safe }}
+                {% endif %}
+              </span>
+            </li>
+
+            {% if order.shipping.tracking_number %}
+            <li class="list-group-item d-flex justify-content-between py-2 px-0">
+              <span class="fw-bold">رقم التتبع:</span>
+              <span>
+                {% if order.shipping.tracking_link %}
+                  <a href="{{ order.shipping.tracking_link }}" target="_blank" class="text-decoration-none">
+                    {{ order.shipping.tracking_number }}
+                    <i class="fas fa-external-link-alt ms-1 small"></i>
+                  </a>
+                {% else %}
+                  {{ order.shipping.tracking_number }}
+                {% endif %}
+              </span>
+            </li>
             {% endif %}
-            {% if order.shipping.city %}
-                <span class="d-block">المدينة: {{ order.shipping.city }}</span>
+
+            {% if order.shipping.method and order.shipping.method != 'غير محدد' %}
+            <li class="list-group-item d-flex justify-content-between py-2 px-0">
+              <span class="fw-bold">شركة الشحن:</span>
+              <span>{{ order.shipping.method }}</span>
+            </li>
             {% endif %}
-            {% if order.shipping.district %}
-                <span class="d-block">الحي: {{ order.shipping.district }}</span>
-            {% endif %}
-            {% if order.shipping.street %}
-                <span class="d-block">الشارع: {{ order.shipping.street }}</span>
-            {% endif %}
-            {% if order.shipping.description %}
-                <span class="d-block">الوصف: {{ order.shipping.description }}</span>
-            {% endif %}
-            {% if order.shipping.postal_code %}
-                <span class="d-block">الرمز البريدي: {{ order.shipping.postal_code }}</span>
-            {% endif %}
-        {% endif %}
-
-        {# إذا ما فيه أي بيانات #}
-        {% if not order.shipping.address and not order.shipping.country 
-              and not order.shipping.city and not order.shipping.district
-              and not order.shipping.street and not order.shipping.description 
-              and not order.shipping.postal_code %}
-            <span class="text-danger">لم يتم تحديد العنوان</span>
-        {% endif %}
-
-        {# عرض إحداثيات الموقع لو موجودة #}
-        {% if order.shipping.raw_data and order.shipping.raw_data.latitude and order.shipping.raw_data.longitude %}
-            <span class="d-block mt-1">
-                <small>الإحداثيات: {{ order.shipping.raw_data.latitude }}, {{ order.shipping.raw_data.longitude }}</small>
-            </span>
-        {% endif %}
-    </div>
-</li>
-<li class="list-group-item d-flex justify-content-between py-2 px-0">
-    <span class="fw-bold">اسم المستلم:</span>
-    <span>
-        {# البحث عن اسم المستلم في عدة أماكن محتملة #}
-        {% if order.receiver.name %}
-            {{ order.receiver.name | safe }}
-        {% elif order.shipping.customer_name %}
-            {{ order.shipping.customer_name | safe }}
-        {% else %}
-            {{ order.customer.first_name | safe }} {{ order.customer.last_name | safe }}
-        {% endif %}
-    </span>
-</li>
-
-<li class="list-group-item d-flex justify-content-between py-2 px-0">
-    <span class="fw-bold">هاتف المستلم:</span>
-    <span>
-        {# البحث عن هاتف المستلم في عدة أماكن محتملة #}
-        {% if order.receiver.phone %}
-            {{ order.receiver.phone | safe }}
-        {% elif order.shipping.phone %}
-            {{ order.shipping.phone | safe }}
-        {% else %}
-            {{ order.customer.phone | safe }}
-        {% endif %}
-    </span>
-</li>
-
-<li class="list-group-item d-flex justify-content-between py-2 px-0">
-    <span class="fw-bold">البريد الإلكتروني:</span>
-    <span>
-        {# البحث عن البريد الإلكتروني في عدة أماكن محتملة #}
-        {% if order.receiver.email %}
-            {{ order.receiver.email | safe }}
-        {% else %}
-            {{ order.customer.email | safe }}
-        {% endif %}
-    </span>
-</li>
-
-{# معلومات الشحن الإضافية إذا كانت متوفرة #}
-{% if order.shipping.tracking_number %}
-<li class="list-group-item d-flex justify-content-between py-2 px-0">
-    <span class="fw-bold">رقم التتبع:</span>
-    <span>
-        {% if order.shipping.tracking_link %}
-            <a href="{{ order.shipping.tracking_link }}" target="_blank" class="text-decoration-none">
-                {{ order.shipping.tracking_number }}
-                <i class="fas fa-external-link-alt ms-1 small"></i>
-            </a>
-        {% else %}
-            {{ order.shipping.tracking_number }}
-        {% endif %}
-    </span>
-</li>
-{% endif %}
-
-{% if order.shipping.method and order.shipping.method != 'غير محدد' %}
-<li class="list-group-item d-flex justify-content-between py-2 px-0">
-    <span class="fw-bold">شركة الشحن:</span>
-    <span>{{ order.shipping.method }}</span>
-</li>
-{% endif %}
           </ul>
         </div>
       </div>
@@ -595,8 +575,7 @@
   body.dark-mode .col-lg-4.bg-light {
     background-color: #252836 !important;
   }
-</style>
-<style>
+  
   /* أنماط المنتجات في الوضع الليلي */
   body.dark-mode .table tbody tr {
     background-color: #2c2f42 !important;
@@ -638,9 +617,8 @@
     border-color: #3a3f58 !important;
   }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<!-- ... الكود السابق ... -->
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 // استخدام event delegation للتعامل مع الأحداث الديناميكية
 document.addEventListener('click', function(e) {
@@ -659,7 +637,6 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// دالة معالجة تحديث حالة المنتج
 // دالة معالجة تحديث حالة المنتج
 function handleProductStatusUpdate(form) {
   const container = form.closest('.product-status-container');
@@ -830,59 +807,179 @@ function handleProductStatusCancel(form) {
     console.error('Error:', error);
   });
 }
-// دالة مساعدة لتحديث واجهة المستخدم بعد تغيير الحالة
 
-
-  // إضافة تحميل متأخر للصور
-  document.addEventListener('DOMContentLoaded', function() {
-    const lazyImages = document.querySelectorAll('img[loading="lazy"]');
-    
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const img = entry.target;
-          img.src = img.dataset.src || img.src;
-          observer.unobserve(img);
+// تحويل نماذج الحالات المخصصة إلى AJAX
+document.addEventListener('DOMContentLoaded', function() {
+  // إضافة معالج للنماذج التي تستخدم AJAX
+  const ajaxForms = document.querySelectorAll('.ajax-form');
+  
+  ajaxForms.forEach(form => {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const formData = new FormData(this);
+      const submitButton = this.querySelector('button[type="submit"]');
+      const originalText = submitButton.innerHTML;
+      
+      // إظهار تحميل
+      submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+      submitButton.disabled = true;
+      
+      // إرسال البيانات عبر AJAX
+      fetch(this.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
         }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // إعادة تعيين النموذج
+          this.reset();
+          
+          // تحديث القائمة المناسبة حسب نوع النموذج
+          if (this.id === 'employee-status-form') {
+            updateEmployeeStatusList(data.new_status);
+          } else if (this.id === 'special-status-form') {
+            updateSpecialStatusList(data.new_status);
+          }
+          
+          Swal.fire({
+            title: 'تم!',
+            text: data.message,
+            icon: 'success',
+            timer: 2000,
+            showConfirmButton: false
+          });
+        } else {
+          throw new Error(data.error || 'حدث خطأ غير متوقع');
+        }
+      })
+      .catch(error => {
+        Swal.fire({
+          title: 'خطأ!',
+          text: error.message,
+          icon: 'error',
+          confirmButtonText: 'حسناً'
+        });
+      })
+      .finally(() => {
+        submitButton.innerHTML = originalText;
+        submitButton.disabled = false;
       });
     });
-
-    lazyImages.forEach(img => {
-      observer.observe(img);
+  });
+  
+  // دالة لتحديث قائمة حالات الموظف
+  function updateEmployeeStatusList(newStatus) {
+    const statusList = document.querySelector('.employee-status-list');
+    
+    if (newStatus && statusList) {
+      // إنشاء عنصر جديد
+      const newItem = document.createElement('li');
+      newItem.className = 'list-group-item d-flex justify-content-between py-1 px-0';
+      newItem.innerHTML = `
+        <div>
+          <span class="badge" style="background-color: ${newStatus.color}; color: white;">
+            ${newStatus.name}
+          </span>
+          ${newStatus.note ? `<span class="ms-2">${newStatus.note}</span>` : ''}
+          <div class="text-muted small mt-1">
+            <i class="fas fa-user me-1"></i>${newStatus.employee_email}
+          </div>
+        </div>
+        <div class="text-muted">${newStatus.created_at}</div>
+      `;
+      
+      // إضافة العنصر الجديد في بداية القائمة
+      if (statusList.firstChild && statusList.firstChild.className.includes('text-center')) {
+        statusList.removeChild(statusList.firstChild);
+      }
+      
+      statusList.insertBefore(newItem, statusList.firstChild);
+    }
+  }
+  
+  // دالة لتحديث قائمة الحالات الخاصة
+  function updateSpecialStatusList(newStatus) {
+    const statusList = document.querySelector('.special-status-list');
+    
+    if (newStatus && statusList) {
+      // إنشاء عنصر جديد
+      const newItem = document.createElement('div');
+      newItem.className = 'list-group-item py-2 px-0';
+      newItem.innerHTML = `
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <span class="badge" style="background-color: ${newStatus.color}; color: white;">
+              ${newStatus.name}
+            </span>
+            ${newStatus.note ? `<p class="mb-0 mt-1 small">${newStatus.note}</p>` : ''}
+          </div>
+          <div class="text-muted small text-end">
+            <div>${newStatus.created_at}</div>
+          </div>
+        </div>
+      `;
+      
+      // إضافة العنصر الجديد في بداية القائمة
+      if (statusList.firstChild && statusList.firstChild.className.includes('text-center')) {
+        statusList.removeChild(statusList.firstChild);
+      }
+      
+      statusList.insertBefore(newItem, statusList.firstChild);
+    }
+  }
+  
+  // إضافة تحميل متأخر للصور
+  const lazyImages = document.querySelectorAll('img[loading="lazy"]');
+  
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const img = entry.target;
+        img.src = img.dataset.src || img.src;
+        observer.unobserve(img);
+      }
     });
   });
 
-  // عرض رسائل التأكيد عند تغيير الحالة بنجاح
-  {% if request.args.get('status_updated') %}
-  Swal.fire({
-    title: 'تم التحديث!',
-    text: 'تم تحديث حالة الطلب بنجاح',
-    icon: 'success',
-    confirmButtonText: 'حسناً',
-    timer: 3000
+  lazyImages.forEach(img => {
+    observer.observe(img);
   });
-  {% endif %}
-  
-  {% if request.args.get('employee_status_added') %}
-  Swal.fire({
-    title: 'تمت الإضافة!',
-    text: 'تمت إضافة الحالة المخصصة بنجاح',
-    icon: 'success',
-    confirmButtonText: 'حسناً',
-    timer: 3000
-  });
-  {% endif %}
-  
-  {% if request.args.get('special_status_added') %}
-  Swal.fire({
-    title: 'تم الحفظ!',
-    text: 'تم حفظ الحالة الخاصة بنجاح',
-    icon: 'success',
-    confirmButtonText: 'حسناً',
-    timer: 3000
-  });
-  {% endif %}
+});
 
+// عرض رسائل التأكيد عند تغيير الحالة بنجاح
+{% if request.args.get('status_updated') %}
+Swal.fire({
+  title: 'تم التحديث!',
+  text: 'تم تحديث حالة الطلب بنجاح',
+  icon: 'success',
+  confirmButtonText: 'حسناً',
+  timer: 3000
+});
+{% endif %}
 
+{% if request.args.get('employee_status_added') %}
+Swal.fire({
+  title: 'تمت الإضافة!',
+  text: 'تمت إضافة الحالة المخصصة بنجاح',
+  icon: 'success',
+  confirmButtonText: 'حسناً',
+  timer: 3000
+});
+{% endif %}
+
+{% if request.args.get('special_status_added') %}
+Swal.fire({
+  title: 'تم الحفظ!',
+  text: 'تم حفظ الحالة الخاصة بنجاح',
+  icon: 'success',
+  confirmButtonText: 'حسناً',
+  timer: 3000
+});
+{% endif %}
 </script>
 {% endblock %}
