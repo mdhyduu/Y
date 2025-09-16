@@ -28,7 +28,8 @@ def create_app():
     app.config['SESSION_COOKIE_SECURE'] = True
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-
+    
+    app.config['WTF_CSRF_CHECK_DEFAULTS'] = True
     
     # إعداد CSRF مع استثناءات للـ Webhooks
     csrf.init_app(app)
