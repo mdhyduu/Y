@@ -253,7 +253,16 @@ def create_app():
         }
         '''
         return render_template_string(manifest_json), 200, {'Content-Type': 'application/json'}
-    
+    # إضافة هيدرز الأمان لكل الردود
+    @app.after_request
+    def add_security_headers(response):
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=()"
+        # لو تبغى Content-Security-Policy (CSP) أقدر أكتب لك نسخة تناسب موقعك
+        return response
     return app
     
     
