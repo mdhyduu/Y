@@ -95,7 +95,15 @@ def create_app():
 
     # فلترات القوالب
     app.jinja_env.filters['format_date'] = format_date
-    
+    @app.after_request
+    def add_csp_header(response):
+        if request.path.startswith('/webhook/'):
+            return response
+            
+        # سياسة أقل تقييداً للتحقق من المشكلة
+        csp_policy = "default-src * 'unsafe-inline' 'unsafe-eval';"
+        response.headers['Content-Security-Policy'] = csp_policy
+        return response
     @app.template_filter('time_ago')
     def time_ago_filter(dt):
         if not dt:
