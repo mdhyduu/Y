@@ -97,24 +97,11 @@ def create_app():
     app.jinja_env.filters['format_date'] = format_date
     @app.after_request
     def add_csp_header(response):
-        # تخطي الـ CSP لو كان endpoint مثل webhooks
         if request.path.startswith('/webhook/'):
             return response
-    
-        csp_policy = (
-            "default-src 'self'; "  # السماح بالتحميل من نفس الدومين
-            "script-src 'self' https://cdn.jsdelivr.net https://code.jquery.com https://kit.fontawesome.com; "
-            "style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
-            "img-src 'self' data: https:; "
-            "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; "
-            "connect-src 'self'; "
-            "frame-ancestors 'self'; "
-            "form-action 'self'; "
-            "base-uri 'self'; "
-            "manifest-src 'self'; "  # ضروري للـ PWA
-            "worker-src 'self'; "    # للسيرفيس ووركر
-            "child-src 'self'; "
-        )
+            
+        # سياسة أقل تقييداً للتحقق من المشكلة
+        csp_policy = "default-src * 'unsafe-inline' 'unsafe-eval';"
         response.headers['Content-Security-Policy'] = csp_policy
         return response
     @app.template_filter('time_ago')
