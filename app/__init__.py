@@ -98,14 +98,13 @@ def create_app():
     # CSP implementation
     @app.after_request
     def add_csp_header(response):
-        # Skip CSP for webhook endpoints
         if request.path.startswith('/webhook/'):
             return response
-            
+    
         csp_policy = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "script-src 'self' https://cdn.jsdelivr.net; "
+            "style-src 'self' https://cdn.jsdelivr.net; "
             "img-src 'self' data: https:; "
             "font-src 'self' https://cdn.jsdelivr.net; "
             "connect-src 'self'; "
