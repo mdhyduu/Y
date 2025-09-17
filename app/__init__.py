@@ -85,10 +85,7 @@ def create_app():
     
 
 
-    @orders_bp.before_request
-    def check_webhook_csrf():
-        if request.path.startswith('/webhook/orders'):
-            return None  # تخطي CSRF protection لمسارات الـ webhook
+    csrf.exempt(orders_bp)
     app.register_blueprint(orders_bp)
     
     app.register_blueprint(categories_bp)
