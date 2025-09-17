@@ -833,7 +833,7 @@ def handle_order_creation(data, webhook_version='2'):
         db.session.rollback()
         logger.error(f"❌ خطأ في إنشاء الطلب من Webhook: {str(e)}", exc_info=True)
         return False
-@orders_bp.route('/webhook/order_status', methods=['POST'])
+@orders_bp.route('/webhook/orders', methods=['POST'])
 @csrf.exempt
 def order_status_webhook():
     """Webhook لاستقبال تحديثات حالة الطلبات من سلة"""

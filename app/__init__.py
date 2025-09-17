@@ -84,7 +84,11 @@ def create_app():
     app.register_blueprint(auth_bp)
     
 
-    csrf.exempt(orders_bp)
+
+    @orders_bp.before_request
+    def check_webhook_csrf():
+        if request.path.startswith('/webhook/orders'):
+            return None  # تخطي CSRF protection لمسارات الـ webhook
     app.register_blueprint(orders_bp)
     
     app.register_blueprint(categories_bp)
@@ -254,3 +258,5 @@ def create_app():
         return render_template_string(manifest_json), 200, {'Content-Type': 'application/json'}
     
     return app
+    
+    

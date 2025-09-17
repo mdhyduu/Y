@@ -423,7 +423,7 @@ def register_webhook(user, event_type='order.status.updated'):
             'Accept': 'application/json'
         }
         
-        webhook_url = f"{Config.BASE_URL}/webhook/order_status"
+        webhook_url = f"{Config.BASE_URL}/webhook/orders"
         
         # الأحداث المهمة التي نريد متابعتها
         important_events = [
