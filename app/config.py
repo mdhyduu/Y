@@ -32,10 +32,11 @@ class Config:
         SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace("postgres://", "postgresql://", 1)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_pre_ping': True,
-        'pool_recycle': 3600,
-        'pool_size': 20,
-        'max_overflow': 40
+    'pool_pre_ping': True,
+    'pool_recycle': 300,  # 5 minutes instead of 1 hour
+    'pool_size': 10,      # Reduced from 20
+    'max_overflow': 10,   # Reduced from 40
+    'pool_timeout': 30,   # Add timeout
     }
     
     # ------ إعدادات الترحيل (Pagination) ------
