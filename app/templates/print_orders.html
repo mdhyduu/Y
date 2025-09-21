@@ -9,264 +9,340 @@
             size: A4;
             margin: 0.5cm;
         }
-        
+
         body {
-            font-family: 'Tajawal', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Tajawal', 'Segoe UI', sans-serif;
             margin: 0;
             padding: 0;
-            color: #333;
-            line-height: 1.4;
-            font-size: 12px;
+            color: #000;
+            line-height: 1.5;
+            font-size: 13px;
             background-color: #fff;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
-        
+
         .print-container {
             padding: 15px;
         }
-        
+
         .header {
             text-align: center;
             margin-bottom: 20px;
             padding-bottom: 15px;
-            border-bottom: 2px solid #ddd;
+            border-bottom: 2px solid #000;
         }
-        
+
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: bold;
+            color: #1a1a1a;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .print-controls {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .print-btn {
+            padding: 10px 18px;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .print-btn:hover {
+            background: #1a2530;
+        }
+
+        .print-btn.secondary {
+            background: #7f8c8d;
+        }
+
+        .print-btn.secondary:hover {
+            background: #6b7c7d;
+        }
+
+        .print-btn.tertiary {
+            background: #16a085;
+        }
+
+        .print-btn.tertiary:hover {
+            background: #138a70;
+        }
+
+        #resolution-info {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 10px;
+        }
+
         .orders-container {
             display: flex;
             flex-wrap: wrap;
             gap: 20px;
             justify-content: center;
         }
-        
+
         .order {
-            page-break-inside: avoid;
             width: calc(50% - 20px);
             min-width: 300px;
+            max-width: 500px;
             margin-bottom: 20px;
-            padding: 15px;
-            border: 1px solid #333;
-            border-radius: 8px;
+            padding: 18px;
+            border: 1.5px solid #000;
+            border-radius: 6px;
             background-color: #fff;
-            break-inside: avoid;
+            page-break-inside: avoid;
             box-sizing: border-box;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         }
-        
+
         .order-header {
             text-align: center;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #ddd;
+            margin-bottom: 18px;
+            padding-bottom: 12px;
+            border-bottom: 1.5px solid #000;
         }
-        
+
         .order-id {
-            font-size: 18px;
+            font-size: 19px;
             font-weight: bold;
-            color: #2c3e50;
-            margin-bottom: 5px;
+            color: #000;
+            margin: 0;
         }
-        
+
         .order-date {
-            color: #7f8c8d;
             font-size: 14px;
+            color: #333;
+            margin-top: 5px;
         }
-        
+
         .product {
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px dashed #ddd;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px dashed #ccc;
         }
-        
+
+        .product:last-child {
+            margin-bottom: 12px;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
         .product-content {
             display: flex;
-            gap: 15px;
-            margin-bottom: 10px;
+            gap: 14px;
         }
-        
+
         .product-image-container {
-            flex: 0 0 120px;
+            flex: 0 0 110px;
             text-align: center;
         }
-        
+
         .product-image {
-            max-width: 120px;
-            max-height: 120px;
-            width: auto;
-            height: auto;
+            width: 100px;
+            height: 100px;
             object-fit: contain;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 3px;
+            border: 1.5px solid #ddd;
+            border-radius: 4px;
+            padding: 4px;
             background-color: #fff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
-        
+
         .no-image {
-            width: 120px;
-            height: 120px;
+            width: 100px;
+            height: 100px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #f5f5f5;
-            border: 1px solid #ddd;
-            border-radius: 5px;
+            background: #f8f8f8;
+            border: 1.5px dashed #ccc;
+            border-radius: 4px;
             font-size: 12px;
-            color: #999;
+            color: #888;
+            margin: 0 auto;
         }
-        
+
         .product-details {
             flex: 1;
         }
-        
+
         .product-name {
+            font-size: 15px;
             font-weight: bold;
-            margin-bottom: 8px;
-            font-size: 16px;
-            color: #2c3e50;
+            color: #000;
+            margin: 0 0 8px 0;
+            line-height: 1.3;
         }
-        
+
         .product-info {
-            margin-bottom: 5px;
-            font-size: 14px;
+            font-size: 13px;
+            margin: 4px 0;
+            color: #333;
         }
-        
+
         .product-info strong {
-            color: #7f8c8d;
+            color: #000;
         }
-        
+
         .product-options {
             margin-top: 10px;
             padding: 10px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-            border: 1px solid #eee;
+            background-color: #f7f7f7;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 12px;
         }
-        
+
         .options-title {
             font-size: 14px;
             font-weight: bold;
-            margin-bottom: 8px;
+            color: #000;
             text-align: center;
-            color: #2c3e50;
-            padding-bottom: 5px;
+            margin: 0 0 6px 0;
+            padding-bottom: 6px;
             border-bottom: 1px solid #ddd;
         }
-        
+
         .option {
-            margin-bottom: 5px;
-            font-size: 13px;
             display: flex;
             justify-content: space-between;
+            margin: 4px 0;
         }
-        
+
         .option-name {
             font-weight: bold;
-            color: #7f8c8d;
+            color: #222;
         }
-        
+
         .barcode-section {
             text-align: center;
-            margin-top: 15px;
-            padding-top: 10px;
-            border-top: 1px dashed #ddd;
+            margin-top: 18px;
+            padding-top: 12px;
+            border-top: 1.5px dashed #000;
         }
-        
+
         .barcode-image {
-            max-width: 180px;
+            width: 180px;
             height: 60px;
-            margin-bottom: 5px;
-            border: 1px solid #ddd;
-            padding: 3px;
+            border: 1.5px solid #000;
+            padding: 4px;
             background-color: #fff;
+            image-rendering: pixelated;
+            margin: 0 auto 6px;
+            display: block;
         }
-        
+
         .barcode-number {
-            font-size: 14px;
+            font-size: 16px;
             font-weight: bold;
-            color: #2c3e50;
+            letter-spacing: 1.5px;
+            color: #000;
+            margin: 0;
         }
-        
+
+        /* Compact View */
+        .compact-view .product-image-container { flex: 0 0 90px; }
+        .compact-view .product-image { width: 85px; height: 85px; }
+        .compact-view .no-image { width: 85px; height: 85px; font-size: 11px; }
+        .compact-view .product-name { font-size: 14px; }
+        .compact-view .product-info { font-size: 12px; }
+        .compact-view .product-options { padding: 6px; font-size: 11px; }
+        .compact-view .option { font-size: 11px; }
+        .compact-view .barcode-image { width: 160px; height: 50px; }
+
+        /* Page Breaks */
         .page-break {
             page-break-before: always;
+            margin: 20px 0;
+            border: none;
+            height: 0;
         }
-        
-        .separator {
-            height: 20px;
-            border-bottom: 2px dashed #ccc;
-            margin: 15px 0;
-        }
-        
-        .compact-view .product-image-container {
-            flex: 0 0 100px;
-        }
-        
-        .compact-view .product-image {
-            max-width: 100px;
-            max-height: 100px;
-        }
-        
-        .compact-view .no-image {
-            width: 100px;
-            height: 100px;
-        }
-        
-        .compact-view .product-name {
-            font-size: 14px;
-        }
-        
-        .compact-view .product-info {
-            font-size: 12px;
-        }
-        
-        @media print {
-            body {
-                padding: 0;
-                font-size: 11px;
-            }
-            
-            .print-container {
-                padding: 10px;
-            }
-            
-            .order {
-                border: 1px solid #000;
-                background-color: white;
-                page-break-inside: avoid;
-                width: calc(50% - 10px);
-            }
-            
-            .product {
-                page-break-inside: avoid;
-            }
-            
-            .no-print {
-                display: none !important;
-            }
-            
-            .order-id {
-                font-size: 16px;
-            }
-            
-            .product-name {
-                font-size: 14px;
-            }
-            
-            .product-info, .option {
-                font-size: 12px;
-            }
-            
-            .barcode-image {
-                max-width: 150px;
-                height: 50px;
-            }
-            
-            .barcode-number {
-                font-size: 13px;
-            }
-        }
-        
+
+        /* Responsive */
         @media (max-width: 768px) {
             .order {
                 width: 100%;
+            }
+
+            .print-btn {
+                width: 220px;
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                font-size: 12px;
+                color: #000;
+                background: white;
+            }
+
+            .print-container {
+                padding: 5px;
+            }
+
+            .header, .print-controls {
+                display: none !important;
+            }
+
+            .order {
+                width: calc(50% - 10px);
+                border: 1.5px solid #000;
+                box-shadow: none;
+                page-break-inside: avoid;
+                break-inside: avoid;
+                margin-bottom: 15px;
+            }
+
+            .product {
+                break-inside: avoid;
+            }
+
+            .product-image {
+                max-width: 100px;
+                max-height: 100px;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .barcode-image {
+                width: 170px !important;
+                height: 55px !important;
+                image-rendering: crisp-edges;
+            }
+
+            .order-id {
+                font-size: 16px;
+            }
+
+            .product-name {
+                font-size: 14px;
+            }
+
+            .product-info, .option {
+                font-size: 12px;
+            }
+
+            .barcode-number {
+                font-size: 14px;
             }
         }
     </style>
@@ -276,16 +352,20 @@
         <div class="header no-print">
             <h1>طباعة الطلبات</h1>
             <p>تم الإنشاء في: {{ current_time }}</p>
-            <div>
-                <button onclick="window.print()" class="no-print" style="padding: 8px 15px; background: #2c3e50; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">
+            <div class="print-controls">
+                <button onclick="window.print()" class="print-btn">
                     <i class="fas fa-print"></i> طباعة
                 </button>
-                <button onclick="toggleCompactView()" class="no-print" style="padding: 8px 15px; background: #7f8c8d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                <button onclick="toggleCompactView()" class="print-btn secondary">
                     <i class="fas fa-compress"></i> عرض مضغوط
                 </button>
+                <button onclick="increaseResolution()" class="print-btn tertiary">
+                    <i class="fas fa-search-plus"></i> تحسين الدقة
+                </button>
             </div>
+            <p id="resolution-info">وضع الدقة الحالي: قياسي</p>
         </div>
-        
+
         <div class="orders-container" id="orders-container">
             {% for order in orders %}
             <div class="order">
@@ -293,86 +373,129 @@
                     <div class="order-id">الطلب #{{ order.reference_id }}</div>
                     <div class="order-date">تاريخ الطلب: {{ order.created_at }}</div>
                 </div>
-                   
+
                 {% for item in order.order_items %}
                 <div class="product">
                     <div class="product-content">
                         <div class="product-image-container">
                             {% if item.main_image %}
-                            <img src="{{ item.main_image }}" alt="{{ item.name }}" class="product-image">
+                                <img src="{{ item.main_image }}" alt="{{ item.name }}" class="product-image" onload="handleImageLoad(this)" onerror="handleImageError(this)">
                             {% else %}
-                            <div class="no-image">لا توجد صورة</div>
+                                <div class="no-image">لا توجد صورة</div>
                             {% endif %}
                         </div>
-                        
                         <div class="product-details">
+                            <div class="product-name">{{ item.name }}</div>
+                            <div class="product-info"><strong>الكمية:</strong> {{ item.quantity }}</div>
+                            {% if item.sku %}
+                                <div class="product-info"><strong>SKU:</strong> {{ item.sku }}</div>
+                            {% endif %}
 
-                            <div class="product-info">
-                                <strong>الكمية:</strong> {{ item.quantity }}
+                            {% if item.options %}
+                            <div class="product-options">
+                                <div class="options-title">الخيارات</div>
+                                {% for option in item.options %}
+                                <div class="option">
+                                    <span class="option-name">{{ option.name }}:</span>
+                                    <span class="option-value">{{ option.value }}</span>
+                                </div>
+                                {% endfor %}
                             </div>
-                                         {% if item.options %}
-                    <div class="product-options">
-
-                        {% for option in item.options %}
-                        <div class="option">
-                            <span class="option-name">{{ option.name }}:</span>
-                            <span class="option-value">{{ option.value }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
+                            {% endif %}
                         </div>
                     </div>
-                    
-
                 </div>
                 {% endfor %}
-              <div class="barcode-section">
-    {% if order.barcode %}
-    <img src="data:image/png;base64,{{ order.barcode }}" 
-         alt="باركود الطلب" class="barcode-image">
-    <div class="barcode-number">#{{ order.reference_id }}</div>
-    {% else %}
-    <div class="barcode-number">لا يوجد باركود للطلب #{{ order.reference_id }}</div>
-    {% endif %}
-</div>  
+
+                <div class="barcode-section">
+                    {% if order.barcode %}
+                        <img src="data:image/png;base64,{{ order.barcode }}" alt="باركود الطلب" class="barcode-image">
+                        <div class="barcode-number">#{{ order.reference_id }}</div>
+                    {% else %}
+                        <div class="barcode-number" style="color:#c00;">[بـاركود غير متاح]</div>
+                    {% endif %}
+                </div>
             </div>
-            
+
+            <!-- صفحة جديدة كل صف من طلبين -->
             {% if not loop.last and loop.index % 2 == 0 %}
-            <div class="separator page-break"></div>
+                <div class="page-break"></div>
             {% endif %}
             {% endfor %}
         </div>
     </div>
-    
+
     <script>
-        // طباعة تلقائية عند تحميل الصفحة
+        // طباعة تلقائية بعد التحميل
         window.onload = function() {
-            // ننتظر قليلاً لضمان تحميل جميع الصور
-            setTimeout(function() {
+            setTimeout(() => {
+
                 window.print();
             }, 1000);
         };
-        
+
         function toggleCompactView() {
             const container = document.getElementById('orders-container');
+            const btn = document.querySelector('.print-btn.secondary');
+
             container.classList.toggle('compact-view');
-            
-            const buttons = document.querySelectorAll('button');
-            const compactButton = buttons[1];
-            
+
             if (container.classList.contains('compact-view')) {
-                compactButton.innerHTML = '<i class="fas fa-expand"></i> عرض عادي';
-                compactButton.style.background = '#2c3e50';
+                btn.innerHTML = '<i class="fas fa-expand"></i> عرض عادي';
+                btn.style.background = '#2c3e50';
             } else {
-                compactButton.innerHTML = '<i class="fas fa-compress"></i> عرض مضغوط';
-                compactButton.style.background = '#7f8c8d';
+                btn.innerHTML = '<i class="fas fa-compress"></i> عرض مضغوط';
+                btn.style.background = '#7f8c8d';
             }
         }
 
-</script>
-    
-    <!-- Font Awesome for icons -->
+        function increaseResolution() {
+            const container = document.getElementById('orders-container');
+            const info = document.getElementById('resolution-info');
+
+            if (container.classList.contains('high-resolution')) {
+                container.classList.remove('high-resolution');
+                info.textContent = 'وضع الدقة الحالي: قياسي';
+
+                document.querySelectorAll('.product-image').forEach(img => {
+                    img.style.width = '';
+                    img.style.height = '';
+                });
+                document.querySelectorAll('.barcode-image').forEach(img => {
+                    img.style.width = '';
+                    img.style.height = '';
+                });
+
+            } else {
+                container.classList.add('high-resolution');
+                info.textContent = 'وضع الدقة الحالي: عالي';
+
+                document.querySelectorAll('.product-image').forEach(img => {
+                    img.style.width = '120px';
+                    img.style.height = '120px';
+                });
+                document.querySelectorAll('.barcode-image').forEach(img => {
+                    img.style.width = '200px';
+                    img.style.height = '70px';
+                });
+            }
+        }
+
+        function handleImageLoad(img) {
+            img.style.imageRendering = 'crisp-edges';
+        }
+
+        function handleImageError(img) {
+            img.style.display = 'none';
+            const container = img.parentElement;
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'no-image';
+            errorDiv.textContent = 'خطأ في الصورة';
+            container.appendChild(errorDiv);
+        }
+    </script>
+
+    <!-- Font Awesome -->
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </body>
 </html>
