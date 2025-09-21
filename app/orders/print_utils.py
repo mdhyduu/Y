@@ -64,7 +64,7 @@ def fetch_order_data(order_id, access_token):
             return None
         finally:
             # التأكد من إغلاق اتصال قاعدة البيانات
-            db.session.close()
+            db.session.remove()
 
 def fetch_orders_parallel(order_ids, access_token, max_workers=DEFAULT_WORKERS):
     """جلب بيانات الطلبات بشكل متوازي باستخدام الجلسة المحسنة"""
