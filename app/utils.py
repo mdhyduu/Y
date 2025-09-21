@@ -13,7 +13,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
-
+from sqlalchemy import text
 # إعداد المسجل
 logger = logging.getLogger(__name__)
 
@@ -355,7 +355,7 @@ def db_session_scope():
 def check_db_connection():
     """فحص صحة اتصال قاعدة البيانات"""
     try:
-        db.session.execute('SELECT 1')
+        db.session.execute(text('SELECT 1'))
         return True
     except Exception as e:
         logger.error(f"فشل في التحقق من اتصال قاعدة البيانات: {str(e)}")
