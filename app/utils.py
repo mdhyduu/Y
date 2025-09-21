@@ -415,7 +415,7 @@ def process_orders_in_parallel(order_ids, access_token):
             return None
         finally:
             # التأكد من إغلاق اتصال قاعدة البيانات
-            db.session.close()
+            db.session.remove()
     
     orders = []
     with ThreadPoolExecutor(max_workers=3) as executor:
