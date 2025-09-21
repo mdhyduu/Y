@@ -2,11 +2,16 @@ from datetime import datetime
 import os
 import barcode
 from barcode.writer import ImageWriter
-from flask import current_app, redirect, request
+from flask import current_app, request
 from .models import db, User, Employee, CustomOrder, SallaOrder
 import logging
 from io import BytesIO
 import base64
+from functools import lru_cache
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from concurrent.futures import ThreadPoolExecutor
 
 # إعداد المسجل
 logger = logging.getLogger(__name__)
@@ -26,7 +31,6 @@ def get_next_order_number():
             last_number = int(last_order.order_number)
             return str(last_number + 1)
         except ValueError:
-            # إذا كان order_number ليس رقماً، نعود لاستخدام ID
             return str(last_order.id + 1000)
     return "1000"
 
@@ -46,159 +50,153 @@ def get_user_from_cookies():
         else:
             employee = Employee.query.get(int(user_id))
             if employee:
-                # الحصول على المستخدم الرئيسي للمتجر
                 user = User.query.filter_by(store_id=employee.store_id).first()
                 return user, employee
             return None, None
     except (ValueError, TypeError):
-        # إذا كان user_id غير رقمي
         return None, None
 
+def create_session():
+    """إنشاء جلسة طلبات مع إعدادات التحسين"""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=0.5,
+        status_forcelist=[429, 500, 502, 503, 504],
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=100, pool_maxsize=100)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
 def generate_barcode(data):
-    """إنشاء باركود وإرجاعه كـ base64"""
+    """إنشاء باركود مع تحسين الأداء"""
     try:
-        # إنشاء الباركود في الذاكرة
         buffer = BytesIO()
         writer = ImageWriter()
-        code = barcode.get('code128', str(data), writer=writer)
         
-        # حفظ في buffer بدلاً من ملف
-        code.write(buffer, options={
+        options = {
             'write_text': False,
             'module_width': 0.4,
             'module_height': 15,
-            'quiet_zone': 10
-        })
+            'quiet_zone': 10,
+            'dpi': 96,
+            'compress': True
+        }
         
-        # تحويل إلى base64
-        barcode_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        return barcode_base64
+        code = barcode.get('code128', str(data), writer=writer)
+        code.write(buffer, options=options)
+        
+        return base64.b64encode(buffer.getvalue()).decode('utf-8')
         
     except Exception as e:
-        logger.error(f"Error generating barcode: {str(e)}", exc_info=True)
+        logger.error(f"Error generating barcode: {str(e)}")
         return None
+
+@lru_cache(maxsize=1000)
+def get_cached_barcode(order_id):
+    """الحصول على الباركود من التخزين المؤقت"""
+    order = SallaOrder.query.get(str(order_id))
+    return order.barcode_data if order else None
+
+def get_barcodes_for_orders(order_ids):
+    """جلب جميع الباركودات للطلبات المحددة في استعلام واحد"""
+    orders = SallaOrder.query.filter(SallaOrder.order_id.in_(order_ids)).all()
+    return {str(order.order_id): order.barcode_data for order in orders}
 
 def generate_and_store_barcode(order_id, order_type='salla'):
     """إنشاء باركود وحفظه في قاعدة البيانات تلقائيًا"""
     try:
-        # تحويل order_id إلى نص للتأكد من تطابق نوع البيانات
         order_id_str = str(order_id)
-        
-        # إنشاء الباركود
         barcode_data = generate_barcode(order_id_str)
         
         if not barcode_data:
-            logger.error(f"فشل في إنشاء الباركود للطلب {order_id_str}")
             return None
         
-        # حفظ الباركود في قاعدة البيانات
         if order_type == 'salla':
-            order = SallaOrder.query.get(order_id_str)  # استخدام النصي هنا
+            order = SallaOrder.query.get(order_id_str)
         else:
-            order = CustomOrder.query.get(order_id_str)  # واستخدام النصي هنا
+            order = CustomOrder.query.get(order_id_str)
             
         if order:
             order.barcode_data = barcode_data
             order.barcode_generated_at = datetime.utcnow()
             db.session.commit()
-            logger.info(f"تم حفظ الباركود تلقائيًا للطلب {order_id_str}")
             return barcode_data
         else:
-            logger.error(f"لم يتم العثور على الطلب {order_id_str} في قاعدة البيانات")
             return None
             
     except Exception as e:
         logger.error(f"خطأ في حفظ الباركود تلقائيًا: {str(e)}")
         return None
+
+def get_main_image(item):
+    """استخراج الصورة الرئيسية بشكل أكثر كفاءة"""
+    thumbnail_url = item.get('product_thumbnail') or item.get('thumbnail')
+    if thumbnail_url and isinstance(thumbnail_url, str):
+        return thumbnail_url
+    
+    images = item.get('images', [])
+    if images and isinstance(images, list) and len(images) > 0:
+        first_image = images[0]
+        image_url = first_image.get('image', '')
+        if image_url:
+            if not image_url.startswith(('http://', 'https://')):
+                return f"https://cdn.salla.sa{image_url}"
+            return image_url
+    
+    for field in ['image', 'url', 'image_url', 'picture']:
+        if item.get(field):
+            return item[field]
+    
+    return ''
+
 def format_date(date_str):
     try:
-        # تحويل التاريخ من تنسيق سلة
         dt = datetime.strptime(date_str.split('.')[0], '%Y-%m-%d %H:%M:%S')
         return dt.strftime('%Y-%m-%d %H:%M')
     except:
         return date_str if date_str else 'غير معروف'
 
-def process_order_data(order_id, items_data):
+def process_order_data(order_id, items_data, barcode_data=None):
     """معالجة بيانات الطلب مع استخدام الباركود المخزن في قاعدة البيانات"""
     order_id = str(order_id)
     items = []
-    logger.info(f"Processing order items: {len(items_data)} items")
     
     for index, item in enumerate(items_data):
-        # تأكد من وجود معرف للمنتج، وإلا أنشئ واحدًا مؤقتًا
         item_id = item.get('id')
         if not item_id:
             item_id = f"temp_{index}"
-            logger.warning(f"Item missing ID, using temporary ID: {item_id}")
         
-        # معالجة الصور - التعديل هنا
-        main_image = ''
+        main_image = get_main_image(item)
         
-        # المحاولة 1: استخدام product_thumbnail إذا موجود
-        if not main_image:
-            thumbnail_url = item.get('product_thumbnail') or item.get('thumbnail')
-            if thumbnail_url and isinstance(thumbnail_url, str):
-                main_image = thumbnail_url
-                logger.info(f"Using product_thumbnail: {main_image}")
-        
-        # المحاولة 2: استخدام images إذا احتوت على بيانات
-        if not main_image:
-            images = item.get('images', [])
-            if images and isinstance(images, list) and len(images) > 0:
-                first_image = images[0]
-                image_url = first_image.get('image', '')
-                if image_url:
-                    if not image_url.startswith(('http://', 'https://')):
-                        base_domain = "https://cdn.salla.sa"
-                        main_image = f"{base_domain}{image_url}"
-                    else:
-                        main_image = image_url
-                    logger.info(f"Using images[0]: {main_image}")
-        
-        # المحاولة 3: استخدام الحقول الاحتياطية
-        if not main_image:
-            for field in ['image', 'url', 'image_url', 'picture']:
-                if item.get(field):
-                    main_image = item[field]
-                    logger.info(f"Using backup field {field}: {main_image}")
-                    break
-        
-        # معالجة الخيارات
         options = []
         item_options = item.get('options', [])
         if isinstance(item_options, list):
             for option in item_options:
-                # استخراج القيمة الأساسية
                 raw_value = option.get('value', '')
                 display_value = 'غير محدد'
                 
-                # محاولة استخراج القيمة الرئيسية من الهيكل المعقد
                 if isinstance(raw_value, dict):
-                    # إذا كانت القيمة قاموساً، نبحث عن الحقل 'name' أو 'value'
                     display_value = raw_value.get('name') or raw_value.get('value') or str(raw_value)
                 elif isinstance(raw_value, list):
-                    # إذا كانت القيمة قائمة، نعالج كل عنصر فيها
                     values_list = []
-                    for option_item in raw_value:  # تغيير اسم المتغير لتجنب التعارض
+                    for option_item in raw_value:
                         if isinstance(option_item, dict):
-                            # للعناصر القاموسية في القائمة
                             value_str = option_item.get('name') or option_item.get('value') or str(option_item)
                             values_list.append(value_str)
                         else:
                             values_list.append(str(option_item))
                     display_value = ', '.join(values_list)
                 else:
-                    # في الحالات الأخرى نستخدم القيمة مباشرة
                     display_value = str(raw_value) if raw_value else 'غير محدد'
                 
-                # إضافة الخيار إلى القائمة
                 options.append({
                     'name': option.get('name', ''),
                     'value': display_value,
                     'type': option.get('type', '')
                 })
         
-        # معالجة الأكواد الرقمية
         digital_codes = []
         for code in item.get('codes', []):
             if isinstance(code, dict):
@@ -207,7 +205,6 @@ def process_order_data(order_id, items_data):
                     'status': code.get('status', 'غير معروف')
                 })
         
-        # معالجة الملفات الرقمية
         digital_files = []
         for file in item.get('files', []):
             if isinstance(file, dict):
@@ -217,7 +214,6 @@ def process_order_data(order_id, items_data):
                     'size': file.get('size', 0)
                 })
         
-        # معالجة الحجوزات
         reservations = []
         for reservation in item.get('reservations', []):
             if isinstance(reservation, dict):
@@ -229,13 +225,13 @@ def process_order_data(order_id, items_data):
                 })
         
         product_info = {
-            'id': item_id,  # استخدام item_id بدلاً من item.get('id')
+            'id': item_id,
             'name': item.get('name', ''),
             'description': item.get('notes', '')
         }
         
         item_data = {
-            'id': item_id,  # استخدام item_id
+            'id': item_id,
             'name': item.get('name', ''),
             'sku': item.get('sku', ''),
             'quantity': item.get('quantity', 0),
@@ -259,49 +255,96 @@ def process_order_data(order_id, items_data):
         }
         
         items.append(item_data)
-        logger.info(f"Processed item: {item_data['name']} (ID: {item_id})")
 
-    # البحث عن الباركود المخزن في قاعدة البيانات
-        order = SallaOrder.query.get(order_id)
-        barcode_data = None
+    if not barcode_data:
+        barcode_data = get_cached_barcode(order_id)
         
-        if order and order.barcode_data:
-            barcode_data = order.barcode_data
-            logger.info(f"Using existing barcode for order {order_id}")
-        else:
-            # إنشاء باركود جديد وحفظه في قاعدة البيانات
+        if not barcode_data:
             barcode_data = generate_and_store_barcode(order_id, 'salla')
-            if barcode_data:
-                logger.info(f"Generated and stored new barcode for order {order_id}")
-            else:
-                logger.error(f"Failed to generate barcode for order {order_id}")
-                # إنشاء باركود مؤقت دون تخزينه
+            if not barcode_data:
                 barcode_data = generate_barcode(order_id)
 
     processed_order = {
         'id': order_id,
         'order_items': items,
-        'barcode': barcode_data  # استخدام الباركود من قاعدة البيانات
+        'barcode': barcode_data
     }
     
-    logger.info(f"Processed order with {len(items)} items and barcode")
     return processed_order
 
-def get_salla_categories(access_token):
-    import requests
+def process_orders_in_parallel(order_ids, access_token):
+    """معالجة الطلبات بشكل متوازي لتحسين الأداء"""
     from .config import Config
     
+    session = create_session()
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Accept': 'application/json'
+    }
+    
+    barcodes_map = get_barcodes_for_orders(order_ids)
+    
+    def fetch_order_data(order_id):
+        try:
+            order_response = session.get(
+                f"{Config.SALLA_ORDERS_API}/{order_id}",
+                headers=headers,
+                timeout=10
+            )
+            
+            if order_response.status_code != 200:
+                return None
+                
+            order_data = order_response.json().get('data', {})
+            
+            items_response = session.get(
+                f"{Config.SALLA_BASE_URL}/orders/items",
+                params={'order_id': order_id},
+                headers=headers,
+                timeout=10
+            )
+            
+            items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
+            
+            barcode_data = barcodes_map.get(order_id)
+            processed_order = process_order_data(order_id, items_data, barcode_data)
+            
+            processed_order['reference_id'] = order_data.get('reference_id', order_id)
+            processed_order['customer'] = order_data.get('customer', {})
+            processed_order['created_at'] = format_date(order_data.get('created_at', ''))
+            
+            return processed_order
+            
+        except Exception as e:
+            logger.error(f"Error fetching order {order_id}: {str(e)}")
+            return None
+    
+    orders = []
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_order = {executor.submit(fetch_order_data, order_id): order_id for order_id in order_ids}
+        
+        for future in future_to_order:
+            result = future.result()
+            if result:
+                orders.append(result)
+    
+    return orders
+
+def get_salla_categories(access_token):
+    from .config import Config
+    
+    session = create_session()
     headers = {
         'Authorization': f'Bearer {access_token}',
         'Accept': 'application/json'
     }
     try:
-        response = requests.get(Config.SALLA_CATEGORIES_API, headers=headers)
+        response = session.get(Config.SALLA_CATEGORIES_API, headers=headers)
         response.raise_for_status()
         return response.json().get('data', [])
     except requests.exceptions.RequestException as e:
-        current_app.logger.error(f"Error fetching categories from Salla: {e}")
-        return []    
+        logger.error(f"Error fetching categories from Salla: {e}")
+        return []
         
 def humanize_time(dt):
     """تحويل التاريخ إلى نص مقروء مثل 'منذ دقيقة'"""
