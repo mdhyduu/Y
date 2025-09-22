@@ -31,13 +31,20 @@ class Config:
     if SQLALCHEMY_DATABASE_URI and SQLALCHEMY_DATABASE_URI.startswith("postgres://"):
         SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace("postgres://", "postgresql://", 1)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # إعدادات PostgreSQL المحسنة
     SQLALCHEMY_ENGINE_OPTIONS = {
-    'pool_pre_ping': True,
-    'pool_recycle': 300,  # 5 minutes instead of 1 hour
-    'pool_size': 10,      # Reduced from 20
-    'max_overflow': 10,   # Reduced from 40
-    'pool_timeout': 30,   # Add timeout
+        'pool_size': 20,
+        'max_overflow': 30,
+        'pool_pre_ping': True,
+        'pool_recycle': 3600,
+        'pool_timeout': 30
     }
+    
+    # إعدادات الأداء
+    MAX_WORKERS = 10
+    REQUEST_TIMEOUT = 15
+    BARCODE_GENERATION_WORKERS = 5
     
     # ------ إعدادات الترحيل (Pagination) ------
     DEFAULT_PER_PAGE = 20

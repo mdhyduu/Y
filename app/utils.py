@@ -11,17 +11,55 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from contextlib import contextmanager
-from sqlalchemy import text
+from sqlalchemy import text, create_engine
+from sqlalchemy.pool import QueuePool
 import threading
-import queue
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
-from concurrent.futures import ThreadPoolExecutor
+import psycopg2
+from threading import Lock
+import queue
 
 # إعداد المسجل للإنتاج
 logger = logging.getLogger(__name__)
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 UPLOAD_FOLDER = 'static/uploads/custom_orders'
+
+# إعداد محرك PostgreSQL مع Connection Pool
+def create_postgresql_engine():
+    """إنشاء محرك PostgreSQL محسن للأداء"""
+    try:
+        # الحصول على إعدادات الاتصال من التطبيق
+        database_uri = current_app.config.get('SQLALCHEMY_DATABASE_URI')
+        if not database_uri:
+            # استخدام URI افتراضي إذا لم يتم تعيينه
+            database_uri = 'postgresql://username:password@localhost:5432/your_database'
+        
+        engine = create_engine(
+            database_uri,
+            poolclass=QueuePool,
+            pool_size=20,
+            max_overflow=30,
+            pool_pre_ping=True,
+            pool_recycle=3600,
+            echo_pool=False  # تعطيل التسجيل للأداء
+        )
+        return engine
+    except Exception as e:
+        logger.error(f"Error creating PostgreSQL engine: {str(e)}")
+        # Fallback إلى الاتصال العادي
+        return db.engine
+
+# إنشاء محرك عالمي (سيتم تهيئته عند الاستخدام الأول)
+_postgres_engine = None
+
+def get_postgres_engine():
+    """الحصول على محرك PostgreSQL مع تهيئة lazy"""
+    global _postgres_engine
+    if _postgres_engine is None:
+        _postgres_engine = create_postgresql_engine()
+    return _postgres_engine
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -184,8 +222,47 @@ def get_cached_barcode_data(order_id):
     finally:
         db.session.remove()
 
-def get_barcodes_for_orders(order_ids):
-    """جلب جميع الباركودات للطلبات المحددة في استعلام واحد"""
+def get_barcodes_for_orders_optimized(order_ids):
+    """نسخة محسنة من دالة جلب الباركودات باستخدام PostgreSQL Connection Pool"""
+    try:
+        if not order_ids:
+            return {}
+        
+        order_ids_str = [str(oid).strip() for oid in order_ids if str(oid).strip()]
+        
+        if not order_ids_str:
+            return {}
+            
+        # استخدام connection pool لتحسين الأداء
+        engine = get_postgres_engine()
+        with engine.connect() as conn:
+            # استعلام واحد لجميع الطلبات باستخدام ANY بدلاً من IN للتعامل مع القوائم الكبيرة
+            query = text("""
+                SELECT id, barcode_data 
+                FROM salla_order 
+                WHERE id = ANY(:order_ids)
+            """)
+            
+            result = conn.execute(query, {'order_ids': order_ids_str})
+            rows = result.fetchall()
+            
+            barcodes_map = {}
+            for row in rows:
+                barcode_data = row[1]
+                if barcode_data:
+                    if not barcode_data.startswith('data:image') and barcode_data.startswith('iVBOR'):
+                        barcode_data = f"data:image/png;base64,{barcode_data}"
+                    barcodes_map[str(row[0])] = barcode_data
+            
+            return barcodes_map
+            
+    except Exception as e:
+        logger.error(f"Error in get_barcodes_for_orders_optimized: {str(e)}")
+        # Fallback إلى الطريقة العادية
+        return get_barcodes_for_orders_fallback(order_ids)
+
+def get_barcodes_for_orders_fallback(order_ids):
+    """طريقة احتياطية لجلب الباركودات"""
     try:
         if not order_ids:
             return {}
@@ -198,7 +275,6 @@ def get_barcodes_for_orders(order_ids):
         orders = SallaOrder.query.filter(SallaOrder.id.in_(order_ids_str)).all()
         
         barcodes_map = {}
-        
         for order in orders:
             if order.barcode_data:
                 barcode_data = order.barcode_data
@@ -211,10 +287,14 @@ def get_barcodes_for_orders(order_ids):
         return barcodes_map
         
     except Exception as e:
-        logger.error(f"Error in get_barcodes_for_orders: {str(e)}")
+        logger.error(f"Error in get_barcodes_for_orders_fallback: {str(e)}")
         return {}
     finally:
         db.session.remove()
+
+def get_barcodes_for_orders(order_ids):
+    """واجهة موحدة لجلب الباركودات (تستخدم النسخة المحسنة)"""
+    return get_barcodes_for_orders_optimized(order_ids)
 
 def generate_and_store_barcode(order_id, order_type='salla'):
     """إنشاء باركود مع التخزين"""
@@ -228,23 +308,38 @@ def generate_and_store_barcode(order_id, order_type='salla'):
         if not barcode_data:
             return None
         
-        # محاولة التخزين في قاعدة البيانات
+        # محاولة التخزين في قاعدة البيانات باستخدام Connection Pool
         try:
-            if order_type == 'salla':
-                order = SallaOrder.query.filter_by(id=order_id_str).first()
-                if not order:
-                    order = SallaOrder(id=order_id_str)
-                    db.session.add(order)
-            else:
-                order = CustomOrder.query.get(order_id_str)
-            
-            if order:
-                order.barcode_data = barcode_data
-                order.barcode_generated_at = datetime.utcnow()
-                db.session.commit()
+            engine = get_postgres_engine()
+            with engine.connect() as conn:
+                if order_type == 'salla':
+                    # استخدام INSERT ON CONFLICT لتحديث السجلات الموجودة
+                    query = text("""
+                        INSERT INTO salla_order (id, barcode_data, barcode_generated_at)
+                        VALUES (:id, :barcode_data, :barcode_generated_at)
+                        ON CONFLICT (id) 
+                        DO UPDATE SET 
+                            barcode_data = EXCLUDED.barcode_data,
+                            barcode_generated_at = EXCLUDED.barcode_generated_at
+                    """)
+                else:
+                    query = text("""
+                        INSERT INTO custom_order (id, barcode_data, barcode_generated_at)
+                        VALUES (:id, :barcode_data, :barcode_generated_at)
+                        ON CONFLICT (id) 
+                        DO UPDATE SET 
+                            barcode_data = EXCLUDED.barcode_data,
+                            barcode_generated_at = EXCLUDED.barcode_generated_at
+                    """)
+                
+                conn.execute(query, {
+                    'id': order_id_str,
+                    'barcode_data': barcode_data,
+                    'barcode_generated_at': datetime.utcnow()
+                })
+                conn.commit()
                 
         except Exception as storage_error:
-            db.session.rollback()
             logger.error(f"Error storing barcode: {str(storage_error)}")
         
         return barcode_data
@@ -252,11 +347,82 @@ def generate_and_store_barcode(order_id, order_type='salla'):
     except Exception as e:
         logger.error(f"Error in generate_and_store_barcode: {str(e)}")
         return None
-    finally:
-        try:
-            db.session.remove()
-        except:
-            pass
+
+def bulk_generate_and_store_barcodes(order_ids, order_type='salla'):
+    """إنشاء وتخزين الباركودات بشكل مجمع باستخدام الخيوط"""
+    try:
+        if not order_ids:
+            return {}
+        
+        barcodes_map = {}
+        records_to_update = []
+        lock = Lock()
+        
+        # إنشاء الباركودات بشكل متزامن
+        def generate_single_barcode(order_id):
+            order_id_str = str(order_id).strip()
+            if not order_id_str:
+                return None, None
+                
+            try:
+                barcode_data = generate_barcode(order_id_str)
+                if barcode_data:
+                    with lock:
+                        records_to_update.append({
+                            'id': order_id_str,
+                            'barcode_data': barcode_data,
+                            'barcode_generated_at': datetime.utcnow()
+                        })
+                    return order_id_str, barcode_data
+            except Exception as e:
+                logger.error(f"Error generating barcode for {order_id_str}: {str(e)}")
+            return order_id_str, None
+        
+        # استخدام ThreadPoolExecutor لإنشاء الباركودات بشكل متزامن
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_id = {executor.submit(generate_single_barcode, order_id): order_id for order_id in order_ids}
+            
+            for future in as_completed(future_to_id):
+                order_id_str, barcode_data = future.result()
+                if barcode_data:
+                    barcodes_map[order_id_str] = barcode_data
+        
+        # تخزين مجمع في PostgreSQL
+        if records_to_update:
+            try:
+                engine = get_postgres_engine()
+                with engine.connect() as conn:
+                    if order_type == 'salla':
+                        query = text("""
+                            INSERT INTO salla_order (id, barcode_data, barcode_generated_at)
+                            VALUES (:id, :barcode_data, :barcode_generated_at)
+                            ON CONFLICT (id) 
+                            DO UPDATE SET 
+                                barcode_data = EXCLUDED.barcode_data,
+                                barcode_generated_at = EXCLUDED.barcode_generated_at
+                        """)
+                    else:
+                        query = text("""
+                            INSERT INTO custom_order (id, barcode_data, barcode_generated_at)
+                            VALUES (:id, :barcode_data, :barcode_generated_at)
+                            ON CONFLICT (id) 
+                            DO UPDATE SET 
+                                barcode_data = EXCLUDED.barcode_data,
+                                barcode_generated_at = EXCLUDED.barcode_generated_at
+                        """)
+                    
+                    # التخزين المجمع
+                    conn.execute(query, records_to_update)
+                    conn.commit()
+                    
+            except Exception as e:
+                logger.error(f"Error in bulk barcode storage: {str(e)}")
+        
+        return barcodes_map
+            
+    except Exception as e:
+        logger.error(f"Error in bulk_generate_and_store_barcodes: {str(e)}")
+        return {}
 
 def get_main_image(item):
     """استخراج الصورة الرئيسية"""
@@ -424,42 +590,46 @@ def db_session_scope():
     finally:
         db.session.remove()
 
-def process_orders_sequentially(order_ids, access_token):
-    """معالجة الطلبات بشكل تسلسلي"""
+def process_orders_concurrently(order_ids, access_token, max_workers=10):
+    """معالجة الطلبات بشكل متزامن باستخدام ThreadPoolExecutor"""
     from .config import Config
     
     if not order_ids:
         return []
     
-    orders = []
-    session = create_session()
-    headers = {
-        'Authorization': f'Bearer {access_token}',
-        'Accept': 'application/json'
-    }
-    
-    # جلب الباركودات مسبقاً لجميع الطلبات
+    # جلب جميع الباركودات مسبقاً في استعلام واحد
     barcodes_map = get_barcodes_for_orders(order_ids)
     
+    orders = []
     successful_orders = 0
     failed_orders = 0
-    
-    for i, order_id in enumerate(order_ids):
+    lock = Lock()  # لحماية المتغيرات المشتركة
+
+    def process_single_order(order_id):
+        nonlocal successful_orders, failed_orders
         order_id_str = str(order_id).strip()
         if not order_id_str:
-            continue
+            return None
             
         try:
+            # إنشاء جلسة مستقلة لكل خيط
+            session = create_session()
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Accept': 'application/json'
+            }
+            
             # جلب بيانات الطلب
             order_response = session.get(
                 f"{Config.SALLA_ORDERS_API}/{order_id_str}",
                 headers=headers,
-                timeout=20
+                timeout=15
             )
             
             if order_response.status_code != 200:
-                failed_orders += 1
-                continue
+                with lock:
+                    failed_orders += 1
+                return None
                 
             order_data = order_response.json().get('data', {})
             
@@ -468,12 +638,12 @@ def process_orders_sequentially(order_ids, access_token):
                 f"{Config.SALLA_BASE_URL}/orders/items",
                 params={'order_id': order_id_str},
                 headers=headers,
-                timeout=20
+                timeout=15
             )
             
             items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
             
-            # استخدام الباركود المخزن مسبقاً إذا متوفر
+            # استخدام الباركود المخزن مسبقاً
             barcode_data = barcodes_map.get(order_id_str)
             
             # معالجة بيانات الطلب
@@ -484,24 +654,43 @@ def process_orders_sequentially(order_ids, access_token):
                 processed_order['customer'] = order_data.get('customer', {})
                 processed_order['created_at'] = format_date(order_data.get('created_at', ''))
                 
-                orders.append(processed_order)
-                successful_orders += 1
+                with lock:
+                    successful_orders += 1
+                return processed_order
             else:
-                failed_orders += 1
-            
-            # إعطاء فرصة للتنفس بين الطلبات
-            if (i + 1) % 5 == 0:
-                time.sleep(0.2)
+                with lock:
+                    failed_orders += 1
+                return None
                 
         except Exception as e:
-            failed_orders += 1
-            logger.error(f"Error processing order: {str(e)}")
-            continue
-    
-    session.close()
-    
+            with lock:
+                failed_orders += 1
+            logger.error(f"Error processing order {order_id_str}: {str(e)}")
+            return None
+        finally:
+            try:
+                session.close()
+            except:
+                pass
+
+    # استخدام ThreadPoolExecutor للمعالجة المتزامنة
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # تقديم جميع المهام مرة واحدة
+        future_to_order = {executor.submit(process_single_order, order_id): order_id for order_id in order_ids}
+        
+        # جمع النتائج عند اكتمالها
+        for future in as_completed(future_to_order):
+            result = future.result()
+            if result:
+                orders.append(result)
+
     logger.info(f"Order processing completed: {successful_orders} successful, {failed_orders} failed")
     return orders
+
+def process_orders_sequentially(order_ids, access_token):
+    """واجهة متوافقة مع الكود القديم (تستخدم المعالجة المتزامنة)"""
+    # استخدام 10 عمال كحد افتراضي (يمكن تعديله حسب احتياجات الخادم)
+    return process_orders_concurrently(order_ids, access_token, max_workers=10)
 
 def get_salla_categories(access_token):
     from .config import Config
@@ -545,3 +734,30 @@ def humanize_time(dt):
         return f"منذ {int(minutes)} دقيقة" if minutes > 1 else "منذ دقيقة"
     else:
         return "الآن"
+
+# دوال مساعدة إضافية للأداء
+def optimize_database_connections():
+    """تحسين اتصالات قاعدة البيانات"""
+    try:
+        # ضبط إعدادات PostgreSQL للأداء
+        engine = get_postgres_engine()
+        with engine.connect() as conn:
+            # تحسين إعدادات الجلسة
+            conn.execute(text("SET work_mem = '256MB'"))
+            conn.execute(text("SET maintenance_work_mem = '512MB'"))
+            conn.execute(text("SET shared_buffers = '256MB'"))
+            conn.commit()
+        logger.info("Database connections optimized")
+    except Exception as e:
+        logger.warning(f"Could not optimize database connections: {str(e)}")
+
+def cleanup_resources():
+    """تنظيف الموارد عند إغلاق التطبيق"""
+    global _postgres_engine
+    try:
+        if _postgres_engine:
+            _postgres_engine.dispose()
+            _postgres_engine = None
+        logger.info("Database resources cleaned up")
+    except Exception as e:
+        logger.error(f"Error cleaning up resources: {str(e)}")
