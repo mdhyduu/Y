@@ -409,14 +409,13 @@
 
                 <div class="barcode-section">
 <!-- تأكد من أنك تستخدم الباركود بهذه الطريقة -->
-{% for order in orders %}
+
     {% if order.barcode %}
         <img src="{{ order.barcode }}" alt="باركود الطلب {{ order.id }}" 
              style="max-width: 200px; height: auto;">
     {% else %}
         <p>⚠️ لا يتوفر باركود لهذا الطلب</p>
     {% endif %}
-{% endfor %}
                 </div>
             </div>
 
