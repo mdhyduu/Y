@@ -101,10 +101,10 @@ def create_app():
         if request.path.startswith('/webhook/'):
             return response
     
-        # CSP مع دعم SRI + strict-dynamic
+        # CSP خفيف يسمح بالسكربتات والستايلات من jsdelivr فقط
         csp = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'strict-dynamic' https://cdn.jsdelivr.net; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             f"img-src 'self' data: blob: https: {request.host_url}; "
             "font-src 'self' https://cdn.jsdelivr.net; "
@@ -130,7 +130,7 @@ def create_app():
         else:
             response.headers['Cache-Control'] = 'public, max-age=3600'
     
-        return response 
+        return response
     @app.template_filter('time_ago')
     def time_ago_filter(dt):
         if not dt:
