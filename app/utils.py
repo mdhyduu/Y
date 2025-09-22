@@ -1,13 +1,3 @@
-# ملاحظة هامة: لكي تعمل هذه التعديلات بشكل صحيح، تأكد من إضافة الإعدادات التالية
-# في ملف إعدادات Flask (config.py) لضمان إعادة تدوير اتصالات قاعدة البيانات تلقائيًا.
-#
-# class Config:
-#     # ... other configs
-#     SQLALCHEMY_ENGINE_OPTIONS = {
-#         'pool_recycle': 280,  # يعيد استخدام الاتصال كل 280 ثانية
-#         'pool_pre_ping': True # يتأكد من أن الاتصال صالح قبل استخدامه
-#     }
-#
 from datetime import datetime
 import os
 import barcode
@@ -17,15 +7,14 @@ from .models import db, User, Employee, CustomOrder, SallaOrder
 import logging
 from io import BytesIO
 import base64
-from functools import lru_cache
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from contextlib import contextmanager
+from sqlalchemy import text
 import threading
 import queue
 import time
-from contextlib import contextmanager
-from sqlalchemy import text
 
 # إعداد المسجل
 logger = logging.getLogger(__name__)
@@ -34,23 +23,8 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 UPLOAD_FOLDER = 'static/uploads/custom_orders'
 
 def allowed_file(filename):
-    """التحقق من امتداد الملف المسموح به"""
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-@contextmanager
-def db_session_scope():
-    """
-    مدير سياق مبسط لإدارة جلسات قاعدة البيانات.
-    يضمن تنفيذ commit أو rollback بشكل آمن.
-    """
-    try:
-        yield db.session
-        db.session.commit()
-    except Exception as e:
-        logger.error(f"Database session error: {str(e)}")
-        db.session.rollback()
-        raise # إعادة إرسال الخطأ للمعالجة في المستوى الأعلى
 
 def get_next_order_number():
     """إنشاء رقم طلب تلقائي يبدأ من 1000"""
@@ -66,273 +40,442 @@ def get_next_order_number():
     except Exception as e:
         logger.error(f"Error in get_next_order_number: {str(e)}")
         return "1000"
-    # لا حاجة لـ db.session.remove() هنا، Flask-SQLAlchemy تدير الجلسة
+    finally:
+        db.session.remove()
 
 def get_user_from_cookies():
     """استخراج بيانات المستخدم من الكوكيز"""
     user_id = request.cookies.get('user_id')
     is_admin = request.cookies.get('is_admin') == 'true'
+    employee_role = request.cookies.get('employee_role', '')
     
     if not user_id:
         return None, None
     
     try:
-        user_id_int = int(user_id)
         if is_admin:
-            user = User.query.get(user_id_int)
+            user = User.query.get(int(user_id))
             return user, None
         else:
-            employee = Employee.query.get(user_id_int)
+            employee = Employee.query.get(int(user_id))
             if employee:
                 user = User.query.filter_by(store_id=employee.store_id).first()
                 return user, employee
             return None, None
     except (ValueError, TypeError) as e:
-        logger.error(f"Error parsing user ID from cookies: {str(e)}")
+        logger.error(f"Error in get_user_from_cookies: {str(e)}")
         return None, None
-    # لا حاجة لـ db.session.remove() هنا
+    finally:
+        db.session.remove()
 
 def create_session():
-    """إنشاء جلسة طلبات (requests session) مع إعدادات إعادة المحاولة"""
+    """إنشاء جلسة طلبات مع إعدادات التحسين"""
     session = requests.Session()
     retry_strategy = Retry(
         total=3,
         backoff_factor=0.5,
         status_forcelist=[429, 500, 502, 503, 504],
     )
-    adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=50, pool_maxsize=50)
+    adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=20, pool_maxsize=20)
     session.mount("https://", adapter)
     session.mount("http://", adapter)
     return session
 
 def generate_barcode(data):
-    """إنشاء باركود بصيغة base64"""
+    """إنشاء باركود مع تحسين الأداء"""
     try:
+        data_str = str(data)
         buffer = BytesIO()
-        # تم تحسين خيارات الكتابة لتقليل حجم الصورة
+        writer = ImageWriter()
+        
         options = {
-            'write_text': False, 'module_width': 0.4, 'module_height': 15.0,
-            'quiet_zone': 6.0, 'font_size': 0, 'text_distance': 0
+            'write_text': True,  # عرض النص تحت الباركود
+            'module_width': 0.3,
+            'module_height': 12,
+            'quiet_zone': 6,
+            'dpi': 96,
+            'font_size': 8
         }
-        code = barcode.get('code128', str(data), writer=ImageWriter())
+        
+        code = barcode.get('code128', data_str, writer=writer)
         code.write(buffer, options=options)
-        return base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        buffer.seek(0)
+        barcode_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        return f"data:image/png;base64,{barcode_base64}"
+        
     except Exception as e:
-        logger.error(f"Error generating barcode for data '{data}': {str(e)}")
+        logger.error(f"Error generating barcode: {str(e)}")
         return None
 
-def get_barcodes_for_orders(order_ids):
-    """جلب جميع الباركودات للطلبات المحددة في استعلام واحد لتحسين الأداء"""
-    if not order_ids:
-        return {}
+def get_cached_barcode_data(order_id):
+    """الحصول على بيانات الباركود من التخزين المؤقت"""
     try:
-        orders = SallaOrder.query.filter(SallaOrder.order_id.in_(order_ids)).all()
+        order_id_str = str(order_id)
+        order = SallaOrder.query.filter_by(order_id=order_id_str).first()
+        if order and order.barcode_data:
+            # التأكد من صحة تنسيق الباركود
+            if not order.barcode_data.startswith('data:image'):
+                if order.barcode_data.startswith('iVBOR'):
+                    return f"data:image/png;base64,{order.barcode_data}"
+            return order.barcode_data
+        return None
+    except Exception as e:
+        logger.error(f"Error in get_cached_barcode_data: {str(e)}")
+        return None
+    finally:
+        db.session.remove()
+
+def get_barcodes_for_orders(order_ids):
+    """جلب جميع الباركودات للطلبات المحددة في استعلام واحد"""
+    try:
+        order_ids_str = [str(oid) for oid in order_ids]
+        orders = SallaOrder.query.filter(SallaOrder.order_id.in_(order_ids_str)).all()
         return {str(order.order_id): order.barcode_data for order in orders if order.barcode_data}
     except Exception as e:
         logger.error(f"Error in get_barcodes_for_orders: {str(e)}")
         return {}
-
-def generate_and_store_barcodes_bulk(order_ids, order_type='salla'):
-    """
-    إنشاء وحفظ الباركودات بشكل جماعي باستخدام عملية تحديث واحدة (bulk update).
-    هذا أكثر كفاءة من تحديث كل سجل على حدة.
-    """
-    try:
-        updates_to_perform = []
-        barcode_map = {}
-
-        for order_id in order_ids:
-            order_id_str = str(order_id)
-            barcode_data = generate_barcode(order_id_str)
-            if barcode_data:
-                barcode_map[order_id_str] = barcode_data
-                update_payload = {
-                    'barcode_data': barcode_data,
-                    'barcode_generated_at': datetime.utcnow()
-                }
-                # يجب إضافة المفتاح الرئيسي للنموذج لكي يعمل التحديث الجماعي
-                if order_type == 'salla':
-                    update_payload['order_id'] = order_id_str
-                else:
-                    update_payload['id'] = int(order_id_str) # افترض أن id هو integer
-                updates_to_perform.append(update_payload)
-        
-        if not updates_to_perform:
-            return barcode_map
-
-        with db_session_scope() as session:
-            model = SallaOrder if order_type == 'salla' else CustomOrder
-            session.bulk_update_mappings(model, updates_to_perform)
-        
-        return barcode_map
-            
-    except Exception as e:
-        logger.error(f"خطأ في الحفظ الجماعي للباركود: {str(e)}")
-        return {}
+    finally:
+        db.session.remove()
 
 def generate_and_store_barcode(order_id, order_type='salla'):
-    """إنشاء باركود وحفظه في قاعدة البيانات لسجل واحد"""
-    order_id_str = str(order_id)
-    barcode_data = generate_barcode(order_id_str)
-    if not barcode_data:
-        return None
-
+    """إنشاء باركود وحفظه في قاعدة البيانات تلقائيًا"""
     try:
-        with db_session_scope():
-            if order_type == 'salla':
-                order = SallaOrder.query.get(order_id_str)
-            else:
-                order = CustomOrder.query.get(int(order_id_str))
+        order_id_str = str(order_id)
+        barcode_data = generate_barcode(order_id_str)
+        
+        if not barcode_data:
+            return None
+        
+        if order_type == 'salla':
+            order = SallaOrder.query.filter_by(order_id=order_id_str).first()
+            if not order:
+                order = SallaOrder(order_id=order_id_str)
+                db.session.add(order)
+        else:
+            order = CustomOrder.query.get(order_id_str)
             
-            if order:
-                order.barcode_data = barcode_data
-                order.barcode_generated_at = datetime.utcnow()
-                return barcode_data
-        return None # في حال لم يتم العثور على الطلب
-    except Exception as e:
-        logger.error(f"خطأ في حفظ الباركود تلقائيًا للطلب {order_id_str}: {str(e)}")
+        if order:
+            order.barcode_data = barcode_data
+            order.barcode_generated_at = datetime.utcnow()
+            db.session.commit()
+            return barcode_data
         return None
+            
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"خطأ في حفظ الباركود: {str(e)}")
+        return None
+    finally:
+        db.session.remove()
 
-def process_order_data(order_data, items_data, barcode_data):
-    """معالجة ودمج بيانات الطلب والمنتجات والباركود"""
-    order_id = str(order_data.get('id'))
+def get_main_image(item):
+    """استخراج الصورة الرئيسية بشكل أكثر كفاءة"""
+    thumbnail_url = item.get('product_thumbnail') or item.get('thumbnail')
+    if thumbnail_url and isinstance(thumbnail_url, str):
+        return thumbnail_url
+    
+    images = item.get('images', [])
+    if images and isinstance(images, list) and len(images) > 0:
+        first_image = images[0]
+        image_url = first_image.get('image', '')
+        if image_url:
+            if not image_url.startswith(('http://', 'https://')):
+                return f"https://cdn.salla.sa{image_url}"
+            return image_url
+    
+    for field in ['image', 'url', 'image_url', 'picture']:
+        if item.get(field):
+            return item[field]
+    
+    return ''
+
+def format_date(date_str):
+    try:
+        dt = datetime.strptime(date_str.split('.')[0], '%Y-%m-%d %H:%M:%S')
+        return dt.strftime('%Y-%m-%d %H:%M')
+    except:
+        return date_str if date_str else 'غير معروف'
+
+def process_order_data(order_id, items_data, barcode_data=None):
+    """معالجة بيانات الطلب مع استخدام الباركود المخزن في قاعدة البيانات"""
+    order_id = str(order_id)
     items = []
     
-    for item in items_data:
+    for index, item in enumerate(items_data):
+        item_id = item.get('id') or f"temp_{index}"
+        main_image = get_main_image(item)
+        
         options = []
-        if isinstance(item.get('options'), list):
-            for option in item.get('options', []):
+        item_options = item.get('options', [])
+        if isinstance(item_options, list):
+            for option in item_options:
+                raw_value = option.get('value', '')
+                display_value = 'غير محدد'
+                
+                if isinstance(raw_value, dict):
+                    display_value = raw_value.get('name') or raw_value.get('value') or str(raw_value)
+                elif isinstance(raw_value, list):
+                    values_list = [str(opt.get('name') or opt.get('value') or str(opt)) 
+                                 for opt in raw_value if isinstance(opt, (dict, str))]
+                    display_value = ', '.join(values_list)
+                else:
+                    display_value = str(raw_value) if raw_value else 'غير محدد'
+                
                 options.append({
                     'name': option.get('name', ''),
-                    'value': option.get('value', {}).get('name', 'غير محدد')
+                    'value': display_value,
+                    'type': option.get('type', '')
                 })
         
-        items.append({
-            'id': item.get('id'),
+        digital_codes = [{'code': code.get('code', ''), 'status': code.get('status', 'غير معروف')} 
+                        for code in item.get('codes', []) if isinstance(code, dict)]
+        
+        digital_files = [{'url': file.get('url', ''), 'name': file.get('name', ''), 'size': file.get('size', 0)} 
+                       for file in item.get('files', []) if isinstance(file, dict)]
+        
+        reservations = [{'id': res.get('id'), 'from': res.get('from', ''), 'to': res.get('to', ''), 'date': res.get('date', '')} 
+                      for res in item.get('reservations', []) if isinstance(res, dict)]
+        
+        item_data = {
+            'id': item_id,
             'name': item.get('name', ''),
             'sku': item.get('sku', ''),
             'quantity': item.get('quantity', 0),
-            'main_image': item.get('product', {}).get('main_image', ''),
+            'currency': item.get('currency', 'SAR'),
+            'price': {
+                'amount': item.get('amounts', {}).get('price_without_tax', {}).get('amount', 0),
+                'currency': item.get('currency', 'SAR')
+            },
+            'tax_percent': item.get('amounts', {}).get('tax', {}).get('percent', '0.00'),
+            'tax_amount': item.get('amounts', {}).get('tax', {}).get('amount', {}).get('amount', 0),
+            'total_price': item.get('amounts', {}).get('total', {}).get('amount', 0),
+            'weight': item.get('weight', 0),
+            'weight_label': item.get('weight_label', ''),
             'notes': item.get('notes', ''),
             'options': options,
-        })
+            'main_image': main_image,
+            'codes': digital_codes,
+            'files': digital_files,
+            'reservations': reservations,
+            'product': {
+                'id': item_id,
+                'name': item.get('name', ''),
+                'description': item.get('notes', '')
+            }
+        }
+        
+        items.append(item_data)
+
+    # الحصول على الباركود
+    if not barcode_data:
+        barcode_data = get_cached_barcode_data(order_id)
     
+    if not barcode_data:
+        barcode_data = generate_and_store_barcode(order_id, 'salla')
+    
+    if not barcode_data:
+        barcode_data = generate_barcode(order_id)
+
     return {
         'id': order_id,
-        'reference_id': order_data.get('reference_id', order_id),
-        'customer': order_data.get('customer', {}),
-        'created_at': format_date(order_data.get('date', {}).get('iso')),
         'order_items': items,
         'barcode': barcode_data
     }
 
-def format_date(date_str):
-    """تنسيق التاريخ بشكل مقروء"""
-    if not date_str:
-        return 'غير معروف'
+@contextmanager
+def db_session_scope():
+    """مدير سياق محسن لإدارة جلسات قاعدة البيانات"""
     try:
-        # ISO 8601 format like "2023-09-21T10:30:00.000Z"
-        dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-        return dt.strftime('%Y-%m-%d %H:%M')
-    except (ValueError, TypeError):
-        return date_str
+        yield db.session
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Database session error: {str(e)}")
+        raise
+    finally:
+        db.session.remove()
 
-def process_orders_in_parallel(order_ids, access_token):
-    """
-    معالجة الطلبات بشكل متوازٍ باستخدام Threads.
-    تم التعديل لاستخدام سياق التطبيق بدلاً من إنشاء تطبيق جديد لكل خيط.
-    """
-    if not order_ids:
-        return []
-        
+def process_orders_in_parallel(order_ids, access_token, flask_app):
+    """معالجة الطلبات بشكل متوازي باستخدام تطبيق Flask الموجود"""
+    from .config import Config
+    
     barcodes_map = get_barcodes_for_orders(order_ids)
-    app = current_app._get_current_object() # الحصول على نسخة من التطبيق الحالي مرة واحدة
-
-    def fetch_order_data(order_id, result_queue):
-        """دالة مساعدة لجلب بيانات الطلب، تعمل داخل كل خيط"""
-        with app.app_context(): # استخدام سياق التطبيق لتمكين الوصول لقاعدة البيانات
+    
+    def fetch_order_data(order_id, result_queue, app):
+        """دالة مساعدة لجلب بيانات الطلب باستخدام تطبيق Flask الموجود"""
+        with app.app_context():  # استخدام سياق التطبيق الموجود
             session = create_session()
-            headers = {'Authorization': f'Bearer {access_token}', 'Accept': 'application/json'}
-            config = app.config
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Accept': 'application/json'
+            }
             
             try:
                 order_response = session.get(
-                    f"{config['SALLA_ORDERS_API']}/{order_id}",
-                    headers=headers, timeout=15
+                    f"{Config.SALLA_ORDERS_API}/{order_id}",
+                    headers=headers,
+                    timeout=15
                 )
-                order_response.raise_for_status() # التأكد من نجاح الطلب
-                order_data = order_response.json().get('data', {})
-                items_data = order_data.get('items', []) # غالبًا ما تكون المنتجات مضمنة
-
-                order_id_str = str(order_id)
-                barcode_data = barcodes_map.get(order_id_str)
-                if not barcode_data:
-                    barcode_data = generate_and_store_barcode(order_id_str, 'salla')
-
-                if barcode_data:
-                    processed_order = process_order_data(order_data, items_data, barcode_data)
-                    result_queue.put(processed_order)
-                else:
+                
+                if order_response.status_code != 200:
+                    logger.warning(f"Failed to fetch order {order_id}: {order_response.status_code}")
                     result_queue.put(None)
-
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Network error fetching order {order_id}: {str(e)}")
-                result_queue.put(None)
+                    return
+                    
+                order_data = order_response.json().get('data', {})
+                
+                items_response = session.get(
+                    f"{Config.SALLA_BASE_URL}/orders/items",
+                    params={'order_id': order_id},
+                    headers=headers,
+                    timeout=15
+                )
+                
+                items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
+                
+                barcode_data = barcodes_map.get(str(order_id))
+                processed_order = process_order_data(order_id, items_data, barcode_data)
+                
+                processed_order['reference_id'] = order_data.get('reference_id', order_id)
+                processed_order['customer'] = order_data.get('customer', {})
+                processed_order['created_at'] = format_date(order_data.get('created_at', ''))
+                
+                result_queue.put(processed_order)
+                
             except Exception as e:
-                logger.error(f"Unexpected error processing order {order_id}: {str(e)}")
+                logger.error(f"Error fetching order {order_id}: {str(e)}")
                 result_queue.put(None)
             finally:
-                # هذا مهم جداً: يعيد الاتصال إلى المجمع (pool) بعد انتهاء الخيط من عمله
-                db.session.remove()
-
+                session.close()
+    
     orders = []
     result_queue = queue.Queue()
-    threads = []
-    max_workers = min(10, len(order_ids)) # تحديد عدد الخيوط بحد أقصى 10
-
-    for order_id in order_ids:
-        thread = threading.Thread(target=fetch_order_data, args=(order_id, result_queue))
-        threads.append(thread)
-        thread.start()
     
-    for thread in threads:
-        thread.join(timeout=45) # انتظار كل خيط لمدة أقصاها 45 ثانية
+    # استخدام ThreadPoolExecutor لإدارة أفضل للخيوط
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        # تقديم جميع المهام
+        future_to_order = {
+            executor.submit(fetch_order_data, order_id, result_queue, flask_app): order_id 
+            for order_id in order_ids
+        }
+        
+        # جمع النتائج مع timeout
+        for future in future_to_order:
+            try:
+                future.result(timeout=30)  # انتظار 30 ثانية كحد أقصى
+            except Exception as e:
+                order_id = future_to_order[future]
+                logger.error(f"Thread timeout/error for order {order_id}: {str(e)}")
+        
+        # جمع النتائج من الطابور
+        while not result_queue.empty():
+            result = result_queue.get()
+            if result:
+                orders.append(result)
+    
+    logger.info(f"Successfully processed {len(orders)} out of {len(order_ids)} orders")
+    return orders
 
-    while not result_queue.empty():
-        result = result_queue.get()
-        if result:
-            orders.append(result)
+# بديل أبسط بدون خيوط متعددة (أكثر أماناً)
+def process_orders_sequentially(order_ids, access_token):
+    """معالجة الطلبات بشكل تسلسلي - أكثر أماناً واستقراراً"""
+    from .config import Config
+    
+    orders = []
+    session = create_session()
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Accept': 'application/json'
+    }
+    
+    barcodes_map = get_barcodes_for_orders(order_ids)
+    
+    for i, order_id in enumerate(order_ids):
+        try:
+            order_response = session.get(
+                f"{Config.SALLA_ORDERS_API}/{order_id}",
+                headers=headers,
+                timeout=15
+            )
             
+            if order_response.status_code != 200:
+                continue
+                
+            order_data = order_response.json().get('data', {})
+            
+            items_response = session.get(
+                f"{Config.SALLA_BASE_URL}/orders/items",
+                params={'order_id': order_id},
+                headers=headers,
+                timeout=15
+            )
+            
+            items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
+            
+            barcode_data = barcodes_map.get(str(order_id))
+            processed_order = process_order_data(order_id, items_data, barcode_data)
+            
+            processed_order['reference_id'] = order_data.get('reference_id', order_id)
+            processed_order['customer'] = order_data.get('customer', {})
+            processed_order['created_at'] = format_date(order_data.get('created_at', ''))
+            
+            orders.append(processed_order)
+            
+            # إعطاء فرصة للتنفس بين الطلبات
+            if i % 5 == 0:
+                time.sleep(0.1)
+                
+        except Exception as e:
+            logger.error(f"Error processing order {order_id}: {str(e)}")
+            continue
+    
+    session.close()
     return orders
 
 def get_salla_categories(access_token):
-    """جلب التصنيفات من منصة سلة"""
     from .config import Config
+    
     session = create_session()
-    headers = {'Authorization': f'Bearer {access_token}', 'Accept': 'application/json'}
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Accept': 'application/json'
+    }
     try:
-        response = session.get(Config.SALLA_CATEGORIES_API, headers=headers, timeout=10)
+        response = session.get(Config.SALLA_CATEGORIES_API, headers=headers)
         response.raise_for_status()
         return response.json().get('data', [])
     except requests.exceptions.RequestException as e:
         logger.error(f"Error fetching categories from Salla: {e}")
         return []
+    finally:
+        session.close()
 
 def humanize_time(dt):
     """تحويل التاريخ إلى نص مقروء مثل 'منذ دقيقة'"""
-    if not isinstance(dt, datetime):
-        return "" # التعامل مع المدخلات غير الصالحة
     now = datetime.utcnow()
     diff = now - dt
     
     seconds = diff.total_seconds()
-    if seconds < 60:
+    minutes = seconds // 60
+    hours = minutes // 60
+    days = hours // 24
+    months = days // 30
+    years = months // 12
+    
+    if years > 0:
+        return f"منذ {int(years)} سنة" if years > 1 else "منذ سنة"
+    elif months > 0:
+        return f"منذ {int(months)} شهر" if months > 1 else "منذ شهر"
+    elif days > 0:
+        return f"منذ {int(days)} يوم" if days > 1 else "منذ يوم"
+    elif hours > 0:
+        return f"منذ {int(hours)} ساعة" if hours > 1 else "منذ ساعة"
+    elif minutes > 0:
+        return f"منذ {int(minutes)} دقيقة" if minutes > 1 else "منذ دقيقة"
+    else:
         return "الآن"
-    minutes = seconds / 60
-    if minutes < 60:
-        return f"منذ {int(minutes)} دقيقة"
-    hours = minutes / 60
-    if hours < 24:
-        return f"منذ {int(hours)} ساعة"
-    days = hours / 24
-    return f"منذ {int(days)} يوم"
+
+# إزالة الدوال المسببة للمشاكل
+# periodic_connection_cleanup() - تم إزالتها
+# close_db_connection() - تم إزالتها
