@@ -634,7 +634,25 @@ class OrderProductStatus(db.Model):
 
     def __repr__(self):
         return f'<OrderProductStatus {self.product_id}: {self.status}>'
-# ... (بقية الكود)
+        
+class OrderAddress(db.Model):
+    __tablename__ = 'order_addresses'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.String(50), db.ForeignKey('salla_orders.id'), nullable=False, unique=True)
+    name = db.Column(db.String(255), nullable=False)  # الاسم الكامل
+    phone = db.Column(db.String(20))  # رقم الهاتف
+    country = db.Column(db.String(100))  # البلد
+    city = db.Column(db.String(100))  # المدينة
+    full_address = db.Column(db.Text)  # العنوان الكامل
+    address_type = db.Column(db.String(10), default='receiver')  # receiver أو customer
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # العلاقة مع الطلب
+    order = relationship('SallaOrder', backref='address', lazy=True)
+    
+    def __repr__(self):
+        return f'<OrderAddress {self.name} ({self.address_type})>'
 # تبقى أحداث SQLAlchemy كما هي
 @event.listens_for(User, 'before_insert')
 def validate_user(mapper, connection, target):

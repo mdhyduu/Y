@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 from . import orders_bp
 from app.models import (db, SallaOrder, CustomOrder, OrderStatus,User, Employee, 
                      OrderAssignment, EmployeeCustomStatus, OrderStatusNote, 
-                     OrderEmployeeStatus, OrderProductStatus, CustomNoteStatus)
+                     OrderEmployeeStatus, OrderProductStatus, CustomNoteStatus, OrderAddress)
 from app.utils import get_user_from_cookies, process_order_data, format_date,  humanize_time
 from app.token_utils import refresh_salla_token
 from app.config import Config
@@ -653,7 +653,6 @@ def extract_store_id_from_webhook(webhook_data):
 from flask_wtf.csrf import CSRFProtect, CSRFError
 
 csrf = CSRFProtect()
-
 def handle_order_creation(data, webhook_version='2'):
     try:
         if webhook_version == '2':
@@ -674,6 +673,15 @@ def handle_order_creation(data, webhook_version='2'):
         
         existing_order = SallaOrder.query.get(order_id)
         if existing_order:
+            # إذا كان الطلب موجوداً، نتحقق من وجود العنوان ونحدثه إذا لزم الأمر
+            if not existing_order.address:
+                address_info = extract_order_address(order_data)
+                new_address = OrderAddress(
+                    order_id=order_id,
+                    **address_info
+                )
+                db.session.add(new_address)
+                db.session.commit()
             return True
         
         user = User.query.filter_by(store_id=store_id).first()
@@ -744,6 +752,16 @@ def handle_order_creation(data, webhook_version='2'):
         )
         
         db.session.add(new_order)
+        db.session.flush()  # للحصول على id الطلب
+        
+        # حفظ بيانات العنوان
+        address_info = extract_order_address(order_data)
+        new_address = OrderAddress(
+            order_id=order_id,
+            **address_info
+        )
+        db.session.add(new_address)
+        
         db.session.commit()
         
         return True
@@ -838,3 +856,60 @@ def order_status_webhook():
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         db.session.close()
+        
+def extract_order_address(order_data):
+    """
+    استخراج بيانات العنوان مع الأولوية للمتسلم
+    يرجع: اسم كامل، هاتف، بلد، مدينة، عنوان كامل
+    """
+    shipping_data = order_data.get('shipping', {})
+    customer_data = order_data.get('customer', {})
+    
+    # الأولوية للمتسلم (receiver)
+    receiver_data = shipping_data.get('receiver', {})
+    address_data = shipping_data.get('address', {})
+    
+    # إذا كان هناك متسلم (receiver) نستخدم بياناته
+    if receiver_data.get('name') or address_data:
+        name = receiver_data.get('name', '').strip()
+        phone = receiver_data.get('phone', '')
+        country = address_data.get('country', '')
+        city = address_data.get('city', '')
+        full_address = address_data.get('shipping_address', '')
+        
+        # إذا كان الاسم فارغاً في المتسلم، نستخدم اسم العميل
+        if not name:
+            name = f"{customer_data.get('first_name', '')} {customer_data.get('last_name', '')}".strip()
+        
+        address_type = 'receiver'
+    
+    # إذا لم يكن هناك متسلم، نستخدم بيانات العميل
+    else:
+        name = f"{customer_data.get('first_name', '')} {customer_data.get('last_name', '')}".strip()
+        phone = f"{customer_data.get('mobile_code', '')}{customer_data.get('mobile', '')}"
+        country = customer_data.get('country', '')
+        city = customer_data.get('city', '')
+        full_address = customer_data.get('location', '')
+        address_type = 'customer'
+    
+    # تنظيف البيانات والتأكد من عدم وجود قيم فارغة
+    if not name:
+        name = 'عميل غير معروف'
+    
+    # بناء العنوان الكامل إذا لم يكن موجوداً
+    if not full_address:
+        address_parts = []
+        if country:
+            address_parts.append(country)
+        if city:
+            address_parts.append(city)
+        full_address = ' - '.join(address_parts) if address_parts else 'لم يتم تحديد العنوان'
+    
+    return {
+        'name': name,
+        'phone': phone,
+        'country': country,
+        'city': city,
+        'full_address': full_address,
+        'address_type': address_type
+    }

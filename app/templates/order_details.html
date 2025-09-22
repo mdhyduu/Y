@@ -448,7 +448,23 @@
     </div>
   </div>
 </div>
-
+<!-- في orders.html أو order_details.html -->
+{% for order in orders %}
+<div class="order-card">
+    <h3>الطلب #{{ order.reference_id }}</h3>
+    
+    {% if order.address %}
+    <div class="address-info">
+        <p><strong>الاسم:</strong> {{ order.address.name }}</p>
+        <p><strong>الهاتف:</strong> {{ order.address.phone }}</p>
+        <p><strong>العنوان:</strong> {{ order.address.full_address }}</p>
+        <p><strong>المدينة:</strong> {{ order.address.city }}</p>
+        <p><strong>البلد:</strong> {{ order.address.country }}</p>
+        <small class="text-muted">({{ 'مستلم' if order.address.address_type == 'receiver' else 'عميل' }})</small>
+    </div>
+    {% endif %}
+</div>
+{% endfor %}
 <style>
   /* أنماط عامة للجدول */
   .table {
