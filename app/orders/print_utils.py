@@ -3,18 +3,80 @@ import requests
 from datetime import datetime
 from weasyprint import HTML
 from . import orders_bp
-from app.utils import get_user_from_cookies, process_order_data, format_date, create_session, db_session_scope, process_orders_sequentially, get_barcodes_for_orders
+from app.utils import (
+    get_user_from_cookies, 
+    process_order_data, 
+    format_date, 
+    create_session, 
+    db_session_scope, 
+    process_orders_concurrently,  # تم التحديث إلى الدالة المتزامنة
+    get_barcodes_for_orders,
+    get_postgres_engine  # إضافة جديدة للاستفادة من اتصالات PostgreSQL المحسنة
+)
 from app.config import Config
 import logging
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 
 # إعداد المسجل للإنتاج
 logger = logging.getLogger('salla_app')
 
+def optimize_pdf_generation(orders):
+    """تحسين أداء إنشاء PDF باستخدام الخيوط"""
+    try:
+        # تقسيم الطلبات إلى مجموعات للمعالجة المتوازية
+        def process_order_group(order_group):
+            processed_orders = []
+            for order in order_group:
+                try:
+                    # معالجة إضافية للطلاب إذا لزم الأمر
+                    processed_order = {
+                        'id': order.get('id', ''),
+                        'reference_id': order.get('reference_id', order.get('id', '')),
+                        'order_items': order.get('order_items', []),
+                        'barcode': order.get('barcode', ''),
+                        'customer': order.get('customer', {}),
+                        'created_at': order.get('created_at', '')
+                    }
+                    processed_orders.append(processed_order)
+                except Exception as e:
+                    logger.error(f"Error processing order {order.get('id', '')}: {str(e)}")
+                    continue
+            return processed_orders
+        
+        # تقسيم الطلبات إلى مجموعات أصغر
+        group_size = max(1, len(orders) // 4)  # 4 مجموعات كحد أقصى
+        order_groups = [orders[i:i + group_size] for i in range(0, len(orders), group_size)]
+        
+        processed_orders = []
+        lock = Lock()
+        
+        # معالجة المجموعات بشكل متزامن
+        with ThreadPoolExecutor(max_workers=min(4, len(order_groups))) as executor:
+            future_to_group = {
+                executor.submit(process_order_group, group): group 
+                for group in order_groups
+            }
+            
+            for future in as_completed(future_to_group):
+                try:
+                    result = future.result()
+                    with lock:
+                        processed_orders.extend(result)
+                except Exception as e:
+                    logger.error(f"Error processing order group: {str(e)}")
+        
+        return processed_orders
+        
+    except Exception as e:
+        logger.error(f"Error in optimize_pdf_generation: {str(e)}")
+        return orders
+
 @orders_bp.route('/download_orders_html')
 def download_orders_html():
-    """معاينة الطلبات بتنسيق HTML للإنتاج"""
-    logger.info("بدء معاينة الطلبات بتنسيق HTML")
+    """معاينة الطلبات بتنسيق HTML للإنتاج - نسخة محسنة"""
+    logger.info("بدء معاينة الطلبات بتنسيق HTML (نسخة محسنة)")
     
     try:
         user, employee = get_user_from_cookies()
@@ -32,7 +94,7 @@ def download_orders_html():
             flash('لم يتم تحديد أي طلبات للمعاينة', 'error')
             return redirect(url_for('orders.index'))
         
-        logger.info(f"معالجة {len(order_ids)} طلب للمعاينة")
+        logger.info(f"معالجة {len(order_ids)} طلب للمعاينة باستخدام الخيوط")
         
         access_token = user.salla_access_token
         
@@ -40,8 +102,9 @@ def download_orders_html():
             flash('يجب ربط المتجر مع سلة أولاً', 'error')
             return redirect(url_for('auth.link_store'))
         
-        # معالجة الطلبات
-        orders = process_orders_sequentially(order_ids, access_token)
+        # استخدام المعالجة المتزامنة مع عدد عمال ديناميكي
+        max_workers = min(current_app.config.get('MAX_WORKERS', 10), len(order_ids))
+        orders = process_orders_concurrently(order_ids, access_token, max_workers)
         
         if not orders:
             flash('لم يتم العثور على أي طلبات للمعاينة', 'error')
@@ -49,19 +112,23 @@ def download_orders_html():
         
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
+        # تحسين أداء العرض
+        optimized_orders = optimize_pdf_generation(orders)
+        
         return render_template('print_orders.html', 
-                             orders=orders, 
+                             orders=optimized_orders, 
                              current_time=current_time)
         
     except Exception as e:
         logger.error(f"خطأ في إنشاء معاينة HTML: {str(e)}")
+        logger.error(traceback.format_exc())
         flash('حدث خطأ أثناء إنشاء المعاينة', 'error')
         return redirect(url_for('orders.index'))
 
 @orders_bp.route('/get_quick_list_data', methods=['POST'])
 def get_quick_list_data():
-    """جلب بيانات القائمة السريعة للطلبات المحددة للإنتاج"""
-    logger.info("بدء جلب بيانات القائمة السريعة")
+    """جلب بيانات القائمة السريعة للطلبات المحددة للإنتاج - نسخة محسنة"""
+    logger.info("بدء جلب بيانات القائمة السريعة (نسخة محسنة)")
     
     try:
         user, employee = get_user_from_cookies()
@@ -83,36 +150,56 @@ def get_quick_list_data():
         if not access_token:
             return jsonify({'success': False, 'error': 'يجب ربط المتجر مع سلة أولاً'}), 400
         
-        logger.info(f"معالجة {len(order_ids)} طلب للقائمة السريعة")
+        logger.info(f"معالجة {len(order_ids)} طلب للقائمة السريعة باستخدام الخيوط")
         
-        # معالجة الطلبات
-        orders = process_orders_sequentially(order_ids, access_token)
+        # استخدام المعالجة المتزامنة مع عدد عمال ديناميكي
+        max_workers = min(current_app.config.get('MAX_WORKERS', 10), len(order_ids))
+        orders = process_orders_concurrently(order_ids, access_token, max_workers)
         
         orders_result = []
         success_count = 0
         error_count = 0
         
-        for order in orders:
+        # معالجة النتائج بشكل متزامن
+        def process_single_order(order):
+            nonlocal success_count, error_count
             try:
                 processed_items = []
                 for item in order.get('order_items', []):
                     processed_items.append({
                         'name': item.get('name', ''),
                         'quantity': item.get('quantity', 0),
-                        'main_image': item.get('main_image', '')
+                        'main_image': item.get('main_image', ''),
+                        'sku': item.get('sku', ''),
+                        'price': item.get('price', {}).get('amount', 0)
                     })
                 
-                orders_result.append({
+                order_data = {
                     'id': order.get('id', ''),
                     'reference_id': order.get('reference_id', order.get('id', '')),
-                    'items': processed_items
-                })
+                    'items': processed_items,
+                    'customer_name': order.get('customer', {}).get('name', ''),
+                    'created_at': order.get('created_at', '')
+                }
                 success_count += 1
+                return order_data
                 
             except Exception as e:
                 error_count += 1
                 logger.error(f"خطأ في معالجة الطلب {order.get('id', '')}: {str(e)}")
-                continue
+                return None
+        
+        # معالجة الطلبات بشكل متزامن
+        with ThreadPoolExecutor(max_workers=min(5, len(orders))) as executor:
+            future_to_order = {
+                executor.submit(process_single_order, order): order 
+                for order in orders
+            }
+            
+            for future in as_completed(future_to_order):
+                result = future.result()
+                if result:
+                    orders_result.append(result)
         
         logger.info(f"تم معالجة {success_count} طلب بنجاح، وفشل {error_count} طلب")
         
@@ -128,12 +215,13 @@ def get_quick_list_data():
         
     except Exception as e:
         logger.error(f"خطأ في جلب بيانات القائمة السريعة: {str(e)}")
+        logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': 'حدث خطأ أثناء جلب البيانات'}), 500
 
 @orders_bp.route('/download_pdf')
 def download_pdf():
-    """تحميل الطلبات كملف PDF للإنتاج"""
-    logger.info("بدء تحميل الطلبات كملف PDF")
+    """تحميل الطلبات كملف PDF للإنتاج - نسخة محسنة"""
+    logger.info("بدء تحميل الطلبات كملف PDF (نسخة محسنة)")
     
     try:
         user, employee = get_user_from_cookies()
@@ -151,7 +239,7 @@ def download_pdf():
             flash('لم يتم تحديد أي طلبات للتحميل', 'error')
             return redirect(url_for('orders.index'))
         
-        logger.info(f"معالجة {len(order_ids)} طلب لتحويل PDF")
+        logger.info(f"معالجة {len(order_ids)} طلب لتحويل PDF باستخدام الخيوط")
         
         access_token = user.salla_access_token
         
@@ -159,8 +247,9 @@ def download_pdf():
             flash('يجب ربط المتجر مع سلة أولاً', 'error')
             return redirect(url_for('auth.link_store'))
         
-        # معالجة الطلبات
-        orders = process_orders_sequentially(order_ids, access_token)
+        # استخدام المعالجة المتزامنة مع عدد عمال ديناميكي
+        max_workers = min(current_app.config.get('MAX_WORKERS', 10), len(order_ids))
+        orders = process_orders_concurrently(order_ids, access_token, max_workers)
         
         if not orders:
             flash('لم يتم العثور على أي طلبات للتحميل', 'error')
@@ -168,22 +257,89 @@ def download_pdf():
         
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
+        # تحسين أداء إنشاء PDF
+        optimized_orders = optimize_pdf_generation(orders)
+        
+        # إنشاء HTML مع تحسينات الأداء
         html = render_template('print_orders.html', 
-                             orders=orders, 
+                             orders=optimized_orders, 
                              current_time=current_time)
         
-        pdf = HTML(string=html).write_pdf()
+        # تحسين إعدادات WeasyPrint للأداء
+        pdf = HTML(
+            string=html,
+            base_url=request.host_url  # لتحميل الموارد بشكل صحيح
+        ).write_pdf(
+            optimize_size=('fonts', 'images'),  # تحسين حجم الخطوط والصور
+            jpeg_quality=80  # تقليل جودة الصور لتقليل الحجم
+        )
         
         filename = f"orders_{current_time.replace(':', '-').replace(' ', '_')}.pdf"
         
         response = make_response(pdf)
         response.headers['Content-Type'] = 'application/pdf'
         response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        response.headers['Content-Length'] = len(pdf)
         
-        logger.info(f"تم إنشاء PDF بنجاح: {filename}")
+        logger.info(f"تم إنشاء PDF بنجاح: {filename} بحجم {len(pdf)} بايت")
         return response
         
     except Exception as e:
         logger.error(f"خطأ في إنشاء PDF: {str(e)}")
+        logger.error(traceback.format_exc())
         flash('حدث خطأ أثناء إنشاء PDF', 'error')
         return redirect(url_for('orders.index'))
+
+@orders_bp.route('/bulk_operations_status', methods=['POST'])
+def bulk_operations_status():
+    """تتبع حالة العمليات المجمعة - وظيفة جديدة"""
+    try:
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
+        
+        data = request.get_json()
+        operation_type = data.get('operation_type', '')
+        order_ids = data.get('order_ids', [])
+        
+        if not operation_type or not order_ids:
+            return jsonify({'success': False, 'error': 'بيانات غير كافية'}), 400
+        
+        # هنا يمكنك إضافة منطق لتتبع حالة العمليات المجمعة
+        # يمكن استخدام قاعدة البيانات أو Redis للتتبع
+        
+        return jsonify({
+            'success': True,
+            'operation_type': operation_type,
+            'total_orders': len(order_ids),
+            'status': 'processing',
+            'progress': 0
+        })
+        
+    except Exception as e:
+        logger.error(f"خطأ في تتبع حالة العمليات المجمعة: {str(e)}")
+        return jsonify({'success': False, 'error': 'حدث خطأ أثناء تتبع الحالة'}), 500
+
+def preload_barcode_data(order_ids):
+    """تحميل مسبق لبيانات الباركود - تحسين للأداء"""
+    try:
+        if not order_ids:
+            return {}
+        
+        # استخدام الدالة المحسنة من utils.py
+        barcodes_map = get_barcodes_for_orders(order_ids)
+        
+        # إذا كانت هناك طلبات بدون باركود، إنشاؤها بشكل مجمع
+        missing_barcodes = [oid for oid in order_ids if str(oid) not in barcodes_map]
+        
+        if missing_barcodes:
+            from app.utils import bulk_generate_and_store_barcodes
+            new_barcodes = bulk_generate_and_store_barcodes(missing_barcodes, 'salla')
+            barcodes_map.update(new_barcodes)
+        
+        return barcodes_map
+        
+    except Exception as e:
+        logger.error(f"Error in preload_barcode_data: {str(e)}")
+        return {}

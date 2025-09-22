@@ -30,21 +30,26 @@ class Config:
     # استبدال بداية الرابط إذا كان من Heroku (لتوافقية مع DigitalOcean)
     if SQLALCHEMY_DATABASE_URI and SQLALCHEMY_DATABASE_URI.startswith("postgres://"):
         SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace("postgres://", "postgresql://", 1)
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
 
     # إعدادات PostgreSQL المحسنة
+
+    # إعدادات الأداء المحسنة لـ PDF والطباعة
+    MAX_WORKERS = 10
+    PDF_GENERATION_WORKERS = 4
+    REQUEST_TIMEOUT = 15
+    PDF_JPEG_QUALITY = 80
+    PDF_OPTIMIZE_SIZE = True
+    BARCODE_GENERATION_WORKERS = 5
+    # إعدادات PostgreSQL المحسنة
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size': 20,
         'max_overflow': 30,
         'pool_pre_ping': True,
-        'pool_recycle': 3600,
-        'pool_timeout': 30
+        'pool_recycle': 3600
     }
     
-    # إعدادات الأداء
-    MAX_WORKERS = 10
-    REQUEST_TIMEOUT = 15
-    BARCODE_GENERATION_WORKERS = 5
     
     # ------ إعدادات الترحيل (Pagination) ------
     DEFAULT_PER_PAGE = 20
