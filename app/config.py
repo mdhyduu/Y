@@ -182,7 +182,12 @@ class ProductionConfig(Config):
     PREFERRED_URL_SCHEME = 'https'
     DEBUG = True
     TESTING = True
-    
+
+    WEASYPRINT_OPTIONS = {
+        'optimize_images': True,
+        'dpi': 96,
+        'image_cache_dir': '/tmp/weasyprint_cache'
+    }
     @classmethod
     def init_app(cls, app):
         Config.init_app(app)
