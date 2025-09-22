@@ -25,9 +25,8 @@ blinker==1.7.0
 # Utilities
 python-dotenv==1.0.0
 requests==2.31.0
-python-barcode>=0.16.1
-Pillow>=10.0.0
-WeasyPrint>=60.0
+python-barcode==0.15.1
+pillow==10.0.0
 pytz==2023.3
 
 # Production
@@ -44,12 +43,11 @@ setuptools==80.0.0
 gunicorn==21.2.0
 APScheduler==3.10.1
 psycopg2-binary==2.9.9
-
-pydyf==0.11.0
+weasyprint==57.0
+pydyf==0.7.0
 webcolors
 Flask-Mail==0.9.1
 
 openpyxl
 pandas
 xlrd
-schedule
