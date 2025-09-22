@@ -127,38 +127,7 @@ class Config:
             if not folder.exists():
                 folder.mkdir(parents=True, exist_ok=True)
         
-        # إضافة رؤوس الأمان
-        @app.after_request
-        def add_security_headers(response):
-            # سياسة أمان المحتوى
-            csp = (
-                "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                "img-src 'self' data: https:; "
-                "font-src 'self' https://cdn.jsdelivr.net; "
-                "connect-src 'self'; "
-                "frame-ancestors 'none'; "
-                "form-action 'self'; "
-                "base-uri 'self'; "
-                "object-src 'none'; "
-            )
-            
-            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-            response.headers['X-Content-Type-Options'] = 'nosniff'
-            response.headers['X-Frame-Options'] = 'DENY'
-            response.headers['X-XSS-Protection'] = '1; mode=block'
-            response.headers['Content-Security-Policy'] = csp
-            response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-            response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
-            
-            # رؤوس لمنع التخزين المؤقت للصفحات الحساسة
-            if request.path.startswith(('/auth/', '/logout')):
-                response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-                response.headers['Pragma'] = 'no-cache'
-                response.headers['Expires'] = '0'
-            
-            return response
+       
 
 
 class DevelopmentConfig(Config):
