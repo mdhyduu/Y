@@ -261,6 +261,13 @@ def create_app():
         }
         '''
         return render_template_string(manifest_json), 200, {'Content-Type': 'application/json'}
+    
+    
+    @app.teardown_appcontext
+    def shutdown_session(exception=None):
+        db.session.remove()   # يغلق الجلسة ويرجع الاتصال للـ pool
+
+    return app
     # إضافة هيدرز الأمان لكل الردود
     @app.after_request
     def add_security_headers(response):
