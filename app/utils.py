@@ -140,21 +140,27 @@ def get_barcodes_for_orders(order_ids):
         db.session.remove()
 
 def generate_and_store_barcode(order_id, order_type='salla'):
-    """إنشاء باركود وحفظه في قاعدة البيانات تلقائيًا"""
+    """إنشاء باركود مع تسجيل مفصل لعملية التخزين"""
     try:
         order_id_str = str(order_id)
+        logger.info(f"🔄 Starting barcode generation for order: {order_id_str}")
+        
         barcode_data = generate_barcode(order_id_str)
         
         if not barcode_data:
+            logger.error(f"❌ Barcode generation failed for order: {order_id_str}")
             return None
         
+        logger.info(f"✅ Barcode generated successfully, length: {len(barcode_data)}")
+        
         if order_type == 'salla':
-            # Fix: Use 'id' instead of 'order_id'
-            order = SallaOrder.query.get(order_id_str)  # Use get() for primary key
+            order = SallaOrder.query.get(order_id_str)
             if not order:
-                # If order doesn't exist, create a new one with the ID
+                logger.info(f"📝 Creating new SallaOrder record for: {order_id_str}")
                 order = SallaOrder(id=order_id_str)
                 db.session.add(order)
+            else:
+                logger.info(f"📖 Found existing SallaOrder for: {order_id_str}")
         else:
             order = CustomOrder.query.get(order_id_str)
             
@@ -162,12 +168,15 @@ def generate_and_store_barcode(order_id, order_type='salla'):
             order.barcode_data = barcode_data
             order.barcode_generated_at = datetime.utcnow()
             db.session.commit()
+            logger.info(f"💾 Barcode stored successfully for order: {order_id_str}")
             return barcode_data
-        return None
+        else:
+            logger.error(f"❌ Order not found for storage: {order_id_str}")
+            return None
             
     except Exception as e:
         db.session.rollback()
-        logger.error(f"خطأ في حفظ الباركود: {str(e)}")
+        logger.error(f"💥 Error storing barcode for {order_id_str}: {str(e)}")
         return None
     finally:
         db.session.remove()
