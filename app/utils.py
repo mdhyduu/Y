@@ -495,7 +495,21 @@ def process_orders_in_parallel(order_ids, access_token):
     # تنظيف نهائي بعد انتهاء جميع الخيوط
     close_db_connection()
     return orders
-        
+def get_salla_categories(access_token):
+    from .config import Config
+    
+    session = create_session()
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Accept': 'application/json'
+    }
+    try:
+        response = session.get(Config.SALLA_CATEGORIES_API, headers=headers)
+        response.raise_for_status()
+        return response.json().get('data', [])
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching categories from Salla: {e}")
+        return []
 def humanize_time(dt):
     """تحويل التاريخ إلى نص مقروء مثل 'منذ دقيقة'"""
     now = datetime.utcnow()
@@ -520,6 +534,7 @@ def humanize_time(dt):
         return f"منذ {int(minutes)} دقيقة" if minutes > 1 else "منذ دقيقة"
     else:
         return "الآن"
+        
 import threading
 import schedule
 
