@@ -333,6 +333,14 @@ import copy
 def order_details(order_id):
     user, current_employee = get_user_from_cookies()
     
+    # إصلاح المشكلة: إعادة تحميل employee مع العلاقات
+    if current_employee:
+        current_employee = db.session.query(Employee).options(
+            selectinload(Employee.custom_statuses)
+        ).get(current_employee.id)
+
+    # باقي الكود الحالي يبقى كما هو...
+    
     if not user:
         flash("الرجاء تسجيل الدخول أولاً", "error")
         response = make_response(redirect(url_for('user_auth.login')))
