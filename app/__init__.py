@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from flask import session, request
 import webcolors
 from flask import jsonify, render_template_string
-from flask_mail import Mail, make_response # إضافة استيراد Flask-Mail
+from flask_mail import Mail # إضافة استيراد Flask-Mail
 
 # إنشاء كائنات الإضافات
 db = SQLAlchemy()
