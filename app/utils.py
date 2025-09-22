@@ -621,7 +621,7 @@ def process_orders_concurrently(order_ids, access_token, max_workers=10):
             
             # جلب بيانات الطلب
             order_response = session.get(
-                f"{Config.salla_ordersS_API}/{order_id_str}",
+                f"{Config.SALLA_ORDERS_API}/{order_id_str}",
                 headers=headers,
                 timeout=15
             )
