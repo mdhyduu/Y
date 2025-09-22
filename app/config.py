@@ -163,7 +163,7 @@ class Config:
 
 class DevelopmentConfig(Config):
     """إعدادات بيئة التطوير"""
-    DEBUG = False
+    DEBUG = True
     SQLALCHEMY_ECHO = False
     COOKIE_SECURE = False
     WTF_CSRF_ENABLED = True
@@ -181,7 +181,7 @@ class ProductionConfig(Config):
     """إعدادات بيئة الإنتاج"""
     PREFERRED_URL_SCHEME = 'https'
     DEBUG = True
-    TESTING = False
+    TESTING = True
     
     @classmethod
     def init_app(cls, app):
