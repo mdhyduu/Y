@@ -95,42 +95,7 @@ def create_app():
 
     # فلترات القوالب
     app.jinja_env.filters['format_date'] = format_date
-    @app.after_request
-    def add_security_headers(response):
-        if request.path.startswith('/webhook/'):
-            return response
-    
-        csp = (
-            "default-src 'self' https: data:; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob: data:; "
-            "style-src 'self' 'unsafe-inline' https:; "
-            "img-src 'self' data: blob: https:; "
-            "font-src 'self' https: data:; "
-            "connect-src 'self' https: wss:; "
-            "frame-ancestors 'none'; "
-            "form-action 'self'; "
-            "base-uri 'self'; "
-            "object-src 'none';"
-        )
-    
-        # إضافة كل الرؤوس الأمنية
-        response.headers['Content-Security-Policy'] = csp
-        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-        response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['X-Frame-Options'] = 'DENY'
-        response.headers['X-XSS-Protection'] = '1; mode=block'
-        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
-    
-        # التحكم في التخزين المؤقت
-        if request.path.startswith(('/auth/', '/logout')):
-            response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-            response.headers['Pragma'] = 'no-cache'
-            response.headers['Expires'] = '0'
-        else:
-            response.headers['Cache-Control'] = 'public, max-age=3600'
-    
-        return response
+   
     @app.template_filter('time_ago')
     def time_ago_filter(dt):
         if not dt:

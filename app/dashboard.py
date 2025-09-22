@@ -188,6 +188,11 @@ def _get_filtered_orders(store_id, status_id=None):
 @dashboard_bp.route('/')
 @login_required
 def index():
+    print(f"user_id: {request.cookies.get('user_id')}")
+    print(f"is_admin: {request.cookies.get('is_admin')}")
+    print(f"employee_role: {request.cookies.get('employee_role')}")
+    
+    # باقي الكود...
     """لوحة التحكم الرئيسية"""
     try:
         is_admin = request.cookies.get('is_admin') == 'true'
