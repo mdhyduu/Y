@@ -43,7 +43,7 @@ def get_next_order_number():
         logger.error(f"Error in get_next_order_number: {str(e)}")
         return "1000"
     finally:
-        db.session.close()
+        db.session.remove()
 
 def get_user_from_cookies():
     """استخراج بيانات المستخدم من الكوكيز"""
@@ -68,7 +68,7 @@ def get_user_from_cookies():
         logger.error(f"Error in get_user_from_cookies: {str(e)}")
         return None, None
     finally:
-        db.session.close()
+        db.session.remove()
 
 def create_session():
     """إنشاء جلسة طلبات مع إعدادات التحسين"""
@@ -116,7 +116,7 @@ def get_cached_barcode_data(order_id):
         logger.error(f"Error in get_cached_barcode_data: {str(e)}")
         return None
     finally:
-        db.session.close()
+        db.session.remove()
 
 def get_barcodes_for_orders(order_ids):
     """جلب جميع الباركودات للطلبات المحددة في استعلام واحد"""
@@ -127,7 +127,7 @@ def get_barcodes_for_orders(order_ids):
         logger.error(f"Error in get_barcodes_for_orders: {str(e)}")
         return {}
     finally:
-        db.session.close()
+        db.session.remove()
 
 def generate_and_store_barcodes_bulk(order_ids, order_type='salla'):
     """إنشاء وحفظ الباركودات بشكل جماعي"""
@@ -166,7 +166,7 @@ def generate_and_store_barcodes_bulk(order_ids, order_type='salla'):
         logger.error(f"خطأ في الحفظ الجماعي للباركود: {str(e)}")
         return {}
     finally:
-        db.session.close()
+        db.session.remove()
 
 def generate_and_store_barcode(order_id, order_type='salla'):
     """إنشاء باركود وحفظه في قاعدة البيانات تلقائيًا"""
@@ -195,7 +195,7 @@ def generate_and_store_barcode(order_id, order_type='salla'):
         logger.error(f"خطأ في حفظ الباركود تلقائيًا: {str(e)}")
         return None
     finally:
-        db.session.close()
+        db.session.remove()
 
 def get_main_image(item):
     """استخراج الصورة الرئيسية بشكل أكثر كفاءة"""
@@ -350,7 +350,7 @@ def db_session_scope():
         logger.error(f"Database session error: {str(e)}")
         raise
     finally:
-        db.session.close()
+        db.session.remove()
 
 def check_db_connection():
     """فحص صحة اتصال قاعدة البيانات"""
