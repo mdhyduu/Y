@@ -123,12 +123,7 @@ def create_app():
         response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
     
         # التحكم في التخزين المؤقت
-        if request.path.startswith(('/auth/', '/logout')):
-            response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-            response.headers['Pragma'] = 'no-cache'
-            response.headers['Expires'] = '0'
-        else:
-            response.headers['Cache-Control'] = 'public, max-age=3600'
+        
     
         return response
     @app.template_filter('time_ago')
