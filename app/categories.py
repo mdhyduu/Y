@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, session
 from .models import db, Department, User
-from .utils import get_salla_categories
+
 import requests
 from .config import Config
 
