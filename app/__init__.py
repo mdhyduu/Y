@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from flask import session, request
 import webcolors
 from flask import jsonify, render_template_string
-from flask_mail import Mail  # إضافة استيراد Flask-Mail
+from flask_mail import Mail, make_response # إضافة استيراد Flask-Mail
 
 # إنشاء كائنات الإضافات
 db = SQLAlchemy()
@@ -95,14 +95,44 @@ def create_app():
 
     # فلترات القوالب
     app.jinja_env.filters['format_date'] = format_date
+    
     @app.after_request
-    def add_csp_header(response):
+    def add_security_headers(response):
+        # استثناء مسارات الـ webhook من رؤوس الأمان
         if request.path.startswith('/webhook/'):
             return response
             
-        # سياسة أقل تقييداً للتحقق من المشكلة
-        csp_policy = "default-src * 'unsafe-inline' 'unsafe-eval';"
-        response.headers['Content-Security-Policy'] = csp_policy
+        # سياسة أمان المحتوى المعدلة للباركود
+        csp = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            f"img-src 'self' data: blob: https: {request.host_url}; "  # إضافة host_url للسماح بالباركود
+            "font-src 'self' https://cdn.jsdelivr.net; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "form-action 'self'; "
+            "base-uri 'self'; "
+            "object-src 'none'; "
+        )
+        
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        response.headers['Content-Security-Policy'] = csp
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+        
+        # رؤوس لمنع التخزين المؤقت للصفحات الحساسة
+        if request.path.startswith(('/auth/', '/logout')):
+            response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+        else:
+            # السماح بالتخزين المؤقت للصفحات الأخرى
+            response.headers['Cache-Control'] = 'public, max-age=3600'
+        
         return response
     @app.template_filter('time_ago')
     def time_ago_filter(dt):
