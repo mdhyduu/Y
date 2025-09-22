@@ -337,7 +337,7 @@ def process_order_data(order_id, items_data, barcode_data=None):
 
 @contextmanager
 def db_session_scope():
-    """مدير سياق لإدارة جلسات قاعدة البيانات بشكل آمن"""
+    """مدير سياق محسن لإدارة جلسات قاعدة البيانات"""
     try:
         yield db.session
         db.session.commit()
@@ -346,132 +346,155 @@ def db_session_scope():
         logger.error(f"Database session error: {str(e)}")
         raise
     finally:
-        db.session.remove()
+        # تنظيف شامل للجلسة
+        try:
+            db.session.expunge_all()
+            db.session.close()
+        except:
+            pass
+        finally:
+            db.session.remove()
+from sqlalchemy import exc
+from sqlalchemy.pool import NullPool
+import time
+
+def close_db_connection():
+    """إغلاق فعلي لاتصالات قاعدة البيانات"""
+    try:
+        # إغلاق جميع الاتصالات في pool
+        db.engine.dispose()
+        logger.info("تم إغلاق اتصالات قاعدة البيانات بنجاح")
+    except Exception as e:
+        logger.error(f"خطأ في إغلاق اتصالات قاعدة البيانات: {str(e)}")
 
 def check_db_connection():
-    """فحص صحة اتصال قاعدة البيانات مع مهلة زمنية"""
+    """فحص صحة اتصال قاعدة البيانات مع إغلاق الاتصالات المعطلة"""
     try:
-        # إضافة مهلة زمنية للاستعلام
+        # محاولة إغلاق الاتصالات القديمة أولاً
+        close_db_connection()
+        
+        # فحص الاتصال مع مهلة زمنية
         result = db.session.execute(text('SELECT 1')).scalar()
         return result == 1
     except Exception as e:
         logger.error(f"فشل في التحقق من اتصال قاعدة البيانات: {str(e)}")
-        return False
+        # محاولة إعادة الاتصال
+        try:
+            close_db_connection()
+            time.sleep(1)
+            db.session.execute(text('SELECT 1')).scalar()
+            return True
+        except:
+            return False
     finally:
         db.session.remove()
-        
 import threading
 import queue
 
 # ... (بقية الاستيرادات الحالية)
 
 def process_orders_in_parallel(order_ids, access_token):
-    """معالجة الطلبات بشكل متوازي باستخدام threading العادي"""
+    """معالجة الطلبات بشكل متوازي مع إدارة محسنة للاتصالات"""
     from .config import Config
     
     barcodes_map = get_barcodes_for_orders(order_ids)
     
     def fetch_order_data(order_id, result_queue):
-        """دالة مساعدة لجلب بيانات الطلب مع إدارة الجلسة"""
-        # إنشاء جلسة جديدة لكل ثريد
-        session = create_session()
-        headers = {
-            'Authorization': f'Bearer {access_token}',
-            'Accept': 'application/json'
-        }
-        
-        try:
-            # فحص اتصال قاعدة البيانات قبل المتابعة
-            if not check_db_connection():
-                logger.error(f"فشل اتصال قاعدة البيانات للطلب {order_id}")
-                result_queue.put(None)
-                return
+        """دالة مساعدة لجلب بيانات الطلب مع إدارة محكمة للاتصالات"""
+        # إنشاء سياق تطبيق جديد لكل خيط
+        app = create_app()
+        with app.app_context():
+            session = create_session()
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Accept': 'application/json'
+            }
+            
+            try:
+                # فحص وإصلاح اتصال قاعدة البيانات قبل المتابعة
+                if not check_db_connection():
+                    logger.error(f"فشل اتصال قاعدة البيانات للطلب {order_id}")
+                    result_queue.put(None)
+                    return
+                    
+                order_response = session.get(
+                    f"{Config.SALLA_ORDERS_API}/{order_id}",
+                    headers=headers,
+                    timeout=10
+                )
                 
-            order_response = session.get(
-                f"{Config.SALLA_ORDERS_API}/{order_id}",
-                headers=headers,
-                timeout=10
-            )
-            
-            if order_response.status_code != 200:
-                result_queue.put(None)
-                return
+                if order_response.status_code != 200:
+                    result_queue.put(None)
+                    return
+                    
+                order_data = order_response.json().get('data', {})
                 
-            order_data = order_response.json().get('data', {})
-            
-            items_response = session.get(
-                f"{Config.SALLA_BASE_URL}/orders/items",
-                params={'order_id': order_id},
-                headers=headers,
-                timeout=10
-            )
-            
-            items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
-            
-            barcode_data = barcodes_map.get(order_id)
-            processed_order = process_order_data(order_id, items_data, barcode_data)
-            
-            processed_order['reference_id'] = order_data.get('reference_id', order_id)
-            processed_order['customer'] = order_data.get('customer', {})
-            processed_order['created_at'] = format_date(order_data.get('created_at', ''))
-            
-            result_queue.put(processed_order)
-            
-        except Exception as e:
-            logger.error(f"Error fetching order {order_id}: {str(e)}")
-            result_queue.put(None)
-        finally:
-            # إغلاق الجلسة
-            session.close()
-            # التأكد من إغلاق اتصال قاعدة البيانات
-            db.session.remove()
+                items_response = session.get(
+                    f"{Config.SALLA_BASE_URL}/orders/items",
+                    params={'order_id': order_id},
+                    headers=headers,
+                    timeout=10
+                )
+                
+                items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
+                
+                barcode_data = barcodes_map.get(order_id)
+                processed_order = process_order_data(order_id, items_data, barcode_data)
+                
+                processed_order['reference_id'] = order_data.get('reference_id', order_id)
+                processed_order['customer'] = order_data.get('customer', {})
+                processed_order['created_at'] = format_date(order_data.get('created_at', ''))
+                
+                result_queue.put(processed_order)
+                
+            except Exception as e:
+                logger.error(f"Error fetching order {order_id}: {str(e)}")
+                result_queue.put(None)
+            finally:
+                # تنظيف شامل
+                try:
+                    session.close()
+                except:
+                    pass
+                finally:
+                    close_db_connection()  # إغلاق فعلي للاتصالات
     
     orders = []
     result_queue = queue.Queue()
     threads = []
-    max_workers = 3  # نفس العدد الذي كان مستخدمًا في ThreadPoolExecutor
+    max_workers = 2  # تقليل عدد العمال لتقليل الضغط على قاعدة البيانات
 
-    # تقسيم order_ids إلى مجموعات حسب عدد العمال
-    chunk_size = (len(order_ids) + max_workers - 1) // max_workers
+    # تقسيم order_ids إلى مجموعات أصغر
+    chunk_size = min(5, (len(order_ids) + max_workers - 1) // max_workers)
     order_chunks = [order_ids[i:i+chunk_size] for i in range(0, len(order_ids), chunk_size)]
     
     for chunk in order_chunks:
-        threads = []  # إعادة تهيئة قائمة الثريدات لكل مجموعة
+        threads = []
         for order_id in chunk:
             thread = threading.Thread(
                 target=fetch_order_data,
-                args=(order_id, result_queue)
+                args=(order_id, result_queue),
+                daemon=True  # جعل الخيوط daemon لتجنب التعلق
             )
             threads.append(thread)
             thread.start()
         
-        # انتظار انتهاء جميع الثريدات في هذه المجموعة
+        # انتظار انتهاء الخيوط مع timeout
         for thread in threads:
-            thread.join()
+            thread.join(timeout=30)  # timeout 30 ثانية
         
-        # جمع النتائج من الطابور
+        # جمع النتائج
         while not result_queue.empty():
             result = result_queue.get()
             if result:
                 orders.append(result)
+        
+        # إعطاء وقت للتنظيف بين المجموعات
+        time.sleep(0.5)
     
+    # تنظيف نهائي بعد انتهاء جميع الخيوط
+    close_db_connection()
     return orders
-
-def get_salla_categories(access_token):
-    from .config import Config
-    
-    session = create_session()
-    headers = {
-        'Authorization': f'Bearer {access_token}',
-        'Accept': 'application/json'
-    }
-    try:
-        response = session.get(Config.SALLA_CATEGORIES_API, headers=headers)
-        response.raise_for_status()
-        return response.json().get('data', [])
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching categories from Salla: {e}")
-        return []
         
 def humanize_time(dt):
     """تحويل التاريخ إلى نص مقروء مثل 'منذ دقيقة'"""
@@ -497,3 +520,19 @@ def humanize_time(dt):
         return f"منذ {int(minutes)} دقيقة" if minutes > 1 else "منذ دقيقة"
     else:
         return "الآن"
+import threading
+import schedule
+
+def periodic_connection_cleanup():
+    """تنظيف دوري لاتصالات قاعدة البيانات"""
+    def cleanup():
+        while True:
+            time.sleep(300)  # كل 5 دقائق
+            close_db_connection()
+    
+    # تشغيل التنظيف في خلفية
+    cleanup_thread = threading.Thread(target=cleanup, daemon=True)
+    cleanup_thread.start()
+
+# تشغيل التنظيف الدوري عند بدء التطبيق
+periodic_connection_cleanup()

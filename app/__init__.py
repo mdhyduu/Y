@@ -12,7 +12,8 @@ from flask import session, request
 import webcolors
 from flask import jsonify, render_template_string
 from flask_mail import Mail  # إضافة استيراد Flask-Mail
-
+import atexit
+from .utils import close_db_connection
 # إنشاء كائنات الإضافات
 db = SQLAlchemy()
 migrate = Migrate()
@@ -262,12 +263,11 @@ def create_app():
         '''
         return render_template_string(manifest_json), 200, {'Content-Type': 'application/json'}
     
-    
-    @app.teardown_appcontext
-    def shutdown_session(exception=None):
-        db.session.remove()   # يغلق الجلسة ويرجع الاتصال للـ pool
 
-    return app
+    @atexit.register
+    def shutdown():
+        """تنظيف الاتصالات عند إغلاق التطبيق"""
+        close_db_connection()
     # إضافة هيدرز الأمان لكل الردود
     @app.after_request
     def add_security_headers(response):
