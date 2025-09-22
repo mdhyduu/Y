@@ -361,25 +361,32 @@ def check_db_connection():
         logger.error(f"فشل في التحقق من اتصال قاعدة البيانات: {str(e)}")
         return False
 
+import threading
+import queue
+
+# ... (بقية الاستيرادات الحالية)
+
 def process_orders_in_parallel(order_ids, access_token):
-    """معالجة الطلبات بشكل متوازي لتحسين الأداء"""
+    """معالجة الطلبات بشكل متوازي باستخدام threading العادي"""
     from .config import Config
-    
-    session = create_session()
-    headers = {
-        'Authorization': f'Bearer {access_token}',
-        'Accept': 'application/json'
-    }
     
     barcodes_map = get_barcodes_for_orders(order_ids)
     
-    def fetch_order_data(order_id):
+    def fetch_order_data(order_id, result_queue):
         """دالة مساعدة لجلب بيانات الطلب مع إدارة الجلسة"""
+        # إنشاء جلسة جديدة لكل ثريد
+        session = create_session()
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Accept': 'application/json'
+        }
+        
         try:
             # فحص اتصال قاعدة البيانات قبل المتابعة
             if not check_db_connection():
                 logger.error(f"فشل اتصال قاعدة البيانات للطلب {order_id}")
-                return None
+                result_queue.put(None)
+                return
                 
             order_response = session.get(
                 f"{Config.SALLA_ORDERS_API}/{order_id}",
@@ -388,7 +395,8 @@ def process_orders_in_parallel(order_ids, access_token):
             )
             
             if order_response.status_code != 200:
-                return None
+                result_queue.put(None)
+                return
                 
             order_data = order_response.json().get('data', {})
             
@@ -408,21 +416,43 @@ def process_orders_in_parallel(order_ids, access_token):
             processed_order['customer'] = order_data.get('customer', {})
             processed_order['created_at'] = format_date(order_data.get('created_at', ''))
             
-            return processed_order
+            result_queue.put(processed_order)
             
         except Exception as e:
             logger.error(f"Error fetching order {order_id}: {str(e)}")
-            return None
+            result_queue.put(None)
         finally:
+            # إغلاق الجلسة
+            session.close()
             # التأكد من إغلاق اتصال قاعدة البيانات
             db.session.remove()
     
     orders = []
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        future_to_order = {executor.submit(fetch_order_data, order_id): order_id for order_id in order_ids}
+    result_queue = queue.Queue()
+    threads = []
+    max_workers = 3  # نفس العدد الذي كان مستخدمًا في ThreadPoolExecutor
+
+    # تقسيم order_ids إلى مجموعات حسب عدد العمال
+    chunk_size = (len(order_ids) + max_workers - 1) // max_workers
+    order_chunks = [order_ids[i:i+chunk_size] for i in range(0, len(order_ids), chunk_size)]
+    
+    for chunk in order_chunks:
+        threads = []  # إعادة تهيئة قائمة الثريدات لكل مجموعة
+        for order_id in chunk:
+            thread = threading.Thread(
+                target=fetch_order_data,
+                args=(order_id, result_queue)
+            )
+            threads.append(thread)
+            thread.start()
         
-        for future in future_to_order:
-            result = future.result()
+        # انتظار انتهاء جميع الثريدات في هذه المجموعة
+        for thread in threads:
+            thread.join()
+        
+        # جمع النتائج من الطابور
+        while not result_queue.empty():
+            result = result_queue.get()
             if result:
                 orders.append(result)
     
