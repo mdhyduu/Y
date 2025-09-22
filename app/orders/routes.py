@@ -1,5 +1,4 @@
 # orders/routes.py
-# orders/routes.py
 import json
 import logging
 from math import ceil
@@ -17,22 +16,17 @@ from app.utils import get_user_from_cookies, process_order_data, format_date,  h
 from app.token_utils import refresh_salla_token
 from app.config import Config
 from flask import send_file
-import pandas as pd
 from io import BytesIO
+import pandas as pd
 from concurrent import futures
-import openpyxl
-from openpyxl.worksheet.datavalidation import DataValidation
-from openpyxl.styles import Alignment
-from openpyxl.worksheet.datavalidation import DataValidation
-# إعداد الـ logger
-logger = logging.getLogger(__name__)
-from openpyxl.styles import Protection
+
+import logging
+
+# إعداد المسجل للإنتاج
+logger = logging.getLogger('salla_app')
+
 @orders_bp.route('/')
 def index():
-    """عرض قائمة الطلبات (سلة + مخصصة) مع نظام الترحيل الكامل
-    - يحافظ على بنية البيانات الحالية للـ template.
-    - يقلل التحميل عبر جلب آخر حالة مخصصة وآخر ملاحظة فقط لكل طلب.
-    """
     user, employee = get_user_from_cookies()
     
     if not user:
@@ -42,7 +36,6 @@ def index():
         response.set_cookie('is_admin', '', expires=0)
         return response
     
-    # جلب معلمات الترحيل والتصفية
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 25, type=int) 
     status_filter = request.args.get('status', '')
@@ -54,13 +47,11 @@ def index():
     search_query = request.args.get('search', '')
     order_type = request.args.get('order_type', 'all')
     
-    # التحقق من صحة معاملات الترحيل
     if page < 1: 
         page = 1
     if per_page not in [10, 25, 50, 100]: 
         per_page = 25
     
-    # جلب بيانات المستخدم والمتجر
     is_general_employee = False
     is_reviewer = False
     
@@ -85,7 +76,6 @@ def index():
         is_reviewer = employee.role in ['reviewer', 'manager']
     
     try:
-        # Queries الأساسية مع selectinload كما كان
         salla_query = SallaOrder.query.filter_by(store_id=user.store_id).options(
             selectinload(SallaOrder.status),
             selectinload(SallaOrder.assignments).selectinload(OrderAssignment.employee)
@@ -96,12 +86,10 @@ def index():
             selectinload(CustomOrder.assignments).selectinload(OrderAssignment.employee)
         )
         
-        # للموظفين العاديين: عرض فقط الطلبات المسندة لهم
         if not is_reviewer and employee:
             salla_query = salla_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee.id)
             custom_query = custom_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee.id)
         
-        # تطبيق الفلاتر المشتركة (الحالات الخاصة والفلترة حسب slug)
         if status_filter in ['late', 'missing', 'not_shipped', 'refunded']:
             if order_type in ['all', 'salla']:
                 salla_query = salla_query.join(
@@ -117,7 +105,7 @@ def index():
                 ).filter(
                     OrderStatusNote.status_flag == status_filter
                 )
-        elif status_filter:  # فلتر الحالة العادية
+        elif status_filter:
             if order_type in ['all', 'salla']:
                 salla_query = salla_query.join(SallaOrder.status).filter(OrderStatus.slug == status_filter)
             if order_type in ['all', 'custom']:
@@ -125,14 +113,12 @@ def index():
                     OrderStatus.slug == status_filter
                 )
         
-        # تطبيق فلتر الموظف (إذا تم تمريره)
         if employee_filter:
             if order_type in ['all', 'salla']:
                 salla_query = salla_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
             if order_type in ['all', 'custom']:
                 custom_query = custom_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
         
-        # فلترة الحالة المخصصة (EmployeeCustomStatus) — حافظنا على المنطق اللي عدلته سابقًا
         if custom_status_filter:
             custom_status_id = int(custom_status_filter)
             if order_type in ['all', 'salla']:
@@ -144,7 +130,6 @@ def index():
                     OrderEmployeeStatus.status_id == custom_status_id
                 )
         
-        # فلتر البحث
         if search_query:
             search_filter = f'%{search_query}%'
             if order_type in ['all', 'salla']:
@@ -162,7 +147,6 @@ def index():
                     )
                 )
         
-        # فلترة حسب التاريخ
         if date_from and date_to:
             try:
                 date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
@@ -193,7 +177,6 @@ def index():
             except ValueError:
                 pass
         
-        # جلب الحالات المخصصة للقائمة
         custom_statuses = []
         if is_reviewer:
             custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(
@@ -202,7 +185,6 @@ def index():
         elif employee:
             custom_statuses = EmployeeCustomStatus.query.filter_by(employee_id=employee.id).all()
         
-        # الترحيل وجلب الطلبات (كما كانت)
         if order_type == 'salla':
             orders_query = salla_query.order_by(nullslast(db.desc(SallaOrder.created_at)))
             pagination_obj = orders_query.paginate(page=page, per_page=per_page, error_out=False)
@@ -237,7 +219,6 @@ def index():
             })()
             orders = pagination_obj.items
         
-        # معالجة البيانات للعرض — مع الحفاظ على نفس المفاتيح للـ template
         processed_orders = []
         
         for order in orders:
@@ -247,7 +228,6 @@ def index():
                 status_name = order.status.name if order.status else 'غير محدد'
                 status_slug = order.status.slug if order.status else 'unknown'
                 
-                # جلب آخر ملاحظة وآخر حالة مخصصة فقط (لتحسين الأداء)
                 last_note = OrderStatusNote.query.filter_by(order_id=order.id).order_by(OrderStatusNote.created_at.desc()).first()
                 last_emp_status = OrderEmployeeStatus.query.filter_by(order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
                 
@@ -264,12 +244,11 @@ def index():
                     'raw_created_at': order.created_at,
                     'type': 'salla',
                     'assignments': order.assignments,
-                    # للحفاظ على التوافق: نعيد نفس القوائم لكن تحتوي فقط على آخر عنصر (إن وجد)
                     'employee_statuses': [last_emp_status] if last_emp_status else [],
                     'status_notes': [last_note] if last_note else []
                 } 
                 
-            else:  # CustomOrder
+            else:
                 last_note = OrderStatusNote.query.filter_by(custom_order_id=order.id).order_by(OrderStatusNote.created_at.desc()).first()
                 last_emp_status = OrderEmployeeStatus.query.filter_by(custom_order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
                 
@@ -298,7 +277,6 @@ def index():
         if is_reviewer:
             employees = Employee.query.filter_by(store_id=user.store_id, is_active=True).all()
         
-        # إعداد بيانات الترحيل للقالب
         pagination = {
             'page': pagination_obj.page,
             'per_page': pagination_obj.per_page,
@@ -312,7 +290,6 @@ def index():
             'end_item': min(pagination_obj.page * pagination_obj.per_page, pagination_obj.total)
         }
         
-        # إعداد بيانات الفلاتر للقالب
         filters = {
             'status': status_filter,
             'employee': employee_filter,
@@ -323,7 +300,6 @@ def index():
             'order_type': order_type
         }
         
-        # إذا كان الطلب AJAX، نرجع القالب الجزئي فقط
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return render_template('orders_partial.html', 
                                 orders=processed_orders, 
@@ -351,12 +327,10 @@ def index():
         logger.exception(error_msg)
         return redirect(url_for('orders.index'))
 
-
 import copy
 
 @orders_bp.route('/<int:order_id>')
 def order_details(order_id):
-    """عرض تفاصيل طلب معين مع المنتجات مباشرة من سلة (بدون shipments)"""
     user, current_employee = get_user_from_cookies()
     
     if not user:
@@ -367,14 +341,12 @@ def order_details(order_id):
         return response
 
     try:
-        # ========== [1] التحقق من صلاحية المستخدم ==========
         is_reviewer = False
         if request.cookies.get('is_admin') == 'true':
             is_reviewer = True
         elif current_employee and current_employee.role in ['reviewer', 'manager']:
             is_reviewer = True
 
-        # ========== [2] التحقق من صلاحية التوكن ==========
         def refresh_and_get_token():
             new_token = refresh_salla_token(user)
             if not new_token:
@@ -414,7 +386,6 @@ def order_details(order_id):
             except requests.exceptions.RequestException as e:
                 raise e
 
-        # ========== [3] جلب بيانات الطلب والمنتجات بشكل متوازي ==========
         def fetch_order_data():
             order_response = make_salla_api_request(f"{Config.SALLA_ORDERS_API}/{order_id}")
             if not isinstance(order_response, requests.Response):
@@ -431,9 +402,7 @@ def order_details(order_id):
             return items_response.json().get('data', [])
 
         def fetch_db_data(app_context, store_id, order_id_str):
-            # استخدام سياق التطبيق الممرر
             with app_context:
-                # جلب البيانات من قاعدة البيانات بشكل متوازي
                 custom_note_statuses = CustomNoteStatus.query.filter_by(
                     store_id=store_id
                 ).all()
@@ -480,37 +449,29 @@ def order_details(order_id):
                     'product_statuses': product_statuses
                 }
 
-        # إنشاء سياق تطبيق جديد للخيوط المنفصلة
         app_context = current_app.app_context()
         
-        # تشغيل جميع المهام بشكل متوازي
         with futures.ThreadPoolExecutor() as executor:
             order_future = executor.submit(fetch_order_data)
             items_future = executor.submit(fetch_order_items)
             db_future = executor.submit(fetch_db_data, app_context, user.store_id, str(order_id))
             
-            # انتظار انتهاء جميع المهام
             order_data = order_future.result()
             items_data = items_future.result()
             db_data = db_future.result()
 
-        # ========== [4] معالجة بيانات الطلب ==========
         processed_order = process_order_data(order_id, items_data)
 
-        # ========== [5] استخراج بيانات العنوان ==========
         address_data = {}
         full_address = 'لم يتم تحديد العنوان'
 
-        # المحاولة 1: من shipping.address
         shipping_data = order_data.get('shipping', {})
         if shipping_data and 'address' in shipping_data:
             address_data = shipping_data.get('address', {})
 
-        # المحاولة 2: من ship_to
         if not address_data and 'ship_to' in order_data:
             address_data = order_data.get('ship_to', {})
 
-        # المحاولة 3: fallback على customer
         if not address_data and 'customer' in order_data:
             customer = order_data.get('customer', {})
             address_data = {
@@ -519,7 +480,6 @@ def order_details(order_id):
                 'description': customer.get('location', '')
             }
 
-        # بناء العنوان الكامل
         if address_data:
             parts = []
             if address_data.get('name'):
@@ -543,7 +503,6 @@ def order_details(order_id):
             if parts:
                 full_address = "، ".join(parts)
 
-        # بيانات المستلم
         receiver_info = {
             'name': address_data.get('name', ''),
             'phone': address_data.get('phone', ''),
@@ -557,7 +516,6 @@ def order_details(order_id):
                 'email': customer_info.get('email', '')
             }
 
-        # تحديث بيانات الطلب
         processed_order.update({
             'id': order_id,
             'reference_id': order_data.get('reference_id') or 'غير متوفر',
@@ -630,52 +588,34 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
+
 import hmac
 import hashlib
+
 def extract_store_id_from_webhook(webhook_data):
-    """استخراج معرف المتجر من بيانات Webhook - الإصدار النهائي"""
     try:
-        # تسجيل بنية البيانات للتصحيح
-        logger.info(f"🔍 تحليل بنية Webhook: المفاتيح الموجودة: {list(webhook_data.keys())}")
-        
-        # البحث في المواقع الأكثر شيوعاً أولاً
         if 'merchant' in webhook_data and webhook_data['merchant'] is not None:
-            store_id = str(webhook_data['merchant'])
-            logger.info(f"✅ تم العثور على معرف المتجر في 'merchant': {store_id}")
-            return store_id
+            return str(webhook_data['merchant'])
             
         if 'merchant_id' in webhook_data and webhook_data['merchant_id'] is not None:
-            store_id = str(webhook_data['merchant_id'])
-            logger.info(f"✅ تم العثور على معرف المتجر في 'merchant_id': {store_id}")
-            return store_id
+            return str(webhook_data['merchant_id'])
             
         if 'store_id' in webhook_data and webhook_data['store_id'] is not None:
-            store_id = str(webhook_data['store_id'])
-            logger.info(f"✅ تم العثور على معرف المتجر في 'store_id': {store_id}")
-            return store_id
+            return str(webhook_data['store_id'])
         
-        # البحث داخل كائن data إذا وجد
         if 'data' in webhook_data and isinstance(webhook_data['data'], dict):
             data_obj = webhook_data['data']
             
             if 'merchant' in data_obj and data_obj['merchant'] is not None:
-                store_id = str(data_obj['merchant'])
-                logger.info(f"✅ تم العثور على معرف المتجر في 'data.merchant': {store_id}")
-                return store_id
+                return str(data_obj['merchant'])
                 
             if 'merchant_id' in data_obj and data_obj['merchant_id'] is not None:
-                store_id = str(data_obj['merchant_id'])
-                logger.info(f"✅ تم العثور على معرف المتجر في 'data.merchant_id': {store_id}")
-                return store_id
+                return str(data_obj['merchant_id'])
                 
             if 'store_id' in data_obj and data_obj['store_id'] is not None:
-                store_id = str(data_obj['store_id'])
-                logger.info(f"✅ تم العثور على معرف المتجر في 'data.store_id': {store_id}")
-                return store_id
+                return str(data_obj['store_id'])
         
-        # إذا لم نجد في أي مكان، نبحث بشكل متعمق
         def deep_find(obj, key):
-            """الببحث المتعمق عن مفتاح في أي مستوى من الكائن"""
             if isinstance(obj, dict):
                 for k, v in obj.items():
                     if k == key and v is not None:
@@ -691,29 +631,23 @@ def extract_store_id_from_webhook(webhook_data):
                         return result
             return None
         
-        # البحث عن أي من المفاتيح المحتملة
         for key in ['merchant', 'merchant_id', 'store_id']:
             value = deep_find(webhook_data, key)
             if value is not None:
-                store_id = str(value)
-                logger.info(f"✅ تم العثور على معرف المتجر بالبحث المتعمق في '{key}': {store_id}")
-                return store_id
+                return str(value)
         
-        logger.warning("❌ لم يتم العثور على معرف المتجر في أي من المواقع المتوقعة")
         return None
         
     except Exception as e:
-        logger.error(f"❌ خطأ في استخراج معرف المتجر: {str(e)}", exc_info=True)
+        logger.error(f"خطأ في استخراج معرف المتجر: {str(e)}", exc_info=True)
         return None
         
 from flask_wtf.csrf import CSRFProtect, CSRFError
 
 csrf = CSRFProtect()
-def handle_order_creation(data, webhook_version='2'):
-    """معالجة إنشاء طلب جديد من Webhook"""
-    try:
-        logger.info(f"🔍 بدء معالجة إنشاء طلب، الإصدار: {webhook_version}")
 
+def handle_order_creation(data, webhook_version='2'):
+    try:
         if webhook_version == '2':
             order_data = data.get('data', {})
             merchant_id = data.get('merchant')
@@ -724,51 +658,37 @@ def handle_order_creation(data, webhook_version='2'):
         store_id = extract_store_id_from_webhook(data)
         
         if store_id is None:
-            logger.error("❌ لا يمكن تحديد متجر من بيانات Webhook")
             return False
         
-        # الباقي من الكود كما هو...
         order_id = str(order_data.get('id'))
         if not order_id:
-            logger.error("❌ بيانات الطلب لا تحتوي على ID")
             return False
         
-        # التحقق من وجود الطلب مسبقاً
         existing_order = SallaOrder.query.get(order_id)
         if existing_order:
-            logger.info(f"✅ الطلب موجود بالفعل: {order_id}")
             return True
         
-        # البحث عن المستخدم بناءً على store_id
         user = User.query.filter_by(store_id=store_id).first()
         
         if not user:
-            logger.warning(f"⚠️ لم يتم العثور على مستخدم للمتجر: {store_id}")
-            
-            # استخدام أول مستخدم مرتبط بسلة كبديل
             user_with_salla = User.query.filter(
                 User._salla_access_token.isnot(None),
                 User.store_id.isnot(None)
             ).first()
             
             if not user_with_salla:
-                logger.error("❌ لا يوجد مستخدمين مرتبطين بسلة")
                 return False
                 
-            logger.info(f"⚠️ تم استخدام مستخدم بديل: {user_with_salla.id} للمتجر {user_with_salla.store_id}")
             store_id = user_with_salla.store_id
         
-        # الباقي من الكود...
-        # الباقي من الكود مع استخدام store_id
         created_at = None
         date_info = order_data.get('date', {})
         if date_info and 'date' in date_info:
             try:
                 date_str = date_info['date'].split('.')[0]
                 created_at = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
-            except Exception as e:
+            except Exception:
                 created_at = datetime.utcnow()
-                logger.warning(f"⚠️ تعذر تحليل تاريخ الإنشاء للطلب {order_id}: {e}")
         
         total_info = order_data.get('total', {})
         total_amount = float(total_info.get('amount', 0))
@@ -779,7 +699,6 @@ def handle_order_creation(data, webhook_version='2'):
         if not customer_name:
             customer_name = order_data.get('customer_name', 'عميل غير معروف')
         
-        # البحث عن حالة الطلب الافتراضية
         status_id = None
         status_info = order_data.get('status', {})
         if status_info:
@@ -794,10 +713,7 @@ def handle_order_creation(data, webhook_version='2'):
             
             if status:
                 status_id = status.id
-            else:
-                logger.warning(f"⚠️ لم يتم العثور على الحالة {status_slug} للمتجر {store_id}")
-                
-        # إذا لم يكن هناك حالة، نستخدم الحالة الافتراضية
+        
         if not status_id:
             default_status = OrderStatus.query.filter_by(
                 store_id=store_id, 
@@ -806,11 +722,7 @@ def handle_order_creation(data, webhook_version='2'):
             
             if default_status:
                 status_id = default_status.id
-                logger.info(f"✅ استخدام الحالة الافتراضية: {status_id} للطلب {order_id}")
-            else:
-                logger.warning(f"⚠️ لا توجد حالات طلب للمتجر {store_id}")
         
-        # إنشاء الطلب الجديد
         new_order = SallaOrder(
             id=order_id,
             store_id=store_id,
@@ -826,26 +738,22 @@ def handle_order_creation(data, webhook_version='2'):
         db.session.add(new_order)
         db.session.commit()
         
-        logger.info(f"✅ تم إنشاء طلب جديد: {order_id} للمتجر {store_id}")
         return True
         
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ خطأ في إنشاء الطلب من Webhook: {str(e)}", exc_info=True)
+        logger.error(f"خطأ في إنشاء الطلب من Webhook: {str(e)}", exc_info=True)
         return False
+
 @orders_bp.route('/webhook/orders', methods=['POST'])
 @csrf.exempt
 def order_status_webhook():
-    """Webhook لاستقبال تحديثات حالة الطلبات من سلة"""
-    logger.info(f"📨 Webhook received - Headers: {dict(request.headers)}")
     setattr(request, "_dont_enforce_csrf", True)
 
     try:
-        # التحقق من إصدار Webhook
         webhook_version = request.headers.get('X-Salla-Webhook-Version', '1')
         security_strategy = request.headers.get('X-Salla-Security-Strategy', 'signature')
         
-        # التحقق من التوقيع حسب الاستراتيجية
         if security_strategy == 'signature' and Config.WEBHOOK_SECRET:
             signature = request.headers.get('X-Salla-Signature')
             raw_body = request.data
@@ -857,67 +765,46 @@ def order_status_webhook():
             ).hexdigest()
             
             if not hmac.compare_digest(signature, expected_sig):
-                logger.warning("❌ Webhook رفض بسبب توقيع غير صحيح")
                 return jsonify({'success': False, 'error': 'توقيع غير صحيح'}), 403
         
         elif security_strategy == 'token':
             token = request.headers.get('Authorization')
-            # التحقق من التوكن إذا لزم الأمر
             if not token or token != f"Bearer {Config.WEBHOOK_SECRET}":
-                logger.warning("❌ Webhook رفض بسبب توكن غير صحيح")
                 return jsonify({'success': False, 'error': 'توكن غير صحيح'}), 403
 
-        # قراءة البيانات ومعالجتها حسب الإصدار
         data = request.get_json()
         if not data:
             return jsonify({'success': False, 'error': 'لا يوجد بيانات'}), 400
 
-        # تسجيل البيانات الواردة للتصحيح (بدون بيانات حساسة)
-        logger.info(f"📥 Webhook {webhook_version} received - Event: {data.get('event')}")
-        
-        # معالجة البيانات حسب إصدار Webhook
         if webhook_version == '2':
             event = data.get('event')
             webhook_data = data.get('data', {})
             merchant_id = data.get('merchant')
             
-            # التحقق من وجود merchant_id
             if merchant_id is None:
-                logger.error("❌ Webhook لا يحتوي على merchant_id")
-                # محاولة استخراج merchant_id من البيانات
                 merchant_id = webhook_data.get('merchant') or webhook_data.get('store_id')
                 if merchant_id is None:
                     return jsonify({'success': False, 'error': 'لا يوجد معرف متجر'}), 400
             
-            # تسجيل معلومات التصحيح
-            logger.info(f"📋 Webhook v2 - Event: {event}, Merchant: {merchant_id}")
-            
             order_data = webhook_data
         else:
-            # هيكل الإصدار v1
             event = data.get('event')
             order_data = data.get('data', {})
             merchant_id = order_data.get('merchant_id')
-            logger.info(f"📋 Webhook v1 - Event: {event}, Merchant: {merchant_id}")
 
-        # معالجة الأحداث المختلفة
         if event == 'order.created' and order_data:
-            # معالجة إنشاء طلب جديد
             success = handle_order_creation(data if webhook_version == '2' else order_data, webhook_version)
             if success:
-                logger.info(f'✅ تم إنشاء الطلب {order_data.get("id")} من Webhook')
                 return jsonify({'success': True, 'message': 'تم إنشاء الطلب بنجاح'}), 200
             else:
-                logger.error(f'❌ فشل في إنشاء الطلب {order_data.get("id")} من Webhook')
                 return jsonify({'success': False, 'error': 'فشل في إنشاء الطلب'}), 500
             
         elif event in ['order.status.updated', 'order.updated'] and order_data:
             order_id = str(order_data.get('id'))
             
-            # استخراج بيانات الحالة بناءً على نوع الحدث
             if event == 'order.status.updated':
                 status_data = order_data.get('status', {})
-            else:  # order.updated
+            else:
                 status_data = order_data.get('status', {}) or order_data.get('current_status', {})
             
             if order_id and status_data:
@@ -935,17 +822,11 @@ def order_status_webhook():
                     if status:
                         order.status_id = status.id
                         db.session.commit()
-                        logger.info(f'✅ تم تحديث حالة الطلب {order_id} إلى {status_slug}')
-                    else:
-                        logger.warning(f'⚠️ لم يتم العثور على الحالة {status_slug} للطلب {order_id}')
-                else:
-                    logger.warning(f'⚠️ لم يتم العثور على الطلب {order_id} في قاعدة البيانات')
 
         return jsonify({'success': True, 'message': 'تم استقبال البيانات بنجاح'}), 200
 
     except Exception as e:
-        logger.error(f'❌ خطأ في معالجة webhook: {str(e)}', exc_info=True)
+        logger.error(f'خطأ في معالجة webhook: {str(e)}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
-        # إغلاق اتصال قاعدة البيانات
         db.session.close()
