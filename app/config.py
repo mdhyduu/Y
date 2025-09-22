@@ -180,7 +180,7 @@ class TestingConfig(Config):
 class ProductionConfig(Config):
     """إعدادات بيئة الإنتاج"""
     PREFERRED_URL_SCHEME = 'https'
-    DEBUG = False
+    DEBUG = True
     TESTING = False
     
     @classmethod
