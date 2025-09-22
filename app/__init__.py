@@ -95,17 +95,11 @@ def create_app():
 
     # فلترات القوالب
     app.jinja_env.filters['format_date'] = format_date
-    
     @app.after_request
     def add_security_headers(response):
-        # لو في وضع التطوير، عطِّي خيار تعطيل CSP بسرعة عبر DEBUG
-        if current_app.debug:
-            # لو عايز تفعل CSP مؤقتًا علشان تختبر، خليه يرجع response هنا
-            # return response
+        if request.path.startswith('/webhook/'):
+            return response
     
-            pass
-    
-        # نسخة خفيفة جداً ومَرنة للتجريب
         csp = (
             "default-src 'self' https: data:; "
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob: data:; "
@@ -119,17 +113,16 @@ def create_app():
             "object-src 'none';"
         )
     
-        # سجل الـ CSP عشان تتأكد إيه اللي بتبعته للمتصفح
-        current_app.logger.debug("CSP header being set: %s", csp)
-    
+        # إضافة كل الرؤوس الأمنية
         response.headers['Content-Security-Policy'] = csp
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
     
-        # التخزين المؤقت
+        # التحكم في التخزين المؤقت
         if request.path.startswith(('/auth/', '/logout')):
             response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
             response.headers['Pragma'] = 'no-cache'
