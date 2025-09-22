@@ -98,16 +98,15 @@ def create_app():
     
     @app.after_request
     def add_security_headers(response):
-        # استثناء مسارات الـ webhook من رؤوس الأمان
         if request.path.startswith('/webhook/'):
             return response
-            
-        # سياسة أمان المحتوى المعدلة للباركود
+    
+        # CSP مع دعم SRI + strict-dynamic
         csp = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "script-src 'self' 'unsafe-inline' 'strict-dynamic' https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            f"img-src 'self' data: blob: https: {request.host_url}; "  # إضافة host_url للسماح بالباركود
+            f"img-src 'self' data: blob: https: {request.host_url}; "
             "font-src 'self' https://cdn.jsdelivr.net; "
             "connect-src 'self'; "
             "frame-ancestors 'none'; "
@@ -115,7 +114,7 @@ def create_app():
             "base-uri 'self'; "
             "object-src 'none'; "
         )
-        
+    
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'DENY'
@@ -123,17 +122,15 @@ def create_app():
         response.headers['Content-Security-Policy'] = csp
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
-        
-        # رؤوس لمنع التخزين المؤقت للصفحات الحساسة
+    
         if request.path.startswith(('/auth/', '/logout')):
             response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
             response.headers['Pragma'] = 'no-cache'
             response.headers['Expires'] = '0'
         else:
-            # السماح بالتخزين المؤقت للصفحات الأخرى
             response.headers['Cache-Control'] = 'public, max-age=3600'
-        
-        return response
+    
+        return response 
     @app.template_filter('time_ago')
     def time_ago_filter(dt):
         if not dt:
