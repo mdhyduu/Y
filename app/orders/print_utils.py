@@ -15,7 +15,7 @@ from app.config import Config
 import concurrent.futures
 from app import db
 import logging
-from flask import current_app  # أضف هذا الاستيراد
+
 # إعداد المسجل للإنتاج
 logger = logging.getLogger('salla_app')
 
@@ -65,7 +65,7 @@ def fetch_order_data(order_id, access_token):
                 'items_data': items_data
             }
     
-    except Exception as e:
+        except Exception as e:
             logger.error(f"Error fetching order {order_id}: {str(e)}")
             return None
 
@@ -106,39 +106,39 @@ def download_orders_html():
         return redirect(url_for('orders.index'))
 
     try:
-        with current_app.app_context(): 
-            access_token = user.salla_access_token
-    
-            if not access_token:
-                flash('يجب ربط المتجر مع سلة أولاً', 'error')
-                return redirect(url_for('auth.link_store'))
-    
-            orders_data = fetch_orders_parallel(order_ids, access_token)
-    
-            if not orders_data:
-                flash('لم يتم العثور على أي طلبات للمعاينة', 'error')
-                return redirect(url_for('orders.index'))
-    
-            orders = []
-            with db_session_scope():
-                for data in orders_data:
-                    try:
-                        processed_order = process_order_data(data['order_id'], data['items_data'])
-                        processed_order['reference_id'] = data['order_data'].get('reference_id', data['order_id'])
-                        processed_order['customer'] = data['order_data'].get('customer', {})
-                        processed_order['created_at'] = format_date(data['order_data'].get('created_at', ''))
-                        orders.append(processed_order)
-                    except Exception as e:
-                        logger.error(f"Error processing order {data['order_id']}: {str(e)}")
-                        continue
-    
-            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-            return render_template(
-                'print_orders.html',
-                orders=orders,
-                current_time=current_time
-            )
+        
+        access_token = user.salla_access_token
+
+        if not access_token:
+            flash('يجب ربط المتجر مع سلة أولاً', 'error')
+            return redirect(url_for('auth.link_store'))
+
+        orders_data = fetch_orders_parallel(order_ids, access_token)
+
+        if not orders_data:
+            flash('لم يتم العثور على أي طلبات للمعاينة', 'error')
+            return redirect(url_for('orders.index'))
+
+        orders = []
+        with db_session_scope():
+            for data in orders_data:
+                try:
+                    processed_order = process_order_data(data['order_id'], data['items_data'])
+                    processed_order['reference_id'] = data['order_data'].get('reference_id', data['order_id'])
+                    processed_order['customer'] = data['order_data'].get('customer', {})
+                    processed_order['created_at'] = format_date(data['order_data'].get('created_at', ''))
+                    orders.append(processed_order)
+                except Exception as e:
+                    logger.error(f"Error processing order {data['order_id']}: {str(e)}")
+                    continue
+
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        return render_template(
+            'print_orders.html',
+            orders=orders,
+            current_time=current_time
+        )
 
     except Exception as e:
         logger.error(f"Error generating HTML: {str(e)}")
