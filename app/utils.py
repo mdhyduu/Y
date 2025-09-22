@@ -130,7 +130,7 @@ def get_barcodes_for_orders(order_ids):
         return {}
 
 def generate_and_store_barcodes_bulk(order_ids, order_type='salla'):
-    """إنشاء وحفظ الباركودات بشكل جماعي"""
+    """إنشاء وحفظ الباركودات بشكل جماعي مع تحسين الأداء"""
     try:
         barcode_map = {}
         orders_to_update = []
@@ -146,28 +146,24 @@ def generate_and_store_barcodes_bulk(order_ids, order_type='salla'):
                     'barcode_generated_at': datetime.utcnow()
                 })
         
-        # تحديث قاعدة البيانات بشكل جماعي
-        if order_type == 'salla':
-            for update_data in orders_to_update:
-                db.session.query(SallaOrder).filter(
-                    SallaOrder.order_id == update_data['id']
-                ).update(update_data)
-        else:
-            for update_data in orders_to_update:
-                db.session.query(CustomOrder).filter(
-                    CustomOrder.id == update_data['id']
-                ).update(update_data)
+        # تحديث قاعدة البيانات بشكل جماعي مع إدارة الجلسة بشكل صحيح
+        with db_session_scope() as session:
+            if order_type == 'salla':
+                for update_data in orders_to_update:
+                    session.query(SallaOrder).filter(
+                        SallaOrder.order_id == update_data['id']
+                    ).update(update_data)
+            else:
+                for update_data in orders_to_update:
+                    session.query(CustomOrder).filter(
+                        CustomOrder.id == update_data['id']
+                    ).update(update_data)
                 
-        db.session.commit()
         return barcode_map
             
     except Exception as e:
-        db.session.rollback()
         logger.error(f"خطأ في الحفظ الجماعي للباركود: {str(e)}")
         return {}
-    finally:
-        db.session.remove()
-
 def generate_and_store_barcode(order_id, order_type='salla'):
     """إنشاء باركود وحفظه في قاعدة البيانات تلقائيًا"""
     try:
@@ -353,14 +349,17 @@ def db_session_scope():
         db.session.remove()
 
 def check_db_connection():
-    """فحص صحة اتصال قاعدة البيانات"""
+    """فحص صحة اتصال قاعدة البيانات مع مهلة زمنية"""
     try:
-        db.session.execute(text('SELECT 1'))
-        return True
+        # إضافة مهلة زمنية للاستعلام
+        result = db.session.execute(text('SELECT 1')).scalar()
+        return result == 1
     except Exception as e:
         logger.error(f"فشل في التحقق من اتصال قاعدة البيانات: {str(e)}")
         return False
-
+    finally:
+        db.session.remove()
+        
 import threading
 import queue
 
