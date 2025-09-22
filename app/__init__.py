@@ -271,12 +271,27 @@ def create_app():
     # إضافة هيدرز الأمان لكل الردود
     @app.after_request
     def add_security_headers(response):
+        # استثناء مسارات الـ webhook من رؤوس الأمان
+        if request.path.startswith('/webhook/'):
+            return response
+            
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=()"
-        # لو تبغى Content-Security-Policy (CSP) أقدر أكتب لك نسخة تناسب موقعك
+        
+        # سياسة محتوى آمنة تسمح بصور البيانات (مهم للباركود)
+        csp_policy = (
+            "default-src 'self'; "
+            "img-src 'self' data: blob: https:; "  # السماح بصور البيانات والباركود
+            "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "font-src 'self' https://cdnjs.cloudflare.com; "
+            "connect-src 'self';"
+        )
+        response.headers['Content-Security-Policy'] = csp_policy
+        
         return response
     return app
     
