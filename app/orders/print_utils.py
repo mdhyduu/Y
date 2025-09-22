@@ -5,26 +5,22 @@ from weasyprint import HTML
 from . import orders_bp
 from app.utils import get_user_from_cookies, process_order_data, format_date, create_session, db_session_scope, check_db_connection
 from app.config import Config
-import concurrent.futures
+import threading  # تغيير من concurrent.futures إلى threading
 from app import create_app, db
 import logging
+import queue  # لإدارة النتائج من الثريدات
 
 # إعداد المسجل للإنتاج
 logger = logging.getLogger('salla_app')
 
 # عدد العمال الافتراضي للطلبات المتوازية
-DEFAULT_WORKERS = 3  # تقليل عدد العمال لتقليل الضغط على قاعدة البيانات
+DEFAULT_WORKERS = 3
 
-def fetch_order_data(order_id, access_token):
+def fetch_order_data(order_id, access_token, result_queue):
     """جلب بيانات طلب واحدة باستخدام الجلسة المحسنة"""
     app = create_app()
     with app.app_context():
         try:
-            # فحص اتصال قاعدة البيانات قبل المتابعة
-            if not check_db_connection():
-                logger.error(f"فشل اتصال قاعدة البيانات للطلب {order_id}")
-                return None
-                
             session = create_session()
             headers = {
                 'Authorization': f'Bearer {access_token}',
@@ -39,7 +35,8 @@ def fetch_order_data(order_id, access_token):
             )
             
             if order_response.status_code != 200:
-                return None
+                result_queue.put(None)
+                return
                 
             order_data = order_response.json().get('data', {})
             
@@ -53,37 +50,44 @@ def fetch_order_data(order_id, access_token):
             
             items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
             
-            return {
+            result_queue.put({
                 'order_id': order_id,
                 'order_data': order_data,
                 'items_data': items_data
-            }
+            })
             
         except Exception as e:
             logger.error(f"Error fetching order {order_id}: {str(e)}")
-            return None
-        finally:
-            # التأكد من إغلاق اتصال قاعدة البيانات
-            db.session.remove()
+            result_queue.put(None)
 
 def fetch_orders_parallel(order_ids, access_token, max_workers=DEFAULT_WORKERS):
-    """جلب بيانات الطلبات بشكل متوازي باستخدام الجلسة المحسنة"""
+    """جلب بيانات الطلبات بشكل متوازي باستخدام threading العادي"""
     orders_data = []
+    result_queue = queue.Queue()
+    threads = []
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_order = {
-            executor.submit(fetch_order_data, order_id, access_token): order_id 
-            for order_id in order_ids
-        }
+    # تقسيم order_ids إلى مجموعات حسب عدد العمال
+    chunk_size = (len(order_ids) + max_workers - 1) // max_workers
+    order_chunks = [order_ids[i:i+chunk_size] for i in range(0, len(order_ids), chunk_size)]
+    
+    for chunk in order_chunks:
+        for order_id in chunk:
+            thread = threading.Thread(
+                target=fetch_order_data,
+                args=(order_id, access_token, result_queue)
+            )
+            threads.append(thread)
+            thread.start()
         
-        for future in concurrent.futures.as_completed(future_to_order):
-            order_id = future_to_order[future]
-            try:
-                result = future.result()
-                if result:
-                    orders_data.append(result)
-            except Exception as e:
-                logger.error(f"Order {order_id} generated an exception: {str(e)}")
+        # انتظار انتهاء جميع الثريدات في هذه المجموعة
+        for thread in threads:
+            thread.join()
+        
+        # جمع النتائج من الطابور
+        while not result_queue.empty():
+            result = result_queue.get()
+            if result:
+                orders_data.append(result)
     
     return orders_data
 
