@@ -101,14 +101,13 @@ def create_app():
         if request.path.startswith('/webhook/'):
             return response
     
-        # CSP خفيف يسمح بالسكربتات والستايلات من jsdelivr فقط
         csp = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            f"img-src 'self' data: blob: https: {request.host_url}; "
-            "font-src 'self' https://cdn.jsdelivr.net; "
-            "connect-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
+            "img-src 'self' data: blob: https:; "
+            "font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.gstatic.com; "
+            "connect-src 'self' https:; "   # السماح بأي اتصال HTTPS (APIs, WebSocket, Ajax)
             "frame-ancestors 'none'; "
             "form-action 'self'; "
             "base-uri 'self'; "
