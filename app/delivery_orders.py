@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, flash, redirect, url_for, request, make_response
+from flask import Blueprint, render_template, flash, redirect, url_for, request, make_response, jsonify
 from .models import Employee, User, OrderDelivery, OrderAssignment, db
 import requests
 from .config import Config
@@ -79,7 +79,7 @@ def delivery_orders():
             city = None
             if 'shipping' in order and 'city' in order['shipping']:
                 city = order['shipping']['city']
-            elif 'customer' in order and 'city' in order['customer']:
+            elif 'customer' in order and 'customer' in order['customer']:
                 city = order['customer']['city']
             
             # فقط طلبات الرياض
@@ -130,6 +130,155 @@ def delivery_orders():
     except Exception as e:
         flash(f'حدث خطأ: {str(e)}', 'error')
         return redirect(url_for('dashboard.index'))
+
+@delivery_bp.route('/assign_order/<order_id>', methods=['GET', 'POST'])
+@delivery_login_required
+def assign_order(order_id):
+    employee = request.current_employee
+    
+    if employee.role != 'delivery_manager':
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'غير مصرح لك'})
+        flash('غير مصرح لك', 'error')
+        return redirect(url_for('dashboard.index'))
+    
+    # جلب المندوبين الذين أضافهم المدير الحالي فقط
+    delivery_employees = Employee.query.filter(
+        Employee.store_id == request.store_id,
+        Employee.role == 'delivery',
+        Employee.added_by == employee.id
+    ).all()
+    
+    if request.method == 'POST':
+        selected_employee_id = request.form.get('employee_id')
+        
+        # تحقق من أن الموظف المختار مضاف بواسطة المدير الحالي
+        try:
+            selected_employee = next((e for e in delivery_employees if str(e.id) == selected_employee_id), None)
+        except:
+            selected_employee = None
+            
+        if not selected_employee:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': 'المندوب المحدد غير مصرح به'})
+            flash('المندوب المحدد غير مصرح به', 'error')
+            return redirect(url_for('delivery.assign_order', order_id=order_id))
+        
+        # تحقق من وجود إسناد سابق
+        existing_assignment = OrderAssignment.query.filter_by(order_id=order_id).first()
+        if existing_assignment:
+            existing_assignment.employee_id = selected_employee_id
+        else:
+            new_assignment = OrderAssignment(
+                order_id=order_id, 
+                employee_id=selected_employee_id
+            )
+            db.session.add(new_assignment)
+        
+        db.session.commit()
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': True, 'message': 'تم إسناد الطلب بنجاح'})
+        flash('تم إسناد الطلب بنجاح', 'success')
+        return redirect(url_for('delivery.delivery_orders'))
+    
+    # إذا كان الطلب من AJAX (للمودال) نعيد فقط محتوى النموذج
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render_template('delivery/assign_order_modal.html', 
+                             order_id=order_id,
+                             employees=delivery_employees)
+    
+    return render_template('delivery/assign_order.html', 
+                         order_id=order_id,
+                         employees=delivery_employees)
+
+# إضافة نقطة نهاية جديدة لإسناد متعدد الطلبات
+@delivery_bp.route('/assign_multiple_orders_modal', methods=['POST'])
+@delivery_login_required
+def assign_multiple_orders_modal():
+    employee = request.current_employee
+    
+    if employee.role != 'delivery_manager':
+        return jsonify({'success': False, 'message': 'غير مصرح لك'})
+    
+    # جلب معرفات الطلبات المحددة
+    data = request.get_json()
+    if not data or 'order_ids' not in data:
+        return jsonify({'success': False, 'message': 'لم يتم تحديد أي طلبات'})
+    
+    order_ids = data['order_ids']
+    
+    # جلب المندوبين الذين أضافهم المدير الحالي فقط
+    delivery_employees = Employee.query.filter(
+        Employee.store_id == request.store_id,
+        Employee.role == 'delivery',
+        Employee.added_by == employee.id
+    ).all()
+    
+    # إرجاع نموذج إسناد متعدد الطلبات
+    return render_template('delivery/assign_multiple_orders_modal.html', 
+                         order_ids=order_ids,
+                         employees=delivery_employees)
+
+# إضافة نقطة نهاية جديدة لمعالجة إسناد متعدد الطلبات
+@delivery_bp.route('/assign_multiple_orders', methods=['POST'])
+@delivery_login_required
+def assign_multiple_orders():
+    employee = request.current_employee
+    
+    if employee.role != 'delivery_manager':
+        return jsonify({'success': False, 'message': 'غير مصرح لك'})
+    
+    # جلب البيانات من الطلب
+    selected_employee_id = request.form.get('employee_id')
+    order_ids = request.form.getlist('order_ids')
+    
+    if not order_ids:
+        return jsonify({'success': False, 'message': 'لم يتم تحديد أي طلبات'})
+    
+    if not selected_employee_id:
+        return jsonify({'success': False, 'message': 'لم يتم تحديد مندوب'})
+    
+    # جلب المندوبين الذين أضافهم المدير الحالي فقط
+    delivery_employees = Employee.query.filter(
+        Employee.store_id == request.store_id,
+        Employee.role == 'delivery',
+        Employee.added_by == employee.id
+    ).all()
+    
+    # تحقق من أن الموظف المختار مضاف بواسطة المدير الحالي
+    selected_employee = next((e for e in delivery_employees if str(e.id) == selected_employee_id), None)
+    if not selected_employee:
+        return jsonify({'success': False, 'message': 'المندوب المحدد غير مصرح به'})
+    
+    # معالجة إسناد كل طلب
+    success_count = 0
+    error_count = 0
+    
+    for order_id in order_ids:
+        try:
+            # تحقق من وجود إسناد سابق
+            existing_assignment = OrderAssignment.query.filter_by(order_id=order_id).first()
+            if existing_assignment:
+                existing_assignment.employee_id = selected_employee_id
+            else:
+                new_assignment = OrderAssignment(
+                    order_id=order_id, 
+                    employee_id=selected_employee_id
+                )
+                db.session.add(new_assignment)
+            
+            success_count += 1
+        except Exception as e:
+            error_count += 1
+            print(f"Error assigning order {order_id}: {str(e)}")
+    
+    db.session.commit()
+    
+    if error_count == 0:
+        return jsonify({'success': True, 'message': f'تم إسناد {success_count} طلب بنجاح'})
+    else:
+        return jsonify({'success': False, 'message': f'تم إسناد {success_count} طلب، وفشل إسناد {error_count} طلب'})
 
 @delivery_bp.route('/scan_barcode', methods=['GET', 'POST'])
 @delivery_login_required
@@ -229,50 +378,6 @@ def deliver_order(order_id):
         flash(f'حدث خطأ: {str(e)}', 'error')
         return redirect(url_for('delivery.scan_barcode'))
 
-@delivery_bp.route('/assign_order/<order_id>', methods=['GET', 'POST'])
-@delivery_login_required
-def assign_order(order_id):
-    employee = request.current_employee
-    
-    if employee.role != 'delivery_manager':
-        flash('غير مصرح لك', 'error')
-        return redirect(url_for('dashboard.index'))
-    
-    # جلب المندوبين الذين أضافهم المدير الحالي فقط
-    delivery_employees = Employee.query.filter(
-        Employee.store_id == request.store_id,
-        Employee.role == 'delivery',
-        Employee.added_by == employee.id
-    ).all()
-    
-    if request.method == 'POST':
-        selected_employee_id = request.form.get('employee_id')
-        
-        # تحقق من أن الموظف المختار مضاف بواسطة المدير الحالي
-        selected_employee = next((e for e in delivery_employees if e.id == int(selected_employee_id)), None)
-        if not selected_employee:
-            flash('المندوب المحدد غير مصرح به', 'error')
-            return redirect(url_for('delivery.assign_order', order_id=order_id))
-        
-        # تحقق من وجود إسناد سابق
-        existing_assignment = OrderAssignment.query.filter_by(order_id=order_id).first()
-        if existing_assignment:
-            existing_assignment.employee_id = selected_employee_id
-        else:
-            new_assignment = OrderAssignment(
-                order_id=order_id, 
-                employee_id=selected_employee_id
-            )
-            db.session.add(new_assignment)
-        
-        db.session.commit()
-        flash('تم إسناد الطلب بنجاح', 'success')
-        return redirect(url_for('delivery.delivery_orders'))
-    
-    return render_template('delivery/assign_order.html', 
-                         order_id=order_id,
-                         employees=delivery_employees)
-
 
 # Update the manage_delivery_employees route
 # ... existing imports ...
@@ -354,3 +459,23 @@ def delete_delivery_employee(employee_id):
         flash(f'حدث خطأ أثناء الحذف: {str(e)}', 'error')
     
     return redirect(url_for('delivery.manage_delivery_employees'))
+        
+@delivery_bp.route('/assign_order_modal/<order_id>')
+@delivery_login_required
+def assign_order_modal(order_id):
+    employee = request.current_employee
+    
+    if employee.role != 'delivery_manager':
+        return render_template('delivery/assign_order_modal.html', 
+                             error='غير مصرح لك')
+    
+    # جلب المندوبين الذين أضافهم المدير الحالي فقط
+    delivery_employees = Employee.query.filter(
+        Employee.store_id == request.store_id,
+        Employee.role == 'delivery',
+        Employee.added_by == employee.id
+    ).all()
+    
+    return render_template('delivery/assign_order_modal.html', 
+                         order_id=order_id,
+                         employees=delivery_employees)

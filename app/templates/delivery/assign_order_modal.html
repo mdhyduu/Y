@@ -1,0 +1,65 @@
+<form method="POST" action="{{ url_for('delivery.assign_order', order_id=order_id) }}" id="assignOrderForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+    
+    {% if error %}
+    <div class="alert alert-danger">
+        {{ error }}
+    </div>
+    {% elif employees %}
+    <div class="mb-3">
+        <label for="employee_id" class="form-label">اختر مندوب التوصيل</label>
+        <select class="form-select" id="employee_id" name="employee_id" required>
+            <option value="">اختر المندوب</option>
+            {% for emp in employees %}
+            <option value="{{ emp.id }}">{{ emp.email }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">إسناد</button>
+    {% else %}
+    <div class="alert alert-warning">
+        لم تقم بإضافة أي مناديب بعد. 
+        <a href="{{ url_for('delivery.manage_delivery_employees') }}" class="alert-link">
+            أضف مناديب جديدين
+        </a>
+    </div>
+    {% endif %}
+    
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // معالجة إرسال النموذج عبر AJAX
+    document.getElementById('assignOrderForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        
+        fetch(this.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // إظهار رسالة النجاح وإغلاق المودال
+                alert(data.message);
+                var modal = bootstrap.Modal.getInstance(document.getElementById('assignOrderModal'));
+                modal.hide();
+                // إعادة تحميل الصفحة لتحديث البيانات
+                location.reload();
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('حدث خطأ أثناء الإسناد');
+        });
+    });
+});
+</script> 

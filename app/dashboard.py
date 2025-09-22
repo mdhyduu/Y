@@ -4,19 +4,22 @@ from .models import (
     Employee, 
     OrderStatusNote, 
     db,
-    OrderAssignment,  # تمت الإضافة
-    SallaOrder,       # تمت الإضافة
-    EmployeeCustomStatus,  # تمت الإضافة
-    OrderEmployeeStatus, 
-    CustomNoteStatus  # تمت الإضافة
+    OrderAssignment,
+    SallaOrder,
+    EmployeeCustomStatus,
+    OrderEmployeeStatus,
+    CustomNoteStatus
 ) 
-
-from datetime import datetime, timedelta
+from datetime import datetime
 from functools import wraps
 from sqlalchemy.orm import joinedload
 import logging
-logger = logging.getLogger(__name__)
+
+# إعداد المسجل للإنتاج
+logger = logging.getLogger('__init__')
+
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
+
 def login_required(view_func):
     """ديكوراتور للتحقق من تسجيل الدخول"""
     @wraps(view_func)
@@ -24,43 +27,34 @@ def login_required(view_func):
         user_id = request.cookies.get('user_id')
         is_admin = request.cookies.get('is_admin') == 'true'
         
-        logger.info(f"محاولة دخول إلى لوحة التحكم - user_id: {user_id}, is_admin: {is_admin}")
-        
-        # إذا لم يكن هناك user_id، نعيد التوجيه إلى تسجيل الدخول
         if not user_id:
-            logger.warning("لم يتم العثور على user_id في الكوكيز")
             flash('يجب تسجيل الدخول أولاً', 'warning')
             return redirect(url_for('user_auth.login'))
         
-        # إذا كان user_id غير رقمية، نحذف الكوكيز ونعيد التوجيه
         if not user_id.isdigit():
-            logger.warning(f"user_id غير رقمي: {user_id}")
             return clear_cookies_and_redirect()
         
         try:
             if is_admin:
                 user = User.query.get(int(user_id))
                 if not user:
-                    logger.error(f"لم يتم العثور على المستخدم بالرقم: {user_id}")
                     flash('بيانات المستخدم غير موجودة', 'error')
                     return clear_cookies_and_redirect()
                 request.current_user = user
-                logger.info(f"تم التحقق من هوية المشرف: {user.email}")
             else:
                 employee = Employee.query.get(int(user_id))
                 if not employee:
-                    logger.error(f"لم يتم العثور على الموظف بالرقم: {user_id}")
                     flash('بيانات الموظف غير موجودة', 'error')
                     return clear_cookies_and_redirect()
                 request.current_user = employee
-                logger.info(f"تم التحقق من هوية الموظف: {employee.email}")
             
             return view_func(*args, **kwargs)
         except Exception as e:
-            logger.error(f"خطأ في التحقق من تسجيل الدخول: {str(e)}", exc_info=True)
+            logger.error(f"خطأ في التحقق من تسجيل الدخول: {str(e)}")
             flash('حدث خطأ في التحقق من هوية المستخدم', 'error')
             return clear_cookies_and_redirect()
     return wrapper
+
 def clear_cookies_and_redirect():
     """حذف الكوكيز وإعادة التوجيه إلى تسجيل الدخول"""
     resp = make_response(redirect(url_for('user_auth.login')))
@@ -70,13 +64,8 @@ def clear_cookies_and_redirect():
     resp.delete_cookie('store_id')
     return resp
 
-# ... بقية الكود كما هو
-
 def _aggregate_default_statuses_for_store(store_id):
-    """
-    دالة مساعدة: تجمع الحالات التلقائية (is_default=True) لكل الموظفين في المتجر
-    وتعيد قائمة من القواميس: {'id','name','color','count'}
-    """
+    """تجمع الحالات التلقائية لكل الموظفين في المتجر"""
     all_default_statuses = EmployeeCustomStatus.query.filter_by(
         is_default=True
     ).join(Employee).filter(
@@ -85,7 +74,6 @@ def _aggregate_default_statuses_for_store(store_id):
 
     status_stats_dict = {}
     for status in all_default_statuses:
-        # عدد مرات استخدام هذه الحالة في OrderEmployeeStatus
         count = OrderEmployeeStatus.query.filter(
             OrderEmployeeStatus.status_id == status.id
         ).count()
@@ -102,13 +90,8 @@ def _aggregate_default_statuses_for_store(store_id):
 
     return list(status_stats_dict.values())
 
-
 def _get_employee_status_stats(employee_id):
-    """
-    دالة مساعدة: إحصاءات الحالات (التلقائية + المخصصة) لموظف محدد
-    ترجع (default_status_stats, custom_status_stats_selected)
-    كل واحدة قائمة من قواميس تحتوي على 'id','name','color','count'
-    """
+    """إحصاءات الحالات لموظف محدد"""
     default_statuss = EmployeeCustomStatus.query.filter_by(
         employee_id=employee_id,
         is_default=True
@@ -144,16 +127,71 @@ def _get_employee_status_stats(employee_id):
         })
 
     return default_status_stats, custom_status_stats_selected
+def _get_active_orders_count(employee_id):
+    """حساب عدد الطلبات النشطة (التي لم يتم توصيلها) للموظف"""
+    delivered_status = EmployeeCustomStatus.query.filter_by(
+        employee_id=employee_id,
+        name='تم التوصيل'
+    ).first()
+    
+    if not delivered_status:
+        return 0
+        
+    # الحصول على جميع الطلبات المسندة للموظف
+    assignments = OrderAssignment.query.filter_by(employee_id=employee_id).all()
+    assigned_order_ids = [a.order_id for a in assignments]
+    
+    if not assigned_order_ids:
+        return 0
+        
+    # حساب الطلبات التي لم يتم توصيلها
+    active_orders_count = 0
+    for order_id in assigned_order_ids:
+        # الحصول على آخر حالة للطلب
+        latest_status = OrderEmployeeStatus.query.filter_by(
+            order_id=order_id
+        ).order_by(OrderEmployeeStatus.created_at.desc()).first()
+        
+        # إذا لم تكن الحالة الأخيرة هي "تم التوصيل"، فإن الطلب لا يزال نشطًا
+        if not latest_status or latest_status.status_id != delivered_status.id:
+            active_orders_count += 1
+            
+    return active_orders_count
 
-
+def _get_filtered_orders(store_id, status_id=None):
+    """دالة مساعدة للحصول على الطلبات المصفاة"""
+    # استخدام joinedload لتحميل جميع العلاقات المطلوبة
+    all_orders = SallaOrder.query.filter_by(
+        store_id=store_id
+    ).options(
+        db.joinedload(SallaOrder.employee_statuses).joinedload(OrderEmployeeStatus.status),
+        db.joinedload(SallaOrder.status_notes),
+        db.joinedload(SallaOrder.assignments).joinedload(OrderAssignment.employee)  # تحميل بيانات الموظفين
+    ).all()
+    
+    # إضافة الحالة الحالية لكل طلب
+    for order in all_orders:
+        if order.employee_statuses:
+            sorted_statuses = sorted(order.employee_statuses, key=lambda x: x.created_at, reverse=True)
+            order.current_status = sorted_statuses[0].status
+        else:
+            order.current_status = None
+    
+    # تصفية الطلبات بناءً على الحالة المحددة
+    if status_id:
+        filtered_orders = [order for order in all_orders 
+                         if order.current_status and order.current_status.id == status_id]
+    else:
+        filtered_orders = all_orders
+    
+    return filtered_orders, all_orders
 @dashboard_bp.route('/')
 @login_required
 def index():
     """لوحة التحكم الرئيسية"""
     try:
         is_admin = request.cookies.get('is_admin') == 'true'
-
-        # متغيرات افتراضية لضمان وجودها في كل المسارات
+        
         default_status_stats = []
         custom_status_stats_selected = []
         all_employee_status_stats = []
@@ -161,21 +199,16 @@ def index():
         if is_admin:
             user = request.current_user
 
-            # جلب جميع الموظفين للمتجر
             all_employees = Employee.query.filter_by(
                 store_id=user.store_id,
                 is_active=True
             ).all()
 
-            # جلب معرف الموظف المحدد من query string إذا وجد
             selected_employee_id = request.args.get('employee_id', type=int)
             selected_employee = None
 
-            # جلب جميع الطلبات للمتجر
             all_orders = SallaOrder.query.options(joinedload(SallaOrder.status)).filter_by(store_id=user.store_id).all()
 
-            # حساب الإحصائيات الشاملة (بما في ذلك new_orders)
-            # new_orders = الطلبات التي ليس لها أي OrderStatusNote بعد (أو تُعتبر جديدة)
             new_orders_count = db.session.query(SallaOrder).outerjoin(
                 OrderStatusNote, OrderStatusNote.order_id == SallaOrder.id
             ).filter(
@@ -204,10 +237,8 @@ def index():
                 ).count()
             }
 
-            # جلب الحالات المخصصة للمتجر
             custom_statuses = CustomNoteStatus.query.filter_by(store_id=user.store_id).all()
 
-            # حساب عدد الطلبات لكل حالة مخصصة (لهذا المتجر)
             custom_status_stats = []
             for status in custom_statuses:
                 count = db.session.query(OrderStatusNote).join(SallaOrder).filter(
@@ -219,22 +250,16 @@ def index():
                     'count': count
                 })
 
-            # جلب آخر النشاطات
             recent_statuses = db.session.query(OrderStatusNote).join(SallaOrder).filter(
                 SallaOrder.store_id == user.store_id
             ).order_by(OrderStatusNote.created_at.desc()).limit(10).all()
 
-            # جلب عدد الموظفين
             employees_count = Employee.query.filter_by(store_id=user.store_id).count()
-
-            # جلب عدد المنتجات (افتراضي)
             products_count = 0
 
-            # إذا تم اختيار موظف معين
             if selected_employee_id:
                 selected_employee = next((emp for emp in all_employees if emp.id == selected_employee_id), None)
                 if selected_employee:
-                    # جلب إحصاءات الموظف المحدد (تلقائية + مخصصة)
                     default_status_stats, custom_status_stats_selected = _get_employee_status_stats(selected_employee_id)
 
                     return render_template('dashboard.html',
@@ -250,7 +275,6 @@ def index():
                                            custom_status_stats_selected=custom_status_stats_selected,
                                            is_admin=True)
 
-            # إذا لم يتم اختيار موظف، نعرض إحصائيات الحالات التلقائية لجميع الموظفين (مجمعة)
             all_employee_status_stats = _aggregate_default_statuses_for_store(user.store_id)
 
             return render_template('dashboard.html',
@@ -266,40 +290,105 @@ def index():
                                    custom_status_stats_selected=custom_status_stats_selected,
                                    all_employee_status_stats=all_employee_status_stats,
                                    is_admin=True)
-
-        # ------------------- حالات الموظفين غير المشرفين -------------------
         else:
             employee = request.current_user
             if not employee:
                 flash('بيانات الموظف غير موجودة', 'error')
-                resp = make_response(redirect(url_for('user_auth.login')))
-                resp.delete_cookie('user_id')
-                resp.delete_cookie('is_admin')
-                return resp
-
+                return clear_cookies_and_redirect()
+            
             user = User.query.filter_by(store_id=employee.store_id).first()
-
-            # تحديد نوع لوحة التحكم حسب الدور
+            
+            # الحصول على الحالة المحددة من الباراميتر
+            selected_status_id = request.args.get('status_id', type=int)
+            
+            # إذا كان موظف توصيل أو مدير توصيل، نعرض لوحة التوصيل
             if employee.role in ('delivery', 'delivery_manager'):
                 is_delivery_manager = (employee.role == 'delivery_manager')
+                
+                # تحديد نطاق الطلبات بناءً على صلاحية الموظف
+                if is_delivery_manager:
+                    # المدير يرى جميع طلبات المتجر
+                    filtered_orders, all_orders = _get_filtered_orders(employee.store_id, selected_status_id)
+                else:
+                    # الموظف العادي يرى فقط الطلبات المسندة إليه
+                    assigned_order_ids = [a.order_id for a in OrderAssignment.query.filter_by(
+                        employee_id=employee.id
+                    ).all()]
+                    
+                    if assigned_order_ids:
+                        # جلب جميع الطلبات ثم تصفيتها
+                        _, store_orders = _get_filtered_orders(employee.store_id, selected_status_id)
+                        filtered_orders = [order for order in store_orders if order.id in assigned_order_ids]
+                        all_orders = filtered_orders
+                    else:
+                        filtered_orders, all_orders = [], []
+                
+                # حساب إحصائيات الحالات للعرض في التبويبات
+                status_stats = {}
+                for order in all_orders:
+                    if order.current_status:
+                        status_id = order.current_status.id
+                        status_name = order.current_status.name
+                        status_color = order.current_status.color
+                        
+                        if status_id not in status_stats:
+                            status_stats[status_id] = {
+                                'id': status_id,
+                                'name': status_name,
+                                'color': status_color,
+                                'count': 1
+                            }
+                        else:
+                            status_stats[status_id]['count'] += 1
+                
+                default_status_stats = list(status_stats.values())
+                
+                # جلب مناديب التوصيل (للمدير فقط)
+                delivery_employees = []
+                if is_delivery_manager:
+                    delivery_employees = Employee.query.filter_by(
+                        store_id=employee.store_id, 
+                        role='delivery',
+                        is_active=True
+                    ).all()
+                
+                # حساب الإحصائيات بناءً على الطلبات
+                in_progress_count = len([order for order in all_orders 
+                                       if order.current_status and order.current_status.name == 'قيد التنفيذ'])
+                completed_count = len([order for order in all_orders 
+                                     if order.current_status and order.current_status.name == 'تم التنفيذ'])
+                
+                # حساب عدد الطلبات الجديدة اليوم
+                new_orders_today = len([o for o in filtered_orders if o.created_at and o.created_at.date() == datetime.now().date()])
+                
                 return render_template('delivery_dashboard.html',
                                        current_user=user,
                                        is_delivery_manager=is_delivery_manager,
-                                       employee=employee)
+                                       employee=employee,
+                                       in_progress_count=in_progress_count,
+                                       completed_count=completed_count,
+                                       default_status_stats=default_status_stats,
+                                       total_orders=len(all_orders),
+                                       delivery_employees=delivery_employees,
+                                       filtered_orders=filtered_orders,
+                                       active_employees_count=len(delivery_employees),
+                                       new_orders_today=new_orders_today,
+                                       order_trend=12,
+                                       completed_trend=8,
+                                       selected_status_id=selected_status_id
+                              )
             else:
-                # جلب الطلبات المسندة لهذا الموظف فقط
+                # للموظفين الآخرين (مراجعين، مديرين، إلخ)
                 assignments = OrderAssignment.query.filter_by(employee_id=employee.id).all()
                 assigned_order_ids = [a.order_id for a in assignments]
 
-                # جلب الطلبات المسندة
                 assigned_orders = SallaOrder.query.filter(
                     SallaOrder.id.in_(assigned_order_ids)
                 ).all() if assigned_order_ids else []
 
-                # حساب الإحصائيات بناءً على الطلبات المسندة فقط
                 stats = {
                     'total_orders': len(assigned_orders),
-                    'new_orders': 0,  # هنا نفترض 0 أو يمكن حسابها بالشكل المناسب إن احتجت
+                    'new_orders': 0,
                     'late_orders': len([o for o in assigned_orders if any(
                         note.status_flag == 'late' for note in o.status_notes
                     )]),
@@ -314,13 +403,11 @@ def index():
                     )])
                 }
 
-                # جلب الحالات التلقائية فقط (التي تم إنشاؤها تلقائياً) لهذا الموظف
                 default_statuses = EmployeeCustomStatus.query.filter_by(
                     employee_id=employee.id,
                     is_default=True
                 ).all()
 
-                # حساب عدد الطلبات لكل حالة تلقائية (محددة بالطلبات المسندة فقط)
                 custom_status_stats = []
                 for status in default_statuses:
                     count = OrderEmployeeStatus.query.filter(
@@ -333,7 +420,6 @@ def index():
                         'count': count
                     })
 
-                # جلب آخر النشاطات للطلبات المسندة فقط
                 recent_statuses = OrderStatusNote.query.filter(
                     OrderStatusNote.order_id.in_(assigned_order_ids)
                 ).options(
@@ -342,7 +428,6 @@ def index():
                     db.joinedload(OrderStatusNote.custom_status)
                 ).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
 
-                # إذا كان الموظف مراجعًا (reviewer أو manager)، نضيف إحصائيات جميع الموظفين
                 if employee.role in ['reviewer', 'manager']:
                     all_employees = Employee.query.filter_by(
                         store_id=employee.store_id,
@@ -370,7 +455,6 @@ def index():
                                                    custom_status_stats_selected=custom_status_stats_selected,
                                                    is_reviewer=True)
 
-                    # إذا لم يتم اختيار موظف، نعرض إحصائيات الحالات التلقائية لجميع الموظفين
                     all_employee_status_stats = _aggregate_default_statuses_for_store(employee.store_id)
 
                     return render_template('employee_dashboard.html',
@@ -386,7 +470,6 @@ def index():
                                            is_reviewer=True)
 
                 else:
-                    # للموظفين العاديين
                     return render_template('employee_dashboard.html',
                                            current_user=user,
                                            employee=employee,
@@ -396,10 +479,12 @@ def index():
                                            recent_statuses=recent_statuses,
                                            assigned_orders=assigned_orders,
                                            is_reviewer=False)
+
     except Exception as e:
-        logger.exception("خطأ في index dashboard")
-        flash(f"حدث خطأ في جلب بيانات لوحة التحكم: {str(e)}", "error")
+        logger.error(f"خطأ في index dashboard: {str(e)}")
+        flash("حدث خطأ في جلب بيانات لوحة التحكم", "error")
         return redirect(url_for('user_auth.login'))
+
 @dashboard_bp.route('/settings')
 @login_required
 def settings():
@@ -412,3 +497,43 @@ def settings():
     user_id = request.cookies.get('user_id')
     user = User.query.get(user_id)
     return render_template('settings.html', user=user)
+    
+@dashboard_bp.route('/filter_orders')
+@login_required
+def filter_orders():
+    """إرجاع الطلبات المصفاة فقط (لطلبات AJAX)"""
+    try:
+        is_admin = request.cookies.get('is_admin') == 'true'
+        if is_admin:
+            return "غير مصرح للمديرين", 403
+            
+        employee = request.current_user
+        if not employee or employee.role not in ('delivery', 'delivery_manager'):
+            return "غير مصرح", 403
+            
+        # الحصول على الحالة المحددة من الباراميتر
+        selected_status_id = request.args.get('status_id', type=int)
+        
+        # تحديد نطاق الطلبات بناءً على صلاحية الموظف
+        if employee.role == 'delivery_manager':
+            # المدير يرى جميع طلبات المتجر
+            filtered_orders, _ = _get_filtered_orders(employee.store_id, selected_status_id)
+        else:
+            # الموظف العادي يرى فقط الطلبات المسندة إليه
+            assigned_order_ids = [a.order_id for a in OrderAssignment.query.filter_by(
+                employee_id=employee.id
+            ).all()]
+            
+            if assigned_order_ids:
+                # جلب جميع الطلبات ثم تصفيتها
+                _, store_orders = _get_filtered_orders(employee.store_id, selected_status_id)
+                filtered_orders = [order for order in store_orders if order.id in assigned_order_ids]
+            else:
+                filtered_orders = []
+        
+        # إرجاع جزء HTML فقط بدلاً من الصفحة كاملة
+        return render_template('orders_partial.html', filtered_orders=filtered_orders)
+        
+    except Exception as e:
+        logger.error(f"خطأ في filter_orders: {str(e)}")
+        return "حدث خطأ أثناء جلب الطلبات", 500

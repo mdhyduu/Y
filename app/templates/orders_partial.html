@@ -1,0 +1,78 @@
+<div class="row">
+    {% for order in filtered_orders %}
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="form-check">
+                    <input class="form-check-input order-checkbox" type="checkbox" data-order-id="{{ order.id }}">
+                    <strong>#{{ order.id}}</strong>
+                </div>
+                <div>
+                    {% if order.current_status %}
+                    <span class="badge me-2" style="background-color: {{ order.current_status.color }}; color: white;">
+                        {{ order.current_status.name }}
+                    </span>
+                    {% endif %}
+                    <small class="text-muted"><i class="fas fa-clock me-1"></i> {{ order.created_at|time_ago }}</small>
+                </div>
+            </div>
+            <div class="card-body">
+                <p class="card-text"><i class="fas fa-user me-2 text-muted"></i> {{ order.customer_name or 'غير معروف' }}</p>
+                <p class="card-text"><i class="fas fa-phone me-2 text-muted"></i> {{ order.customer_phone or 'غير متوفر' }}</p>
+                <p class="card-text"><i class="fas fa-map-marker-alt me-2 text-muted"></i> {{ order.customer_address or 'غير متوفر' }}</p>
+            </div>
+            <div class="card-footer d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-primary">{{ order.total_amount }} ر.س</span>
+                <div>
+                    <button class="btn btn-primary btn-sm">تغيير الحالة</button>
+                    <a href="{{ url_for('orders.order_details', order_id=order.id) }}" 
+                       class="btn btn-sm btn-info mb-1" title="عرض التفاصيل">
+                        <i class="fas fa-eye"></i> عرض
+                    </a>
+                    <button class="btn btn-sm btn-warning mb-1 assign-btn" 
+                            data-order-id="{{ order.id }}" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#assignOrderModal">
+                        <i class="fas fa-user-plus"></i> 
+                        {% if order.assigned_to %}تعديل{% else %}إسناد{% endif %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center py-5">
+        <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+        <p class="text-muted">لا توجد طلبات في هذه الحالة</p>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // استخدام event delegation للتعامل مع الأزرار المحملة ديناميكيًا
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.assign-btn')) {
+            const button = e.target.closest('.assign-btn');
+            const orderId = button.getAttribute('data-order-id');
+            
+            // تحميل محتوى المودال
+            fetch('/delivery/assign_order_modal/' + orderId)
+                .then(response => response.text())
+                .then(html => {
+                    document.getElementById('assignModalContent').innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('assignModalContent').innerHTML = 
+                        '<div class="alert alert-danger">حدث خطأ أثناء تحميل المحتوى</div>';
+                });
+        }
+    });
+    
+    // إعادة تهيئة إدارة الاختيار بعد تحميل المحتوى
+    if (typeof initOrderSelection === 'function') {
+        initOrderSelection();
+    }
+});
+</script>
