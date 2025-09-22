@@ -13,7 +13,7 @@ import webcolors
 from flask import jsonify, render_template_string
 from flask_mail import Mail  # إضافة استيراد Flask-Mail
 import atexit
-from .utils import close_db_connection
+from app.utils import close_db_connection
 # إنشاء كائنات الإضافات
 db = SQLAlchemy()
 migrate = Migrate()
