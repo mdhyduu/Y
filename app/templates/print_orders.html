@@ -408,15 +408,18 @@
                 {% endfor %}
 
                 <div class="barcode-section">
-                    {% if order.barcode %}
-                        <img src="data:image/png;base64,{{ order.barcode }}" alt="باركود الطلب" class="barcode-image">
-                        <div class="barcode-number">#{{ order.reference_id }}</div>
-                    {% else %}
-                        <div class="barcode-number" style="color:#c00;">[بـاركود غير متاح]</div>
-                    {% endif %}
+<!-- تأكد من أنك تستخدم الباركود بهذه الطريقة -->
+{% for order in orders %}
+    {% if order.barcode %}
+        <img src="{{ order.barcode }}" alt="باركود الطلب {{ order.id }}" 
+             style="max-width: 200px; height: auto;">
+    {% else %}
+        <p>⚠️ لا يتوفر باركود لهذا الطلب</p>
+    {% endif %}
+{% endfor %}
                 </div>
             </div>
- 
+
             <!-- صفحة جديدة كل صف من طلبين -->
             {% if not loop.last and loop.index % 2 == 0 %}
                 <div class="page-break"></div>
