@@ -14,6 +14,7 @@ from urllib3.util.retry import Retry
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from sqlalchemy import text
+from flask import current_app
 # إعداد المسجل
 logger = logging.getLogger(__name__)
 
@@ -107,27 +108,26 @@ def generate_barcode(data):
         logger.error(f"Error generating barcode: {str(e)}")
         return None
 
+# عدل الدوال التالية لإضافة سياق التطبيق
 def get_cached_barcode_data(order_id):
-    """الحصول على بيانات الباركود من التخزين المؤقت (بيانات فقط، ليس كائنات)"""
+    """الحصول على بيانات الباركود من التخزين المؤقت"""
     try:
-        order = SallaOrder.query.get(str(order_id))
-        return order.barcode_data if order else None
+        with current_app.app_context():  # أضف هذا السطر
+            order = SallaOrder.query.get(str(order_id))
+            return order.barcode_data if order else None
     except Exception as e:
         logger.error(f"Error in get_cached_barcode_data: {str(e)}")
         return None
-    finally:
-        db.session.remove()
 
 def get_barcodes_for_orders(order_ids):
     """جلب جميع الباركودات للطلبات المحددة في استعلام واحد"""
     try:
-        orders = SallaOrder.query.filter(SallaOrder.order_id.in_(order_ids)).all()
-        return {str(order.order_id): order.barcode_data for order in orders}
+        with current_app.app_context():  # أضف هذا السطر
+            orders = SallaOrder.query.filter(SallaOrder.order_id.in_(order_ids)).all()
+            return {str(order.order_id): order.barcode_data for order in orders}
     except Exception as e:
         logger.error(f"Error in get_barcodes_for_orders: {str(e)}")
         return {}
-    finally:
-        db.session.remove()
 
 def generate_and_store_barcodes_bulk(order_ids, order_type='salla'):
     """إنشاء وحفظ الباركودات بشكل جماعي"""
