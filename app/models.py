@@ -676,4 +676,4 @@ def ensure_default_statuses_for_existing_employees():
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"فشل إنشاء الحالات التلقائية للموظفين الحاليين: {str(e)}")
-        return False
+        return False 
