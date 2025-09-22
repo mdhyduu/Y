@@ -122,9 +122,16 @@ def create_app():
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
     
-        # التحكم في التخزين المؤقت
-        
     
+        if request.path.startswith(('/auth/', '/logout')):
+            # لا تخزن أبداً صفحات المصادقة الحساسة
+            response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+        else:
+            # اسمح للمتصفح الخاص بالمستخدم فقط بتخزين الصفحة
+            response.headers['Cache-Control'] = 'private, max-age=3600'
+
         return response
     @app.template_filter('time_ago')
     def time_ago_filter(dt):
