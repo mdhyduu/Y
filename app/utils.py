@@ -239,7 +239,7 @@ def get_barcodes_for_orders_optimized(order_ids):
             # استعلام واحد لجميع الطلبات باستخدام ANY بدلاً من IN للتعامل مع القوائم الكبيرة
             query = text("""
                 SELECT id, barcode_data 
-                FROM salla_order 
+                FROM salla_orders 
                 WHERE id = ANY(:order_ids)
             """)
             
@@ -315,7 +315,7 @@ def generate_and_store_barcode(order_id, order_type='salla'):
                 if order_type == 'salla':
                     # استخدام INSERT ON CONFLICT لتحديث السجلات الموجودة
                     query = text("""
-                        INSERT INTO salla_order (id, barcode_data, barcode_generated_at)
+                        INSERT INTO salla_orders (id, barcode_data, barcode_generated_at)
                         VALUES (:id, :barcode_data, :barcode_generated_at)
                         ON CONFLICT (id) 
                         DO UPDATE SET 
@@ -394,7 +394,7 @@ def bulk_generate_and_store_barcodes(order_ids, order_type='salla'):
                 with engine.connect() as conn:
                     if order_type == 'salla':
                         query = text("""
-                            INSERT INTO salla_order (id, barcode_data, barcode_generated_at)
+                            INSERT INTO salla_orders (id, barcode_data, barcode_generated_at)
                             VALUES (:id, :barcode_data, :barcode_generated_at)
                             ON CONFLICT (id) 
                             DO UPDATE SET 
@@ -621,7 +621,7 @@ def process_orders_concurrently(order_ids, access_token, max_workers=10):
             
             # جلب بيانات الطلب
             order_response = session.get(
-                f"{Config.SALLA_ORDERS_API}/{order_id_str}",
+                f"{Config.salla_ordersS_API}/{order_id_str}",
                 headers=headers,
                 timeout=15
             )
