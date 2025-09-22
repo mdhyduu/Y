@@ -478,6 +478,63 @@ def humanize_time(dt):
         return f"منذ {int(minutes)} دقيقة" if minutes > 1 else "منذ دقيقة"
     else:
         return "الآن"
+def debug_barcode_generation():
+    """تسجيل مفصل لعملية توليد الباركود (مصحح)"""
+    import sys
+    logger.info("=== BARCODE DEBUG INFO ===")
+    logger.info(f"Python path: {sys.executable}")
+    logger.info(f"Python version: {sys.version}")
+    
+    try:
+        import barcode
+        # طريقة آمنة للحصول على الإصدار
+        if hasattr(barcode, '__version__'):
+            logger.info(f"Barcode version: {barcode.__version__}")
+        else:
+            logger.info("Barcode module imported successfully (version attribute not available)")
+    except ImportError as e:
+        logger.error(f"Barcode import error: {e}")
+    
+    try:
+        import PIL
+        if hasattr(PIL, '__version__'):
+            logger.info(f"PIL version: {PIL.__version__}")
+        else:
+            # حاول مع Image مباشرة
+            from PIL import Image
+            logger.info(f"PIL available via Image: {Image.__version__}")
+    except ImportError as e:
+        logger.error(f"PIL import error: {e}")
+    
+    # اختبار عملي مبسط
+    try:
+        test_result = generate_barcode_simple_test()
+        if test_result:
+            logger.info("✅ Test barcode generation: SUCCESS")
+        else:
+            logger.error("❌ Test barcode generation: FAILED")
+    except Exception as e:
+        logger.error(f"❌ Test barcode generation error: {e}")
+
+def generate_barcode_simple_test():
+    """اختبار مبسط لتوليد الباركود"""
+    try:
+        data_str = "TEST123"
+        buffer = BytesIO()
+        
+        # استخدام code39 بدلاً من code128 (أكثر استقراراً)
+        import barcode
+        from barcode.writer import ImageWriter
+        
+        code = barcode.get('code39', data_str, writer=ImageWriter())
+        code.write(buffer)
+        
+        buffer.seek(0)
+        return len(buffer.getvalue()) > 100  # التأكد من أن الصورة ليست فارغة
+        
+    except Exception as e:
+        logger.error(f"Simple barcode test failed: {e}")
+        return False
 
 # إزالة الدوال المسببة للمشاكل
 # periodic_connection_cleanup() - تم إزالتها
