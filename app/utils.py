@@ -107,12 +107,12 @@ def generate_barcode(data):
     except Exception as e:
         logger.error(f"Error generating barcode: {str(e)}")
         return None
-
 def get_cached_barcode_data(order_id):
     """الحصول على بيانات الباركود من التخزين المؤقت"""
     try:
         order_id_str = str(order_id)
-        order = SallaOrder.query.filter_by(order_id=order_id_str).first()
+        # Fix: Use 'id' instead of 'order_id' since that's the primary key in SallaOrder
+        order = SallaOrder.query.get(order_id_str)  # Use get() for primary key lookup
         if order and order.barcode_data:
             # التأكد من صحة تنسيق الباركود
             if not order.barcode_data.startswith('data:image'):
@@ -130,8 +130,9 @@ def get_barcodes_for_orders(order_ids):
     """جلب جميع الباركودات للطلبات المحددة في استعلام واحد"""
     try:
         order_ids_str = [str(oid) for oid in order_ids]
-        orders = SallaOrder.query.filter(SallaOrder.order_id.in_(order_ids_str)).all()
-        return {str(order.order_id): order.barcode_data for order in orders if order.barcode_data}
+        # Fix: Filter by 'id' instead of 'order_id'
+        orders = SallaOrder.query.filter(SallaOrder.id.in_(order_ids_str)).all()
+        return {str(order.id): order.barcode_data for order in orders if order.barcode_data}
     except Exception as e:
         logger.error(f"Error in get_barcodes_for_orders: {str(e)}")
         return {}
@@ -148,9 +149,11 @@ def generate_and_store_barcode(order_id, order_type='salla'):
             return None
         
         if order_type == 'salla':
-            order = SallaOrder.query.filter_by(order_id=order_id_str).first()
+            # Fix: Use 'id' instead of 'order_id'
+            order = SallaOrder.query.get(order_id_str)  # Use get() for primary key
             if not order:
-                order = SallaOrder(order_id=order_id_str)
+                # If order doesn't exist, create a new one with the ID
+                order = SallaOrder(id=order_id_str)
                 db.session.add(order)
         else:
             order = CustomOrder.query.get(order_id_str)
