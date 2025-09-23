@@ -321,24 +321,22 @@
       {% endif %}
 
       <!-- قسم المعلومات الإضافية -->
- 
+  
+    {% if order_address %}
+    <div class="address-info">
+        <p><strong>الاسم:</strong> {{ order_address.name }}</p>
+        <p><strong>الهاتف:</strong> {{ order_address.phone }}</p>
+        <p><strong>العنوان:</strong> {{ order_address.full_address }}</p>
+        <p><strong>المدينة:</strong> {{ order_address.city }}</p>
+        <p><strong>البلد:</strong> {{ order_address.country }}</p>
+        <small class="text-muted">({{ 'مستلم' if order_address.address_type == 'receiver' else 'عميل' }})</small>
+    </div>
+    {% endif
      
     </div>
   </div>
 </div>
-<!-- في orders.html أو order_details.html -->
-    {% if order_address %}
-    <div class="address-info">
-        <p><strong>الاسم:</strong> {{ order.address.name }}</p>
-        <p><strong>الهاتف:</strong> {{ order.address.phone }}</p>
-        <p><strong>العنوان:</strong> {{ order.address.full_address }}</p>
-        <p><strong>المدينة:</strong> {{ order.address.city }}</p>
-        <p><strong>البلد:</strong> {{ order.address.country }}</p>
-        <small class="text-muted">({{ 'مستلم' if order.address.address_type == 'receiver' else 'عميل' }})</small>
-    </div>
-    {% endif %}
-     
-   <!-- بدلاً من order.shipping.address -->
+
 {% if order_address %}
     <div class="address-info">
         <h4>العنوان المحفوظ:</h4>
