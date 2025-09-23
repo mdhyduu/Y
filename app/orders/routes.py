@@ -668,6 +668,8 @@ from flask_wtf.csrf import CSRFProtect, CSRFError
 csrf = CSRFProtect()
 def handle_order_creation(data, webhook_version='2'):
     try:
+        print(f"🔔 بدء معالجة ويب هوك - الإصدار: {webhook_version}")
+        
         # --- استخراج البيانات الأساسية من Webhook ---
         if webhook_version == '2':
             order_data = data.get('data', {})
@@ -676,39 +678,65 @@ def handle_order_creation(data, webhook_version='2'):
             order_data = data
             merchant_id = data.get('merchant_id')
 
+        print(f"📦 بيانات الطلب المستلمة: {order_data.get('id')}")
+        
         store_id = extract_store_id_from_webhook(data)
+        print(f"🏪 معرف المتجر المستخرج: {store_id}")
+        
         if store_id is None:
+            print("❌ فشل في استخراج معرف المتجر")
             return False
 
         order_id = str(order_data.get('id'))
+        print(f"🆔 معرف الطلب: {order_id}")
+        
         if not order_id:
+            print("❌ لا يوجد معرف طلب")
             return False
 
         # --- التحقق إذا الطلب موجود مسبقاً ---
         existing_order = SallaOrder.query.get(order_id)
         if existing_order:
-            # إذا ما عنده عنوان نضيفه
+            print(f"✅ الطلب موجود مسبقاً في قاعدة البيانات")
+            
+            # التصحيح: التحقق من وجود العنوان في جدول OrderAddress
             existing_address = OrderAddress.query.filter_by(order_id=order_id).first()
-            if not existing_order.address:
-                    address_info = extract_order_address(order_data)
+            print(f"📫 العنوان الموجود: {existing_address}")
+            
+            if not existing_address:  # إذا لم يكن هناك عنوان نضيفه
+                print("📝 لم يتم العثور على عنوان، جاري استخراج العنوان من البيانات...")
+                address_info = extract_order_address(order_data)
+                print(f"📍 بيانات العنوان المستخرجة: {address_info}")
+                
+                if address_info:  # التأكد من وجود بيانات العنوان
                     new_address = OrderAddress(
                         order_id=order_id,
                         **address_info
                     )
                     db.session.add(new_address)
                     db.session.commit()
+                    print("✅ تم حفظ العنوان الجديد بنجاح")
+                else:
+                    print("⚠️ لا توجد بيانات عنوان لاحفظها")
+            else:
+                print("✅ العنوان موجود مسبقاً، لا حاجة للإضافة")
             return True
+
+        print("🆕 طلب جديد، جاري إنشاؤه...")
 
         # --- ربط الطلب بالمستخدم (store owner) ---
         user = User.query.filter_by(store_id=store_id).first()
         if not user:
+            print("🔍 البحث عن مستخدم بديل...")
             user_with_salla = User.query.filter(
                 User._salla_access_token.isnot(None),
                 User.store_id.isnot(None)
             ).first()
             if not user_with_salla:
+                print("❌ لم يتم العثور على أي مستخدم")
                 return False
             store_id = user_with_salla.store_id
+            print(f"✅ تم العثور على مستخدم بديل: {store_id}")
 
         # --- معالجة تاريخ الإنشاء ---
         created_at = None
@@ -717,19 +745,23 @@ def handle_order_creation(data, webhook_version='2'):
             try:
                 date_str = date_info['date'].split('.')[0]
                 created_at = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+                print(f"📅 تاريخ الإنشاء: {created_at}")
             except Exception:
                 created_at = datetime.utcnow()
+                print("⚠️ استخدام التاريخ الحالي بسبب خطأ في التحليل")
 
         # --- المبلغ والعملة ---
         total_info = order_data.get('total') or order_data.get('amounts', {}).get('total', {})
         total_amount = float(total_info.get('amount', 0))
         currency = total_info.get('currency', 'SAR')
+        print(f"💰 المبلغ: {total_amount} {currency}")
 
         # --- بيانات العميل ---
         customer = order_data.get('customer', {})
         customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip()
         if not customer_name:
             customer_name = order_data.get('customer_name', 'عميل غير معروف')
+        print(f"👤 اسم العميل: {customer_name}")
 
         # --- تحديد حالة الطلب ---
         status_id = None
@@ -745,6 +777,7 @@ def handle_order_creation(data, webhook_version='2'):
             ).first()
             if status:
                 status_id = status.id
+                print(f"🏷️ حالة الطلب: {status_slug} (ID: {status_id})")
 
         if not status_id:
             default_status = OrderStatus.query.filter_by(
@@ -753,6 +786,7 @@ def handle_order_creation(data, webhook_version='2'):
             ).order_by(OrderStatus.sort).first()
             if default_status:
                 status_id = default_status.id
+                print(f"🔧 استخدام الحالة الافتراضية: {status_id}")
 
         # --- إنشاء الطلب ---
         new_order = SallaOrder(
@@ -767,24 +801,33 @@ def handle_order_creation(data, webhook_version='2'):
             status_id=status_id
         )
         db.session.add(new_order)
-        db.session.flush()  # للحصول على ID الطلب مباشرة
+        db.session.flush()
+        print("✅ تم إنشاء الطلب في قاعدة البيانات")
 
-        # --- إضافة العنوان ---
+        # --- إضافة العنوان (التصحيح: دائمًا نضيف العنوان للطلبات الجديدة) ---
         address_info = extract_order_address(order_data)
+        print(f"📍 بيانات العنوان المستخرجة للطلب الجديد: {address_info}")
+        
         if address_info:
             new_address = OrderAddress(
                 order_id=order_id,
                 **address_info
             )
             db.session.add(new_address)
+            print("✅ تم إضافة العنوان للطلب الجديد")
+        else:
+            print("⚠️ لا توجد بيانات عنوان للطلب الجديد")
 
         # --- حفظ كل شيء ---
         db.session.commit()
+        print("🎉 تم حفظ الطلب والعنوان بنجاح")
         return True
 
     except Exception as e:
         db.session.rollback()
-        logger.error(f"خطأ في إنشاء الطلب من Webhook: {str(e)}", exc_info=True)
+        error_msg = f"❌ خطأ في إنشاء الطلب من Webhook: {str(e)}"
+        print(error_msg)
+        logger.error(error_msg, exc_info=True)
         return False
 @orders_bp.route('/webhook/orders', methods=['POST'])
 @csrf.exempt
@@ -877,14 +920,23 @@ def extract_order_address(order_data):
     استخراج بيانات العنوان مع الأولوية للمتسلم
     يرجع: اسم كامل، هاتف، بلد، مدينة، عنوان كامل
     """
+    print("🔍 بدء استخراج العنوان من بيانات الطلب...")
+    
     shipping_data = order_data.get('shipping', {}) or {}
     customer_data = order_data.get('customer', {}) or {}
+    
+    print(f"🚚 بيانات الشحن: {shipping_data}")
+    print(f"👤 بيانات العميل: {customer_data}")
     
     # الأولوية للمتسلم (receiver)
     receiver_data = shipping_data.get('receiver', {}) or {}
     address_data = shipping_data.get('address') or shipping_data.get('pickup_address', {}) or {}
     
+    print(f"📦 بيانات المتسلم: {receiver_data}")
+    print(f"🏠 بيانات العنوان: {address_data}")
+    
     if receiver_data.get('name') or address_data:
+        print("✅ استخدام بيانات المتسلم والعنوان")
         name = receiver_data.get('name', '').strip()
         phone = receiver_data.get('phone') or f"{customer_data.get('mobile_code', '')}{customer_data.get('mobile', '')}"
         country = address_data.get('country', customer_data.get('country', ''))
@@ -897,6 +949,7 @@ def extract_order_address(order_data):
         address_type = 'receiver'
     
     else:
+        print("🔍 استخدام بيانات العميل كبديل")
         name = customer_data.get('full_name') or f"{customer_data.get('first_name', '')} {customer_data.get('last_name', '')}".strip()
         phone = f"{customer_data.get('mobile_code', '')}{customer_data.get('mobile', '')}"
         country = customer_data.get('country', '')
@@ -906,12 +959,14 @@ def extract_order_address(order_data):
     
     if not name:
         name = 'عميل غير معروف'
+        print("⚠️ استخدام اسم افتراضي: عميل غير معروف")
     
     if not full_address:
         parts = [p for p in [country, city] if p]
         full_address = ' - '.join(parts) if parts else 'لم يتم تحديد العنوان'
+        print("⚠️ استخدام عنوان مبني من البلد والمدينة")
     
-    return {
+    result = {
         'name': name,
         'phone': phone,
         'country': country,
@@ -919,3 +974,6 @@ def extract_order_address(order_data):
         'full_address': full_address,
         'address_type': address_type
     }
+    
+    print(f"📋 النتيجة النهائية للعنوان: {result}")
+    return result
