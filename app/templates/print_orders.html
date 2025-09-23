@@ -156,8 +156,8 @@
         }
 
         .product-image {
-            width: 100px;
-            height: 100px;
+            width: 100%;
+            height: 100%;
             object-fit: contain;
             border: 1.5px solid #ddd;
             border-radius: 4px;
@@ -420,7 +420,10 @@
             </div>
 
             <!-- صفحة جديدة كل صف من طلبين -->
-
+            {% if not loop.last and loop.index % 2 == 0 %}
+                <div class="page-break"></div>
+            {% endif %}
+            {% endfor %}
         </div>
     </div>
 
