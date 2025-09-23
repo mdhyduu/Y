@@ -854,6 +854,7 @@ def order_status_webhook():
         elif event in ['order.status.updated', 'order.updated'] and order_data:
             order_id = str(order_data.get('id'))
             
+            # تحديث حالة الطلب (الكود الحالي)
             if event == 'order.status.updated':
                 status_data = order_data.get('status', {})
             else:
@@ -873,7 +874,18 @@ def order_status_webhook():
 
                     if status:
                         order.status_id = status.id
-                        db.session.commit()
+                        print(f"✅ تم تحديث حالة الطلب {order_id} إلى {status_slug}")
+
+            # ⭐⭐ إضافة تحديث العنوان عند حدث order.updated ⭐⭐
+            if event == 'order.updated' and order_data:
+                print(f"🔄 معالجة تحديث الطلب والعنوان للطلب {order_id}")
+                update_success = update_order_address(order_id, order_data)
+                if update_success:
+                    print(f"✅ تم تحديث بيانات العنوان للطلب {order_id}")
+                else:
+                    print(f"⚠️ فشل في تحديث العنوان للطلب {order_id}")
+
+            db.session.commit()
 
         return jsonify({'success': True, 'message': 'تم استقبال البيانات بنجاح'}), 200
 
@@ -945,3 +957,55 @@ def extract_order_address(order_data):
     
     print(f"📋 النتيجة النهائية للعنوان: {result}")
     return result
+    
+def update_order_address(order_id, order_data):
+    """
+    تحديث عنوان الطلب في قاعدة البيانات
+    """
+    try:
+        print(f"🔄 محاولة تحديث العنوان للطلب {order_id}")
+        
+        # استخراج بيانات العنوان من الطلب
+        address_info = extract_order_address(order_data)
+        print(f"📍 بيانات العنوان المستخرجة للتحديث: {address_info}")
+        
+        if not address_info:
+            print("⚠️ لا توجد بيانات عنوان للتحديث")
+            return False
+        
+        # البحث عن العنوان الحالي في قاعدة البيانات
+        existing_address = OrderAddress.query.filter_by(order_id=str(order_id)).first()
+        
+        if existing_address:
+            print("✅ وجود عنوان موجود، جاري التحديث...")
+            # تحديث البيانات الحالية
+            existing_address.name = encrypt_data(address_info.get('name', ''))
+            existing_address.phone = encrypt_data(address_info.get('phone', ''))
+            existing_address.country = address_info.get('country', '')
+            existing_address.city = address_info.get('city', '')
+            existing_address.full_address = address_info.get('full_address', '')
+            existing_address.address_type = address_info.get('address_type', 'customer')
+        else:
+            print("🆕 إنشاء عنوان جديد...")
+            # إنشاء سجل جديد إذا لم يكن موجوداً
+            new_address = OrderAddress(
+                order_id=str(order_id),
+                name=encrypt_data(address_info.get('name', '')),
+                phone=encrypt_data(address_info.get('phone', '')),
+                country=address_info.get('country', ''),
+                city=address_info.get('city', ''),
+                full_address=address_info.get('full_address', ''),
+                address_type=address_info.get('address_type', 'customer')
+            )
+            db.session.add(new_address)
+        
+        db.session.commit()
+        print("✅ تم تحديث العنوان بنجاح")
+        return True
+        
+    except Exception as e:
+        db.session.rollback()
+        error_msg = f"❌ خطأ في تحديث العنوان: {str(e)}"
+        print(error_msg)
+        logger.error(error_msg, exc_info=True)
+        return False
