@@ -469,7 +469,8 @@ def order_details(order_id):
             db_data = db_future.result()
 
         processed_order = process_order_data(order_id, items_data)
-
+        order_address = OrderAddress.query.filter_by(order_id=str(order_id)).first()
+        
         address_data = {}
         full_address = 'لم يتم تحديد العنوان'
 
@@ -569,6 +570,7 @@ def order_details(order_id):
 
         return render_template('order_details.html', 
             order=processed_order,
+            order_address=order_address, 
             status_notes=db_data['status_notes'],
             employee_statuses=db_data['employee_statuses'],
             custom_note_statuses=db_data['custom_note_statuses'],
