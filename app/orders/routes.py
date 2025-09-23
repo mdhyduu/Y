@@ -19,13 +19,15 @@ from flask import send_file
 from io import BytesIO
 import pandas as pd
 from concurrent import futures
-
+from cryptography.fernet import Fernet
+import base64
 import logging
 
 # إعداد المسجل للإنتاج
 logger = logging.getLogger('salla_app')
+
 def get_cipher():
-    key = base64.urlsafe_b64encode(Config.SECRET_KEY[:21].encode().ljust(21, b'0'))
+    key = base64.urlsafe_b64encode(Config.SECRET_KEY[:32].encode().ljust(32, b'0'))
     return Fernet(key)
 
 # دوال التشفير وفك التشفير
