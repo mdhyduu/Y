@@ -8,7 +8,8 @@ from .models import (
     SallaOrder,
     EmployeeCustomStatus,
     OrderEmployeeStatus,
-    CustomNoteStatus
+    CustomNoteStatus,
+    OrderAddress
 ) 
 from datetime import datetime
 from functools import wraps
