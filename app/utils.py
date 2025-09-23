@@ -602,81 +602,82 @@ def process_orders_concurrently(order_ids, access_token, max_workers=10):
     failed_orders = 0
     lock = Lock()
 
-    
-    # استخدام ThreadPoolExecutor للمعالجة المتزامنة
-    
     def process_single_order(order_id):
+        """معالجة طلب واحد مع ضمان وجود سياق التطبيق"""
         nonlocal successful_orders, failed_orders
         order_id_str = str(order_id).strip()
         if not order_id_str:
             return None
             
-        try:
-            # إنشاء جلسة مستقلة لكل خيط
-            session = create_session()
-            headers = {
-                'Authorization': f'Bearer {access_token}',
-                'Accept': 'application/json'
-            }
-            
-            # جلب بيانات الطلب
-            order_response = session.get(
-                f"{Config.SALLA_ORDERS_API}/{order_id_str}",
-                headers=headers,
-                timeout=15
-            )
-            
-            if order_response.status_code != 200:
-                with lock:
-                    failed_orders += 1
-                return None
-                
-            order_data = order_response.json().get('data', {})
-            
-            # جلب بيانات العناصر
-            items_response = session.get(
-                f"{Config.SALLA_BASE_URL}/orders/items",
-                params={'order_id': order_id_str},
-                headers=headers,
-                timeout=15
-            )
-            
-            items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
-            
-            # استخدام الباركود المخزن مسبقاً
-            barcode_data = barcodes_map.get(order_id_str)
-            
-            # معالجة بيانات الطلب
-            processed_order = process_order_data(order_id_str, items_data, barcode_data)
-            
-            if processed_order:
-                processed_order['reference_id'] = order_data.get('reference_id', order_id_str)
-                processed_order['customer'] = order_data.get('customer', {})
-                processed_order['created_at'] = format_date(order_data.get('created_at', ''))
-                
-                with lock:
-                    successful_orders += 1
-                return processed_order
-            else:
-                with lock:
-                    failed_orders += 1
-                return None
-                
-        except Exception as e:
-            with lock:
-                failed_orders += 1
-            logger.error(f"Error processing order {order_id_str}: {str(e)}")
-            return None
-        finally:
+        # استخدام سياق التطبيق الممرر
+        app = current_app._get_current_object()
+        with app.app_context():
             try:
-                session.close()
-            except:
-                pass
+                # إنشاء جلسة مستقلة لكل خيط
+                session = create_session()
+                headers = {
+                    'Authorization': f'Bearer {access_token}',
+                    'Accept': 'application/json'
+                }
+                
+                # جلب بيانات الطلب
+                order_response = session.get(
+                    f"{Config.SALLA_ORDERS_API}/{order_id_str}",
+                    headers=headers,
+                    timeout=15
+                )
+                
+                if order_response.status_code != 200:
+                    with lock:
+                        failed_orders += 1
+                    return None
+                    
+                order_data = order_response.json().get('data', {})
+                
+                # جلب بيانات العناصر
+                items_response = session.get(
+                    f"{Config.SALLA_BASE_URL}/orders/items",
+                    params={'order_id': order_id_str},
+                    headers=headers,
+                    timeout=15
+                )
+                
+                items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
+                
+                # استخدام الباركود المخزن مسبقاً
+                barcode_data = barcodes_map.get(order_id_str)
+                
+                # معالجة بيانات الطلب داخل سياق التطبيق
+                processed_order = process_order_data(order_id_str, items_data, barcode_data)
+                
+                if processed_order:
+                    processed_order['reference_id'] = order_data.get('reference_id', order_id_str)
+                    processed_order['customer'] = order_data.get('customer', {})
+                    processed_order['created_at'] = format_date(order_data.get('created_at', ''))
+                    
+                    with lock:
+                        successful_orders += 1
+                    return processed_order
+                else:
+                    with lock:
+                        failed_orders += 1
+                    return None
+                    
+            except Exception as e:
+                with lock:
+                    failed_orders += 1
+                logger.error(f"Error processing order {order_id_str}: {str(e)}")
+                return None
+            finally:
+                try:
+                    session.close()
+                except:
+                    pass
 
     # استخدام ThreadPoolExecutor للمعالجة المتزامنة
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # تقديم جميع المهام مرة واحدة
-        future_to_order = {executor.submit(process_single_order_wrapper, order_id): order_id for order_id in order_ids}
+        future_to_order = {executor.submit(process_single_order, order_id): order_id for order_id in order_ids}
         
         # جمع النتائج عند اكتمالها
         for future in as_completed(future_to_order):
