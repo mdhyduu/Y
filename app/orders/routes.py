@@ -24,6 +24,32 @@ import logging
 
 # إعداد المسجل للإنتاج
 logger = logging.getLogger('salla_app')
+def get_cipher():
+    key = base64.urlsafe_b64encode(Config.SECRET_KEY[:32].encode().ljust(32, b'0'))
+    return Fernet(key)
+
+# دوال التشفير وفك التشفير
+def encrypt_data(data):
+    """تشفير البيانات النصية"""
+    if not data:
+        return data
+    try:
+        cipher = get_cipher()
+        return cipher.encrypt(data.encode()).decode()
+    except Exception as e:
+        logger.error(f"خطأ في تشفير البيانات: {str(e)}")
+        return data
+
+def decrypt_data(encrypted_data):
+    """فك تشفير البيانات"""
+    if not encrypted_data:
+        return encrypted_data
+    try:
+        cipher = get_cipher()
+        return cipher.decrypt(encrypted_data.encode()).decode()
+    except Exception as e:
+        logger.error(f"خطأ في فك تشفير البيانات: {str(e)}")
+        return encrypted_data
 
 @orders_bp.route('/')
 def index():
@@ -595,6 +621,7 @@ def extract_store_id_from_webhook(webhook_data):
 from flask_wtf.csrf import CSRFProtect, CSRFError
 
 csrf = CSRFProtect()
+
 def handle_order_creation(data, webhook_version='2'):
     try:
         print(f"🔔 بدء معالجة ويب هوك - الإصدار: {webhook_version}")
@@ -638,6 +665,10 @@ def handle_order_creation(data, webhook_version='2'):
                 print(f"📍 بيانات العنوان المستخرجة: {address_info}")
                 
                 if address_info:  # التأكد من وجود بيانات العنوان
+                    # تشفير البيانات الحساسة قبل الحفظ
+                    address_info['name'] = encrypt_data(address_info.get('name', ''))
+                    address_info['phone'] = encrypt_data(address_info.get('phone', ''))
+                    
                     new_address = OrderAddress(
                         order_id=order_id,
                         **address_info
@@ -692,6 +723,9 @@ def handle_order_creation(data, webhook_version='2'):
             customer_name = order_data.get('customer_name', 'عميل غير معروف')
         print(f"👤 اسم العميل: {customer_name}")
 
+        # --- تشفير اسم العميل قبل الحفظ ---
+        encrypted_customer_name = encrypt_data(customer_name)
+
         # --- تحديد حالة الطلب ---
         status_id = None
         status_info = order_data.get('status', {})
@@ -721,7 +755,7 @@ def handle_order_creation(data, webhook_version='2'):
         new_order = SallaOrder(
             id=order_id,
             store_id=store_id,
-            customer_name=customer_name,
+            customer_name=encrypted_customer_name,  # حفظ الاسم مشفر
             created_at=created_at or datetime.utcnow(),
             total_amount=total_amount,
             currency=currency,
@@ -733,11 +767,15 @@ def handle_order_creation(data, webhook_version='2'):
         db.session.flush()
         print("✅ تم إنشاء الطلب في قاعدة البيانات")
 
-        # --- إضافة العنوان (التصحيح: دائمًا نضيف العنوان للطلبات الجديدة) ---
+        # --- إضافة العنوان (مع التشفير) ---
         address_info = extract_order_address(order_data)
         print(f"📍 بيانات العنوان المستخرجة للطلب الجديد: {address_info}")
         
         if address_info:
+            # تشفير البيانات الحساسة قبل الحفظ
+            address_info['name'] = encrypt_data(address_info.get('name', ''))
+            address_info['phone'] = encrypt_data(address_info.get('phone', ''))
+            
             new_address = OrderAddress(
                 order_id=order_id,
                 **address_info
