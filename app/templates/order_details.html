@@ -321,138 +321,7 @@
       {% endif %}
 
       <!-- قسم المعلومات الإضافية -->
-      <div class="card shadow-sm border-0">
-        <div class="card-header bg-white py-2">
-          <h5 class="mb-0 fs-5"><i class="fas fa-info-circle ms-2"></i>معلومات إضافية</h5>
-        </div>
-        
-        <div class="card-body p-2">
-          <ul class="list-group list-group-flush small">
-            <li class="list-group-item d-flex justify-content-between py-1 px-0">
-              <span class="fw-bold">تاريخ الطلب:</span>
-              <span>
-                {% if order.created_at is string %}
-                  {{ order.created_at | safe }}
-                {% elif order.created_at %}
-                  {{ order.created_at.strftime('%Y-%m-%d %H:%M') }}
-                {% else %}
-                  غير متوفر
-                {% endif %}
-              </span>
-            </li>
-
-            <!-- معلومات العنوان -->
-            <li class="list-group-item py-2 px-0">
-              <div class="fw-bold mb-1">عنوان الشحن الكامل:</div>
-              <div class="text-muted small">
-                {% if order.shipping.address and order.shipping.address != 'لم يتم تحديد العنوان' %}
-                  {{ order.shipping.address }}
-                {% else %}
-                  {% if order.shipping.country %}
-                    <span class="d-block">الدولة: {{ order.shipping.country }}</span>
-                  {% endif %}
-                  {% if order.shipping.city %}
-                    <span class="d-block">المدينة: {{ order.shipping.city }}</span>
-                  {% endif %}
-                  {% if order.shipping.district %}
-                    <span class="d-block">الحي: {{ order.shipping.district }}</span>
-                  {% endif %}
-                  {% if order.shipping.street %}
-                    <span class="d-block">الشارع: {{ order.shipping.street }}</span>
-                  {% endif %}
-                  {% if order.shipping.description %}
-                    <span class="d-block">الوصف: {{ order.shipping.description }}</span>
-                  {% endif %}
-                  {% if order.shipping.postal_code %}
-                    <span class="d-block">الرمز البريدي: {{ order.shipping.postal_code }}</span>
-                  {% endif %}
-                {% endif %}
-
-                {% if not order.shipping.address and not order.shipping.country 
-                      and not order.shipping.city and not order.shipping.district
-                      and not order.shipping.street and not order.shipping.description 
-                      and not order.shipping.postal_code %}
-                  <span class="text-danger">لم يتم تحديد العنوان</span>
-                {% endif %}
-
-                {% if order.shipping.raw_data and order.shipping.raw_data.latitude and order.shipping.raw_data.longitude %}
-                  <span class="d-block mt-1">
-                    <small>الإحداثيات: {{ order.shipping.raw_data.latitude }}, {{ order.shipping.raw_data.longitude }}</small>
-                  </span>
-                {% endif %}
-              </div>
-            </li>
-            
-            <li class="list-group-item d-flex justify-content-between py-2 px-0">
-              <span class="fw-bold">اسم المستلم:</span>
-              <span>
-                {% if order.receiver.name %}
-                  {{ order.receiver.name | safe }}
-                {% elif order.shipping.customer_name %}
-                  {{ order.shipping.customer_name | safe }}
-                {% else %}
-                  {{ order.customer.first_name | safe }} {{ order.customer.last_name | safe }}
-                {% endif %}
-              </span>
-            </li>
-
-            <li class="list-group-item d-flex justify-content-between py-2 px-0">
-              <span class="fw-bold">هاتف المستلم:</span>
-              <span>
-                {% if order.receiver.phone %}
-                  {{ order.receiver.phone | safe }}
-                {% elif order.shipping.phone %}
-                  {{ order.shipping.phone | safe }}
-                {% else %}
-                  {{ order.customer.phone | safe }}
-                {% endif %}
-              </span>
-            </li>
-
-            <li class="list-group-item d-flex justify-content-between py-2 px-0">
-              <span class="fw-bold">البريد الإلكتروني:</span>
-              <span>
-                {% if order.receiver.email %}
-                  {{ order.receiver.email | safe }}
-                {% else %}
-                  {{ order.customer.email | safe }}
-                {% endif %}
-              </span>
-            </li>
-
-            {% if order.shipping.tracking_number %}
-            <li class="list-group-item d-flex justify-content-between py-2 px-0">
-              <span class="fw-bold">رقم التتبع:</span>
-              <span>
-                {% if order.shipping.tracking_link %}
-                  <a href="{{ order.shipping.tracking_link }}" target="_blank" class="text-decoration-none">
-                    {{ order.shipping.tracking_number }}
-                    <i class="fas fa-external-link-alt ms-1 small"></i>
-                  </a>
-                {% else %}
-                  {{ order.shipping.tracking_number }}
-                {% endif %}
-              </span>
-            </li>
-            {% endif %}
-
-            {% if order.shipping.method and order.shipping.method != 'غير محدد' %}
-            <li class="list-group-item d-flex justify-content-between py-2 px-0">
-              <span class="fw-bold">شركة الشحن:</span>
-              <span>{{ order.shipping.method }}</span>
-            </li>
-            {% endif %}
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-<!-- في orders.html أو order_details.html -->
-{% for order in orders %}
-<div class="order-card">
-    <h3>الطلب #{{ order.reference_id }}</h3>
-    
+ 
     {% if order.address %}
     <div class="address-info">
         <p><strong>الاسم:</strong> {{ order.address.name }}</p>
@@ -463,8 +332,15 @@
         <small class="text-muted">({{ 'مستلم' if order.address.address_type == 'receiver' else 'عميل' }})</small>
     </div>
     {% endif %}
+     
+    </div>
+  </div>
 </div>
-{% endfor %}
+<!-- في orders.html أو order_details.html -->
+
+    
+
+
 <style>
   /* أنماط عامة للجدول */
   .table {

@@ -657,6 +657,7 @@ from flask_wtf.csrf import CSRFProtect, CSRFError
 csrf = CSRFProtect()
 def handle_order_creation(data, webhook_version='2'):
     try:
+        # --- استخراج البيانات الأساسية من Webhook ---
         if webhook_version == '2':
             order_data = data.get('data', {})
             merchant_id = data.get('merchant')
@@ -665,40 +666,41 @@ def handle_order_creation(data, webhook_version='2'):
             merchant_id = data.get('merchant_id')
 
         store_id = extract_store_id_from_webhook(data)
-        
         if store_id is None:
             return False
-        
+
         order_id = str(order_data.get('id'))
         if not order_id:
             return False
-        
+
+        # --- التحقق إذا الطلب موجود مسبقاً ---
         existing_order = SallaOrder.query.get(order_id)
         if existing_order:
-            # إذا كان الطلب موجوداً، نتحقق من وجود العنوان ونحدثه إذا لزم الأمر
-            if not existing_order.address:
+            # إذا ما عنده عنوان نضيفه
+            existing_address = OrderAddress.query.filter_by(order_id=order_id).first()
+            if not existing_address:
                 address_info = extract_order_address(order_data)
-                new_address = OrderAddress(
-                    order_id=order_id,
-                    **address_info
-                )
-                db.session.add(new_address)
-                db.session.commit()
+                if address_info:
+                    new_address = OrderAddress(
+                        order_id=order_id,
+                        **address_info
+                    )
+                    db.session.add(new_address)
+                    db.session.commit()
             return True
-        
+
+        # --- ربط الطلب بالمستخدم (store owner) ---
         user = User.query.filter_by(store_id=store_id).first()
-        
         if not user:
             user_with_salla = User.query.filter(
                 User._salla_access_token.isnot(None),
                 User.store_id.isnot(None)
             ).first()
-            
             if not user_with_salla:
                 return False
-                
             store_id = user_with_salla.store_id
-        
+
+        # --- معالجة تاريخ الإنشاء ---
         created_at = None
         date_info = order_data.get('date', {})
         if date_info and 'date' in date_info:
@@ -707,40 +709,42 @@ def handle_order_creation(data, webhook_version='2'):
                 created_at = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
             except Exception:
                 created_at = datetime.utcnow()
-        
-        total_info = order_data.get('total', {})
+
+        # --- المبلغ والعملة ---
+        total_info = order_data.get('total') or order_data.get('amounts', {}).get('total', {})
         total_amount = float(total_info.get('amount', 0))
         currency = total_info.get('currency', 'SAR')
-        
+
+        # --- بيانات العميل ---
         customer = order_data.get('customer', {})
         customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip()
         if not customer_name:
             customer_name = order_data.get('customer_name', 'عميل غير معروف')
-        
+
+        # --- تحديد حالة الطلب ---
         status_id = None
         status_info = order_data.get('status', {})
         if status_info:
             status_slug = status_info.get('slug', '').lower().replace('-', '_')
             if not status_slug and status_info.get('name'):
                 status_slug = status_info['name'].lower().replace(' ', '_')
-            
+
             status = OrderStatus.query.filter_by(
                 slug=status_slug,
                 store_id=store_id
             ).first()
-            
             if status:
                 status_id = status.id
-        
+
         if not status_id:
             default_status = OrderStatus.query.filter_by(
-                store_id=store_id, 
+                store_id=store_id,
                 is_active=True
             ).order_by(OrderStatus.sort).first()
-            
             if default_status:
                 status_id = default_status.id
-        
+
+        # --- إنشاء الطلب ---
         new_order = SallaOrder(
             id=order_id,
             store_id=store_id,
@@ -752,27 +756,26 @@ def handle_order_creation(data, webhook_version='2'):
             raw_data=json.dumps(order_data, ensure_ascii=False),
             status_id=status_id
         )
-        
         db.session.add(new_order)
-        db.session.flush()  # للحصول على id الطلب
-        
-        # حفظ بيانات العنوان
+        db.session.flush()  # للحصول على ID الطلب مباشرة
+
+        # --- إضافة العنوان ---
         address_info = extract_order_address(order_data)
-        new_address = OrderAddress(
-            order_id=order_id,
-            **address_info
-        )
-        db.session.add(new_address)
-        
+        if address_info:
+            new_address = OrderAddress(
+                order_id=order_id,
+                **address_info
+            )
+            db.session.add(new_address)
+
+        # --- حفظ كل شيء ---
         db.session.commit()
-        
         return True
-        
+
     except Exception as e:
         db.session.rollback()
         logger.error(f"خطأ في إنشاء الطلب من Webhook: {str(e)}", exc_info=True)
         return False
-
 @orders_bp.route('/webhook/orders', methods=['POST'])
 @csrf.exempt
 def order_status_webhook():
@@ -864,48 +867,39 @@ def extract_order_address(order_data):
     استخراج بيانات العنوان مع الأولوية للمتسلم
     يرجع: اسم كامل، هاتف، بلد، مدينة، عنوان كامل
     """
-    shipping_data = order_data.get('shipping', {})
-    customer_data = order_data.get('customer', {})
+    shipping_data = order_data.get('shipping', {}) or {}
+    customer_data = order_data.get('customer', {}) or {}
     
     # الأولوية للمتسلم (receiver)
-    receiver_data = shipping_data.get('receiver', {})
-    address_data = shipping_data.get('address', {})
+    receiver_data = shipping_data.get('receiver', {}) or {}
+    address_data = shipping_data.get('address') or shipping_data.get('pickup_address', {}) or {}
     
-    # إذا كان هناك متسلم (receiver) نستخدم بياناته
     if receiver_data.get('name') or address_data:
         name = receiver_data.get('name', '').strip()
-        phone = receiver_data.get('phone', '')
-        country = address_data.get('country', '')
-        city = address_data.get('city', '')
-        full_address = address_data.get('shipping_address', '')
+        phone = receiver_data.get('phone') or f"{customer_data.get('mobile_code', '')}{customer_data.get('mobile', '')}"
+        country = address_data.get('country', customer_data.get('country', ''))
+        city = address_data.get('city', customer_data.get('city', ''))
+        full_address = address_data.get('shipping_address', '') or customer_data.get('location', '')
         
-        # إذا كان الاسم فارغاً في المتسلم، نستخدم اسم العميل
         if not name:
-            name = f"{customer_data.get('first_name', '')} {customer_data.get('last_name', '')}".strip()
+            name = customer_data.get('full_name') or f"{customer_data.get('first_name', '')} {customer_data.get('last_name', '')}".strip()
         
         address_type = 'receiver'
     
-    # إذا لم يكن هناك متسلم، نستخدم بيانات العميل
     else:
-        name = f"{customer_data.get('first_name', '')} {customer_data.get('last_name', '')}".strip()
+        name = customer_data.get('full_name') or f"{customer_data.get('first_name', '')} {customer_data.get('last_name', '')}".strip()
         phone = f"{customer_data.get('mobile_code', '')}{customer_data.get('mobile', '')}"
         country = customer_data.get('country', '')
         city = customer_data.get('city', '')
         full_address = customer_data.get('location', '')
         address_type = 'customer'
     
-    # تنظيف البيانات والتأكد من عدم وجود قيم فارغة
     if not name:
         name = 'عميل غير معروف'
     
-    # بناء العنوان الكامل إذا لم يكن موجوداً
     if not full_address:
-        address_parts = []
-        if country:
-            address_parts.append(country)
-        if city:
-            address_parts.append(city)
-        full_address = ' - '.join(address_parts) if address_parts else 'لم يتم تحديد العنوان'
+        parts = [p for p in [country, city] if p]
+        full_address = ' - '.join(parts) if parts else 'لم يتم تحديد العنوان'
     
     return {
         'name': name,
