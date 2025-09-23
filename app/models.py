@@ -640,15 +640,20 @@ class OrderAddress(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.String(50), db.ForeignKey('salla_orders.id'), nullable=False, unique=True)
-    name = db.Column(db.String(255), nullable=False)  # الاسم الكامل
-    phone = db.Column(db.String(20))  # رقم الهاتف
-    country = db.Column(db.String(100))  # البلد
-    city = db.Column(db.String(100))  # المدينة
-    full_address = db.Column(db.Text)  # العنوان الكامل
-    address_type = db.Column(db.String(10), default='receiver')  # receiver أو customer
+    name = db.Column(db.String(255), nullable=False)
+    phone = db.Column(db.String(20))
+    country = db.Column(db.String(100))
+    city = db.Column(db.String(100))  # إضافة فهرس لهذا الحقل
+    full_address = db.Column(db.Text)
+    address_type = db.Column(db.String(10), default='receiver')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # العلاقة مع الطلب
+    # إضافة فهرس للحقل city لتحسين أداء الاستعلامات
+    __table_args__ = (
+        db.Index('ix_order_addresses_city', 'city'),
+        db.Index('ix_order_addresses_city_type', 'city', 'address_type'),
+    )
+    
     order = relationship('SallaOrder', backref='address', lazy=True)
     
     def __repr__(self):

@@ -158,15 +158,23 @@ def _get_active_orders_count(employee_id):
             
     return active_orders_count
 
-def _get_filtered_orders(store_id, status_id=None):
+def _get_filtered_orders(store_id, status_id=None, for_delivery=False):
     """دالة مساعدة للحصول على الطلبات المصفاة"""
     # استخدام joinedload لتحميل جميع العلاقات المطلوبة
-    all_orders = SallaOrder.query.filter_by(
-        store_id=store_id
-    ).options(
+    query = SallaOrder.query.filter_by(store_id=store_id)
+    
+    # إذا كان للعرض على فريق التوصيل، نضيف join مع OrderAddress للتصفية حسب المدينة
+    if for_delivery:
+        query = query.join(OrderAddress).filter(
+            OrderAddress.city == 'الرياض',
+            OrderAddress.address_type == 'receiver'
+        )
+    
+    all_orders = query.options(
         db.joinedload(SallaOrder.employee_statuses).joinedload(OrderEmployeeStatus.status),
         db.joinedload(SallaOrder.status_notes),
-        db.joinedload(SallaOrder.assignments).joinedload(OrderAssignment.employee)  # تحميل بيانات الموظفين
+        db.joinedload(SallaOrder.assignments).joinedload(OrderAssignment.employee),
+        db.joinedload(SallaOrder.address)  # تحميل بيانات العنوان
     ).all()
     
     # إضافة الحالة الحالية لكل طلب
@@ -307,26 +315,37 @@ def index():
             selected_status_id = request.args.get('status_id', type=int)
             
             # إذا كان موظف توصيل أو مدير توصيل، نعرض لوحة التوصيل
+            # في قسم delivery و delivery_manager:
             if employee.role in ('delivery', 'delivery_manager'):
                 is_delivery_manager = (employee.role == 'delivery_manager')
                 
                 # تحديد نطاق الطلبات بناءً على صلاحية الموظف
                 if is_delivery_manager:
-                    # المدير يرى جميع طلبات المتجر
-                    filtered_orders, all_orders = _get_filtered_orders(employee.store_id, selected_status_id)
+                    # المدير يرى جميع طلبات المتجر في الرياض فقط
+                    filtered_orders, all_orders = _get_filtered_orders(
+                        employee.store_id, 
+                        selected_status_id, 
+                        for_delivery=True  # تصفية لطلبات الرياض فقط
+                    )
                 else:
-                    # الموظف العادي يرى فقط الطلبات المسندة إليه
+                    # الموظف العادي يرى فقط الطلبات المسندة إليه في الرياض فقط
                     assigned_order_ids = [a.order_id for a in OrderAssignment.query.filter_by(
                         employee_id=employee.id
                     ).all()]
                     
                     if assigned_order_ids:
-                        # جلب جميع الطلبات ثم تصفيتها
-                        _, store_orders = _get_filtered_orders(employee.store_id, selected_status_id)
+                        # جلب جميع طلبات المتجر في الرياض ثم تصفيتها للموظف
+                        _, store_orders = _get_filtered_orders(
+                            employee.store_id, 
+                            selected_status_id, 
+                            for_delivery=True  # تصفية لطلبات الرياض فقط
+                        )
                         filtered_orders = [order for order in store_orders if order.id in assigned_order_ids]
                         all_orders = filtered_orders
                     else:
                         filtered_orders, all_orders = [], []
+    
+    # باقي الكود كما هو...
                 
                 # حساب إحصائيات الحالات للعرض في التبويبات
                 status_stats = {}
@@ -519,19 +538,27 @@ def filter_orders():
         # الحصول على الحالة المحددة من الباراميتر
         selected_status_id = request.args.get('status_id', type=int)
         
-        # تحديد نطاق الطلبات بناءً على صلاحية الموظف
+        # تحديد نطاق الطلبات بناءً على صلاحية الموظف مع التصفية للرياض فقط
         if employee.role == 'delivery_manager':
-            # المدير يرى جميع طلبات المتجر
-            filtered_orders, _ = _get_filtered_orders(employee.store_id, selected_status_id)
+            # المدير يرى جميع طلبات المتجر في الرياض فقط
+            filtered_orders, _ = _get_filtered_orders(
+                employee.store_id, 
+                selected_status_id, 
+                for_delivery=True  # تصفية لطلبات الرياض فقط
+            )
         else:
-            # الموظف العادي يرى فقط الطلبات المسندة إليه
+            # الموظف العادي يرى فقط الطلبات المسندة إليه في الرياض فقط
             assigned_order_ids = [a.order_id for a in OrderAssignment.query.filter_by(
                 employee_id=employee.id
             ).all()]
             
             if assigned_order_ids:
-                # جلب جميع الطلبات ثم تصفيتها
-                _, store_orders = _get_filtered_orders(employee.store_id, selected_status_id)
+                # جلب جميع طلبات المتجر في الرياض ثم تصفيتها للموظف
+                _, store_orders = _get_filtered_orders(
+                    employee.store_id, 
+                    selected_status_id, 
+                    for_delivery=True  # تصفية لطلبات الرياض فقط
+                )
                 filtered_orders = [order for order in store_orders if order.id in assigned_order_ids]
             else:
                 filtered_orders = []
