@@ -35,8 +35,8 @@ class Config:
     # إعدادات PostgreSQL المحسنة
 
     # إعدادات الأداء المحسنة لـ PDF والطباعة
-    MAX_WORKERS = 3
-    PDF_GENERATION_WORKERS = 3
+    MAX_WORKERS = 10
+    PDF_GENERATION_WORKERS = 10
     REQUEST_TIMEOUT = 15
     PDF_JPEG_QUALITY = 80
     PDF_OPTIMIZE_SIZE = True

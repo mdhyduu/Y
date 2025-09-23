@@ -9,9 +9,9 @@ from app.utils import (
     format_date, 
     create_session, 
     db_session_scope, 
-    process_orders_concurrently,
+    process_orders_concurrently,  # تم التحديث إلى الدالة المتزامنة
     get_barcodes_for_orders,
-    get_postgres_engine
+    get_postgres_engine  # إضافة جديدة للاستفادة من اتصالات PostgreSQL المحسنة
 )
 from app.config import Config
 import logging
@@ -25,9 +25,6 @@ logger = logging.getLogger('salla_app')
 def optimize_pdf_generation(orders):
     """تحسين أداء إنشاء PDF باستخدام الخيوط"""
     try:
-        if not orders:
-            return []
-            
         # تقسيم الطلبات إلى مجموعات للمعالجة المتوازية
         def process_order_group(order_group):
             processed_orders = []
@@ -55,24 +52,20 @@ def optimize_pdf_generation(orders):
         processed_orders = []
         lock = Lock()
         
-        # معالجة المجموعات بشكل متزامن فقط إذا كانت هناك مجموعات
-        if order_groups:
-            # تأكد من أن max_workers لا يكون صفراً
-            max_workers = max(1, min(4, len(order_groups)))
+        # معالجة المجموعات بشكل متزامن
+        with ThreadPoolExecutor(max_workers=min(4, len(order_groups))) as executor:
+            future_to_group = {
+                executor.submit(process_order_group, group): group 
+                for group in order_groups
+            }
             
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                future_to_group = {
-                    executor.submit(process_order_group, group): group 
-                    for group in order_groups
-                }
-                
-                for future in as_completed(future_to_group):
-                    try:
-                        result = future.result()
-                        with lock:
-                            processed_orders.extend(result)
-                    except Exception as e:
-                        logger.error(f"Error processing order group: {str(e)}")
+            for future in as_completed(future_to_group):
+                try:
+                    result = future.result()
+                    with lock:
+                        processed_orders.extend(result)
+                except Exception as e:
+                    logger.error(f"Error processing order group: {str(e)}")
         
         return processed_orders
         
@@ -110,7 +103,7 @@ def download_orders_html():
             return redirect(url_for('auth.link_store'))
         
         # استخدام المعالجة المتزامنة مع عدد عمال ديناميكي
-        max_workers = max(1, min(current_app.config.get('MAX_WORKERS', 10), len(order_ids)))
+        max_workers = min(current_app.config.get('MAX_WORKERS', 10), len(order_ids))
         orders = process_orders_concurrently(order_ids, access_token, max_workers)
         
         if not orders:
@@ -160,24 +153,12 @@ def get_quick_list_data():
         logger.info(f"معالجة {len(order_ids)} طلب للقائمة السريعة باستخدام الخيوط")
         
         # استخدام المعالجة المتزامنة مع عدد عمال ديناميكي
-        max_workers = max(1, min(current_app.config.get('MAX_WORKERS', 10), len(order_ids)))
+        max_workers = min(current_app.config.get('MAX_WORKERS', 10), len(order_ids))
         orders = process_orders_concurrently(order_ids, access_token, max_workers)
         
         orders_result = []
         success_count = 0
         error_count = 0
-        
-        # إذا لم توجد طلبات، إرجاع نتيجة فارغة
-        if not orders:
-            return jsonify({
-                'success': True,
-                'orders': [],
-                'stats': {
-                    'total': len(order_ids),
-                    'successful': 0,
-                    'failed': len(order_ids)
-                }
-            })
         
         # معالجة النتائج بشكل متزامن
         def process_single_order(order):
@@ -208,9 +189,8 @@ def get_quick_list_data():
                 logger.error(f"خطأ في معالجة الطلب {order.get('id', '')}: {str(e)}")
                 return None
         
-        # معالجة الطلبات بشكل متزامن - التأكد من أن max_workers لا يكون صفراً
-        max_workers_processing = max(1, min(5, len(orders)))
-        with ThreadPoolExecutor(max_workers=max_workers_processing) as executor:
+        # معالجة الطلبات بشكل متزامن
+        with ThreadPoolExecutor(max_workers=min(5, len(orders))) as executor:
             future_to_order = {
                 executor.submit(process_single_order, order): order 
                 for order in orders
@@ -268,7 +248,7 @@ def download_pdf():
             return redirect(url_for('auth.link_store'))
         
         # استخدام المعالجة المتزامنة مع عدد عمال ديناميكي
-        max_workers = max(1, min(current_app.config.get('MAX_WORKERS', 10), len(order_ids)))
+        max_workers = min(current_app.config.get('MAX_WORKERS', 10), len(order_ids))
         orders = process_orders_concurrently(order_ids, access_token, max_workers)
         
         if not orders:
