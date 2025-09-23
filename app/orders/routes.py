@@ -19,8 +19,7 @@ from flask import send_file
 from io import BytesIO
 import pandas as pd
 from concurrent import futures
-from cryptography.fernet import Fernet
-import base64
+
 import logging
 
 # إعداد المسجل للإنتاج
