@@ -322,6 +322,11 @@
 
       <!-- قسم المعلومات الإضافية -->
  
+     
+    </div>
+  </div>
+</div>
+<!-- في orders.html أو order_details.html -->
     {% if order_address %}
     <div class="address-info">
         <p><strong>الاسم:</strong> {{ order.address.name }}</p>
@@ -333,11 +338,6 @@
     </div>
     {% endif %}
      
-    </div>
-  </div>
-</div>
-<!-- في orders.html أو order_details.html -->
-
    <!-- بدلاً من order.shipping.address -->
 {% if order_address %}
     <div class="address-info">
