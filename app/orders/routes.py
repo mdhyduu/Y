@@ -469,8 +469,19 @@ def order_details(order_id):
             db_data = db_future.result()
 
         processed_order = process_order_data(order_id, items_data)
+        # جلب العنوان مباشرة من قاعدة البيانات
         order_address = OrderAddress.query.filter_by(order_id=str(order_id)).first()
         
+        full_address = 'لم يتم تحديد العنوان'
+        receiver_info = {}
+        
+        if order_address:
+            full_address = order_address.full_address or full_address
+            receiver_info = {
+                'name': order_address.name,
+                'phone': order_address.phone,
+                'email': ''  # إذا حبيت أضيف حقل email في OrderAddress
+            }
         address_data = {}
         full_address = 'لم يتم تحديد العنوان'
 
