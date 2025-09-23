@@ -19,7 +19,7 @@ import time
 import psycopg2
 from threading import Lock
 import queue
-
+from flask import has_app_context
 # إعداد المسجل للإنتاج
 logger = logging.getLogger(__name__)
 
@@ -197,31 +197,29 @@ def generate_barcode(data):
 def get_cached_barcode_data(order_id):
     """الحصول على بيانات الباركود من التخزين المؤقت"""
     try:
-        order_id_str = str(order_id).strip()
-        if not order_id_str:
-            return None
-        
-        order = SallaOrder.query.filter_by(id=order_id_str).first()
-        
-        if order and order.barcode_data:
-            barcode_data = order.barcode_data
-            
-            if barcode_data.startswith('data:image'):
-                return barcode_data
-            elif barcode_data.startswith('iVBOR'):
-                fixed_barcode = f"data:image/png;base64,{barcode_data}"
-                return fixed_barcode
-            else:
+        with app_context():
+            order_id_str = str(order_id).strip()
+            if not order_id_str:
                 return None
+            
+            order = SallaOrder.query.filter_by(id=order_id_str).first()
+            
+            if order and order.barcode_data:
+                barcode_data = order.barcode_data
                 
-        return None
-        
+                if barcode_data.startswith('data:image'):
+                    return barcode_data
+                elif barcode_data.startswith('iVBOR'):
+                    fixed_barcode = f"data:image/png;base64,{barcode_data}"
+                    return fixed_barcode
+                else:
+                    return None
+                    
+            return None
+            
     except Exception as e:
         logger.error(f"Error in get_cached_barcode_data: {str(e)}")
         return None
-    finally:
-        db.session.remove()
-
 def get_barcodes_for_orders_optimized(order_ids):
     """نسخة محسنة من دالة جلب الباركودات باستخدام PostgreSQL Connection Pool"""
     try:
@@ -264,34 +262,32 @@ def get_barcodes_for_orders_optimized(order_ids):
 def get_barcodes_for_orders_fallback(order_ids):
     """طريقة احتياطية لجلب الباركودات"""
     try:
-        if not order_ids:
-            return {}
-        
-        order_ids_str = [str(oid).strip() for oid in order_ids if str(oid).strip()]
-        
-        if not order_ids_str:
-            return {}
+        with app_context():
+            if not order_ids:
+                return {}
             
-        orders = SallaOrder.query.filter(SallaOrder.id.in_(order_ids_str)).all()
-        
-        barcodes_map = {}
-        for order in orders:
-            if order.barcode_data:
-                barcode_data = order.barcode_data
+            order_ids_str = [str(oid).strip() for oid in order_ids if str(oid).strip()]
+            
+            if not order_ids_str:
+                return {}
                 
-                if not barcode_data.startswith('data:image') and barcode_data.startswith('iVBOR'):
-                    barcode_data = f"data:image/png;base64,{barcode_data}"
-                
-                barcodes_map[str(order.id)] = barcode_data
-        
-        return barcodes_map
-        
+            orders = SallaOrder.query.filter(SallaOrder.id.in_(order_ids_str)).all()
+            
+            barcodes_map = {}
+            for order in orders:
+                if order.barcode_data:
+                    barcode_data = order.barcode_data
+                    
+                    if not barcode_data.startswith('data:image') and barcode_data.startswith('iVBOR'):
+                        barcode_data = f"data:image/png;base64,{barcode_data}"
+                    
+                    barcodes_map[str(order.id)] = barcode_data
+            
+            return barcodes_map
+            
     except Exception as e:
         logger.error(f"Error in get_barcodes_for_orders_fallback: {str(e)}")
         return {}
-    finally:
-        db.session.remove()
-
 def get_barcodes_for_orders(order_ids):
     """واجهة موحدة لجلب الباركودات (تستخدم النسخة المحسنة)"""
     return get_barcodes_for_orders_optimized(order_ids)
@@ -591,8 +587,9 @@ def db_session_scope():
         db.session.remove()
 
 def process_orders_concurrently(order_ids, access_token, max_workers=10):
-    """معالجة الطلبات بشكل متزامن باستخدام ThreadPoolExecutor"""
+    """معالجة الطلبات بشكل متزامن مع إدارة سياق التطبيق"""
     from .config import Config
+    from flask import current_app
     
     if not order_ids:
         return []
@@ -603,8 +600,11 @@ def process_orders_concurrently(order_ids, access_token, max_workers=10):
     orders = []
     successful_orders = 0
     failed_orders = 0
-    lock = Lock()  # لحماية المتغيرات المشتركة
+    lock = Lock()
 
+    
+    # استخدام ThreadPoolExecutor للمعالجة المتزامنة
+    
     def process_single_order(order_id):
         nonlocal successful_orders, failed_orders
         order_id_str = str(order_id).strip()
@@ -676,7 +676,7 @@ def process_orders_concurrently(order_ids, access_token, max_workers=10):
     # استخدام ThreadPoolExecutor للمعالجة المتزامنة
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # تقديم جميع المهام مرة واحدة
-        future_to_order = {executor.submit(process_single_order, order_id): order_id for order_id in order_ids}
+        future_to_order = {executor.submit(process_single_order_wrapper, order_id): order_id for order_id in order_ids}
         
         # جمع النتائج عند اكتمالها
         for future in as_completed(future_to_order):
