@@ -19,8 +19,6 @@ import time
 import psycopg2
 from threading import Lock
 import queue
-from flask import current_app, copy_current_app_context
-import threading
 
 # إعداد المسجل للإنتاج
 logger = logging.getLogger(__name__)
@@ -196,51 +194,33 @@ def generate_barcode(data):
         logger.error(f"Error in generate_barcode: {str(e)}")
         return None
 
-
-
-# Add this context manager for application context
-@contextmanager
-def app_context():
-    """Application context manager for threaded operations"""
-    app = current_app._get_current_object()
-    with app.app_context():
-        yield
-
 def get_cached_barcode_data(order_id):
-    """الحصول على بيانات الباركود من التخزين المؤقت مع تطبيق السياق"""
+    """الحصول على بيانات الباركود من التخزين المؤقت"""
     try:
-        # Use application context explicitly
-        app = current_app._get_current_object()
-        with app.app_context():
-            order_id_str = str(order_id).strip()
-            if not order_id_str:
-                return None
-            
-            order = SallaOrder.query.filter_by(id=order_id_str).first()
-            
-            if order and order.barcode_data:
-                barcode_data = order.barcode_data
-                
-                if barcode_data.startswith('data:image'):
-                    return barcode_data
-                elif barcode_data.startswith('iVBOR'):
-                    fixed_barcode = f"data:image/png;base64,{barcode_data}"
-                    return fixed_barcode
-                else:
-                    return None
-                    
+        order_id_str = str(order_id).strip()
+        if not order_id_str:
             return None
+        
+        order = SallaOrder.query.filter_by(id=order_id_str).first()
+        
+        if order and order.barcode_data:
+            barcode_data = order.barcode_data
             
-    except RuntimeError as e:
-        if "working outside of application context" in str(e):
-            # Fallback to direct database connection without Flask context
-            return get_cached_barcode_data_fallback(order_id)
-        logger.error(f"Error in get_cached_barcode_data: {str(e)}")
+            if barcode_data.startswith('data:image'):
+                return barcode_data
+            elif barcode_data.startswith('iVBOR'):
+                fixed_barcode = f"data:image/png;base64,{barcode_data}"
+                return fixed_barcode
+            else:
+                return None
+                
         return None
+        
     except Exception as e:
         logger.error(f"Error in get_cached_barcode_data: {str(e)}")
         return None
-
+    finally:
+        db.session.remove()
 
 def get_barcodes_for_orders_optimized(order_ids):
     """نسخة محسنة من دالة جلب الباركودات باستخدام PostgreSQL Connection Pool"""
@@ -281,36 +261,37 @@ def get_barcodes_for_orders_optimized(order_ids):
         # Fallback إلى الطريقة العادية
         return get_barcodes_for_orders_fallback(order_ids)
 
-def get_cached_barcode_data_fallback(order_id):
-    """Fallback method without Flask application context"""
+def get_barcodes_for_orders_fallback(order_ids):
+    """طريقة احتياطية لجلب الباركودات"""
     try:
-        order_id_str = str(order_id).strip()
-        if not order_id_str:
-            return None
+        if not order_ids:
+            return {}
         
-        # Use raw SQL connection without Flask-SQLAlchemy
-        engine = get_postgres_engine()
-        with engine.connect() as conn:
-            query = text("""
-                SELECT barcode_data 
-                FROM salla_orders 
-                WHERE id = :order_id
-            """)
-            result = conn.execute(query, {'order_id': order_id_str})
-            row = result.fetchone()
+        order_ids_str = [str(oid).strip() for oid in order_ids if str(oid).strip()]
+        
+        if not order_ids_str:
+            return {}
             
-            if row and row[0]:
-                barcode_data = row[0]
-                if barcode_data.startswith('data:image'):
-                    return barcode_data
-                elif barcode_data.startswith('iVBOR'):
-                    return f"data:image/png;base64,{barcode_data}"
-            
-        return None
+        orders = SallaOrder.query.filter(SallaOrder.id.in_(order_ids_str)).all()
+        
+        barcodes_map = {}
+        for order in orders:
+            if order.barcode_data:
+                barcode_data = order.barcode_data
+                
+                if not barcode_data.startswith('data:image') and barcode_data.startswith('iVBOR'):
+                    barcode_data = f"data:image/png;base64,{barcode_data}"
+                
+                barcodes_map[str(order.id)] = barcode_data
+        
+        return barcodes_map
         
     except Exception as e:
-        logger.error(f"Error in get_cached_barcode_data_fallback: {str(e)}")
-        return None
+        logger.error(f"Error in get_barcodes_for_orders_fallback: {str(e)}")
+        return {}
+    finally:
+        db.session.remove()
+
 def get_barcodes_for_orders(order_ids):
     """واجهة موحدة لجلب الباركودات (تستخدم النسخة المحسنة)"""
     return get_barcodes_for_orders_optimized(order_ids)
@@ -494,7 +475,7 @@ def format_date(date_str):
         return date_str if date_str else 'غير معروف'
 
 def process_order_data(order_id, items_data, barcode_data=None):
-    """معالجة بيانات الطلب مع استخدام الباركود المخزن ومعالجة السياق"""
+    """معالجة بيانات الطلب مع استخدام الباركود المخزن"""
     try:
         order_id_str = str(order_id).strip()
         if not order_id_str:
@@ -572,7 +553,7 @@ def process_order_data(order_id, items_data, barcode_data=None):
                 logger.error(f"Error processing item: {str(item_error)}")
                 continue
 
-        # الحصول على الباركود - استخدام النسخة المحسنة التي تتعامل مع السياق
+        # الحصول على الباركود
         final_barcode_data = barcode_data
         
         if not final_barcode_data:
@@ -610,22 +591,19 @@ def db_session_scope():
         db.session.remove()
 
 def process_orders_concurrently(order_ids, access_token, max_workers=10):
-    """معالجة الطلبات بشكل متزامن مع التعامل مع سياق التطبيق"""
+    """معالجة الطلبات بشكل متزامن باستخدام ThreadPoolExecutor"""
     from .config import Config
     
     if not order_ids:
         return []
     
-    # جلب جميع الباركودات مسبقاً في استعلام واحد (يتم في السياق الرئيسي)
+    # جلب جميع الباركودات مسبقاً في استعلام واحد
     barcodes_map = get_barcodes_for_orders(order_ids)
     
     orders = []
     successful_orders = 0
     failed_orders = 0
-    lock = Lock()
-
-    # الحصول على كائن التطبيق الحالي للاستخدام في الخيوط
-    app = current_app._get_current_object()
+    lock = Lock()  # لحماية المتغيرات المشتركة
 
     def process_single_order(order_id):
         nonlocal successful_orders, failed_orders
@@ -634,58 +612,56 @@ def process_orders_concurrently(order_ids, access_token, max_workers=10):
             return None
             
         try:
-            # استخدام سياق التطبيق في الخيط
-            with app.app_context():
-                # إنشاء جلسة مستقلة لكل خيط
-                session = create_session()
-                headers = {
-                    'Authorization': f'Bearer {access_token}',
-                    'Accept': 'application/json'
-                }
+            # إنشاء جلسة مستقلة لكل خيط
+            session = create_session()
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Accept': 'application/json'
+            }
+            
+            # جلب بيانات الطلب
+            order_response = session.get(
+                f"{Config.SALLA_ORDERS_API}/{order_id_str}",
+                headers=headers,
+                timeout=15
+            )
+            
+            if order_response.status_code != 200:
+                with lock:
+                    failed_orders += 1
+                return None
                 
-                # جلب بيانات الطلب
-                order_response = session.get(
-                    f"{Config.SALLA_ORDERS_API}/{order_id_str}",
-                    headers=headers,
-                    timeout=15
-                )
+            order_data = order_response.json().get('data', {})
+            
+            # جلب بيانات العناصر
+            items_response = session.get(
+                f"{Config.SALLA_BASE_URL}/orders/items",
+                params={'order_id': order_id_str},
+                headers=headers,
+                timeout=15
+            )
+            
+            items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
+            
+            # استخدام الباركود المخزن مسبقاً
+            barcode_data = barcodes_map.get(order_id_str)
+            
+            # معالجة بيانات الطلب
+            processed_order = process_order_data(order_id_str, items_data, barcode_data)
+            
+            if processed_order:
+                processed_order['reference_id'] = order_data.get('reference_id', order_id_str)
+                processed_order['customer'] = order_data.get('customer', {})
+                processed_order['created_at'] = format_date(order_data.get('created_at', ''))
                 
-                if order_response.status_code != 200:
-                    with lock:
-                        failed_orders += 1
-                    return None
-                    
-                order_data = order_response.json().get('data', {})
+                with lock:
+                    successful_orders += 1
+                return processed_order
+            else:
+                with lock:
+                    failed_orders += 1
+                return None
                 
-                # جلب بيانات العناصر
-                items_response = session.get(
-                    f"{Config.SALLA_BASE_URL}/orders/items",
-                    params={'order_id': order_id_str},
-                    headers=headers,
-                    timeout=15
-                )
-                
-                items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
-                
-                # استخدام الباركود المخزن مسبقاً
-                barcode_data = barcodes_map.get(order_id_str)
-                
-                # معالجة بيانات الطلب
-                processed_order = process_order_data(order_id_str, items_data, barcode_data)
-                
-                if processed_order:
-                    processed_order['reference_id'] = order_data.get('reference_id', order_id_str)
-                    processed_order['customer'] = order_data.get('customer', {})
-                    processed_order['created_at'] = format_date(order_data.get('created_at', ''))
-                    
-                    with lock:
-                        successful_orders += 1
-                    return processed_order
-                else:
-                    with lock:
-                        failed_orders += 1
-                    return None
-                    
         except Exception as e:
             with lock:
                 failed_orders += 1
@@ -785,40 +761,3 @@ def cleanup_resources():
         logger.info("Database resources cleaned up")
     except Exception as e:
         logger.error(f"Error cleaning up resources: {str(e)}")
-        
-def get_barcodes_for_orders_thread_safe(order_ids):
-    """نسخة آمنة للخيوط من دالة جلب الباركودات"""
-    try:
-        if not order_ids:
-            return {}
-        
-        order_ids_str = [str(oid).strip() for oid in order_ids if str(oid).strip()]
-        
-        if not order_ids_str:
-            return {}
-            
-        # استخدام connection pool مباشرة بدون الاعتماد على سياق Flask
-        engine = get_postgres_engine()
-        with engine.connect() as conn:
-            query = text("""
-                SELECT id, barcode_data 
-                FROM salla_orders 
-                WHERE id = ANY(:order_ids)
-            """)
-            
-            result = conn.execute(query, {'order_ids': order_ids_str})
-            rows = result.fetchall()
-            
-            barcodes_map = {}
-            for row in rows:
-                barcode_data = row[1]
-                if barcode_data:
-                    if not barcode_data.startswith('data:image') and barcode_data.startswith('iVBOR'):
-                        barcode_data = f"data:image/png;base64,{barcode_data}"
-                    barcodes_map[str(row[0])] = barcode_data
-            
-            return barcodes_map
-            
-    except Exception as e:
-        logger.error(f"Error in get_barcodes_for_orders_thread_safe: {str(e)}")
-        return {}
