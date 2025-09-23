@@ -132,18 +132,15 @@ def download_orders_html():
         flash('حدث خطأ أثناء إنشاء المعاينة', 'error')
         return redirect(url_for('orders.index'))
 
-
 @orders_bp.route('/get_quick_list_data', methods=['POST'])
 def get_quick_list_data():
     """جلب بيانات القائمة السريعة مع إصلاح سياق التطبيق"""
     try:
-        with current_app.app_context():  # إضافة سياق التطبيق
-            user, employee = get_user_from_cookies()
-            
-            if not user:
-                return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
-            
-   
+        # Remove the manual app_context() call as it's not needed here
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
         
         data = request.get_json()
         
@@ -169,7 +166,6 @@ def get_quick_list_data():
         success_count = 0
         error_count = 0
         
-        # إذا لم توجد طلبات، إرجاع نتيجة فارغة
         if not orders:
             return jsonify({
                 'success': True,
@@ -181,36 +177,40 @@ def get_quick_list_data():
                 }
             })
         
-        # معالجة النتائج بشكل متزامن
+        # الحصول على كائن التطبيق للاستخدام في الخيوط
+        app = current_app._get_current_object()
+        
         def process_single_order(order):
             nonlocal success_count, error_count
             try:
-                processed_items = []
-                for item in order.get('order_items', []):
-                    processed_items.append({
-                        'name': item.get('name', ''),
-                        'quantity': item.get('quantity', 0),
-                        'main_image': item.get('main_image', ''),
-                        'sku': item.get('sku', ''),
-                        'price': item.get('price', {}).get('amount', 0)
-                    })
-                
-                order_data = {
-                    'id': order.get('id', ''),
-                    'reference_id': order.get('reference_id', order.get('id', '')),
-                    'items': processed_items,
-                    'customer_name': order.get('customer', {}).get('name', ''),
-                    'created_at': order.get('created_at', '')
-                }
-                success_count += 1
-                return order_data
-                
+                # استخدام سياق التطبيق في الخيط
+                with app.app_context():
+                    processed_items = []
+                    for item in order.get('order_items', []):
+                        processed_items.append({
+                            'name': item.get('name', ''),
+                            'quantity': item.get('quantity', 0),
+                            'main_image': item.get('main_image', ''),
+                            'sku': item.get('sku', ''),
+                            'price': item.get('price', {}).get('amount', 0)
+                        })
+                    
+                    order_data = {
+                        'id': order.get('id', ''),
+                        'reference_id': order.get('reference_id', order.get('id', '')),
+                        'items': processed_items,
+                        'customer_name': order.get('customer', {}).get('name', ''),
+                        'created_at': order.get('created_at', '')
+                    }
+                    success_count += 1
+                    return order_data
+                    
             except Exception as e:
                 error_count += 1
                 logger.error(f"خطأ في معالجة الطلب {order.get('id', '')}: {str(e)}")
                 return None
         
-        # معالجة الطلبات بشكل متزامن - التأكد من أن max_workers لا يكون صفراً
+        # معالجة الطلبات بشكل متزامن
         max_workers_processing = max(1, min(5, len(orders)))
         with ThreadPoolExecutor(max_workers=max_workers_processing) as executor:
             future_to_order = {
@@ -239,7 +239,6 @@ def get_quick_list_data():
         logger.error(f"خطأ في جلب بيانات القائمة السريعة: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': 'حدث خطأ أثناء جلب البيانات'}), 500
-
 @orders_bp.route('/download_pdf')
 def download_pdf():
     """تحميل الطلبات كملف PDF للإنتاج - نسخة محسنة"""
