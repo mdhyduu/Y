@@ -338,7 +338,21 @@
 </div>
 <!-- في orders.html أو order_details.html -->
 
-    
+   <!-- بدلاً من order.shipping.address -->
+{% if order_address %}
+    <div class="address-info">
+        <h4>العنوان المحفوظ:</h4>
+        <p><strong>الاسم:</strong> {{ order_address.name }}</p>
+        <p><strong>الهاتف:</strong> {{ order_address.phone }}</p>
+        <p><strong>العنوان:</strong> {{ order_address.full_address }}</p>
+        <p><strong>المدينة:</strong> {{ order_address.city }}</p>
+        <p><strong>البلد:</strong> {{ order_address.country }}</p>
+    </div>
+{% else %}
+    <div class="address-info">
+        <p>لم يتم حفظ عنوان لهذا الطلب بعد</p>
+    </div>
+{% endif %} 
 
 
 <style>
