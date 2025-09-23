@@ -20,11 +20,20 @@ import psycopg2
 from threading import Lock
 import queue
 from flask import has_app_context
+
 # إعداد المسجل للإنتاج
 logger = logging.getLogger(__name__)
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 UPLOAD_FOLDER = 'static/uploads/custom_orders'
+
+@contextmanager
+def app_context():
+    """مدير سياق للتطبيق لاستخدامه في الخيوط"""
+    from flask import current_app
+    app = current_app._get_current_object()
+    with app.app_context():
+        yield
 
 # إعداد محرك PostgreSQL مع Connection Pool
 def create_postgresql_engine():
@@ -68,14 +77,15 @@ def allowed_file(filename):
 def get_next_order_number():
     """إنشاء رقم طلب تلقائي يبدأ من 1000"""
     try:
-        last_order = CustomOrder.query.order_by(CustomOrder.id.desc()).first()
-        if last_order and last_order.order_number:
-            try:
-                last_number = int(last_order.order_number)
-                return str(last_number + 1)
-            except ValueError:
-                return str(last_order.id + 1000)
-        return "1000"
+        with app_context():
+            last_order = CustomOrder.query.order_by(CustomOrder.id.desc()).first()
+            if last_order and last_order.order_number:
+                try:
+                    last_number = int(last_order.order_number)
+                    return str(last_number + 1)
+                except ValueError:
+                    return str(last_order.id + 1000)
+            return "1000"
     except Exception as e:
         logger.error(f"Error in get_next_order_number: {str(e)}")
         return "1000"
@@ -92,15 +102,16 @@ def get_user_from_cookies():
         return None, None
     
     try:
-        if is_admin:
-            user = User.query.get(int(user_id))
-            return user, None
-        else:
-            employee = Employee.query.get(int(user_id))
-            if employee:
-                user = User.query.filter_by(store_id=employee.store_id).first()
-                return user, employee
-            return None, None
+        with app_context():
+            if is_admin:
+                user = User.query.get(int(user_id))
+                return user, None
+            else:
+                employee = Employee.query.get(int(user_id))
+                if employee:
+                    user = User.query.filter_by(store_id=employee.store_id).first()
+                    return user, employee
+                return None, None
     except (ValueError, TypeError) as e:
         logger.error(f"Error in get_user_from_cookies: {str(e)}")
         return None, None
@@ -220,6 +231,7 @@ def get_cached_barcode_data(order_id):
     except Exception as e:
         logger.error(f"Error in get_cached_barcode_data: {str(e)}")
         return None
+
 def get_barcodes_for_orders_optimized(order_ids):
     """نسخة محسنة من دالة جلب الباركودات باستخدام PostgreSQL Connection Pool"""
     try:
@@ -288,63 +300,107 @@ def get_barcodes_for_orders_fallback(order_ids):
     except Exception as e:
         logger.error(f"Error in get_barcodes_for_orders_fallback: {str(e)}")
         return {}
+
 def get_barcodes_for_orders(order_ids):
     """واجهة موحدة لجلب الباركودات (تستخدم النسخة المحسنة)"""
     return get_barcodes_for_orders_optimized(order_ids)
 
-def generate_and_store_barcode(order_id, order_type='salla'):
-    """إنشاء باركود مع التخزين"""
+def generate_and_store_barcode(order_id, order_type='salla', store_id=None):
+    """إنشاء باركود مع التخزين - معدل لمعالجة مشكلة store_id"""
     try:
-        order_id_str = str(order_id).strip()
-        if not order_id_str:
-            return None
-        
-        barcode_data = generate_barcode(order_id_str)
-        
-        if not barcode_data:
-            return None
-        
-        # محاولة التخزين في قاعدة البيانات باستخدام Connection Pool
-        try:
-            engine = get_postgres_engine()
-            with engine.connect() as conn:
-                if order_type == 'salla':
-                    # استخدام INSERT ON CONFLICT لتحديث السجلات الموجودة
-                    query = text("""
-                        INSERT INTO salla_orders (id, barcode_data, barcode_generated_at)
-                        VALUES (:id, :barcode_data, :barcode_generated_at)
-                        ON CONFLICT (id) 
-                        DO UPDATE SET 
-                            barcode_data = EXCLUDED.barcode_data,
-                            barcode_generated_at = EXCLUDED.barcode_generated_at
-                    """)
-                else:
-                    query = text("""
-                        INSERT INTO custom_order (id, barcode_data, barcode_generated_at)
-                        VALUES (:id, :barcode_data, :barcode_generated_at)
-                        ON CONFLICT (id) 
-                        DO UPDATE SET 
-                            barcode_data = EXCLUDED.barcode_data,
-                            barcode_generated_at = EXCLUDED.barcode_generated_at
-                    """)
-                
-                conn.execute(query, {
-                    'id': order_id_str,
-                    'barcode_data': barcode_data,
-                    'barcode_generated_at': datetime.utcnow()
-                })
-                conn.commit()
-                
-        except Exception as storage_error:
-            logger.error(f"Error storing barcode: {str(storage_error)}")
-        
-        return barcode_data
+        with app_context():
+            order_id_str = str(order_id).strip()
+            if not order_id_str:
+                return None
             
+            barcode_data = generate_barcode(order_id_str)
+            
+            if not barcode_data:
+                return None
+            
+            # محاولة التخزين في قاعدة البيانات باستخدام Connection Pool
+            try:
+                engine = get_postgres_engine()
+                with engine.connect() as conn:
+                    if order_type == 'salla':
+                        # استخدام INSERT ON CONFLICT مع توفير store_id
+                        # إذا لم يتم توفير store_id، نحاول الحصول عليه من الطلب الموجود
+                        query = text("""
+                            INSERT INTO salla_orders (id, store_id, barcode_data, barcode_generated_at)
+                            VALUES (:id, :store_id, :barcode_data, :barcode_generated_at)
+                            ON CONFLICT (id) 
+                            DO UPDATE SET 
+                                barcode_data = EXCLUDED.barcode_data,
+                                barcode_generated_at = EXCLUDED.barcode_generated_at
+                        """)
+                        
+                        # محاولة الحصول على store_id من الطلب الموجود إذا لم يتم توفيره
+                        if store_id is None:
+                            existing_order_query = text("SELECT store_id FROM salla_orders WHERE id = :id")
+                            result = conn.execute(existing_order_query, {'id': order_id_str})
+                            existing_order = result.fetchone()
+                            if existing_order and existing_order[0]:
+                                store_id = existing_order[0]
+                    
+                    else:
+                        query = text("""
+                            INSERT INTO custom_order (id, barcode_data, barcode_generated_at)
+                            VALUES (:id, :barcode_data, :barcode_generated_at)
+                            ON CONFLICT (id) 
+                            DO UPDATE SET 
+                                barcode_data = EXCLUDED.barcode_data,
+                                barcode_generated_at = EXCLUDED.barcode_generated_at
+                        """)
+                    
+                    params = {
+                        'id': order_id_str,
+                        'barcode_data': barcode_data,
+                        'barcode_generated_at': datetime.utcnow()
+                    }
+                    
+                    if order_type == 'salla' and store_id is not None:
+                        params['store_id'] = store_id
+                    
+                    conn.execute(query, params)
+                    conn.commit()
+                    
+            except Exception as storage_error:
+                logger.error(f"Error storing barcode: {str(storage_error)}")
+                # محاولة التحديث فقط إذا فشل الإدراج
+                try:
+                    engine = get_postgres_engine()
+                    with engine.connect() as conn:
+                        if order_type == 'salla':
+                            update_query = text("""
+                                UPDATE salla_orders 
+                                SET barcode_data = :barcode_data, 
+                                    barcode_generated_at = :barcode_generated_at
+                                WHERE id = :id
+                            """)
+                        else:
+                            update_query = text("""
+                                UPDATE custom_order 
+                                SET barcode_data = :barcode_data, 
+                                    barcode_generated_at = :barcode_generated_at
+                                WHERE id = :id
+                            """)
+                        
+                        conn.execute(update_query, {
+                            'id': order_id_str,
+                            'barcode_data': barcode_data,
+                            'barcode_generated_at': datetime.utcnow()
+                        })
+                        conn.commit()
+                except Exception as update_error:
+                    logger.error(f"Error updating barcode: {str(update_error)}")
+            
+            return barcode_data
+                
     except Exception as e:
         logger.error(f"Error in generate_and_store_barcode: {str(e)}")
         return None
 
-def bulk_generate_and_store_barcodes(order_ids, order_type='salla'):
+def bulk_generate_and_store_barcodes(order_ids, order_type='salla', store_id=None):
     """إنشاء وتخزين الباركودات بشكل مجمع باستخدام الخيوط"""
     try:
         if not order_ids:
@@ -367,7 +423,8 @@ def bulk_generate_and_store_barcodes(order_ids, order_type='salla'):
                         records_to_update.append({
                             'id': order_id_str,
                             'barcode_data': barcode_data,
-                            'barcode_generated_at': datetime.utcnow()
+                            'barcode_generated_at': datetime.utcnow(),
+                            'store_id': store_id
                         })
                     return order_id_str, barcode_data
             except Exception as e:
@@ -386,33 +443,67 @@ def bulk_generate_and_store_barcodes(order_ids, order_type='salla'):
         # تخزين مجمع في PostgreSQL
         if records_to_update:
             try:
-                engine = get_postgres_engine()
-                with engine.connect() as conn:
-                    if order_type == 'salla':
-                        query = text("""
-                            INSERT INTO salla_orders (id, barcode_data, barcode_generated_at)
-                            VALUES (:id, :barcode_data, :barcode_generated_at)
-                            ON CONFLICT (id) 
-                            DO UPDATE SET 
-                                barcode_data = EXCLUDED.barcode_data,
-                                barcode_generated_at = EXCLUDED.barcode_generated_at
-                        """)
-                    else:
-                        query = text("""
-                            INSERT INTO custom_order (id, barcode_data, barcode_generated_at)
-                            VALUES (:id, :barcode_data, :barcode_generated_at)
-                            ON CONFLICT (id) 
-                            DO UPDATE SET 
-                                barcode_data = EXCLUDED.barcode_data,
-                                barcode_generated_at = EXCLUDED.barcode_generated_at
-                        """)
-                    
-                    # التخزين المجمع
-                    conn.execute(query, records_to_update)
-                    conn.commit()
-                    
+                with app_context():
+                    engine = get_postgres_engine()
+                    with engine.connect() as conn:
+                        if order_type == 'salla':
+                            query = text("""
+                                INSERT INTO salla_orders (id, store_id, barcode_data, barcode_generated_at)
+                                VALUES (:id, :store_id, :barcode_data, :barcode_generated_at)
+                                ON CONFLICT (id) 
+                                DO UPDATE SET 
+                                    barcode_data = EXCLUDED.barcode_data,
+                                    barcode_generated_at = EXCLUDED.barcode_generated_at
+                            """)
+                        else:
+                            query = text("""
+                                INSERT INTO custom_order (id, barcode_data, barcode_generated_at)
+                                VALUES (:id, :barcode_data, :barcode_generated_at)
+                                ON CONFLICT (id) 
+                                DO UPDATE SET 
+                                    barcode_data = EXCLUDED.barcode_data,
+                                    barcode_generated_at = EXCLUDED.barcode_generated_at
+                            """)
+                        
+                        # التخزين المجمع
+                        conn.execute(query, records_to_update)
+                        conn.commit()
+                        
             except Exception as e:
                 logger.error(f"Error in bulk barcode storage: {str(e)}")
+                # محاولة التحديث الفردي للطلبات التي فشل تخزينها
+                try:
+                    with app_context():
+                        engine = get_postgres_engine()
+                        with engine.connect() as conn:
+                            if order_type == 'salla':
+                                update_query = text("""
+                                    UPDATE salla_orders 
+                                    SET barcode_data = :barcode_data, 
+                                        barcode_generated_at = :barcode_generated_at
+                                    WHERE id = :id
+                                """)
+                            else:
+                                update_query = text("""
+                                    UPDATE custom_order 
+                                    SET barcode_data = :barcode_data, 
+                                        barcode_generated_at = :barcode_generated_at
+                                    WHERE id = :id
+                                """)
+                            
+                            for record in records_to_update:
+                                try:
+                                    conn.execute(update_query, {
+                                        'id': record['id'],
+                                        'barcode_data': record['barcode_data'],
+                                        'barcode_generated_at': record['barcode_generated_at']
+                                    })
+                                except Exception as single_update_error:
+                                    logger.error(f"Error updating barcode for {record['id']}: {str(single_update_error)}")
+                            
+                            conn.commit()
+                except Exception as update_error:
+                    logger.error(f"Error in bulk barcode update: {str(update_error)}")
         
         return barcodes_map
             
@@ -470,105 +561,106 @@ def format_date(date_str):
         logger.warning(f"Failed to format date: {str(e)}")
         return date_str if date_str else 'غير معروف'
 
-def process_order_data(order_id, items_data, barcode_data=None):
+def process_order_data(order_id, items_data, barcode_data=None, store_id=None):
     """معالجة بيانات الطلب مع استخدام الباركود المخزن"""
     try:
-        order_id_str = str(order_id).strip()
-        if not order_id_str:
-            return None
+        with app_context():
+            order_id_str = str(order_id).strip()
+            if not order_id_str:
+                return None
+                
+            items = []
             
-        items = []
-        
-        for index, item in enumerate(items_data):
-            try:
-                item_id = item.get('id') or f"temp_{index}"
-                main_image = get_main_image(item)
-                
-                options = []
-                item_options = item.get('options', [])
-                if isinstance(item_options, list):
-                    for option in item_options:
-                        raw_value = option.get('value', '')
-                        display_value = 'غير محدد'
-                        
-                        if isinstance(raw_value, dict):
-                            display_value = raw_value.get('name') or raw_value.get('value') or str(raw_value)
-                        elif isinstance(raw_value, list):
-                            values_list = [str(opt.get('name') or opt.get('value') or str(opt)) 
-                                         for opt in raw_value if isinstance(opt, (dict, str))]
-                            display_value = ', '.join(values_list)
-                        else:
-                            display_value = str(raw_value) if raw_value else 'غير محدد'
-                        
-                        options.append({
-                            'name': option.get('name', ''),
-                            'value': display_value,
-                            'type': option.get('type', '')
-                        })
-                
-                digital_codes = [{'code': code.get('code', ''), 'status': code.get('status', 'غير معروف')} 
-                                for code in item.get('codes', []) if isinstance(code, dict)]
-                
-                digital_files = [{'url': file.get('url', ''), 'name': file.get('name', ''), 'size': file.get('size', 0)} 
-                               for file in item.get('files', []) if isinstance(file, dict)]
-                
-                reservations = [{'id': res.get('id'), 'from': res.get('from', ''), 'to': res.get('to', ''), 'date': res.get('date', '')} 
-                              for res in item.get('reservations', []) if isinstance(res, dict)]
-                
-                item_data = {
-                    'id': item_id,
-                    'name': item.get('name', ''),
-                    'sku': item.get('sku', ''),
-                    'quantity': item.get('quantity', 0),
-                    'currency': item.get('currency', 'SAR'),
-                    'price': {
-                        'amount': item.get('amounts', {}).get('price_without_tax', {}).get('amount', 0),
-                        'currency': item.get('currency', 'SAR')
-                    },
-                    'tax_percent': item.get('amounts', {}).get('tax', {}).get('percent', '0.00'),
-                    'tax_amount': item.get('amounts', {}).get('tax', {}).get('amount', {}).get('amount', 0),
-                    'total_price': item.get('amounts', {}).get('total', {}).get('amount', 0),
-                    'weight': item.get('weight', 0),
-                    'weight_label': item.get('weight_label', ''),
-                    'notes': item.get('notes', ''),
-                    'options': options,
-                    'main_image': main_image,
-                    'codes': digital_codes,
-                    'files': digital_files,
-                    'reservations': reservations,
-                    'product': {
+            for index, item in enumerate(items_data):
+                try:
+                    item_id = item.get('id') or f"temp_{index}"
+                    main_image = get_main_image(item)
+                    
+                    options = []
+                    item_options = item.get('options', [])
+                    if isinstance(item_options, list):
+                        for option in item_options:
+                            raw_value = option.get('value', '')
+                            display_value = 'غير محدد'
+                            
+                            if isinstance(raw_value, dict):
+                                display_value = raw_value.get('name') or raw_value.get('value') or str(raw_value)
+                            elif isinstance(raw_value, list):
+                                values_list = [str(opt.get('name') or opt.get('value') or str(opt)) 
+                                             for opt in raw_value if isinstance(opt, (dict, str))]
+                                display_value = ', '.join(values_list)
+                            else:
+                                display_value = str(raw_value) if raw_value else 'غير محدد'
+                            
+                            options.append({
+                                'name': option.get('name', ''),
+                                'value': display_value,
+                                'type': option.get('type', '')
+                            })
+                    
+                    digital_codes = [{'code': code.get('code', ''), 'status': code.get('status', 'غير معروف')} 
+                                    for code in item.get('codes', []) if isinstance(code, dict)]
+                    
+                    digital_files = [{'url': file.get('url', ''), 'name': file.get('name', ''), 'size': file.get('size', 0)} 
+                                   for file in item.get('files', []) if isinstance(file, dict)]
+                    
+                    reservations = [{'id': res.get('id'), 'from': res.get('from', ''), 'to': res.get('to', ''), 'date': res.get('date', '')} 
+                                  for res in item.get('reservations', []) if isinstance(res, dict)]
+                    
+                    item_data = {
                         'id': item_id,
                         'name': item.get('name', ''),
-                        'description': item.get('notes', '')
+                        'sku': item.get('sku', ''),
+                        'quantity': item.get('quantity', 0),
+                        'currency': item.get('currency', 'SAR'),
+                        'price': {
+                            'amount': item.get('amounts', {}).get('price_without_tax', {}).get('amount', 0),
+                            'currency': item.get('currency', 'SAR')
+                        },
+                        'tax_percent': item.get('amounts', {}).get('tax', {}).get('percent', '0.00'),
+                        'tax_amount': item.get('amounts', {}).get('tax', {}).get('amount', {}).get('amount', 0),
+                        'total_price': item.get('amounts', {}).get('total', {}).get('amount', 0),
+                        'weight': item.get('weight', 0),
+                        'weight_label': item.get('weight_label', ''),
+                        'notes': item.get('notes', ''),
+                        'options': options,
+                        'main_image': main_image,
+                        'codes': digital_codes,
+                        'files': digital_files,
+                        'reservations': reservations,
+                        'product': {
+                            'id': item_id,
+                            'name': item.get('name', ''),
+                            'description': item.get('notes', '')
+                        }
                     }
-                }
-                
-                items.append(item_data)
-                
-            except Exception as item_error:
-                logger.error(f"Error processing item: {str(item_error)}")
-                continue
+                    
+                    items.append(item_data)
+                    
+                except Exception as item_error:
+                    logger.error(f"Error processing item: {str(item_error)}")
+                    continue
 
-        # الحصول على الباركود
-        final_barcode_data = barcode_data
-        
-        if not final_barcode_data:
-            final_barcode_data = get_cached_barcode_data(order_id_str)
-        
-        if not final_barcode_data:
-            final_barcode_data = generate_and_store_barcode(order_id_str, 'salla')
-        
-        if not final_barcode_data:
-            final_barcode_data = generate_barcode(order_id_str)
+            # الحصول على الباركود
+            final_barcode_data = barcode_data
+            
+            if not final_barcode_data:
+                final_barcode_data = get_cached_barcode_data(order_id_str)
+            
+            if not final_barcode_data:
+                final_barcode_data = generate_and_store_barcode(order_id_str, 'salla', store_id)
+            
+            if not final_barcode_data:
+                final_barcode_data = generate_barcode(order_id_str)
 
-        result = {
-            'id': order_id_str,
-            'order_items': items,
-            'barcode': final_barcode_data
-        }
-        
-        return result
-        
+            result = {
+                'id': order_id_str,
+                'order_items': items,
+                'barcode': final_barcode_data
+            }
+            
+            return result
+            
     except Exception as e:
         logger.error(f"Error in process_order_data: {str(e)}")
         return None
@@ -586,13 +678,20 @@ def db_session_scope():
     finally:
         db.session.remove()
 
-def process_orders_concurrently(order_ids, access_token, max_workers=10):
+def process_orders_concurrently(order_ids, access_token, max_workers=10, app=None):
     """معالجة الطلبات بشكل متزامن مع إدارة سياق التطبيق"""
     from .config import Config
-    from flask import current_app
     
     if not order_ids:
         return []
+    
+    # إذا لم يتم تمرير التطبيق، نحاول استخدام current_app
+    if app is None:
+        try:
+            app = current_app._get_current_object()
+        except RuntimeError:
+            # إذا كنا خارج سياق التطبيق، نستخدم النسخة المعدلة
+            return process_orders_concurrently_fallback(order_ids, access_token, max_workers)
     
     # جلب جميع الباركودات مسبقاً في استعلام واحد
     barcodes_map = get_barcodes_for_orders(order_ids)
@@ -610,7 +709,6 @@ def process_orders_concurrently(order_ids, access_token, max_workers=10):
             return None
             
         # استخدام سياق التطبيق الممرر
-        app = current_app._get_current_object()
         with app.app_context():
             try:
                 # إنشاء جلسة مستقلة لكل خيط
@@ -647,8 +745,11 @@ def process_orders_concurrently(order_ids, access_token, max_workers=10):
                 # استخدام الباركود المخزن مسبقاً
                 barcode_data = barcodes_map.get(order_id_str)
                 
+                # استخراج store_id من بيانات الطلب إذا أمكن
+                store_id = order_data.get('store_id')
+                
                 # معالجة بيانات الطلب داخل سياق التطبيق
-                processed_order = process_order_data(order_id_str, items_data, barcode_data)
+                processed_order = process_order_data(order_id_str, items_data, barcode_data, store_id)
                 
                 if processed_order:
                     processed_order['reference_id'] = order_data.get('reference_id', order_id_str)
@@ -686,6 +787,159 @@ def process_orders_concurrently(order_ids, access_token, max_workers=10):
                 orders.append(result)
 
     logger.info(f"Order processing completed: {successful_orders} successful, {failed_orders} failed")
+    return orders
+
+def process_orders_concurrently_fallback(order_ids, access_token, max_workers=10):
+    """نسخة احتياطية للمعالجة المتزامنة بدون سياق تطبيق"""
+    from .config import Config
+    
+    if not order_ids:
+        return []
+    
+    orders = []
+    successful_orders = 0
+    failed_orders = 0
+    lock = Lock()
+
+    def process_single_order_fallback(order_id):
+        """معالجة طلب واحد بدون سياق تطبيق"""
+        nonlocal successful_orders, failed_orders
+        order_id_str = str(order_id).strip()
+        if not order_id_str:
+            return None
+            
+        try:
+            # إنشاء جلسة مستقلة لكل خيط
+            session = create_session()
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Accept': 'application/json'
+            }
+            
+            # جلب بيانات الطلب
+            order_response = session.get(
+                f"{Config.SALLA_ORDERS_API}/{order_id_str}",
+                headers=headers,
+                timeout=15
+            )
+            
+            if order_response.status_code != 200:
+                with lock:
+                    failed_orders += 1
+                return None
+                
+            order_data = order_response.json().get('data', {})
+            
+            # جلب بيانات العناصر
+            items_response = session.get(
+                f"{Config.SALLA_BASE_URL}/orders/items",
+                params={'order_id': order_id_str},
+                headers=headers,
+                timeout=15
+            )
+            
+            items_data = items_response.json().get('data', []) if items_response.status_code == 200 else []
+            
+            # معالجة البيانات بدون استخدام قاعدة البيانات
+            try:
+                order_id_str = str(order_id).strip()
+                if not order_id_str:
+                    return None
+                    
+                items = []
+                
+                for index, item in enumerate(items_data):
+                    try:
+                        item_id = item.get('id') or f"temp_{index}"
+                        main_image = get_main_image(item)
+                        
+                        options = []
+                        item_options = item.get('options', [])
+                        if isinstance(item_options, list):
+                            for option in item_options:
+                                raw_value = option.get('value', '')
+                                display_value = 'غير محدد'
+                                
+                                if isinstance(raw_value, dict):
+                                    display_value = raw_value.get('name') or raw_value.get('value') or str(raw_value)
+                                elif isinstance(raw_value, list):
+                                    values_list = [str(opt.get('name') or opt.get('value') or str(opt)) 
+                                                 for opt in raw_value if isinstance(opt, (dict, str))]
+                                    display_value = ', '.join(values_list)
+                                else:
+                                    display_value = str(raw_value) if raw_value else 'غير محدد'
+                                
+                                options.append({
+                                    'name': option.get('name', ''),
+                                    'value': display_value,
+                                    'type': option.get('type', '')
+                                })
+                        
+                        item_data = {
+                            'id': item_id,
+                            'name': item.get('name', ''),
+                            'sku': item.get('sku', ''),
+                            'quantity': item.get('quantity', 0),
+                            'currency': item.get('currency', 'SAR'),
+                            'price': {
+                                'amount': item.get('amounts', {}).get('price_without_tax', {}).get('amount', 0),
+                                'currency': item.get('currency', 'SAR')
+                            },
+                            'main_image': main_image,
+                            'options': options,
+                        }
+                        
+                        items.append(item_data)
+                        
+                    except Exception as item_error:
+                        logger.error(f"Error processing item: {str(item_error)}")
+                        continue
+
+                # إنشاء الباركود مباشرة بدون تخزين
+                barcode_data = generate_barcode(order_id_str)
+
+                result = {
+                    'id': order_id_str,
+                    'order_items': items,
+                    'barcode': barcode_data,
+                    'reference_id': order_data.get('reference_id', order_id_str),
+                    'customer': order_data.get('customer', {}),
+                    'created_at': format_date(order_data.get('created_at', ''))
+                }
+                
+                with lock:
+                    successful_orders += 1
+                return result
+                
+            except Exception as process_error:
+                logger.error(f"Error processing order data: {str(process_error)}")
+                with lock:
+                    failed_orders += 1
+                return None
+                
+        except Exception as e:
+            with lock:
+                failed_orders += 1
+            logger.error(f"Error processing order {order_id_str}: {str(e)}")
+            return None
+        finally:
+            try:
+                session.close()
+            except:
+                pass
+
+    # استخدام ThreadPoolExecutor للمعالجة المتزامنة
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # تقديم جميع المهام مرة واحدة
+        future_to_order = {executor.submit(process_single_order_fallback, order_id): order_id for order_id in order_ids}
+        
+        # جمع النتائج عند اكتمالها
+        for future in as_completed(future_to_order):
+            result = future.result()
+            if result:
+                orders.append(result)
+
+    logger.info(f"Order processing completed (fallback): {successful_orders} successful, {failed_orders} failed")
     return orders
 
 def process_orders_sequentially(order_ids, access_token):
