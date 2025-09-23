@@ -479,8 +479,6 @@ def order_details(order_id):
             receiver_info = {
                 'name': order_address.name or '',
                 'phone': order_address.phone or '',
-                'city': order_address.city or '',
-                
 
             }
         else:
@@ -495,38 +493,14 @@ def order_details(order_id):
         processed_order.update({
             'id': order_id,
             'reference_id': order_data.get('reference_id') or 'غير متوفر',
-            'customer': {
-                'first_name': order_data.get('customer', {}).get('first_name', ''),
-                'last_name': order_data.get('customer', {}).get('last_name', ''),
 
-                'phone': f"{order_data.get('customer', {}).get('mobile_code', '')}{order_data.get('customer', {}).get('mobile', '')}"
-            },
             'status': {
                 'name': order_data.get('status', {}).get('name', 'غير معروف'),
                 'slug': order_data.get('status', {}).get('slug', 'unknown')
             },
             'created_at': format_date(order_data.get('created_at', '')),
-            'payment_method': order_data.get('payment_method', 'غير محدد'),
-            'receiver': receiver_info,
-            'shipping': {
-                'customer_name': receiver_info.get('name', ''),
-                'phone': receiver_info.get('phone', ''),
-                'method': order_data.get('shipping', {}).get('courier_name', 'غير محدد'),
-                'tracking_number': order_data.get('shipping', {}).get('tracking_number', ''),
-                'tracking_link': order_data.get('shipping', {}).get('tracking_link', ''),
-                'address': full_address,
-                'country': order_address.country if order_address else '',
-                'city': order_address.city if order_address else '',
-                'district': '',
-                'street': '',
-                'description': '',
-                'postal_code': '',
-                'raw_data': None
-            },
-            'payment': {
-                'status': order_data.get('payment', {}).get('status', ''),
-                'method': order_data.get('payment', {}).get('method', '')
-            },
+
+
             'amount': {
                 'sub_total': order_data.get('amounts', {}).get('sub_total', {'amount': 0, 'currency': 'SAR'}),
                 'shipping_cost': order_data.get('amounts', {}).get('shipping_cost', {'amount': 0, 'currency': 'SAR'}),
