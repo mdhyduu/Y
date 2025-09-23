@@ -479,6 +479,8 @@ def order_details(order_id):
             receiver_info = {
                 'name': order_address.name or '',
                 'phone': order_address.phone or '',
+                'city': order_address.city or '',
+                
 
             }
         else:

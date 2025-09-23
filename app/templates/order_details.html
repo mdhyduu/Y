@@ -321,22 +321,7 @@
       {% endif %}
 
       <!-- قسم المعلومات الإضافية -->
-  
-    {% if order_address %}
-    <div class="address-info">
-        <p><strong>الاسم:</strong> {{ order_address.name }}</p>
-        <p><strong>الهاتف:</strong> {{ order_address.phone }}</p>
-        <p><strong>العنوان:</strong> {{ order_address.full_address }}</p>
-        <p><strong>المدينة:</strong> {{ order_address.city }}</p>
-        <p><strong>البلد:</strong> {{ order_address.country }}</p>
-        <small class="text-muted">({{ 'مستلم' if order_address.address_type == 'receiver' else 'عميل' }})</small>
-    </div>
-    {% endif %}
-     
-    </div>
-  </div>
-</div>
- 
+   
 {% if order_address %}
     <div class="address-info">
         <h4>العنوان المحفوظ:</h4>
@@ -351,6 +336,10 @@
         <p>لم يتم حفظ عنوان لهذا الطلب بعد</p>
     </div>
 {% endif %} 
+
+    </div>
+  </div>
+</div>
 
 
 <style>
