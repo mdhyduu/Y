@@ -479,7 +479,7 @@ def order_details(order_id):
             receiver_info = {
                 'name': order_address.name or '',
                 'phone': order_address.phone or '',
-                'email': order_address.email or ''
+
             }
         else:
             print("❌ لا يوجد عنوان محفوظ")
@@ -487,7 +487,7 @@ def order_details(order_id):
             receiver_info = {
                 'name': '',
                 'phone': '',
-                'email': ''
+            
             }
 
         processed_order.update({
@@ -496,7 +496,7 @@ def order_details(order_id):
             'customer': {
                 'first_name': order_data.get('customer', {}).get('first_name', ''),
                 'last_name': order_data.get('customer', {}).get('last_name', ''),
-                'email': order_data.get('customer', {}).get('email', ''),
+
                 'phone': f"{order_data.get('customer', {}).get('mobile_code', '')}{order_data.get('customer', {}).get('mobile', '')}"
             },
             'status': {
