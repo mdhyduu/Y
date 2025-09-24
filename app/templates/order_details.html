@@ -321,7 +321,7 @@
       {% endif %}
 
       <!-- قسم المعلومات الإضافية -->
-   
+ {% if delivery_manager or delivery  %}
 {% if order_address %}
     <div class="address-info">
         <h4>العنوان المحفوظ:</h4>
@@ -336,7 +336,7 @@
         <p>لم يتم حفظ عنوان لهذا الطلب بعد</p>
     </div>
 {% endif %} 
-
+{% endif %}
     </div>
   </div>
 </div>
