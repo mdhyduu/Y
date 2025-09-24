@@ -1,7 +1,5 @@
-# orders/status_management.py
-# orders/status_management.py 
 from flask import (jsonify, request, redirect, url_for, flash, render_template, 
-                   make_response, current_app)  # إضافة make_response و current_app
+                   make_response, current_app)
 from . import orders_bp
 from app.models import (db, OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, 
                        CustomNoteStatus, OrderProductStatus, OrderAssignment)
@@ -12,7 +10,8 @@ from datetime import datetime
 from app.models import Employee
 import logging
 
-logger = logging.getLogger(__name__)
+# إعداد المسجل للإنتاج
+logger = logging.getLogger('salla_app')
 
 @orders_bp.route('/<int:order_id>/update_status', methods=['POST'])
 def update_order_status(order_id):
@@ -77,7 +76,7 @@ def update_order_status(order_id):
             flash(f"خطأ: {error_message}", "error")
         return redirect(url_for('orders.order_details', order_id=order_id))
     except Exception as e:
-        flash(f"حدث خطأ غير متوقع: {str(e)}", "error")
+        flash("حدث خطأ غير متوقع", "error")
         return redirect(url_for('orders.order_details', order_id=order_id))
 
 
@@ -141,6 +140,24 @@ def add_status_note(order_id):
                 flash(conflict_message, "error")
                 return redirect(url_for('orders.order_details', order_id=order_id))
         
+        # ✅ إزالة جميع الحالات التلقائية الأخرى قبل إضافة الحالة الجديدة
+        if status_flag != "custom":
+            # حذف جميع الحالات التلقائية الأخرى لهذا الطلب
+            OrderStatusNote.query.filter_by(
+                order_id=str(order_id)
+            ).filter(
+                OrderStatusNote.status_flag != None,
+                OrderStatusNote.status_flag != status_flag
+            ).delete(synchronize_session=False)
+        else:
+            # حذف جميع الحالات المخصصة الأخرى لهذا الطلب
+            OrderStatusNote.query.filter_by(
+                order_id=str(order_id),
+                status_flag="custom"
+            ).filter(
+                OrderStatusNote.custom_status_id != custom_status_id
+            ).delete(synchronize_session=False)
+        
         # ✅ تحديث أو إنشاء جديد
         existing_note = OrderStatusNote.query.filter_by(
             order_id=str(order_id),
@@ -168,8 +185,6 @@ def add_status_note(order_id):
             db.session.add(new_note)
             db.session.commit()
             message = "تم حفظ الملاحظة بنجاح"
-        
-        handle_status_transitions(order_id, status_flag, custom_status_id)
         
         # إذا كان الطلب AJAX، نرجع JSON
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -219,12 +234,11 @@ def add_status_note(order_id):
      
     except Exception as e:
         db.session.rollback()
-        error_msg = f"حدث خطأ: {str(e)}"
+        error_msg = "حدث خطأ أثناء حفظ الملاحظة"
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': False, 'error': error_msg}), 500
         else:
             flash(error_msg, "error")
-            current_app.logger.error(f"Error adding status note: {str(e)}", exc_info=True)
             return redirect(url_for('orders.order_details', order_id=order_id))
             
 @orders_bp.route('/<int:order_id>/add_employee_status', methods=['POST'])
@@ -289,28 +303,20 @@ def add_employee_status(order_id):
                 flash(conflict_message, "error")
                 return redirect(url_for('orders.order_details', order_id=order_id))
         
-        # ✅ تحديث أو إنشاء جديد
-        existing_status = OrderEmployeeStatus.query.filter_by(
-            order_id=str(order_id),
-            status_id=status_id
-        ).first()
-    
-        if existing_status:
-            existing_status.note = note
-            existing_status.updated_at = datetime.utcnow()
-            db.session.commit()
-            message = "تم تحديث الحالة بنجاح"
-        else:
-            new_status = OrderEmployeeStatus(
-                order_id=str(order_id),
-                status_id=status_id,
-                note=note
-            )
-            db.session.add(new_status)
-            db.session.commit()
-            message = 'تم إضافة الحالة بنجاح'
+        # ✅ إزالة جميع الحالات المخصصة الأخرى قبل إضافة الحالة الجديدة
+        OrderEmployeeStatus.query.filter_by(
+            order_id=str(order_id)
+        ).delete(synchronize_session=False)
         
-        handle_status_transitions(order_id, 'custom', status_id)
+        # ✅ إنشاء الحالة الجديدة
+        new_status = OrderEmployeeStatus(
+            order_id=str(order_id),
+            status_id=status_id,
+            note=note
+        )
+        db.session.add(new_status)
+        db.session.commit()
+        message = 'تم إضافة الحالة بنجاح'
         
         # إذا كان الطلب AJAX، نرجع JSON
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -333,13 +339,12 @@ def add_employee_status(order_id):
         
     except Exception as e:
         db.session.rollback()
-        error_msg = f'حدث خطأ: {str(e)}'
+        error_msg = 'حدث خطأ أثناء إضافة الحالة'
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': False, 'error': error_msg}), 500
         else:
             flash(error_msg, 'error')
             return redirect(url_for('orders.order_details', order_id=order_id))
-
 
 
 @orders_bp.route('/employee_status', methods=['GET', 'POST'])
@@ -354,7 +359,9 @@ def manage_employee_status():
         return response
     
     # للموظفين العاديين: جلب بيانات الموظف
-    if not request.cookies.get('is_admin') == 'true':
+    if not request.cookies.get('is_admin') == 'true' and employee:
+        ensure_default_statuses(employee.id)
+        
         if not employee:
             flash('غير مصرح لك بالوصول', 'error')
             response = make_response(redirect(url_for('user_auth.login')))
@@ -534,6 +541,11 @@ def bulk_update_status():
     updated_count = 0
     for order_id in order_ids:
         try:
+            # ✅ إزالة جميع الحالات المخصصة الأخرى قبل إضافة الحالة الجديدة
+            OrderEmployeeStatus.query.filter_by(
+                order_id=str(order_id)
+            ).delete(synchronize_session=False)
+            
             new_status = OrderEmployeeStatus(
                 order_id=str(order_id),
                 status_id=status_id,
@@ -545,7 +557,7 @@ def bulk_update_status():
             db.session.rollback()
             return jsonify({
                 'success': False,
-                'error': f'حدث خطأ أثناء تحديث الطلب {order_id}: {str(e)}'
+                'error': f'حدث خطأ أثناء تحديث الطلب {order_id}'
             }), 500
     
     try:
@@ -558,9 +570,8 @@ def bulk_update_status():
         db.session.rollback()
         return jsonify({
             'success': False,
-            'error': f'حدث خطأ أثناء حفظ التغييرات: {str(e)}'
+            'error': 'حدث خطأ أثناء حفظ التغييرات'
         }), 500
-        
         
 def get_done_status_id(employee_id):
     """جلب ID الخاص بحالة 'تم التنفيذ' مع كاش داخلي لزيادة السرعة"""
@@ -657,7 +668,7 @@ def update_product_status(order_id, product_id):
                     db.session.commit()
             except Exception as e:
                 db.session.rollback()
-                current_app.logger.error(f"Error auto-updating order status: {str(e)}", exc_info=True)
+                logger.error(f"Error auto-updating order status: {str(e)}")
 
         # إرجاع بيانات محدثة للعرض
         return jsonify({
@@ -669,10 +680,10 @@ def update_product_status(order_id, product_id):
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"Error updating product status: {str(e)}", exc_info=True)
+        logger.error(f"Error updating product status: {str(e)}")
         return jsonify({
             'success': False, 
-            'error': f'خطأ في الخادم: {str(e)}'
+            'error': 'خطأ في تحديث حالة المنتج'
         }), 500
 @orders_bp.route('/<order_id>/product/<product_id>/cancel_status', methods=['POST'])
 def cancel_product_status(order_id, product_id):
@@ -711,88 +722,13 @@ def cancel_product_status(order_id, product_id):
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"Error canceling product status: {str(e)}", exc_info=True)
+        logger.error(f"Error canceling product status: {str(e)}")
         return jsonify({
             'success': False, 
-            'error': f'خطأ في الخادم: {str(e)}'
+            'error': 'خطأ في إلغاء حالة المنتج'
         }), 500
-# دوال مساعدة لإدارة تحولات الحالات
-# إضافة قاموس الأولويات في بداية الملف
-STATUS_PRIORITIES = {
-    'قيد التنفيذ': 1,
-    'تم التنفيذ': 2,
-    'جاهز للشحن': 3,
-    'تم الشحن': 4,
-    'جاري التوصيل': 5,
-    'تم التوصيل': 6
-}
 
-# تعديل دالة handle_status_transitions
-def handle_status_transitions(order_id, new_status_type, custom_status_id=None):
-    """
-    إدارة التحولات بين الحالات بشكل تلقائي حسب الأولوية
-    - إزالة الحالات الأقل أولوية عند إضافة حالة جديدة أعلى أولوية
-    """
-    try:
-        # الحصول على اسم الحالة الجديدة
-        new_status_name = new_status_type
-        if custom_status_id:
-            custom_status = EmployeeCustomStatus.query.get(custom_status_id)
-            if custom_status:
-                new_status_name = custom_status.name
 
-        # الحصول على أولوية الحالة الجديدة
-        new_priority = STATUS_PRIORITIES.get(new_status_name, 0)
-
-        # إذا كانت الحالة الجديدة لها أولوية، نبحث عن الحالات الأقل أولوية لإزالتها
-        if new_priority > 0:
-            # جلب جميع الحالات الحالية للطلب
-            current_statuses = []
-            
-            # جلب حالات الموظفين
-            employee_statuses = OrderEmployeeStatus.query.filter_by(
-                order_id=str(order_id)
-            ).all()
-            
-            for status in employee_statuses:
-                custom_status = EmployeeCustomStatus.query.get(status.status_id)
-                if custom_status and custom_status.name in STATUS_PRIORITIES:
-                    current_statuses.append({
-                        'id': status.id,
-                        'name': custom_status.name,
-                        'priority': STATUS_PRIORITIES[custom_status.name],
-                        'type': 'employee'
-                    })
-            
-            # جلب ملاحظات الحالة
-            status_notes = OrderStatusNote.query.filter_by(
-                order_id=str(order_id)
-            ).all()
-            
-            for note in status_notes:
-                if note.status_flag in STATUS_PRIORITIES:
-                    current_statuses.append({
-                        'id': note.id,
-                        'name': note.status_flag,
-                        'priority': STATUS_PRIORITIES[note.status_flag],
-                        'type': 'note'
-                    })
-            
-            # إزالة الحالات الأقل أولوية
-            for status in current_statuses:
-                if status['priority'] < new_priority:
-                    if status['type'] == 'employee':
-                        OrderEmployeeStatus.query.filter_by(id=status['id']).delete()
-                    elif status['type'] == 'note':
-                        OrderStatusNote.query.filter_by(id=status['id']).delete()
-
-        db.session.commit()
-        return True
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"Error in handle_status_transitions: {str(e)}", exc_info=True)
-        return False
 def check_status_conflict(order_id, new_status_type, custom_status_id=None):
     """
     التحقق من وجود تعارض بين الحالة الجديدة والحالات الحالية
@@ -841,8 +777,8 @@ def check_status_conflict(order_id, new_status_type, custom_status_id=None):
         return False, ""
         
     except Exception as e:
-        current_app.logger.error(f"Error in check_status_conflict: {str(e)}", exc_info=True)
-        return True, f"حدث خطأ في التحقق من التعارض: {str(e)}"
+        logger.error(f"Error in check_status_conflict: {str(e)}")
+        return True, "حدث خطأ في التحقق من التعارض"
 
 
 @orders_bp.route('/<order_id>/update_print_status', methods=['POST'])
