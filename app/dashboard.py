@@ -197,7 +197,12 @@ def _get_filtered_orders(store_id, status_id=None, for_delivery=False):
 @dashboard_bp.route('/')
 @login_required
 def index():
-
+    print(f"user_id: {request.cookies.get('user_id')}")
+    print(f"is_admin: {request.cookies.get('is_admin')}")
+    print(f"employee_role: {request.cookies.get('employee_role')}")
+    
+    # باقي الكود...
+    """لوحة التحكم الرئيسية"""
     try:
         is_admin = request.cookies.get('is_admin') == 'true'
         
@@ -406,22 +411,35 @@ def index():
                     SallaOrder.id.in_(assigned_order_ids)
                 ).all() if assigned_order_ids else []
 
-                stats = {
-                    'total_orders': len(assigned_orders),
-                    'new_orders': 0,
-                    'late_orders': len([o for o in assigned_orders if any(
-                        note.status_flag == 'late' for note in o.status_notes
-                    )]),
-                    'missing_orders': len([o for o in assigned_orders if any(
-                        note.status_flag == 'missing' for note in o.status_notes
-                    )]),
-                    'refunded_orders': len([o for o in assigned_orders if any(
-                        note.status_flag == 'refunded' for note in o.status_notes
-                    )]),
-                    'not_shipped_orders': len([o for o in assigned_orders if any(
-                        note.status_flag == 'not_shipped' for note in o.status_notes
-                    )])
-                }
+                # لو المراجع أو المدير، يشوف كل الطلبات في المتجر
+                if employee.role in ['reviewer', 'manager']:
+                    all_orders = SallaOrder.query.filter_by(store_id=employee.store_id).all()
+                
+                    stats = {
+                        'total_orders': len(all_orders),
+                        'new_orders': db.session.query(SallaOrder).outerjoin(
+                            OrderStatusNote, OrderStatusNote.order_id == SallaOrder.id
+                        ).filter(
+                            SallaOrder.store_id == employee.store_id,
+                            OrderStatusNote.id == None
+                        ).count(),
+                        'late_orders': db.session.query(OrderStatusNote).join(SallaOrder).filter(
+                            OrderStatusNote.status_flag == 'late',
+                            SallaOrder.store_id == employee.store_id
+                        ).count(),
+                        'missing_orders': db.session.query(OrderStatusNote).join(SallaOrder).filter(
+                            OrderStatusNote.status_flag == 'missing',
+                            SallaOrder.store_id == employee.store_id
+                        ).count(),
+                        'refunded_orders': db.session.query(OrderStatusNote).join(SallaOrder).filter(
+                            OrderStatusNote.status_flag == 'refunded',
+                            SallaOrder.store_id == employee.store_id
+                        ).count(),
+                        'not_shipped_orders': db.session.query(OrderStatusNote).join(SallaOrder).filter(
+                            OrderStatusNote.status_flag == 'not_shipped',
+                            SallaOrder.store_id == employee.store_id
+                        ).count()
+                    }
 
                 default_statuses = EmployeeCustomStatus.query.filter_by(
                     employee_id=employee.id,
@@ -448,34 +466,7 @@ def index():
                     db.joinedload(OrderStatusNote.custom_status)
                 ).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
 
-                # في قسم المراجع (reviewer) في dashboard.py
-
                 if employee.role in ['reviewer', 'manager']:
-                    # حساب الطلبات الجديدة بشكل صحيح - مثل المدير
-                    new_orders_count = db.session.query(SallaOrder).outerjoin(
-                        OrderStatusNote, OrderStatusNote.order_id == SallaOrder.id
-                    ).filter(
-                        SallaOrder.store_id == employee.store_id,
-                        OrderStatusNote.id == None,  # الطلبات بدون ملاحظات
-                        SallaOrder.id.in_(assigned_order_ids)  # فقط الطلبات المسندة للمراجع
-                    ).count() if assigned_order_ids else 0
-                
-                    stats = {
-                        'total_orders': len(assigned_orders),
-                        'new_orders': new_orders_count,  # ✅ الآن محسوبة بشكل صحيح
-                        'late_orders': len([o for o in assigned_orders if any(
-                            note.status_flag == 'late' for note in o.status_notes
-                        )]),
-                        'missing_orders': len([o for o in assigned_orders if any(
-                            note.status_flag == 'missing' for note in o.status_notes
-                        )]),
-                        'refunded_orders': len([o for o in assigned_orders if any(
-                            note.status_flag == 'refunded' for note in o.status_notes
-                        )]),
-                        'not_shipped_orders': len([o for o in assigned_orders if any(
-                            note.status_flag == 'not_shipped' for note in o.status_notes
-                        )])
-                    }
                     all_employees = Employee.query.filter_by(
                         store_id=employee.store_id,
                         is_active=True
