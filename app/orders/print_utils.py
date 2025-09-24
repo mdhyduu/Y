@@ -191,7 +191,7 @@ def get_quick_list_data():
                         'name': item.get('name', ''),
                         'quantity': item.get('quantity', 0),
                         'main_image': item.get('main_image', ''),
-                        'sku': item.get('sku', ''),
+
                         'price': item.get('price', {}).get('amount', 0)
                     })
                 
