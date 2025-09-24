@@ -151,7 +151,7 @@
                             </div>
                         </th>
                         <th>رقم الطلب</th>
-                        <th class="d-none d-md-table-cell">النوع</th>
+
                         <th class="d-none d-md-table-cell">الحالة</th>
                         <th>الحالة المخصصة</th>
                         <th>العلامات</th>
@@ -174,13 +174,7 @@
                         <td>
                             <span class="fw-bold">#{{ order.reference_id }}</span>
                         </td>
-                        <td class="d-none d-md-table-cell">
-                            {% if order.type == 'custom' %}
-                                <span class="badge bg-info">مخصص</span>
-                            {% else %}
-                                <span class="badge bg-primary">سلة</span>
-                            {% endif %}
-                        </td>
+
                         <td class="d-none d-md-table-cell">
                             {% if order.status %}
                                 <span class="status-badge status-{{ order.status.slug }}" 
