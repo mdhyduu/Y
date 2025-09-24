@@ -403,18 +403,17 @@ def index():
                                        selected_status_id=selected_status_id
                               )
             else:
-                # للموظفين الآخرين (مراجعين، مديرين، إلخ)
+                # 🔹 باقي الموظفين
                 assignments = OrderAssignment.query.filter_by(employee_id=employee.id).all()
                 assigned_order_ids = [a.order_id for a in assignments]
-
                 assigned_orders = SallaOrder.query.filter(
                     SallaOrder.id.in_(assigned_order_ids)
                 ).all() if assigned_order_ids else []
 
-                # لو المراجع أو المدير، يشوف كل الطلبات في المتجر
+                # ✅ هنا التعديل: لو المراجع أو المدير يجيب كل الطلبات في المتجر
                 if employee.role in ['reviewer', 'manager']:
                     all_orders = SallaOrder.query.filter_by(store_id=employee.store_id).all()
-                
+
                     stats = {
                         'total_orders': len(all_orders),
                         'new_orders': db.session.query(SallaOrder).outerjoin(
@@ -441,44 +440,37 @@ def index():
                         ).count()
                     }
 
-                default_statuses = EmployeeCustomStatus.query.filter_by(
-                    employee_id=employee.id,
-                    is_default=True
-                ).all()
+                    default_statuses = EmployeeCustomStatus.query.filter_by(
+                        employee_id=employee.id,
+                        is_default=True
+                    ).all()
 
-                custom_status_stats = []
-                for status in default_statuses:
-                    count = OrderEmployeeStatus.query.filter(
-                        OrderEmployeeStatus.status_id == status.id,
-                        OrderEmployeeStatus.order_id.in_(assigned_order_ids)
-                    ).count() if assigned_order_ids else 0
+                    custom_status_stats = []
+                    for status in default_statuses:
+                        count = OrderEmployeeStatus.query.filter(
+                            OrderEmployeeStatus.status_id == status.id,
+                            OrderEmployeeStatus.order_id.in_([o.id for o in all_orders])
+                        ).count()
+                        custom_status_stats.append({'status': status, 'count': count})
 
-                    custom_status_stats.append({
-                        'status': status,
-                        'count': count
-                    })
+                    recent_statuses = OrderStatusNote.query.join(SallaOrder).filter(
+                        SallaOrder.store_id == employee.store_id
+                    ).options(
+                        db.joinedload(OrderStatusNote.admin),
+                        db.joinedload(OrderStatusNote.employee),
+                        db.joinedload(OrderStatusNote.custom_status)
+                    ).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
 
-                recent_statuses = OrderStatusNote.query.filter(
-                    OrderStatusNote.order_id.in_(assigned_order_ids)
-                ).options(
-                    db.joinedload(OrderStatusNote.admin),
-                    db.joinedload(OrderStatusNote.employee),
-                    db.joinedload(OrderStatusNote.custom_status)
-                ).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
-
-                if employee.role in ['reviewer', 'manager']:
                     all_employees = Employee.query.filter_by(
                         store_id=employee.store_id,
                         is_active=True
                     ).all()
 
                     selected_employee_id = request.args.get('employee_id', type=int)
-
                     if selected_employee_id:
                         selected_employee = next((emp for emp in all_employees if emp.id == selected_employee_id), None)
                         if selected_employee:
                             default_status_stats, custom_status_stats_selected = _get_employee_status_stats(selected_employee_id)
-
                             return render_template('employee_dashboard.html',
                                                    current_user=user,
                                                    employee=employee,
@@ -494,7 +486,6 @@ def index():
                                                    is_reviewer=True)
 
                     all_employee_status_stats = _aggregate_default_statuses_for_store(employee.store_id)
-
                     return render_template('employee_dashboard.html',
                                            current_user=user,
                                            employee=employee,
@@ -508,6 +499,49 @@ def index():
                                            is_reviewer=True)
 
                 else:
+                    # 🔹 الموظف العادي (غير مراجع/مدير) زي ما هو
+                    stats = {
+                        'total_orders': len(assigned_orders),
+                        'new_orders': 0,
+                        'late_orders': len([o for o in assigned_orders if any(
+                            note.status_flag == 'late' for note in o.status_notes
+                        )]),
+                        'missing_orders': len([o for o in assigned_orders if any(
+                            note.status_flag == 'missing' for note in o.status_notes
+                        )]),
+                        'refunded_orders': len([o for o in assigned_orders if any(
+                            note.status_flag == 'refunded' for note in o.status_notes
+                        )]),
+                        'not_shipped_orders': len([o for o in assigned_orders if any(
+                            note.status_flag == 'not_shipped' for note in o.status_notes
+                        )])
+                    }
+
+                    default_statuses = EmployeeCustomStatus.query.filter_by(
+                        employee_id=employee.id,
+                        is_default=True
+                    ).all()
+
+                    custom_status_stats = []
+                    for status in default_statuses:
+                        count = OrderEmployeeStatus.query.filter(
+                            OrderEmployeeStatus.status_id == status.id,
+                            OrderEmployeeStatus.order_id.in_(assigned_order_ids)
+                        ).count() if assigned_order_ids else 0
+
+                        custom_status_stats.append({
+                            'status': status,
+                            'count': count
+                        })
+
+                    recent_statuses = OrderStatusNote.query.filter(
+                        OrderStatusNote.order_id.in_(assigned_order_ids)
+                    ).options(
+                        db.joinedload(OrderStatusNote.admin),
+                        db.joinedload(OrderStatusNote.employee),
+                        db.joinedload(OrderStatusNote.custom_status)
+                    ).order_by(OrderStatusNote.created_at.desc()).limit(5).all()
+
                     return render_template('employee_dashboard.html',
                                            current_user=user,
                                            employee=employee,
