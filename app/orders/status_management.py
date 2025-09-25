@@ -9,10 +9,7 @@ import requests
 from datetime import datetime
 from app.models import Employee
 import logging
-import requests
-from datetime import datetime
-from flask import current_app
-from threading import Thread
+
 # إعداد المسجل للإنتاج
 logger = logging.getLogger('salla_app')
 
