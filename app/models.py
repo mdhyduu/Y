@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 import re
-
+from sqlalchemy import Index
 # Third-party imports
 from cryptography.fernet import Fernet, InvalidToken
 from flask import current_app
@@ -14,7 +14,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship, backref, validates
-
+from sqlalchemy.dialects.postgresql import JSONB
 # Local application imports
 from . import db
 
@@ -373,7 +373,7 @@ class SallaOrder(db.Model):
     last_synced = db.Column(db.DateTime, nullable=True)
     # العمود الأساسي للربط
     status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'), nullable=True)
-    
+    full_order_data = db.Column(db.JSONB, nullable=True)
     # العلاقة الصحيحة مع OrderStatus
     status = db.relationship('OrderStatus', backref='salla_orders', lazy=True)
 
