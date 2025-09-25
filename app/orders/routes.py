@@ -249,19 +249,6 @@ def index():
         processed_orders = []
         
         for order in orders:
-            # التحقق إذا كان الـ ID صالحاً للرابط (ليس None ويمكن تحويله إلى int)
-            has_valid_link = True
-            try:
-                if order.id is None:
-                    has_valid_link = False
-                elif isinstance(order.id, str) and (order.id.lower() == 'none' or not order.id.isdigit()):
-                    has_valid_link = False
-                else:
-                    # محاولة تحويل إلى int للتحقق
-                    int(order.id)
-            except (ValueError, TypeError):
-                has_valid_link = False
-            
             if isinstance(order, SallaOrder):
                 raw_data = json.loads(order.raw_data) if order.raw_data else {}
                 reference_id = raw_data.get('reference_id', order.id)
@@ -285,11 +272,10 @@ def index():
                     'type': 'salla',
                     'assignments': order.assignments,
                     'employee_statuses': [last_emp_status] if last_emp_status else [],
-                    'status_notes': [last_note] if last_note else [],
-                    'has_valid_link': has_valid_link  # إضافة هذا الحقل الجديد
+                    'status_notes': [last_note] if last_note else []
                 } 
                 
-            else:  # CustomOrder
+            else:
                 last_note = OrderStatusNote.query.filter_by(custom_order_id=order.id).order_by(OrderStatusNote.created_at.desc()).first()
                 last_emp_status = OrderEmployeeStatus.query.filter_by(custom_order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
                 
@@ -309,8 +295,7 @@ def index():
                     'currency': order.currency,
                     'assignments': order.assignments,
                     'employee_statuses': [last_emp_status] if last_emp_status else [],
-                    'status_notes': [last_note] if last_note else [],
-                    'has_valid_link': has_valid_link  # إضافة هذا الحقل الجديد
+                    'status_notes': [last_note] if last_note else []
                 }
                     
             processed_orders.append(processed_order)
