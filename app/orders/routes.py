@@ -373,7 +373,6 @@ def order_details(order_id):
         response.set_cookie('is_admin', '', expires=0)
         return response
 
-
     try:
         is_reviewer = False
         if request.cookies.get('is_admin') == 'true':
@@ -387,15 +386,23 @@ def order_details(order_id):
         order_data = None
         items_data = []
         
-        if order and hasattr(order, 'full_order_data') and order.full_order_data:
+        if order and order.full_order_data:
             print("✅ استخدام البيانات المحلية المخزنة")
             order_data = order.full_order_data
             items_data = order_data.get('items', [])
             
-            # إذا لم تكن العناصر متوفرة في البيانات الكاملة، نستخدم API كاحتياطي
+            # 🔥 إذا لم تكن العناصر متوفرة محلياً، نضيفها ونحدث التخزين
             if not items_data:
-                print("⚠️ العناصر غير متوفرة محلياً، جاري جلبها من API...")
+                print("⚠️ العناصر غير متوفرة محلياً، جاري جلبها من API وتحديث التخزين...")
                 items_data = fetch_order_items_from_api(user, order_id)
+                if items_data:
+                    # تحديث البيانات المحلية بإضافة العناصر
+                    order_data['items'] = items_data
+                    order.full_order_data = order_data  # تحديث الحقل
+                    db.session.commit()
+                    print(f"✅ تم تحديث البيانات المحلية بإضافة {len(items_data)} عنصر")
+                else:
+                    print("❌ فشل في جلب العناصر من API")
         else:
             print("⚠️ الطلب غير موجود محلياً أو لا يحتوي على بيانات كاملة، جاري جلب البيانات من API...")
             # ⭐⭐ الخطوة 2: جلب البيانات من API كاحتياطي ⭐⭐
@@ -405,14 +412,14 @@ def order_details(order_id):
                 # ⭐⭐ حفظ البيانات محلياً للاستخدام المستقبلي ⭐⭐
                 if order:
                     # تحديث الطلب الموجود
-                    order.full_order_data = order_data
+                    order.full_order_data = order_data  # ✅ تحتوي على العناصر
                     print("✅ تم تحديث البيانات المحلية للطلب الموجود")
                 else:
                     # إنشاء طلب جديد في قاعدة البيانات
-                    new_order = create_order_from_api_data(user, order_data)
+                    new_order = create_order_from_api_data(user, order_data, items_data)  # ✅ نمرر العناصر
                     if new_order:
                         order = new_order
-                        print("✅ تم إنشاء طلب جديد في قاعدة البيانات")
+                        print("✅ تم إنشاء طلب جديد في قاعدة البيانات مع العناصر")
                 
                 db.session.commit()
 
@@ -465,7 +472,7 @@ def order_details(order_id):
             }
         })
 
-        # ⭐⭐ الخطوة 6: جلب البيانات الإضافية من قاعدة البيانات (الملاحظات، الحالات، etc.) ⭐⭐
+        # ⭐⭐ الخطوة 6: جلب البيانات الإضافية من قاعدة البيانات ⭐⭐
         db_data = fetch_additional_order_data(user.store_id, str(order_id))
 
         return render_template('order_details.html', 
@@ -486,12 +493,12 @@ def order_details(order_id):
         return redirect(url_for('orders.index'))
 
 # ⭐⭐ الدوال المساعدة الجديدة ⭐⭐
-
 def fetch_order_items_from_api(user, order_id):
-    """جلب عناصر الطلب من API كاحتياطي عندما لا تكون متوفرة محلياً"""
+    """جلب عناصر الطلب من API مع معالجة الأخطاء المحسنة"""
     try:
         access_token = refresh_salla_token_if_needed(user)
         if not access_token:
+            print("❌ لا يوجد access token")
             return []
             
         headers = {
@@ -508,16 +515,17 @@ def fetch_order_items_from_api(user, order_id):
         )
         
         if response.status_code == 200:
-            return response.json().get('data', [])
+            items = response.json().get('data', [])
+            print(f"✅ تم جلب {len(items)} عنصر من API للطلب {order_id}")
+            return items
         else:
-            print(f"❌ خطأ في جلب العناصر من API: {response.status_code}")
+            print(f"❌ خطأ في جلب العناصر من API: {response.status_code} - {response.text}")
             return []
     except Exception as e:
         print(f"❌ خطأ في جلب العناصر من API: {str(e)}")
         return []
-
 def fetch_order_data_from_api(user, order_id):
-    """جلب بيانات الطلب من API عندما لا تكون متوفرة محلياً"""
+    """جلب بيانات الطلب من API مع تضمين العناصر في البيانات الرئيسية"""
     try:
         access_token = refresh_salla_token_if_needed(user)
         if not access_token:
@@ -543,16 +551,14 @@ def fetch_order_data_from_api(user, order_id):
         order_data = order_response.json().get('data', {})
         
         # جلب عناصر الطلب
-        items_response = requests.get(
-            f"{Config.SALLA_BASE_URL}/orders/items",
-            params={'order_id': order_id, 'include': 'images'},
-            headers=headers,
-            timeout=15
-        )
+        items_data = fetch_order_items_from_api(user, order_id)
         
-        items_data = []
-        if items_response.status_code == 200:
-            items_data = items_response.json().get('data', [])
+        # ✅ دمج العناصر مع البيانات الرئيسية للتخزين
+        if items_data:
+            order_data['items'] = items_data
+            print(f"✅ تم دمج {len(items_data)} عنصر مع بيانات الطلب")
+        else:
+            print("⚠️ لم يتم العثور على عناصر للطلب")
         
         return order_data, items_data
         
@@ -560,8 +566,8 @@ def fetch_order_data_from_api(user, order_id):
         print(f"❌ خطأ في جلب بيانات الطلب من API: {str(e)}")
         return None, []
 
-def create_order_from_api_data(user, order_data):
-    """إنشاء طلب جديد في قاعدة البيانات من بيانات API"""
+def create_order_from_api_data(user, order_data, items_data=None):
+    """إنشاء طلب جديد في قاعدة البيانات من بيانات API مع تضمين العناصر"""
     try:
         order_id = str(order_data.get('id'))
         if not order_id:
@@ -588,6 +594,15 @@ def create_order_from_api_data(user, order_data):
         total_amount = float(total_info.get('amount', 0))
         currency = total_info.get('currency', 'SAR')
         
+        # 🔥 دمج العناصر مع البيانات الرئيسية إذا كانت متوفرة
+        if items_data:
+            order_data['items'] = items_data
+        else:
+            # إذا لم تكن العناصر متوفرة، نجلبها من API
+            items_data = fetch_order_items_from_api(user, order_id)
+            if items_data:
+                order_data['items'] = items_data
+        
         # إنشاء الطلب الجديد
         new_order = SallaOrder(
             id=order_id,
@@ -598,7 +613,7 @@ def create_order_from_api_data(user, order_data):
             currency=currency,
             payment_method=order_data.get('payment_method', ''),
             raw_data=json.dumps(order_data, ensure_ascii=False),
-            full_order_data=order_data  # تخزين البيانات الكاملة
+            full_order_data=order_data  # ✅ تحتوي على العناصر الآن
         )
         
         db.session.add(new_order)
