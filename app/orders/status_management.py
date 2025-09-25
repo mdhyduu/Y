@@ -839,43 +839,7 @@ def update_product_status(order_id, product_id):
         # إذا لم يتبق أي منتج غير مكتمل
         if all_products_done:
             try:
-                # 1. تحديث حالة الطلب في سلة
-                if user.salla_access_token:
-                    headers = {
-                        'Authorization': f'Bearer {user.salla_access_token}',
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-
-                    # استخدام حالة "مكتمل" في سلة
-                    payload = {
-                        'slug': get_completed_status_slug(),  # دالة مساعدة
-                        'note': 'تم تنفيذ جميع المنتجات في الطلب تلقائياً'
-                    }
-
-                    try:
-                        response = requests.post(
-                            f"{Config.SALLA_ORDERS_API}/{order_id}/status",
-                            headers=headers,
-                            json=payload,
-                            timeout=10
-                        )
-                        
-                        if response.status_code == 200:
-                            logger.info(f"✅ تم تحديث حالة الطلب {order_id} في سلة إلى مكتمل")
-                        else:
-                            logger.warning(f"⚠️ فشل تحديث حالة الطلب في سلة: {response.status_code} - {response.text}")
-                            
-                    except requests.exceptions.RequestException as e:
-                        logger.error(f"❌ خطأ في الاتصال بسلة: {str(e)}")
-                else:
-                    logger.warning("⚠️ لا يوجد توكن وصول لسلة، سيتم التحديث المحلي فقط")
-
-            except Exception as e:
-                logger.error(f"❌ خطأ عام في تحديث حالة الطلب في سلة: {str(e)}")
-
-            try:
-                # 2. تحديث الحالة المخصصة للموظف محلياً
+                # 1. تحديث الحالة المخصصة للموظف محلياً أولاً (الأهم)
                 if employee:
                     done_status_id = get_done_status_id(employee.id)
                     if done_status_id:
@@ -904,7 +868,7 @@ def update_product_status(order_id, product_id):
                 logger.error(f"❌ خطأ في تحديث الحالة المخصصة: {str(e)}")
 
             try:
-                # 3. إضافة ملاحظة حالة تلقائية للمراجعين
+                # 2. إضافة ملاحظة حالة تلقائية للمراجعين
                 if employee:
                     auto_note = OrderStatusNote(
                         order_id=str(order_id),
@@ -918,6 +882,58 @@ def update_product_status(order_id, product_id):
                     
             except Exception as e:
                 logger.error(f"❌ خطأ في إضافة الملاحظة التلقائية: {str(e)}")
+
+            try:
+                # 3. تحديث حالة الطلب في سلة (بشكل منفصل وغير متزامن)
+                if user.salla_access_token:
+                    # نستخدم task أو thread لتجنب blocking
+                    from threading import Thread
+                    
+                    def update_salla_status_async():
+                        try:
+                            headers = {
+                                'Authorization': f'Bearer {user.salla_access_token}',
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            }
+
+                            payload = {
+                                'slug': get_completed_status_slug(),
+                                'note': 'تم تنفيذ جميع المنتجات في الطلب تلقائياً'
+                            }
+
+                            response = requests.post(
+                                f"{Config.SALLA_ORDERS_API}/{order_id}/status",
+                                headers=headers,
+                                json=payload,
+                                timeout=15  # زيادة الوقت لـ 15 ثانية
+                            )
+                            
+                            if response.status_code == 200:
+                                logger.info(f"✅ تم تحديث حالة الطلب {order_id} في سلة إلى مكتمل")
+                            elif response.status_code == 429:
+                                logger.warning(f"⏳ تم تجاوز معدل الطلبات لسلة، سيتم إعادة المحاولة لاحقاً للطلب {order_id}")
+                                # يمكن إضافة الطلب إلى queue لإعادة المحاولة لاحقاً
+                            else:
+                                logger.warning(f"⚠️ فشل تحديث حالة الطلب في سلة: {response.status_code} - {response.text}")
+                                
+                        except requests.exceptions.Timeout:
+                            logger.error(f"⏰ انتهى وقت الانتظار لتحديث سلة للطلب {order_id}")
+                        except requests.exceptions.RequestException as e:
+                            logger.error(f"❌ خطأ في الاتصال بسلة: {str(e)}")
+                        except Exception as e:
+                            logger.error(f"❌ خطأ غير متوقع في تحديث سلة: {str(e)}")
+
+                    # تشغيل المهمة في thread منفصل
+                    thread = Thread(target=update_salla_status_async)
+                    thread.daemon = True
+                    thread.start()
+                    
+                else:
+                    logger.warning("⚠️ لا يوجد توكن وصول لسلة، سيتم التحديث المحلي فقط")
+
+            except Exception as e:
+                logger.error(f"❌ خطأ في بدء تحديث سلة: {str(e)}")
 
         # إرجاع بيانات محدثة للعرض
         return jsonify({
@@ -940,25 +956,24 @@ def update_product_status(order_id, product_id):
 def get_completed_status_slug():
     """
     الحصول على slug المناسب لحالة الإكتمال في سلة
-    يمكن تخصيص هذا حسب إعدادات متجرك
+    مع fallback للقيم المختلفة
     """
-    # القيم المحتملة لحالة الإكتمال في سلة
-    completed_slugs = ['completed', 'delivered', 'تم-التوصيل', 'مكتمل']
+    # ترتيب الأفضلية لحالات الإكتمال
+    completed_slugs = ['completed', 'delivered', 'تم-التوصيل', 'مكتمل', 'تم التسليم']
     
-    # يمكن جلب الحالات الفعلية من سلة API إذا لزم الأمر
-    # أو تحديدها بناءً على إعدادات المتجر
-    
-    return completed_slugs[0]  # استخدام القيمة الأولى كافتراضي
+    # يمكن جلب الحالات الفعلية من إعدادات المتجر
+    return completed_slugs[0]  # استخدام القيمة الأولى
 
 
 def get_done_status_id(employee_id):
-    """جلب ID الخاص بحالة 'تم التنفيذ' مع كاش داخلي لزيادة السرعة"""
+    """جلب ID الخاص بحالة 'تم التنفيذ' مع كاش داخلي"""
     if not hasattr(current_app, "done_status_cache"):
         current_app.done_status_cache = {}
 
     if employee_id in current_app.done_status_cache:
         return current_app.done_status_cache[employee_id]
 
+    # البحث عن حالة "تم التنفيذ"
     status = EmployeeCustomStatus.query.filter_by(
         name="تم التنفيذ",
         employee_id=employee_id
@@ -968,18 +983,7 @@ def get_done_status_id(employee_id):
         current_app.done_status_cache[employee_id] = status.id
         return status.id
     
-    # إذا لم توجد حالة "تم التنفيذ"، نبحث عن حالة مشابهة أو ننشئها
-    alternative_names = ["مكتمل", "منتهي", "منفذ"]
-    for name in alternative_names:
-        status = EmployeeCustomStatus.query.filter_by(
-            name=name,
-            employee_id=employee_id
-        ).first()
-        if status:
-            current_app.done_status_cache[employee_id] = status.id
-            return status.id
-    
-    # إذا لم توجد أي حالة، ننشئ حالة "تم التنفيذ" جديدة
+    # إذا لم توجد، ننشئها
     try:
         new_status = EmployeeCustomStatus(
             name="تم التنفيذ",
@@ -994,3 +998,10 @@ def get_done_status_id(employee_id):
     except Exception as e:
         logger.error(f"❌ فشل إنشاء حالة 'تم التنفيذ' للموظف {employee_id}: {str(e)}")
         return None
+
+
+# إضافة دالة لإعادة المحاولة لاحقاً (اختياري)
+def retry_salla_status_update(order_id, user_id, max_retries=3):
+    """إعادة محاولة تحديث حالة الطلب في سلة"""
+    # يمكن تنفيذ هذا باستخدام queue system مثل Celery أو Redis Queue
+    pass
