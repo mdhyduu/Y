@@ -687,21 +687,39 @@ def get_main_image(item):
     except Exception as e:
         logger.error(f"Error in get_main_image: {str(e)}")
         return ''
-
-def format_date(date_str):
-    """تنسيق التاريخ مع معالجة الأخطاء"""
+def format_date(date_input):
+    """تنسيق التاريخ مع معالجة جميع أنواع المدخلات"""
     try:
-        if not date_str:
+        if not date_input:
             return 'غير معروف'
+        
+        # إذا كان كائن datetime
+        if isinstance(date_input, datetime):
+            return date_input.strftime('%Y-%m-%d %H:%M')
+        
+        # إذا كان سلسلة نصية
+        if isinstance(date_input, str):
+            # إزالة الأجزاء الدقيقة إذا وجدت
+            date_clean = date_input.split('.')[0] if '.' in date_input else date_input
+            date_clean = date_clean.split('+')[0] if '+' in date_clean else date_clean
+            date_clean = date_clean.split('Z')[0] if 'Z' in date_clean else date_clean
             
-        date_parts = date_str.split('.')[0]
-        dt = datetime.strptime(date_parts, '%Y-%m-%d %H:%M:%S')
-        return dt.strftime('%Y-%m-%d %H:%M')
+            # محاولة التنسيقات المختلفة
+            for fmt in ['%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d']:
+                try:
+                    dt = datetime.strptime(date_clean, fmt)
+                    return dt.strftime('%Y-%m-%d %H:%M')
+                except ValueError:
+                    continue
+        
+        # إذا فشلت جميع المحاولات، إرجاع التمثيل النصي
+        return str(date_input) if date_input else 'غير معروف'
         
     except Exception as e:
         logger.warning(f"Failed to format date: {str(e)}")
-        return date_str if date_str else 'غير معروف'
-
+        if isinstance(date_input, datetime):
+            return date_input.strftime('%Y-%m-%d %H:%M')
+        return str(date_input) if date_input else 'غير معروف'
 def process_order_data(order_id, items_data, barcode_data=None, store_id=None):
     """معالجة بيانات الطلب مع استخدام الباركود المخزن - معدل"""
     try:
