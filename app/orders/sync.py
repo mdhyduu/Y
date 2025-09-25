@@ -239,7 +239,7 @@ def sync_orders():
         
         # تحديد وقت آخر مزامنة
         last_sync = getattr(user, 'last_sync', None)
-        from_date = (datetime.utcnow() - timedelta(days=7)).strftime('%Y-%m-%d') if not last_sync else last_sync.strftime('%Y-%m-%d')
+        from_date = (datetime.utcnow() - timedelta(days=2)).strftime('%Y-%m-%d') if not last_sync else last_sync.strftime('%Y-%m-%d')
         
         headers = {
             'Authorization': f'Bearer {access_token}',
