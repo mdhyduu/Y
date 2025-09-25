@@ -132,12 +132,16 @@ def create_session():
     return session
 
 def generate_barcode(data):
-    """إنشاء باركود مع معالجة الأخطاء"""
+    """إنشاء باركود مع معالجة الأخطاء وضمان استخدام رقم الطلب الصحيح"""
     try:
+        # التأكد من أن البيانات هي رقم الطلب الحقيقي
         data_str = str(data).strip()
         if not data_str:
             logger.error("Empty data provided for barcode generation")
             return None
+        
+        # تسجيل رقم الطلب المستخدم لإنشاء الباركود
+        logger.info(f"Generating barcode for order ID: {data_str}")
         
         # اختيار نوع الباركود المناسب
         barcode_type = 'code128'
@@ -153,7 +157,8 @@ def generate_barcode(data):
                 'quiet_zone': 4,
                 'font_size': 10,
                 'text_distance': 5,
-                'dpi': 72
+                'dpi': 72,
+                'text': data_str  # التأكد من ظهور رقم الطلب تحت الباركود
             })
             
             barcode_instance = code_class(data_str, writer=writer)
@@ -170,6 +175,7 @@ def generate_barcode(data):
             barcode_base64 = base64.b64encode(image_data).decode('utf-8')
             result = f"data:image/png;base64,{barcode_base64}"
             
+            logger.info(f"Barcode generated successfully for order: {data_str}")
             return result
             
         except Exception as barcode_error:
@@ -184,7 +190,8 @@ def generate_barcode(data):
                     'module_width': 0.4,
                     'module_height': 15,
                     'quiet_zone': 4,
-                    'font_size': 10
+                    'font_size': 10,
+                    'text': data_str  # التأكد من ظهور رقم الطلب
                 })
                 
                 barcode_instance = code_class(data_str, writer=writer)
@@ -195,6 +202,7 @@ def generate_barcode(data):
                 barcode_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
                 result = f"data:image/png;base64,{barcode_base64}"
                 
+                logger.info(f"Barcode generated with code39 for order: {data_str}")
                 return result
                 
             except Exception as fallback_error:
@@ -305,42 +313,60 @@ def get_barcodes_for_orders(order_ids):
     """واجهة موحدة لجلب الباركودات (تستخدم النسخة المحسنة)"""
     return get_barcodes_for_orders_optimized(order_ids)
 
+
 def generate_and_store_barcode(order_id, order_type='salla', store_id=None):
-    """إنشاء باركود مع التخزين - معدل لمعالجة مشكلة store_id"""
+    """إنشاء باركود مع التخزين - معدل لضمان استخدام رقم الطلب الصحيح"""
     try:
         with app_context():
             order_id_str = str(order_id).strip()
             if not order_id_str:
+                logger.error("Empty order ID provided for barcode generation")
                 return None
             
+            # تسجيل محاولة إنشاء الباركود
+            logger.info(f"Attempting to generate barcode for order: {order_id_str}, type: {order_type}")
+            
+            # استخدام رقم الطلب الحقيقي لإنشاء الباركود
             barcode_data = generate_barcode(order_id_str)
             
             if not barcode_data:
+                logger.error(f"Failed to generate barcode for order: {order_id_str}")
                 return None
             
-            # محاولة التخزين في قاعدة البيانات باستخدام Connection Pool
+            # محاولة التخزين في قاعدة البيانات
             try:
                 engine = get_postgres_engine()
                 with engine.connect() as conn:
                     if order_type == 'salla':
-                        # استخدام INSERT ON CONFLICT مع توفير store_id
-                        # إذا لم يتم توفير store_id، نحاول الحصول عليه من الطلب الموجود
+                        # البحث عن الطلب أولاً للتأكد من وجوده
+                        existing_order_query = text("SELECT id, reference_id FROM salla_orders WHERE id = :id")
+                        result = conn.execute(existing_order_query, {'id': order_id_str})
+                        existing_order = result.fetchone()
+                        
+                        if existing_order:
+                            # استخدام reference_id إذا كان متاحاً (رقم الطلب الحقيقي)
+                            reference_id = existing_order[1] or order_id_str
+                            logger.info(f"Using reference_id: {reference_id} for order: {order_id_str}")
+                        else:
+                            reference_id = order_id_str
+                        
                         query = text("""
-                            INSERT INTO salla_orders (id, store_id, barcode_data, barcode_generated_at)
-                            VALUES (:id, :store_id, :barcode_data, :barcode_generated_at)
+                            INSERT INTO salla_orders (id, store_id, barcode_data, barcode_generated_at, reference_id)
+                            VALUES (:id, :store_id, :barcode_data, :barcode_generated_at, :reference_id)
                             ON CONFLICT (id) 
                             DO UPDATE SET 
                                 barcode_data = EXCLUDED.barcode_data,
-                                barcode_generated_at = EXCLUDED.barcode_generated_at
+                                barcode_generated_at = EXCLUDED.barcode_generated_at,
+                                reference_id = EXCLUDED.reference_id
                         """)
                         
-                        # محاولة الحصول على store_id من الطلب الموجود إذا لم يتم توفيره
-                        if store_id is None:
-                            existing_order_query = text("SELECT store_id FROM salla_orders WHERE id = :id")
-                            result = conn.execute(existing_order_query, {'id': order_id_str})
-                            existing_order = result.fetchone()
-                            if existing_order and existing_order[0]:
-                                store_id = existing_order[0]
+                        params = {
+                            'id': order_id_str,
+                            'store_id': store_id,
+                            'barcode_data': barcode_data,
+                            'barcode_generated_at': datetime.utcnow(),
+                            'reference_id': reference_id
+                        }
                     
                     else:
                         query = text("""
@@ -351,18 +377,16 @@ def generate_and_store_barcode(order_id, order_type='salla', store_id=None):
                                 barcode_data = EXCLUDED.barcode_data,
                                 barcode_generated_at = EXCLUDED.barcode_generated_at
                         """)
-                    
-                    params = {
-                        'id': order_id_str,
-                        'barcode_data': barcode_data,
-                        'barcode_generated_at': datetime.utcnow()
-                    }
-                    
-                    if order_type == 'salla' and store_id is not None:
-                        params['store_id'] = store_id
+                        
+                        params = {
+                            'id': order_id_str,
+                            'barcode_data': barcode_data,
+                            'barcode_generated_at': datetime.utcnow()
+                        }
                     
                     conn.execute(query, params)
                     conn.commit()
+                    logger.info(f"Barcode stored successfully for order: {order_id_str}")
                     
             except Exception as storage_error:
                 logger.error(f"Error storing barcode: {str(storage_error)}")
@@ -391,6 +415,7 @@ def generate_and_store_barcode(order_id, order_type='salla', store_id=None):
                             'barcode_generated_at': datetime.utcnow()
                         })
                         conn.commit()
+                        logger.info(f"Barcode updated successfully for order: {order_id_str}")
                 except Exception as update_error:
                     logger.error(f"Error updating barcode: {str(update_error)}")
             
@@ -401,10 +426,14 @@ def generate_and_store_barcode(order_id, order_type='salla', store_id=None):
         return None
 
 def bulk_generate_and_store_barcodes(order_ids, order_type='salla', store_id=None):
-    """إنشاء وتخزين الباركودات بشكل مجمع باستخدام الخيوط"""
+    """إنشاء وتخزين الباركودات بشكل مجمع باستخدام الخيوط - معدل لضمان استخدام رقم الطلب الصحيح"""
     try:
         if not order_ids:
+            logger.warning("No order IDs provided for bulk barcode generation")
             return {}
+        
+        # تسجيل بدء العملية
+        logger.info(f"Starting bulk barcode generation for {len(order_ids)} orders, type: {order_type}")
         
         barcodes_map = {}
         records_to_update = []
@@ -414,11 +443,23 @@ def bulk_generate_and_store_barcodes(order_ids, order_type='salla', store_id=Non
         def generate_single_barcode(order_id):
             order_id_str = str(order_id).strip()
             if not order_id_str:
+                logger.warning("Empty order ID in bulk generation")
                 return None, None
                 
             try:
+                # تسجيل محاولة إنشاء الباركود لرقم طلب محدد
+                logger.info(f"Generating barcode for order: {order_id_str}")
+                
+                # استخدام رقم الطلب الحقيقي لإنشاء الباركود
                 barcode_data = generate_barcode(order_id_str)
+                
                 if barcode_data:
+                    # التحقق من أن الباركود يحتوي على رقم الطلب الصحيح
+                    if order_id_str in barcode_data:
+                        logger.info(f"Barcode generated successfully for order: {order_id_str}")
+                    else:
+                        logger.warning(f"Barcode generated but order ID mismatch for: {order_id_str}")
+                    
                     with lock:
                         records_to_update.append({
                             'id': order_id_str,
@@ -427,11 +468,18 @@ def bulk_generate_and_store_barcodes(order_ids, order_type='salla', store_id=Non
                             'store_id': store_id
                         })
                     return order_id_str, barcode_data
+                else:
+                    logger.error(f"Failed to generate barcode for order: {order_id_str}")
+                    return order_id_str, None
+                    
             except Exception as e:
                 logger.error(f"Error generating barcode for {order_id_str}: {str(e)}")
-            return order_id_str, None
+                return order_id_str, None
         
         # استخدام ThreadPoolExecutor لإنشاء الباركودات بشكل متزامن
+        successful_generations = 0
+        failed_generations = 0
+        
         with ThreadPoolExecutor(max_workers=5) as executor:
             future_to_id = {executor.submit(generate_single_barcode, order_id): order_id for order_id in order_ids}
             
@@ -439,6 +487,12 @@ def bulk_generate_and_store_barcodes(order_ids, order_type='salla', store_id=Non
                 order_id_str, barcode_data = future.result()
                 if barcode_data:
                     barcodes_map[order_id_str] = barcode_data
+                    successful_generations += 1
+                else:
+                    failed_generations += 1
+        
+        # تسجيل نتائج الإنشاء
+        logger.info(f"Barcode generation completed: {successful_generations} successful, {failed_generations} failed")
         
         # تخزين مجمع في PostgreSQL
         if records_to_update:
@@ -447,14 +501,25 @@ def bulk_generate_and_store_barcodes(order_ids, order_type='salla', store_id=Non
                     engine = get_postgres_engine()
                     with engine.connect() as conn:
                         if order_type == 'salla':
+                            # البحث عن reference_id للطلبات الموجودة
+                            existing_orders_query = text("SELECT id, reference_id FROM salla_orders WHERE id = ANY(:order_ids)")
+                            result = conn.execute(existing_orders_query, {'order_ids': [r['id'] for r in records_to_update]})
+                            existing_orders = {row[0]: row[1] for row in result.fetchall()}
+                            
                             query = text("""
-                                INSERT INTO salla_orders (id, store_id, barcode_data, barcode_generated_at)
-                                VALUES (:id, :store_id, :barcode_data, :barcode_generated_at)
+                                INSERT INTO salla_orders (id, store_id, barcode_data, barcode_generated_at, reference_id)
+                                VALUES (:id, :store_id, :barcode_data, :barcode_generated_at, :reference_id)
                                 ON CONFLICT (id) 
                                 DO UPDATE SET 
                                     barcode_data = EXCLUDED.barcode_data,
-                                    barcode_generated_at = EXCLUDED.barcode_generated_at
+                                    barcode_generated_at = EXCLUDED.barcode_generated_at,
+                                    reference_id = COALESCE(EXCLUDED.reference_id, salla_orders.reference_id)
                             """)
+                            
+                            # إضافة reference_id لكل سجل
+                            for record in records_to_update:
+                                record['reference_id'] = existing_orders.get(record['id'], record['id'])
+                                
                         else:
                             query = text("""
                                 INSERT INTO custom_order (id, barcode_data, barcode_generated_at)
@@ -466,12 +531,17 @@ def bulk_generate_and_store_barcodes(order_ids, order_type='salla', store_id=Non
                             """)
                         
                         # التخزين المجمع
-                        conn.execute(query, records_to_update)
+                        result = conn.execute(query, records_to_update)
                         conn.commit()
+                        
+                        logger.info(f"Successfully stored {len(records_to_update)} barcodes in database")
                         
             except Exception as e:
                 logger.error(f"Error in bulk barcode storage: {str(e)}")
                 # محاولة التحديث الفردي للطلبات التي فشل تخزينها
+                successful_storages = 0
+                failed_storages = 0
+                
                 try:
                     with app_context():
                         engine = get_postgres_engine()
@@ -498,19 +568,30 @@ def bulk_generate_and_store_barcodes(order_ids, order_type='salla', store_id=Non
                                         'barcode_data': record['barcode_data'],
                                         'barcode_generated_at': record['barcode_generated_at']
                                     })
+                                    successful_storages += 1
                                 except Exception as single_update_error:
                                     logger.error(f"Error updating barcode for {record['id']}: {str(single_update_error)}")
+                                    failed_storages += 1
                             
                             conn.commit()
+                            logger.info(f"Individual update completed: {successful_storages} successful, {failed_storages} failed")
+                            
                 except Exception as update_error:
                     logger.error(f"Error in bulk barcode update: {str(update_error)}")
+        
+        # التحقق النهائي من الباركودات المخزنة
+        logger.info(f"Final barcodes map contains {len(barcodes_map)} entries")
+        
+        # تسجيل عينة من الباركودات للتأكد
+        sample_orders = list(barcodes_map.keys())[:3] if barcodes_map else []
+        for order_id in sample_orders:
+            logger.info(f"Sample - Order {order_id}: Barcode generated successfully")
         
         return barcodes_map
             
     except Exception as e:
         logger.error(f"Error in bulk_generate_and_store_barcodes: {str(e)}")
         return {}
-
 def get_main_image(item):
     """استخراج الصورة الرئيسية"""
     try:
@@ -562,12 +643,16 @@ def format_date(date_str):
         return date_str if date_str else 'غير معروف'
 
 def process_order_data(order_id, items_data, barcode_data=None, store_id=None):
-    """معالجة بيانات الطلب مع استخدام الباركود المخزن"""
+    """معالجة بيانات الطلب مع استخدام الباركود المخزن - معدل"""
     try:
         with app_context():
             order_id_str = str(order_id).strip()
             if not order_id_str:
+                logger.error("Empty order ID in process_order_data")
                 return None
+                
+            # تسجيل معالجة الطلب
+            logger.info(f"Processing order data for order: {order_id_str}")
                 
             items = []
             
@@ -641,30 +726,33 @@ def process_order_data(order_id, items_data, barcode_data=None, store_id=None):
                     logger.error(f"Error processing item: {str(item_error)}")
                     continue
 
-            # الحصول على الباركود
+            # الحصول على الباركود - التأكد من استخدام رقم الطلب الصحيح
             final_barcode_data = barcode_data
             
             if not final_barcode_data:
                 final_barcode_data = get_cached_barcode_data(order_id_str)
             
             if not final_barcode_data:
+                logger.info(f"Generating new barcode for order: {order_id_str}")
                 final_barcode_data = generate_and_store_barcode(order_id_str, 'salla', store_id)
             
             if not final_barcode_data:
+                logger.warning(f"Using fallback barcode generation for order: {order_id_str}")
                 final_barcode_data = generate_barcode(order_id_str)
 
             result = {
                 'id': order_id_str,
                 'order_items': items,
-                'barcode': final_barcode_data
+                'barcode': final_barcode_data,
+                'barcode_order_id': order_id_str  # إضافة حقل لتتبع رقم الطلب المستخدم
             }
             
+            logger.info(f"Order data processed successfully for order: {order_id_str}")
             return result
             
     except Exception as e:
         logger.error(f"Error in process_order_data: {str(e)}")
         return None
-
 @contextmanager
 def db_session_scope():
     """مدير سياق لإدارة جلسات قاعدة البيانات"""
@@ -1016,3 +1104,37 @@ def cleanup_resources():
         logger.info("Database resources cleaned up")
     except Exception as e:
         logger.error(f"Error cleaning up resources: {str(e)}")
+        
+def verify_barcode_order_ids():
+    """فحص جميع الباركودات للتأكد من استخدام أرقام الطلبات الصحيحة"""
+    try:
+        with app_context():
+            engine = get_postgres_engine()
+            with engine.connect() as conn:
+                # الحصول على جميع الباركودات
+                query = text("SELECT id, barcode_data FROM salla_orders WHERE barcode_data IS NOT NULL")
+                result = conn.execute(query)
+                rows = result.fetchall()
+                
+                problematic_orders = []
+                for row in rows:
+                    order_id = row[0]
+                    barcode_data = row[1]
+                    
+                    # التحقق مما إذا كان الباركود يحتوي على رقم الطلب الصحيح
+                    if barcode_data and order_id not in barcode_data:
+                        problematic_orders.append({
+                            'order_id': order_id,
+                            'barcode_data_sample': barcode_data[:100] + '...' if len(barcode_data) > 100 else barcode_data
+                        })
+                
+                if problematic_orders:
+                    logger.warning(f"Found {len(problematic_orders)} orders with potential barcode ID mismatch")
+                    for order in problematic_orders:
+                        logger.warning(f"Order {order['order_id']} has barcode that doesn't match order ID")
+                
+                return problematic_orders
+                
+    except Exception as e:
+        logger.error(f"Error in verify_barcode_order_ids: {str(e)}")
+        return []
