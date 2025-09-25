@@ -51,7 +51,6 @@ def decrypt_data(encrypted_data):
     except Exception as e:
         logger.error(f"خطأ في فك تشفير البيانات: {str(e)}")
         return encrypted_data
-
 @orders_bp.route('/')
 def index():
     user, employee = get_user_from_cookies()
@@ -73,6 +72,10 @@ def index():
     date_to = request.args.get('date_to', '')
     search_query = request.args.get('search', '')
     order_type = request.args.get('order_type', 'all')
+    
+    # 🔥 **التصحيح: معالجة القيمة 'None' لـ custom_status_filter**
+    if custom_status_filter == 'None':
+        custom_status_filter = ''
     
     if page < 1: 
         page = 1
@@ -141,17 +144,34 @@ def index():
                 )
         
         if employee_filter:
-            if order_type in ['all', 'salla']:
-                salla_query = salla_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
-            if order_type in ['all', 'custom']:
-                custom_query = custom_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
+            # 🔥 **التصحيح: معالجة القيمة 'None' لـ employee_filter**
+            if employee_filter != 'None':
+                try:
+                    employee_id = int(employee_filter)
+                    if order_type in ['all', 'salla']:
+                        salla_query = salla_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_id)
+                    if order_type in ['all', 'custom']:
+                        custom_query = custom_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_id)
+                except ValueError:
+                    pass  # تجاهل إذا كانت القيمة غير رقمية
         
         if custom_status_filter:
-            custom_status_id = int(custom_status_filter)
-            if order_type in ['all', 'salla']:
-                salla_query = salla_query.join(SallaOrder.employee_statuses).filter(
-                    OrderEmployeeStatus.status_id == custom_status_id
-                )
+            # 🔥 **التصحيح: معالجة القيمة 'None' وتحويل إلى integer**
+            if custom_status_filter != 'None':
+                try:
+                    custom_status_id = int(custom_status_filter)
+                    if order_type in ['all', 'salla']:
+                        salla_query = salla_query.join(SallaOrder.employee_statuses).filter(
+                            OrderEmployeeStatus.status_id == custom_status_id
+                        )
+                    if order_type in ['all', 'custom']:
+                        custom_query = custom_query.join(CustomOrder.employee_statuses).filter(
+                            OrderEmployeeStatus.status_id == custom_status_id
+                        )
+                except ValueError:
+                    pass  # تجاهل إذا كانت القيمة غير رقمية
+        
+        # ... باقي الكود بدون تغيير ...
             if order_type in ['all', 'custom']:
                 custom_query = custom_query.join(CustomOrder.employee_statuses).filter(
                     OrderEmployeeStatus.status_id == custom_status_id
