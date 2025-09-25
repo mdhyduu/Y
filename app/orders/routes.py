@@ -881,4 +881,131 @@ def order_status_webhook():
                 print(f"🔄 معالجة تحديث الطلب والعنوان للطلب {order_id}")
                 update_success = update_order_address(order_id, order_data)
                 if update_success:
-                    print(f"✅ تم تحديث بيانات 
+                    print(f"✅ تم تحديث بيانات العنوان للطلب {order_id}")
+                else:
+                    print(f"⚠️ فشل في تحديث العنوان للطلب {order_id}")
+
+            db.session.commit()
+
+        return jsonify({'success': True, 'message': 'تم استقبال البيانات بنجاح'}), 200
+
+    except Exception as e:
+        logger.error(f'خطأ في معالجة webhook: {str(e)}', exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        db.session.close()
+        
+def extract_order_address(order_data):
+    """
+    استخراج بيانات العنوان مع الأولوية للمتسلم
+    يرجع: اسم كامل، هاتف، بلد، مدينة، عنوان كامل
+    """
+    print("🔍 بدء استخراج العنوان من بيانات الطلب...")
+    
+    shipping_data = order_data.get('shipping', {}) or {}
+    customer_data = order_data.get('customer', {}) or {}
+    
+    print(f"🚚 بيانات الشحن: {shipping_data}")
+    print(f"👤 بيانات العميل: {customer_data}")
+    
+    # الأولوية للمتسلم (receiver)
+    receiver_data = shipping_data.get('receiver', {}) or {}
+    address_data = shipping_data.get('address') or shipping_data.get('pickup_address', {}) or {}
+    
+    print(f"📦 بيانات المتسلم: {receiver_data}")
+    print(f"🏠 بيانات العنوان: {address_data}")
+    
+    if receiver_data.get('name') or address_data:
+        print("✅ استخدام بيانات المتسلم والعنوان")
+        name = receiver_data.get('name', '').strip()
+        phone = receiver_data.get('phone') or f"{customer_data.get('mobile_code', '')}{customer_data.get('mobile', '')}"
+        country = address_data.get('country', customer_data.get('country', ''))
+        city = address_data.get('city', customer_data.get('city', ''))
+        full_address = address_data.get('shipping_address', '') or customer_data.get('location', '')
+        
+        if not name:
+            name = customer_data.get('full_name') or f"{customer_data.get('first_name', '')} {customer_data.get('last_name', '')}".strip()
+        
+        address_type = 'receiver'
+    
+    else:
+        print("🔍 استخدام بيانات العميل كبديل")
+        name = customer_data.get('full_name') or f"{customer_data.get('first_name', '')} {customer_data.get('last_name', '')}".strip()
+        phone = f"{customer_data.get('mobile_code', '')}{customer_data.get('mobile', '')}"
+        country = customer_data.get('country', '')
+        city = customer_data.get('city', '')
+        full_address = customer_data.get('location', '')
+        address_type = 'customer'
+    
+    if not name:
+        name = 'عميل غير معروف'
+        print("⚠️ استخدام اسم افتراضي: عميل غير معروف")
+    
+    if not full_address:
+        parts = [p for p in [country, city] if p]
+        full_address = ' - '.join(parts) if parts else 'لم يتم تحديد العنوان'
+        print("⚠️ استخدام عنوان مبني من البلد والمدينة")
+    
+    result = {
+        'name': name,
+        'phone': phone,
+        'country': country,
+        'city': city,
+        'full_address': full_address,
+        'address_type': address_type
+    }
+    
+    print(f"📋 النتيجة النهائية للعنوان: {result}")
+    return result
+    
+def update_order_address(order_id, order_data):
+    """
+    تحديث عنوان الطلب في قاعدة البيانات
+    """
+    try:
+        print(f"🔄 محاولة تحديث العنوان للطلب {order_id}")
+        
+        # استخراج بيانات العنوان من الطلب
+        address_info = extract_order_address(order_data)
+        print(f"📍 بيانات العنوان المستخرجة للتحديث: {address_info}")
+        
+        if not address_info:
+            print("⚠️ لا توجد بيانات عنوان للتحديث")
+            return False
+        
+        # البحث عن العنوان الحالي في قاعدة البيانات
+        existing_address = OrderAddress.query.filter_by(order_id=str(order_id)).first()
+        
+        if existing_address:
+            print("✅ وجود عنوان موجود، جاري التحديث...")
+            # تحديث البيانات الحالية
+            existing_address.name = encrypt_data(address_info.get('name', ''))
+            existing_address.phone = encrypt_data(address_info.get('phone', ''))
+            existing_address.country = address_info.get('country', '')
+            existing_address.city = address_info.get('city', '')
+            existing_address.full_address = address_info.get('full_address', '')
+            existing_address.address_type = address_info.get('address_type', 'customer')
+        else:
+            print("🆕 إنشاء عنوان جديد...")
+            # إنشاء سجل جديد إذا لم يكن موجوداً
+            new_address = OrderAddress(
+                order_id=str(order_id),
+                name=encrypt_data(address_info.get('name', '')),
+                phone=encrypt_data(address_info.get('phone', '')),
+                country=address_info.get('country', ''),
+                city=address_info.get('city', ''),
+                full_address=address_info.get('full_address', ''),
+                address_type=address_info.get('address_type', 'customer')
+            )
+            db.session.add(new_address)
+        
+        db.session.commit()
+        print("✅ تم تحديث العنوان بنجاح")
+        return True
+        
+    except Exception as e:
+        db.session.rollback()
+        error_msg = f"❌ خطأ في تحديث العنوان: {str(e)}"
+        print(error_msg)
+        logger.error(error_msg, exc_info=True)
+        return False
