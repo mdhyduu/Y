@@ -17,7 +17,7 @@ from app.token_utils import refresh_salla_token
 from app.config import Config
 from flask import send_file
 from io import BytesIO
-import pandas as pd
+
 from concurrent import futures
 
 import logging
@@ -374,91 +374,64 @@ def order_details(order_id):
         return response
 
     try:
+        # التحقق من صلاحية المراجع
         is_reviewer = False
         if request.cookies.get('is_admin') == 'true':
             is_reviewer = True
         elif current_employee and current_employee.role in ['reviewer', 'manager']:
             is_reviewer = True
 
-        # ⭐⭐ الخطوة 1: محاولة جلب الطلب من قاعدة البيانات أولاً ⭐⭐
-        order = SallaOrder.query.filter_by(id=str(order_id), store_id=user.store_id).first()
-        
-        order_data = None
-        items_data = []
-        
+        # ⭐⭐ محاولة جلب الطلب من قاعدة البيانات أولاً ⭐⭐
+        order = SallaOrder.query.filter_by(
+            id=str(order_id), store_id=user.store_id
+        ).first()
+
         if order and order.full_order_data:
             print("✅ استخدام البيانات المحلية المخزنة")
             order_data = order.full_order_data
             items_data = order_data.get('items', [])
-            
-            # 🔥 إذا لم تكن العناصر متوفرة محلياً، نضيفها ونحدث التخزين
+
+            # إذا ما فيه عناصر داخل الـ JSON، نجيبها من API
             if not items_data:
-                print("⚠️ العناصر غير متوفرة محلياً، جاري جلبها من API وتحديث التخزين...")
+                print("⚠️ العناصر غير متوفرة محلياً، جاري جلبها من API...")
                 items_data = fetch_order_items_from_api(user, order_id)
-                if items_data:
-                    # تحديث البيانات المحلية بإضافة العناصر
-                    order_data['items'] = items_data
-                    order.full_order_data = order_data  # تحديث الحقل
-                    db.session.commit()
-                    print(f"✅ تم تحديث البيانات المحلية بإضافة {len(items_data)} عنصر")
-                else:
-                    print("❌ فشل في جلب العناصر من API")
+
         else:
-            print("⚠️ الطلب غير موجود محلياً أو لا يحتوي على بيانات كاملة، جاري جلب البيانات من API...")
-            # ⭐⭐ الخطوة 2: جلب البيانات من API كاحتياطي ⭐⭐
+            print("⚠️ الطلب غير موجود محلياً، جاري جلب البيانات من API...")
             order_data, items_data = fetch_order_data_from_api(user, order_id)
-            
-            if order_data:
-                # ⭐⭐ حفظ البيانات محلياً للاستخدام المستقبلي ⭐⭐
-                if order:
-                    # تحديث الطلب الموجود
-                    order.full_order_data = order_data  # ✅ تحتوي على العناصر
-                    print("✅ تم تحديث البيانات المحلية للطلب الموجود")
-                else:
-                    # إنشاء طلب جديد في قاعدة البيانات
-                    new_order = create_order_from_api_data(user, order_data, items_data)  # ✅ نمرر العناصر
-                    if new_order:
-                        order = new_order
-                        print("✅ تم إنشاء طلب جديد في قاعدة البيانات مع العناصر")
-                
+
+            # إذا عندنا سجل موجود نحفظ البيانات
+            if order_data and order:
+                order.full_order_data = order_data
                 db.session.commit()
+                print("✅ تم حفظ البيانات محلياً للاستخدام المستقبلي")
 
-        # ⭐⭐ الخطوة 3: إذا فشل كل شيء، عرض رسالة خطأ ⭐⭐
-        if not order_data:
-            flash('الطلب غير موجود أو لا يمكن الوصول إليه', 'error')
-            return redirect(url_for('orders.index'))
+        # --- جلب بيانات إضافية من DB (الحالات، الملاحظات ...) ---
+        db_data = fetch_db_data(current_app.app_context(), user.store_id, str(order_id))
 
-        # ⭐⭐ الخطوة 4: معالجة البيانات (سواء كانت محلية أو من API) ⭐⭐
+        # --- معالجة الطلب ---
         processed_order = process_order_data(order_id, items_data)
-        
-        # جلب العنوان من قاعدة البيانات
+
+        # --- جلب العنوان من DB ---
         order_address = OrderAddress.query.filter_by(order_id=str(order_id)).first()
         print(f"🔍 العنوان من DB: {order_address}")
-        
+
         if order_address:
-            print("✅ استخدام العنوان المحفوظ في قاعدة البيانات")
-            # فك تشفير البيانات الحساسة
-            decrypted_name = decrypt_data(order_address.name) if order_address.name else ''
-            decrypted_phone = decrypt_data(order_address.phone) if order_address.phone else ''
-            
+            print("✅ استخدام العنوان المحفوظ")
             full_address = order_address.full_address or 'لم يتم تحديد العنوان'
             receiver_info = {
-                'name': decrypted_name,
-                'phone': decrypted_phone,
+                'name': decrypt_data(order_address.name) if order_address.name else '',
+                'phone': decrypt_data(order_address.phone) if order_address.phone else '',
             }
         else:
             print("❌ لا يوجد عنوان محفوظ")
             full_address = 'لم يتم تحديد العنوان'
-            receiver_info = {
-                'name': '',
-                'phone': '',
-            }
+            receiver_info = {'name': '', 'phone': ''}
 
-        # ⭐⭐ الخطوة 5: تحديث بيانات processed_order من order_data ⭐⭐
+        # --- دمج بيانات الطلب الأساسية ---
         processed_order.update({
             'id': order_id,
-            'reference_id': order_data.get('reference_id') or order_data.get('id') or 'غير متوفر',
-            'customer_name': decrypt_data(order.customer_name) if order and order.customer_name else 'عميل غير معروف',
+            'reference_id': order_data.get('reference_id') or 'غير متوفر',
             'status': {
                 'name': order_data.get('status', {}).get('name', 'غير معروف'),
                 'slug': order_data.get('status', {}).get('slug', 'unknown')
@@ -472,10 +445,8 @@ def order_details(order_id):
             }
         })
 
-        # ⭐⭐ الخطوة 6: جلب البيانات الإضافية من قاعدة البيانات ⭐⭐
-        db_data = fetch_additional_order_data(user.store_id, str(order_id))
-
-        return render_template('order_details.html', 
+        return render_template(
+            'order_details.html',
             order=processed_order,
             order_address=order_address,
             status_notes=db_data['status_notes'],
@@ -491,116 +462,118 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
-def create_order_from_api_data(user, order_data, items_data=None):
-    """إنشاء طلب جديد في قاعدة البيانات من بيانات API مع تضمين العناصر"""
-    try:
-        order_id = str(order_data.get('id'))
-        if not order_id:
-            return None
+def fetch_db_data(app_context, store_id, order_id_str):
+    """جلب بيانات الحالات والملاحظات من قاعدة البيانات"""
+    with app_context:
+        custom_note_statuses = CustomNoteStatus.query.filter_by(
+            store_id=store_id
+        ).all()
             
-        # استخراج البيانات الأساسية
-        customer = order_data.get('customer', {})
-        customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip()
-        if not customer_name:
-            customer_name = order_data.get('customer_name', 'عميل غير معروف')
+        status_notes = OrderStatusNote.query.filter_by(
+            order_id=order_id_str
+        ).options(
+            selectinload(OrderStatusNote.admin),
+            selectinload(OrderStatusNote.employee),
+            selectinload(OrderStatusNote.custom_status)
+        ).order_by(
+            OrderStatusNote.created_at.desc()
+        ).all()
+
+        employee_statuses = db.session.query(
+            OrderEmployeeStatus,
+            EmployeeCustomStatus,
+            Employee
+        ).join(
+            EmployeeCustomStatus,
+            OrderEmployeeStatus.status_id == EmployeeCustomStatus.id
+        ).join(
+            Employee,
+            EmployeeCustomStatus.employee_id == Employee.id
+        ).filter(
+            OrderEmployeeStatus.order_id == order_id_str
+        ).order_by(
+            OrderEmployeeStatus.created_at.desc()
+        ).all()
+
+        status_records = OrderProductStatus.query.filter_by(order_id=order_id_str).all()
+        product_statuses = {}
+        for status in status_records:
+            product_statuses[status.product_id] = {
+                'status': status.status,
+                'notes': status.notes,
+                'updated_at': status.updated_at
+            }
             
-        # معالجة التاريخ
-        created_at = None
-        date_info = order_data.get('date', {})
-        if date_info and 'date' in date_info:
-            try:
-                date_str = date_info['date'].split('.')[0]
-                created_at = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
-            except Exception:
-                created_at = datetime.utcnow()
-        
-        # المبلغ والعملة
-        total_info = order_data.get('total') or order_data.get('amounts', {}).get('total', {})
-        total_amount = float(total_info.get('amount', 0))
-        currency = total_info.get('currency', 'SAR')
-        
-        # 🔥 دمج العناصر مع البيانات الرئيسية إذا كانت متوفرة
-        if items_data:
-            order_data['items'] = items_data
-        else:
-            # إذا لم تكن العناصر متوفرة، نجلبها من API
-            items_data = fetch_order_items_from_api(user, order_id)
-            if items_data:
-                order_data['items'] = items_data
-        
-        # إنشاء الطلب الجديد
-        new_order = SallaOrder(
-            id=order_id,
-            store_id=user.store_id,
-            customer_name=encrypt_data(customer_name),
-            created_at=created_at or datetime.utcnow(),
-            total_amount=total_amount,
-            currency=currency,
-            payment_method=order_data.get('payment_method', ''),
-            raw_data=json.dumps(order_data, ensure_ascii=False),
-            full_order_data=order_data  # ✅ تحتوي على العناصر الآن
-        )
-        
-        db.session.add(new_order)
-        
-        # إضافة العنوان إذا كان متوفراً
-        address_info = extract_order_address(order_data)
-        if address_info:
-            address_info['name'] = encrypt_data(address_info.get('name', ''))
-            address_info['phone'] = encrypt_data(address_info.get('phone', ''))
-            
-            new_address = OrderAddress(
-                order_id=order_id,
-                **address_info
-            )
-            db.session.add(new_address)
-        
-        return new_order
-        
-    except Exception as e:
-        print(f"❌ خطأ في إنشاء الطلب من بيانات API: {str(e)}")
-        return None
-def fetch_order_data_from_api(user, order_id):
-    """جلب بيانات الطلب من API مع تضمين العناصر في البيانات الرئيسية"""
+        return {
+            'custom_note_statuses': custom_note_statuses,
+            'status_notes': status_notes,
+            'employee_statuses': employee_statuses,
+            'product_statuses': product_statuses
+        }
+
+# --- دوال المساعدة ---
+
+def fetch_order_items_from_api(user, order_id):
+    """جلب عناصر الطلب من API كاحتياطي"""
     try:
         access_token = refresh_salla_token(user)
         if not access_token:
-            return None, []
-            
+            return []
+
         headers = {
             'Authorization': f'Bearer {access_token}',
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         }
-        
-        # جلب بيانات الطلب الأساسية
+
+        response = requests.get(
+            f"{Config.SALLA_BASE_URL}/orders/items",
+            params={'order_id': order_id, 'include': 'images'},
+            headers=headers,
+            timeout=15
+        )
+
+        if response.status_code == 200:
+            return response.json().get('data', [])
+        else:
+            return []
+    except Exception as e:
+        print(f"❌ خطأ في جلب العناصر من API: {str(e)}")
+        return []
+
+
+def fetch_order_data_from_api(user, order_id):
+    """جلب بيانات الطلب كاملة من API"""
+    try:
+        access_token = refresh_salla_token(user)
+        if not access_token:
+            return {}, []
+
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+
         order_response = requests.get(
             f"{Config.SALLA_ORDERS_API}/{order_id}",
             headers=headers,
             timeout=15
         )
-        
-        if order_response.status_code != 200:
-            print(f"❌ خطأ في جلب بيانات الطلب من API: {order_response.status_code}")
-            return None, []
-        
         order_data = order_response.json().get('data', {})
-        
-        # جلب عناصر الطلب
-        items_data = fetch_order_items_from_api(user, order_id)
-        
-        # ✅ دمج العناصر مع البيانات الرئيسية للتخزين
-        if items_data:
-            order_data['items'] = items_data
-            print(f"✅ تم دمج {len(items_data)} عنصر مع بيانات الطلب")
-        else:
-            print("⚠️ لم يتم العثور على عناصر للطلب")
-        
+
+        items_response = requests.get(
+            f"{Config.SALLA_BASE_URL}/orders/items",
+            params={'order_id': order_id, 'include': 'images'},
+            headers=headers,
+            timeout=15
+        )
+        items_data = items_response.json().get('data', [])
+
         return order_data, items_data
-        
     except Exception as e:
         print(f"❌ خطأ في جلب بيانات الطلب من API: {str(e)}")
-        return None, []
+        return {}, []
 import hmac
 import hashlib
 
@@ -662,7 +635,6 @@ def handle_order_creation(data, webhook_version='2'):
     try:
         print(f"🔔 بدء معالجة ويب هوك - الإصدار: {webhook_version}")
         
-        # --- استخراج البيانات الأساسية من Webhook ---
         if webhook_version == '2':
             order_data = data.get('data', {})
             merchant_id = data.get('merchant')
@@ -691,17 +663,15 @@ def handle_order_creation(data, webhook_version='2'):
         if existing_order:
             print(f"✅ الطلب موجود مسبقاً في قاعدة البيانات")
             
-            # التصحيح: التحقق من وجود العنوان في جدول OrderAddress
-            existing_address = OrderAddress.query.filter_by(order_id=order_id).first()
-            print(f"📫 العنوان الموجود: {existing_address}")
+            # ⭐⭐ تحديث البيانات الكاملة إذا كانت موجودة ⭐⭐
+            existing_order.full_order_data = order_data
+            print("✅ تم تحديث البيانات الكاملة للطلب الموجود")
             
-            if not existing_address:  # إذا لم يكن هناك عنوان نضيفه
-                print("📝 لم يتم العثور على عنوان، جاري استخراج العنوان من البيانات...")
+            # تحديث العنوان إذا لزم الأمر
+            existing_address = OrderAddress.query.filter_by(order_id=order_id).first()
+            if not existing_address:
                 address_info = extract_order_address(order_data)
-                print(f"📍 بيانات العنوان المستخرجة: {address_info}")
-                
-                if address_info:  # التأكد من وجود بيانات العنوان
-                    # تشفير البيانات الحساسة قبل الحفظ
+                if address_info:
                     address_info['name'] = encrypt_data(address_info.get('name', ''))
                     address_info['phone'] = encrypt_data(address_info.get('phone', ''))
                     
@@ -710,17 +680,14 @@ def handle_order_creation(data, webhook_version='2'):
                         **address_info
                     )
                     db.session.add(new_address)
-                    db.session.commit()
-                    print("✅ تم حفظ العنوان الجديد بنجاح")
-                else:
-                    print("⚠️ لا توجد بيانات عنوان لاحفظها")
-            else:
-                print("✅ العنوان موجود مسبقاً، لا حاجة للإضافة")
+                    print("✅ تم إضافة العنوان للطلب الموجود")
+            
+            db.session.commit()
             return True
 
         print("🆕 طلب جديد، جاري إنشاؤه...")
 
-        # --- ربط الطلب بالمستخدم (store owner) ---
+        # --- ربط الطلب بالمستخدم ---
         user = User.query.filter_by(store_id=store_id).first()
         if not user:
             print("🔍 البحث عن مستخدم بديل...")
@@ -759,7 +726,7 @@ def handle_order_creation(data, webhook_version='2'):
             customer_name = order_data.get('customer_name', 'عميل غير معروف')
         print(f"👤 اسم العميل: {customer_name}")
 
-        # --- تشفير اسم العميل قبل الحفظ ---
+        # --- تشفير اسم العميل ---
         encrypted_customer_name = encrypt_data(customer_name)
 
         # --- تحديد حالة الطلب ---
@@ -787,28 +754,28 @@ def handle_order_creation(data, webhook_version='2'):
                 status_id = default_status.id
                 print(f"🔧 استخدام الحالة الافتراضية: {status_id}")
 
-        # --- إنشاء الطلب ---
+        # --- إنشاء الطلب مع تخزين البيانات الكاملة ⭐⭐ ---
         new_order = SallaOrder(
             id=order_id,
             store_id=store_id,
-            customer_name=encrypted_customer_name,  # حفظ الاسم مشفر
+            customer_name=encrypted_customer_name,
             created_at=created_at or datetime.utcnow(),
             total_amount=total_amount,
             currency=currency,
             payment_method=order_data.get('payment_method', ''),
             raw_data=json.dumps(order_data, ensure_ascii=False),
-            status_id=status_id
+            status_id=status_id,
+            full_order_data=order_data  # ⭐⭐ تخزين البيانات الكاملة ⭐⭐
         )
         db.session.add(new_order)
         db.session.flush()
-        print("✅ تم إنشاء الطلب في قاعدة البيانات")
+        print("✅ تم إنشاء الطلب في قاعدة البيانات مع البيانات الكاملة")
 
-        # --- إضافة العنوان (مع التشفير) ---
+        # --- إضافة العنوان ---
         address_info = extract_order_address(order_data)
         print(f"📍 بيانات العنوان المستخرجة للطلب الجديد: {address_info}")
         
         if address_info:
-            # تشفير البيانات الحساسة قبل الحفظ
             address_info['name'] = encrypt_data(address_info.get('name', ''))
             address_info['phone'] = encrypt_data(address_info.get('phone', ''))
             
@@ -818,17 +785,73 @@ def handle_order_creation(data, webhook_version='2'):
             )
             db.session.add(new_address)
             print("✅ تم إضافة العنوان للطلب الجديد")
-        else:
-            print("⚠️ لا توجد بيانات عنوان للطلب الجديد")
 
         # --- حفظ كل شيء ---
         db.session.commit()
-        print("🎉 تم حفظ الطلب والعنوان بنجاح")
+        print("🎉 تم حفظ الطلب والعنوان والبيانات الكاملة بنجاح")
         return True
 
     except Exception as e:
         db.session.rollback()
         error_msg = f"❌ خطأ في إنشاء الطلب من Webhook: {str(e)}"
+        print(error_msg)
+        logger.error(error_msg, exc_info=True)
+        return False
+def handle_order_update(data, webhook_version='2'):
+    """معالجة تحديث الطلب عبر webhook"""
+    try:
+        if webhook_version == '2':
+            order_data = data.get('data', {})
+        else:
+            order_data = data
+
+        order_id = str(order_data.get('id'))
+        if not order_id:
+            print("❌ لا يوجد معرف طلب للتحديث")
+            return False
+
+        print(f"🔄 معالجة تحديث الطلب: {order_id}")
+
+        # البحث عن الطلب الموجود
+        order = SallaOrder.query.get(order_id)
+        if not order:
+            print(f"⚠️ الطلب {order_id} غير موجود، جاري إنشاؤه...")
+            return handle_order_creation(data, webhook_version)
+
+        # ⭐⭐ تحديث البيانات الكاملة ⭐⭐
+        order.full_order_data = order_data
+        print("✅ تم تحديث البيانات الكاملة للطلب")
+
+        # تحديث الحالة إذا كانت متوفرة
+        status_info = order_data.get('status', {})
+        if status_info:
+            status_slug = status_info.get('slug', '').lower().replace('-', '_')
+            if not status_slug and status_info.get('name'):
+                status_slug = status_info['name'].lower().replace(' ', '_')
+
+            status = OrderStatus.query.filter_by(
+                slug=status_slug,
+                store_id=order.store_id
+            ).first()
+            if status:
+                order.status_id = status.id
+                print(f"✅ تم تحديث حالة الطلب إلى: {status_slug}")
+
+        # تحديث العنوان
+        update_success = update_order_address(order_id, order_data)
+        if update_success:
+            print("✅ تم تحديث العنوان")
+
+        # تحديث تاريخ التعديل
+        order.updated_at = datetime.utcnow()
+
+        db.session.commit()
+        print(f"🎉 تم تحديث الطلب {order_id} بنجاح")
+        return True
+
+    except Exception as e:
+        db.session.rollback()
+        error_msg = f"❌ خطأ في تحديث الطلب من Webhook: {str(e)}"
         print(error_msg)
         logger.error(error_msg, exc_info=True)
         return False
@@ -838,6 +861,7 @@ def order_status_webhook():
     setattr(request, "_dont_enforce_csrf", True)
 
     try:
+        # ... التحقق من التوقيع (نفس الكود) ...
         webhook_version = request.headers.get('X-Salla-Webhook-Version', '1')
         security_strategy = request.headers.get('X-Salla-Security-Strategy', 'signature')
         
@@ -858,78 +882,42 @@ def order_status_webhook():
             token = request.headers.get('Authorization')
             if not token or token != f"Bearer {Config.WEBHOOK_SECRET}":
                 return jsonify({'success': False, 'error': 'توكن غير صحيح'}), 403
-
         data = request.get_json()
         if not data:
             return jsonify({'success': False, 'error': 'لا يوجد بيانات'}), 400
 
+        webhook_version = request.headers.get('X-Salla-Webhook-Version', '1')
+        
         if webhook_version == '2':
             event = data.get('event')
             webhook_data = data.get('data', {})
             merchant_id = data.get('merchant')
-            
-            if merchant_id is None:
-                merchant_id = webhook_data.get('merchant') or webhook_data.get('store_id')
-                if merchant_id is None:
-                    return jsonify({'success': False, 'error': 'لا يوجد معرف متجر'}), 400
-            
-            order_data = webhook_data
         else:
             event = data.get('event')
-            order_data = data.get('data', {})
-            merchant_id = order_data.get('merchant_id')
+            webhook_data = data
+            merchant_id = webhook_data.get('merchant_id')
 
-        if event == 'order.created' and order_data:
-            success = handle_order_creation(data if webhook_version == '2' else order_data, webhook_version)
-            if success:
-                return jsonify({'success': True, 'message': 'تم إنشاء الطلب بنجاح'}), 200
-            else:
-                return jsonify({'success': False, 'error': 'فشل في إنشاء الطلب'}), 500
+        # ⭐⭐ معالجة الأحداث المختلفة ⭐⭐
+        if event == 'order.created':
+            success = handle_order_creation(data if webhook_version == '2' else webhook_data, webhook_version)
             
-        elif event in ['order.status.updated', 'order.updated'] and order_data:
-            order_id = str(order_data.get('id'))
+        elif event in ['order.updated', 'order.status.updated']:
+            success = handle_order_update(data if webhook_version == '2' else webhook_data, webhook_version)
             
-            # تحديث حالة الطلب (الكود الحالي)
-            if event == 'order.status.updated':
-                status_data = order_data.get('status', {})
-            else:
-                status_data = order_data.get('status', {}) or order_data.get('current_status', {})
-            
-            if order_id and status_data:
-                order = SallaOrder.query.get(order_id)
-                if order:
-                    status_slug = status_data.get('slug', '').lower().replace('-', '_')
-                    if not status_slug and status_data.get('name'):
-                        status_slug = status_data['name'].lower().replace(' ', '_')
-                    
-                    status = OrderStatus.query.filter_by(
-                        slug=status_slug,
-                        store_id=order.store_id
-                    ).first()
+        else:
+            print(f"🔔 حدث غير معالج: {event}")
+            success = True
 
-                    if status:
-                        order.status_id = status.id
-                        print(f"✅ تم تحديث حالة الطلب {order_id} إلى {status_slug}")
-
-            # ⭐⭐ إضافة تحديث العنوان عند حدث order.updated ⭐⭐
-            if event == 'order.updated' and order_data:
-                print(f"🔄 معالجة تحديث الطلب والعنوان للطلب {order_id}")
-                update_success = update_order_address(order_id, order_data)
-                if update_success:
-                    print(f"✅ تم تحديث بيانات العنوان للطلب {order_id}")
-                else:
-                    print(f"⚠️ فشل في تحديث العنوان للطلب {order_id}")
-
-            db.session.commit()
-
-        return jsonify({'success': True, 'message': 'تم استقبال البيانات بنجاح'}), 200
+        if success:
+            return jsonify({'success': True, 'message': 'تم معالجة الحدث بنجاح'}), 200
+        else:
+            return jsonify({'success': False, 'error': 'فشل في معالجة الحدث'}), 500
 
     except Exception as e:
         logger.error(f'خطأ في معالجة webhook: {str(e)}', exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         db.session.close()
-        
 def extract_order_address(order_data):
     """
     استخراج بيانات العنوان مع الأولوية للمتسلم
