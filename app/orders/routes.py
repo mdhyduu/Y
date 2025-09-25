@@ -563,7 +563,7 @@ def create_order_from_api_data(user, order_data, items_data=None):
 def fetch_order_data_from_api(user, order_id):
     """جلب بيانات الطلب من API مع تضمين العناصر في البيانات الرئيسية"""
     try:
-        access_token = refresh_salla_token_if_needed(user)
+        access_token = refresh_salla_token(user)
         if not access_token:
             return None, []
             
@@ -601,38 +601,6 @@ def fetch_order_data_from_api(user, order_id):
     except Exception as e:
         print(f"❌ خطأ في جلب بيانات الطلب من API: {str(e)}")
         return None, []
-        
-def fetch_order_items_from_api(user, order_id):
-    """جلب عناصر الطلب من API مع معالجة الأخطاء المحسنة"""
-    try:
-        access_token = refresh_salla_token_if_needed(user)
-        if not access_token:
-            print("❌ لا يوجد access token")
-            return []
-            
-        headers = {
-            'Authorization': f'Bearer {access_token}',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
-        
-        response = requests.get(
-            f"{Config.SALLA_BASE_URL}/orders/items",
-            params={'order_id': order_id, 'include': 'images'},
-            headers=headers,
-            timeout=15
-        )
-        
-        if response.status_code == 200:
-            items = response.json().get('data', [])
-            print(f"✅ تم جلب {len(items)} عنصر من API للطلب {order_id}")
-            return items
-        else:
-            print(f"❌ خطأ في جلب العناصر من API: {response.status_code} - {response.text}")
-            return []
-    except Exception as e:
-        print(f"❌ خطأ في جلب العناصر من API: {str(e)}")
-        return []
 import hmac
 import hashlib
 
