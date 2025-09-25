@@ -373,7 +373,7 @@ class SallaOrder(db.Model):
     last_synced = db.Column(db.DateTime, nullable=True)
     # العمود الأساسي للربط
     status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'), nullable=True)
-    full_order_data = db.Column(db.JSONB, nullable=True)
+    full_order_data = db.Column(db.JSON, nullable=True)
     # العلاقة الصحيحة مع OrderStatus
     status = db.relationship('OrderStatus', backref='salla_orders', lazy=True)
 
