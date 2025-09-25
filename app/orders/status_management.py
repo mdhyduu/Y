@@ -781,227 +781,94 @@ def check_status_conflict(order_id, new_status_type, custom_status_id=None):
         return True, "حدث خطأ في التحقق من التعارض"
 
 
-@orders_bp.route('/<order_id>/product/<product_id>/update_status', methods=['POST'])
-def update_product_status(order_id, product_id):
-    """تحديث حالة منتج معين داخل الطلب + تحديث حالة الطلب إذا كل المنتجات تم تنفيذها"""
+@orders_bp.route('/<order_id>/update_print_status', methods=['POST'])
+def update_print_status(order_id):
+    """تحديث حالة الطلب من نسخة الطباعة (للموظفين)"""
     user, employee = get_user_from_cookies()
+    
     if not user:
         return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
-
-    # استقبال البيانات كـ JSON
+    
+    # للموظفين فقط
+    if request.cookies.get('is_admin') == 'true':
+        return jsonify({'success': False, 'error': 'هذه الخدمة للموظفين فقط'}), 403
+    
+    if not employee:
+        return jsonify({'success': False, 'error': 'غير مصرح لك بهذا الإجراء'}), 403
+    
     data = request.get_json()
     if not data:
         return jsonify({'success': False, 'error': 'بيانات غير صالحة'}), 400
         
-    new_status = data.get('status', 'تم التنفيذ')
-    notes = data.get('notes', '')
-
-    # التحقق من صحة product_id
-    if not product_id or product_id == 'undefined':
-        return jsonify({
-            'success': False, 
-            'error': 'معرف المنتج غير صالح'
-        }), 400
-
-    try:
-        # البحث عن حالة المنتج الحالية أو إنشاء جديدة
-        status_obj = OrderProductStatus.query.filter_by(
-            order_id=str(order_id),
-            product_id=str(product_id)
-        ).first()
-
-        if status_obj:
-            status_obj.status = new_status
-            status_obj.notes = notes
-            status_obj.updated_at = datetime.utcnow()
-            if employee:
-                status_obj.employee_id = employee.id
-        else:
-            status_obj = OrderProductStatus(
-                order_id=str(order_id),
-                product_id=str(product_id),
-                status=new_status,
-                notes=notes,
-                employee_id=employee.id if employee else None
-            )
-            db.session.add(status_obj)
-
-        db.session.commit()
-
-        # ✅ التحقق السريع: إذا ما فيه أي منتج غير "تم التنفيذ"
-        not_done = OrderProductStatus.query.filter(
-            OrderProductStatus.order_id == str(order_id),
-            OrderProductStatus.status != "تم التنفيذ"
-        ).first()
-
-        all_products_done = not not_done  # True إذا كل المنتجات مكتملة
-
-        # إذا لم يتبق أي منتج غير مكتمل
-        if all_products_done:
-            try:
-                # 1. تحديث الحالة المخصصة للموظف محلياً أولاً (الأهم)
-                if employee:
-                    done_status_id = get_done_status_id(employee.id)
-                    if done_status_id:
-                        # تحديث أو إضافة الحالة للطلب
-                        order_status = OrderEmployeeStatus.query.filter_by(
-                            order_id=str(order_id),
-                            status_id=done_status_id
-                        ).first()
-
-                        if not order_status:
-                            order_status = OrderEmployeeStatus(
-                                order_id=str(order_id),
-                                status_id=done_status_id,
-                                note="تم تحويل الطلب تلقائياً بعد تنفيذ جميع المنتجات"
-                            )
-                            db.session.add(order_status)
-                        else:
-                            order_status.note = "تم تحديث تلقائياً بعد تنفيذ جميع المنتجات"
-                            order_status.updated_at = datetime.utcnow()
-
-                        db.session.commit()
-                        logger.info(f"✅ تم تحديث الحالة المخصصة للطلب {order_id}")
-
-            except Exception as e:
-                db.session.rollback()
-                logger.error(f"❌ خطأ في تحديث الحالة المخصصة: {str(e)}")
-
-            try:
-                # 2. إضافة ملاحظة حالة تلقائية للمراجعين
-                if employee:
-                    auto_note = OrderStatusNote(
-                        order_id=str(order_id),
-                        status_flag="completed",
-                        note="تم الانتهاء من جميع المنتجات تلقائياً",
-                        employee_id=employee.id
-                    )
-                    db.session.add(auto_note)
-                    db.session.commit()
-                    logger.info(f"✅ تم إضافة ملاحظة تلقائية للطلب {order_id}")
-                    
-            except Exception as e:
-                logger.error(f"❌ خطأ في إضافة الملاحظة التلقائية: {str(e)}")
-
-            try:
-                # 3. تحديث حالة الطلب في سلة (بشكل منفصل وغير متزامن)
-                if user.salla_access_token:
-                    # نستخدم task أو thread لتجنب blocking
-                    from threading import Thread
-                    
-                    def update_salla_status_async():
-                        try:
-                            headers = {
-                                'Authorization': f'Bearer {user.salla_access_token}',
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json'
-                            }
-
-                            payload = {
-                                'slug': get_completed_status_slug(),
-                                'note': 'تم تنفيذ جميع المنتجات في الطلب تلقائياً'
-                            }
-
-                            response = requests.post(
-                                f"{Config.SALLA_ORDERS_API}/{order_id}/status",
-                                headers=headers,
-                                json=payload,
-                                timeout=15  # زيادة الوقت لـ 15 ثانية
-                            )
-                            
-                            if response.status_code == 200:
-                                logger.info(f"✅ تم تحديث حالة الطلب {order_id} في سلة إلى مكتمل")
-                            elif response.status_code == 429:
-                                logger.warning(f"⏳ تم تجاوز معدل الطلبات لسلة، سيتم إعادة المحاولة لاحقاً للطلب {order_id}")
-                                # يمكن إضافة الطلب إلى queue لإعادة المحاولة لاحقاً
-                            else:
-                                logger.warning(f"⚠️ فشل تحديث حالة الطلب في سلة: {response.status_code} - {response.text}")
-                                
-                        except requests.exceptions.Timeout:
-                            logger.error(f"⏰ انتهى وقت الانتظار لتحديث سلة للطلب {order_id}")
-                        except requests.exceptions.RequestException as e:
-                            logger.error(f"❌ خطأ في الاتصال بسلة: {str(e)}")
-                        except Exception as e:
-                            logger.error(f"❌ خطأ غير متوقع في تحديث سلة: {str(e)}")
-
-                    # تشغيل المهمة في thread منفصل
-                    thread = Thread(target=update_salla_status_async)
-                    thread.daemon = True
-                    thread.start()
-                    
-                else:
-                    logger.warning("⚠️ لا يوجد توكن وصول لسلة، سيتم التحديث المحلي فقط")
-
-            except Exception as e:
-                logger.error(f"❌ خطأ في بدء تحديث سلة: {str(e)}")
-
-        # إرجاع بيانات محدثة للعرض
-        return jsonify({
-            'success': True, 
-            'message': 'تم تحديث حالة المنتج بنجاح',
-            'status': new_status,
-            'updated_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M'),
-            'all_products_done': all_products_done  # إرجاع حالة اكتمال جميع المنتجات
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"❌ خطأ في تحديث حالة المنتج: {str(e)}")
-        return jsonify({
-            'success': False, 
-            'error': 'خطأ في تحديث حالة المنتج'
-        }), 500
-
-
-def get_completed_status_slug():
-    """
-    الحصول على slug المناسب لحالة الإكتمال في سلة
-    مع fallback للقيم المختلفة
-    """
-    # ترتيب الأفضلية لحالات الإكتمال
-    completed_slugs = ['completed', 'delivered', 'تم-التوصيل', 'مكتمل', 'تم التسليم']
+    status = data.get('status')
     
-    # يمكن جلب الحالات الفعلية من إعدادات المتجر
-    return completed_slugs[0]  # استخدام القيمة الأولى
-
-
-def get_done_status_id(employee_id):
-    """جلب ID الخاص بحالة 'تم التنفيذ' مع كاش داخلي"""
-    if not hasattr(current_app, "done_status_cache"):
-        current_app.done_status_cache = {}
-
-    if employee_id in current_app.done_status_cache:
-        return current_app.done_status_cache[employee_id]
-
-    # البحث عن حالة "تم التنفيذ"
-    status = EmployeeCustomStatus.query.filter_by(
-        name="تم التنفيذ",
-        employee_id=employee_id
-    ).first()
-
-    if status:
-        current_app.done_status_cache[employee_id] = status.id
-        return status.id
+    if not status:
+        return jsonify({'success': False, 'error': 'يجب تحديد حالة'}), 400
     
-    # إذا لم توجد، ننشئها
-    try:
-        new_status = EmployeeCustomStatus(
+    # البحث عن حالة "تم التنفيذ" الافتراضية للموظف
+    if status == "تم التنفيذ":
+        done_status = EmployeeCustomStatus.query.filter_by(
             name="تم التنفيذ",
-            color="#28a745",
-            employee_id=employee_id
-        )
-        db.session.add(new_status)
-        db.session.commit()
+            employee_id=employee.id
+        ).first()
         
-        current_app.done_status_cache[employee_id] = new_status.id
-        return new_status.id
-    except Exception as e:
-        logger.error(f"❌ فشل إنشاء حالة 'تم التنفيذ' للموظف {employee_id}: {str(e)}")
-        return None
-
-
-# إضافة دالة لإعادة المحاولة لاحقاً (اختياري)
-def retry_salla_status_update(order_id, user_id, max_retries=3):
-    """إعادة محاولة تحديث حالة الطلب في سلة"""
-    # يمكن تنفيذ هذا باستخدام queue system مثل Celery أو Redis Queue
-    pass
+        if not done_status:
+            # إنشاء حالة "تم التنفيذ" إذا لم توجد
+            done_status = EmployeeCustomStatus(
+                name="تم التنفيذ",
+                color="#28a745",
+                employee_id=employee.id
+            )
+            db.session.add(done_status)
+            db.session.commit()
+        
+        # إضافة/تحديث حالة الطلب
+        existing_status = OrderEmployeeStatus.query.filter_by(
+            order_id=str(order_id),
+            status_id=done_status.id
+        ).first()
+        
+        if existing_status:
+            existing_status.updated_at = datetime.utcnow()
+        else:
+            new_status = OrderEmployeeStatus(
+                order_id=str(order_id),
+                status_id=done_status.id,
+                note="تم التحديث من نسخة الطباعة"
+            )
+            db.session.add(new_status)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'تم تحديث الحالة بنجاح'})
+    
+    # للحالات الأخرى، نستخدم نظام الملاحظات
+    status_mapping = {
+        "قيد التنفيذ": "قيد التنفيذ",
+        "ملغى": "ملغى",
+        "لم يبدأ": "لم يبدأ"
+    }
+    
+    if status in status_mapping:
+        status_flag = status_mapping[status]
+        
+        # البحث عن ملاحظة موجودة أو إنشاء جديدة
+        existing_note = OrderStatusNote.query.filter_by(
+            order_id=str(order_id),
+            status_flag=status_flag
+        ).first()
+        
+        if existing_note:
+            existing_note.updated_at = datetime.utcnow()
+        else:
+            new_note = OrderStatusNote(
+                order_id=str(order_id),
+                status_flag=status_flag,
+                note="تم التحديث من نسخة الطباعة",
+                employee_id=employee.id
+            )
+            db.session.add(new_note)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'تم تحديث الحالة بنجاح'})
+    
+    return jsonify({'success': False, 'error': 'حالة غير معروفة'}), 400
