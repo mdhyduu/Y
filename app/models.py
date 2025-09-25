@@ -12,10 +12,8 @@ from sqlalchemy import (
     DateTime, LargeBinary, ForeignKey,
     func, event
 )
-import sqlalchemy as sa
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship, backref, validates
-
 from sqlalchemy.dialects.postgresql import JSONB
 # Local application imports
 from . import db
@@ -359,17 +357,12 @@ class EmployeePermission(db.Model):
     employee = relationship('Employee', back_populates='permissions')
     department = relationship('Department', back_populates='permissions')
 
-
-
 class SallaOrder(db.Model):
     __tablename__ = 'salla_orders'
     __table_args__ = (
         db.Index('ix_salla_orders_store_created', 'store_id', 'created_at'),
         db.Index('ix_salla_orders_status', 'status_id'),
-        # ممكن تضيف GIN index لو حابب تستعلم كثير داخل full_order_data
-        sa.Index('ix_salla_orders_full_data', 'full_order_data', postgresql_using='gin')
     )
-
     id = db.Column(db.String(50), primary_key=True)
     store_id = db.Column(db.Integer, nullable=False)
     customer_name = db.Column(db.String(255))
@@ -378,24 +371,23 @@ class SallaOrder(db.Model):
     currency = db.Column(db.String(10), default='SAR')
     payment_method = db.Column(db.String(100))
     last_synced = db.Column(db.DateTime, nullable=True)
-
     # العمود الأساسي للربط
     status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'), nullable=True)
+    full_order_data = db.Column(db.JSON, nullable=True)
+    # العلاقة الصحيحة مع OrderStatus
     status = db.relationship('OrderStatus', backref='salla_orders', lazy=True)
 
-    # ✅ أعمدة JSONB
-    full_order_data = db.Column(JSONB, nullable=True)  # بيانات الطلب كاملة
-    raw_data = db.Column(JSONB)  # أي بيانات إضافية خام من API
-
-    # باقي الأعمدة
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    raw_data = db.Column(db.JSON)
     barcode_data = db.Column(db.Text)  # تخزين الباركود كـ base64
     barcode_generated_at = db.Column(db.DateTime)  # وقت إنشاء الباركود
+
 
     # العلاقات الأخرى
     status_notes = relationship('OrderStatusNote', back_populates='order')
     employee_statuses = relationship('OrderEmployeeStatus', back_populates='order')
     assignments = relationship('OrderAssignment', back_populates='order')
+# إضافة إلى models.py
 class CustomOrder(db.Model):
     __tablename__ = 'custom_orders'
     
