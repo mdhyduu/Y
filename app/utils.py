@@ -163,8 +163,8 @@ def generate_barcode(data):
             # إعدادات محسنة للكاتب
             writer.set_options({
                 'write_text': True,
-                'module_width': 0.3,  # تقليل العرض قليلاً
-                'module_height': 12,   # تقليل الارتفاع قليلاً
+                'module_width': 0.4,  # تقليل العرض قليلاً
+                'module_height': 15,   # تقليل الارتفاع قليلاً
                 'quiet_zone': 3,      # منطقة هادئة أصغر
                 'font_size': 8,       # حجم خط أصغر
                 'text_distance': 3,   # تقليل المسافة بين النص والباركود
