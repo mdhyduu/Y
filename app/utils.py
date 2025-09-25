@@ -140,28 +140,45 @@ def generate_barcode(data):
             logger.error("Empty data provided for barcode generation")
             return None
         
-        # تسجيل رقم الطلب المستخدم لإنشاء الباركود
-        logger.info(f"Generating barcode for order ID: {data_str}")
+        # تنظيف البيانات من أي رموز غير مرغوب فيها
+        # إزالة أي رموز غير رقمية باستثناء الأحرف الأساسية
+        import re
+        cleaned_data = re.sub(r'[^\w\s-]', '', data_str)  # إزالة الرموز الخاصة
+        cleaned_data = cleaned_data.strip()
         
-        # اختيار نوع الباركود المناسب
+        if not cleaned_data:
+            logger.error("Data is empty after cleaning")
+            return None
+            
+        # تسجيل رقم الطلب المستخدم لإنشاء الباركود
+        logger.info(f"Generating barcode for order ID: {cleaned_data} (original: {data_str})")
+        
+        # استخدام code128 كخيار أول (يدعم الأحرف الرقمية فقط بشكل أفضل)
         barcode_type = 'code128'
         
         try:
             code_class = barcode.get_barcode_class(barcode_type)
             writer = ImageWriter()
             
+            # إعدادات محسنة للكاتب
             writer.set_options({
                 'write_text': True,
-                'module_width': 0.4,
-                'module_height': 15,
-                'quiet_zone': 4,
-                'font_size': 10,
-                'text_distance': 5,
-                'dpi': 72,
-                'text': data_str  # التأكد من ظهور رقم الطلب تحت الباركود
+                'module_width': 0.3,  # تقليل العرض قليلاً
+                'module_height': 12,   # تقليل الارتفاع قليلاً
+                'quiet_zone': 3,      # منطقة هادئة أصغر
+                'font_size': 8,       # حجم خط أصغر
+                'text_distance': 3,   # تقليل المسافة بين النص والباركود
+                'dpi': 96,            # زيادة الدقة
+                'text': cleaned_data  # استخدام البيانات المنظفة
             })
             
-            barcode_instance = code_class(data_str, writer=writer)
+            # التأكد من أن البيانات مناسبة لنوع الباركود
+            if barcode_type == 'code128':
+                # code128 يدعم الأحرف الرقمية والأبجدية الرقمية بشكل أفضل
+                if not re.match(r'^[\dA-Za-z\-\s]+$', cleaned_data):
+                    logger.warning(f"Data may not be optimal for code128: {cleaned_data}")
+            
+            barcode_instance = code_class(cleaned_data, writer=writer)
             buffer = BytesIO()
             barcode_instance.write(buffer)
             
@@ -175,44 +192,87 @@ def generate_barcode(data):
             barcode_base64 = base64.b64encode(image_data).decode('utf-8')
             result = f"data:image/png;base64,{barcode_base64}"
             
-            logger.info(f"Barcode generated successfully for order: {data_str}")
+            # التحقق من أن الباركود لا يحتوي على رموز إضافية
+            if '+' in result[:100] or '/' in result[:100]:
+                logger.warning("Barcode contains special characters, trying alternative method")
+                return generate_barcode_alternative(cleaned_data)
+            
+            logger.info(f"Barcode generated successfully for order: {cleaned_data}")
             return result
             
         except Exception as barcode_error:
             logger.warning(f"Failed with {barcode_type}, trying code39: {barcode_error}")
-            
-            try:
-                code_class = barcode.get_barcode_class('code39')
-                writer = ImageWriter()
-                
-                writer.set_options({
-                    'write_text': True,
-                    'module_width': 0.4,
-                    'module_height': 15,
-                    'quiet_zone': 4,
-                    'font_size': 10,
-                    'text': data_str  # التأكد من ظهور رقم الطلب
-                })
-                
-                barcode_instance = code_class(data_str, writer=writer)
-                buffer = BytesIO()
-                barcode_instance.write(buffer)
-                
-                buffer.seek(0)
-                barcode_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-                result = f"data:image/png;base64,{barcode_base64}"
-                
-                logger.info(f"Barcode generated with code39 for order: {data_str}")
-                return result
-                
-            except Exception as fallback_error:
-                logger.error(f"All barcode generation methods failed: {fallback_error}")
-                return None
+            return generate_barcode_with_code39(cleaned_data)
                 
     except Exception as e:
         logger.error(f"Error in generate_barcode: {str(e)}")
         return None
 
+def generate_barcode_with_code39(data):
+    """إنشاء باركود باستخدام code39 كبديل"""
+    try:
+        code_class = barcode.get_barcode_class('code39')
+        writer = ImageWriter()
+        
+        writer.set_options({
+            'write_text': True,
+            'module_width': 0.4,
+            'module_height': 15,
+            'quiet_zone': 4,
+            'font_size': 10,
+            'text_distance': 5,
+            'dpi': 72,
+            'text': data
+        })
+        
+        # استخدام add_checksum=False لمنع إضافة أحرف التحقق
+        barcode_instance = code_class(data, writer=writer, add_checksum=False)
+        buffer = BytesIO()
+        barcode_instance.write(buffer)
+        
+        buffer.seek(0)
+        barcode_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        result = f"data:image/png;base64,{barcode_base64}"
+        
+        logger.info(f"Barcode generated with code39 for order: {data}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Failed to generate barcode with code39: {str(e)}")
+        return generate_barcode_alternative(data)
+
+def generate_barcode_alternative(data):
+    """طريقة بديلة لإنشاء الباركود باستخدام مكتبة مختلفة إذا لزم الأمر"""
+    try:
+        # محاولة استخدام مكتبة python-barcode مع إعدادات أكثر تحكماً
+        from barcode import Code128
+        from barcode.writer import ImageWriter as AltImageWriter
+        
+        writer = AltImageWriter()
+        writer.set_options({
+            'write_text': True,
+            'text': data,
+            'quiet_zone': 2,
+            'module_width': 0.35,
+            'module_height': 10,
+            'font_size': 9,
+            'text_distance': 2
+        })
+        
+        code128 = Code128(data, writer=writer)
+        buffer = BytesIO()
+        code128.write(buffer)
+        
+        buffer.seek(0)
+        barcode_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        result = f"data:image/png;base64,{barcode_base64}"
+        
+        logger.info(f"Barcode generated with alternative method for order: {data}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"All barcode generation methods failed: {str(e)}")
+        return None
 def get_cached_barcode_data(order_id):
     """الحصول على بيانات الباركود من التخزين المؤقت"""
     try:
