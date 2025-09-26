@@ -380,6 +380,12 @@ def order_details(order_id):
         elif current_employee and current_employee.role in ['reviewer', 'manager']:
             is_reviewer = True
 
+        # ⭐⭐ التحقق من صلاحية التوكن أولاً ⭐⭐
+        access_token = refresh_salla_token(user)
+        if not access_token:
+            flash('انتهت صلاحية الجلسة، الرجاء إعادة الربط مع سلة', 'error')
+            return redirect(url_for('auth.link_store'))  # أو صفحة إعادة الربط المناسبة
+
         # ⭐⭐ الخطوة 1: محاولة جلب الطلب من قاعدة البيانات أولاً ⭐⭐
         order = SallaOrder.query.filter_by(id=str(order_id), store_id=user.store_id).first()
         
@@ -398,7 +404,7 @@ def order_details(order_id):
                 if items_data:
                     # تحديث البيانات المحلية بإضافة العناصر
                     order_data['items'] = items_data
-                    order.full_order_data = order_data  # تحديث الحقل
+                    order.full_order_data = order_data
                     db.session.commit()
                     print(f"✅ تم تحديث البيانات المحلية بإضافة {len(items_data)} عنصر")
                 else:
@@ -408,15 +414,19 @@ def order_details(order_id):
             # ⭐⭐ الخطوة 2: جلب البيانات من API كاحتياطي ⭐⭐
             order_data, items_data = fetch_order_data_from_api(user, order_id)
             
+            if not order_data:
+                flash('فشل في جلب بيانات الطلب، الرجاء التحقق من اتصال سلة', 'error')
+                return redirect(url_for('orders.index'))
+            
             if order_data:
                 # ⭐⭐ حفظ البيانات محلياً للاستخدام المستقبلي ⭐⭐
                 if order:
                     # تحديث الطلب الموجود
-                    order.full_order_data = order_data  # ✅ تحتوي على العناصر
+                    order.full_order_data = order_data
                     print("✅ تم تحديث البيانات المحلية للطلب الموجود")
                 else:
                     # إنشاء طلب جديد في قاعدة البيانات
-                    new_order = create_order_from_api_data(user, order_data, items_data)  # ✅ نمرر العناصر
+                    new_order = create_order_from_api_data(user, order_data, items_data)
                     if new_order:
                         order = new_order
                         print("✅ تم إنشاء طلب جديد في قاعدة البيانات مع العناصر")
@@ -433,7 +443,6 @@ def order_details(order_id):
         
         # جلب العنوان من قاعدة البيانات
         order_address = OrderAddress.query.filter_by(order_id=str(order_id)).first()
-        print(f"🔍 العنوان من DB: {order_address}")
         
         if order_address:
             print("✅ استخدام العنوان المحفوظ في قاعدة البيانات")
@@ -447,7 +456,6 @@ def order_details(order_id):
         processed_order.update({
             'id': order_id,
             'reference_id': order_data.get('reference_id') or order_data.get('id') or 'غير متوفر',
-      
             'status': {
                 'name': order_data.get('status', {}).get('name', 'غير معروف'),
                 'slug': order_data.get('status', {}).get('slug', 'unknown')
@@ -481,38 +489,7 @@ def order_details(order_id):
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
 
-# 🔥 تعريف الدوال المساعدة المطلوبة
 
-def refresh_salla_token(user):
-    """تجديد token سلة إذا لزم الأمر"""
-    try:
-        if not user.salla_access_token:
-            return None
-            
-        # التحقق إذا كان الـ token منتهي الصلاحية
-        headers = {
-            'Authorization': f'Bearer {user.salla_access_token}',
-            'Content-Type': 'application/json'
-        }
-        
-        # طلب بسيط للتحقق من صلاحية الـ token
-        test_response = requests.get(
-            f"{Config.SALLA_BASE_URL}/orders",
-            params={'limit': 1},
-            headers=headers,
-            timeout=10
-        )
-        
-        if test_response.status_code != 401:
-            return user.salla_access_token
-        
-        # إذا كان الـ token منتهي الصلاحية، نجده
-        new_token = refresh_salla_token(user)
-        return new_token
-        
-    except Exception as e:
-        print(f"❌ خطأ في التحقق من صلاحية الـ token: {str(e)}")
-        return user.salla_access_token  # نعيد الـ token القديم على أمل أنه يعمل
 
 def fetch_order_data_from_api(user, order_id):
     """جلب بيانات الطلب من API مع تضمين العناصر في البيانات الرئيسية"""
