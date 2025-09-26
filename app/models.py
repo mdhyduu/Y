@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 import re
-from sqlalchemy import Index, Enum
+from sqlalchemy import Index
 # Third-party imports
 from cryptography.fernet import Fernet, InvalidToken
 from flask import current_app
@@ -17,9 +17,6 @@ from sqlalchemy.orm import relationship, backref, validates
 from sqlalchemy.dialects.postgresql import JSONB
 # Local application imports
 from . import db
-from sqlalchemy.dialects.postgresql import JSONB
-
-# ثم في نموذج SallaOrder، غير السطر إلى:
 
 def repair_encrypted_token(token):
     """إصلاح تام للتوكنات التالفة"""
@@ -44,13 +41,6 @@ def repair_encrypted_token(token):
 
 class User(db.Model):
     __tablename__ = 'users'
-    __table_args__ = (
-        Index('ix_users_store_id', 'store_id'),
-        Index('ix_users_token_expires', 'token_expires_at'),
-        Index('ix_users_verified', 'is_verified'),
-        Index('ix_users_email_verified', 'email_verified'),
-        Index('ix_users_created_at', 'created_at'),
-    )
 
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
@@ -77,9 +67,7 @@ class User(db.Model):
     verification_token = db.Column(db.String(100), unique=True, nullable=True)
     verification_token_expires = db.Column(db.DateTime, nullable=True)
         # العلاقات
-    status_notes = relationship('OrderStatusNote', back_populates='admin', 
-                              foreign_keys='OrderStatusNote.admin_id',
-                              lazy='selectin') 
+    status_notes = relationship('OrderStatusNote', back_populates='admin', foreign_keys='OrderStatusNote.admin_id') 
     # === دوال إدارة التوكنات ===
     
     @property
@@ -255,16 +243,8 @@ class User(db.Model):
             'last_sync': self.last_sync.isoformat() if self.last_sync else None,
             'has_valid_tokens': self.tokens_are_valid
         }
-
 class Employee(db.Model):
     __tablename__ = 'employees'
-    __table_args__ = (
-        Index('ix_employees_store_active', 'store_id', 'is_active'),
-        Index('ix_employees_role', 'role'),
-        Index('ix_employees_region', 'region'),
-        Index('ix_employees_store_role', 'store_id', 'role'),
-        Index('ix_employees_created_at', 'created_at'),
-    )
 
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
@@ -285,25 +265,20 @@ class Employee(db.Model):
     remember_token = db.Column(db.String(100))  # New field for remember me functionality
     status_notes = relationship('OrderStatusNote', back_populates='employee', 
                               foreign_keys='OrderStatusNote.employee_id',
-                              cascade='all, delete-orphan',
-                              lazy='selectin')
+                              cascade='all, delete-orphan')
     
     permissions = relationship('EmployeePermission', back_populates='employee',
-                             cascade='all, delete-orphan',
-                             lazy='selectin')
+                             cascade='all, delete-orphan')
     
     custom_statuses = relationship('EmployeeCustomStatus', back_populates='employee',
-                                 cascade='all, delete-orphan',
-                                 lazy='selectin')
+                                 cascade='all, delete-orphan')
     
     assignments = relationship('OrderAssignment', back_populates='employee',
-                             cascade='all, delete-orphan',
-                             lazy='selectin')
+                             cascade='all, delete-orphan')
     
     added_employees = relationship('Employee', 
                                  backref=db.backref('added_by_manager', remote_side=[id]),
-                                 cascade='all, delete-orphan',
-                                 lazy='selectin')
+                                 cascade='all, delete-orphan')
      
 
     def set_password(self, password: str):
@@ -359,13 +334,9 @@ class Employee(db.Model):
             return user.get_refresh_token()
         return None
 
+# Other models remain the same as in the original file
 class Department(db.Model):
     __tablename__ = 'departments'
-    __table_args__ = (
-        Index('ix_departments_store_id', 'store_id'),
-        Index('ix_departments_parent_id', 'parent_id'),
-        Index('ix_departments_salla_id', 'salla_id'),
-    )
     
     id = db.Column(db.Integer, primary_key=True)
     salla_id = db.Column(db.Integer, unique=True, nullable=False)
@@ -373,16 +344,11 @@ class Department(db.Model):
     store_id = db.Column(db.Integer, nullable=False)
     parent_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=True)
     
-    children = relationship('Department', backref=backref('parent', remote_side=[id]), lazy='selectin')
-    permissions = relationship('EmployeePermission', back_populates='department', lazy='selectin')
+    children = relationship('Department', backref=backref('parent', remote_side=[id]))
+    permissions = relationship('EmployeePermission', back_populates='department')
 
 class EmployeePermission(db.Model):
     __tablename__ = 'employee_permissions'
-    __table_args__ = (
-        Index('ix_employee_permissions_employee', 'employee_id'),
-        Index('ix_employee_permissions_department', 'department_id'),
-        Index('ix_employee_permissions_composite', 'employee_id', 'department_id'),
-    )
     
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.Integer, ForeignKey('employees.id'), nullable=False)
@@ -394,15 +360,9 @@ class EmployeePermission(db.Model):
 class SallaOrder(db.Model):
     __tablename__ = 'salla_orders'
     __table_args__ = (
-        Index('ix_salla_orders_store_created', 'store_id', 'created_at'),
-        Index('ix_salla_orders_status', 'status_id'),
-        Index('ix_salla_orders_customer', 'customer_name'),
-        Index('ix_salla_orders_payment', 'payment_method'),
-        Index('ix_salla_orders_sync', 'last_synced'),
-        Index('ix_salla_orders_total', 'total_amount'),
-        Index('ix_salla_orders_store_status_date', 'store_id', 'status_id', 'created_at'),
+        db.Index('ix_salla_orders_store_created', 'store_id', 'created_at'),
+        db.Index('ix_salla_orders_status', 'status_id'),
     )
-    
     id = db.Column(db.String(50), primary_key=True)
     store_id = db.Column(db.Integer, nullable=False)
     customer_name = db.Column(db.String(255))
@@ -413,31 +373,27 @@ class SallaOrder(db.Model):
     last_synced = db.Column(db.DateTime, nullable=True)
     # العمود الأساسي للربط
     status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'), nullable=True)
-    full_order_data = db.Column(JSONB, nullable=True)
+    full_order_data = db.Column(db.JSON, nullable=True)
     # العلاقة الصحيحة مع OrderStatus
-    status = db.relationship('OrderStatus', backref='salla_orders', lazy='selectin')
+    status = db.relationship('OrderStatus', backref='salla_orders', lazy=True)
 
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     raw_data = db.Column(db.JSON)
     barcode_data = db.Column(db.Text)  # تخزين الباركود كـ base64
     barcode_generated_at = db.Column(db.DateTime)  # وقت إنشاء الباركود
 
-    # العلاقات الأخرى
-    status_notes = relationship('OrderStatusNote', back_populates='order', 
-                              lazy='selectin',
-                              order_by='OrderStatusNote.created_at.desc()')
-    employee_statuses = relationship('OrderEmployeeStatus', back_populates='order', lazy='selectin')
-    assignments = relationship('OrderAssignment', back_populates='order', lazy='selectin')
 
+    # العلاقات الأخرى
+    status_notes = relationship('OrderStatusNote', back_populates='order')
+    employee_statuses = relationship('OrderEmployeeStatus', back_populates='order')
+    assignments = relationship('OrderAssignment', back_populates='order')
+# إضافة إلى models.py
 class CustomOrder(db.Model):
     __tablename__ = 'custom_orders'
     
     __table_args__ = (
-        Index('ix_custom_orders_store_created', 'store_id', 'created_at'),
-        Index('ix_custom_orders_status', 'status_id'),
-        Index('ix_custom_orders_customer', 'customer_name'),
-        Index('ix_custom_orders_phone', 'customer_phone'),
-        Index('ix_custom_orders_store_status', 'store_id', 'status_id'),
+        db.Index('ix_custom_orders_store_created', 'store_id', 'created_at'),
+        db.Index('ix_custom_orders_status', 'status_id'),
     )
     
     id = db.Column(db.Integer, primary_key=True)
@@ -456,18 +412,14 @@ class CustomOrder(db.Model):
     barcode_data = db.Column(db.Text)
     barcode_generated_at = db.Column(db.DateTime)
     # العلاقات
-    status = db.relationship('OrderStatus', backref='custom_orders', lazy='selectin')
+    status = db.relationship('OrderStatus', backref='custom_orders', lazy=True)
     status_notes = relationship('OrderStatusNote', back_populates='custom_order', 
                               foreign_keys='OrderStatusNote.custom_order_id',
-                              cascade='all, delete-orphan',
-                              lazy='selectin',
-                              order_by='OrderStatusNote.created_at.desc()')
+                              cascade='all, delete-orphan')
     employee_statuses = relationship('OrderEmployeeStatus', back_populates='custom_order',
-                                   foreign_keys='OrderEmployeeStatus.custom_order_id',
-                                   lazy='selectin')
+                                   foreign_keys='OrderEmployeeStatus.custom_order_id')
     assignments = relationship('OrderAssignment', back_populates='custom_order',
-                             foreign_keys='OrderAssignment.custom_order_id',
-                             lazy='selectin')
+                             foreign_keys='OrderAssignment.custom_order_id')
     
     def __repr__(self):
         return f'<CustomOrder {self.order_number}>'
@@ -475,16 +427,10 @@ class CustomOrder(db.Model):
 class OrderStatusNote(db.Model):
     __tablename__ = 'order_status_notes'
     __table_args__ = (
-        Index('ix_status_notes_order', 'order_id'),
-        Index('ix_status_notes_custom_order', 'custom_order_id'),
-        Index('ix_status_notes_flag', 'status_flag'),
-        Index('ix_status_notes_created', 'created_at'),
-        Index('ix_status_notes_admin', 'admin_id'),
-        Index('ix_status_notes_employee', 'employee_id'),
-        Index('ix_status_notes_composite', 'order_id', 'created_at'),
-        Index('ix_status_notes_custom_composite', 'custom_order_id', 'created_at'),
+        db.Index('ix_status_notes_order', 'order_id'),
+        db.Index('ix_status_notes_custom_order', 'custom_order_id'),
+        db.Index('ix_status_notes_flag', 'status_flag'),
     )
-    
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.String(50), ForeignKey('salla_orders.id'), nullable=False)
     status_flag = db.Column(db.String(20), nullable=False)
@@ -504,11 +450,6 @@ class OrderStatusNote(db.Model):
 
 class EmployeeCustomStatus(db.Model):
     __tablename__ = 'employee_custom_statuses'
-    __table_args__ = (
-        Index('ix_employee_statuses_employee', 'employee_id'),
-        Index('ix_employee_statuses_active', 'is_active'),
-        Index('ix_employee_statuses_default', 'is_default'),
-    )
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -517,7 +458,8 @@ class EmployeeCustomStatus(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     is_default = db.Column(db.Boolean, default=False)
     employee = relationship('Employee', back_populates='custom_statuses')
-    order_statuses = relationship('OrderEmployeeStatus', back_populates='status', lazy='selectin')
+    order_statuses = relationship('OrderEmployeeStatus', back_populates='status')
+    
 
 # ... (الكود الحالي)
 
@@ -578,13 +520,9 @@ def after_employee_insert(mapper, connection, target):
         # تسجيل الخطأ ولكن لا نوقف التطبيق
         current_app.logger.error(f"فشل إنشاء الحالات الافتراضية للموظف {target.id}: {str(e)}")
 
+# ... (بقية الكود الحالي)
 class CustomNoteStatus(db.Model):
     __tablename__ = 'custom_note_statuses'
-    __table_args__ = (
-        Index('ix_custom_note_statuses_store', 'store_id'),
-        Index('ix_custom_note_statuses_active', 'is_active'),
-        Index('ix_custom_note_statuses_created', 'created_at'),
-    )
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -598,18 +536,10 @@ class CustomNoteStatus(db.Model):
     # العلاقات
     admin = relationship('User', foreign_keys=[created_by_admin])
     employee = relationship('Employee', foreign_keys=[created_by_employee])
-    notes = relationship('OrderStatusNote', back_populates='custom_status', lazy='selectin')
+    notes = relationship('OrderStatusNote', back_populates='custom_status')
 
 class Product(db.Model):
     __tablename__ = 'product'
-    __table_args__ = (
-        Index('ix_products_store_id', 'store_id'),
-        Index('ix_products_salla_id', 'salla_id'),
-        Index('ix_products_active', 'is_active'),
-        Index('ix_products_sku', 'sku'),
-        Index('ix_products_name', 'name'),
-    )
-    
     id = db.Column(db.Integer, primary_key=True)
     salla_id = db.Column(db.String(50), unique=True, nullable=False)
     name = db.Column(db.String(255), nullable=False)
@@ -625,14 +555,6 @@ class Product(db.Model):
 
 class OrderAssignment(db.Model):
     __tablename__ = 'order_assignment'
-    __table_args__ = (
-        Index('ix_order_assignment_employee', 'employee_id'),
-        Index('ix_order_assignment_order', 'order_id'),
-        Index('ix_order_assignment_custom_order', 'custom_order_id'),
-        Index('ix_order_assignment_assigned_at', 'assigned_at'),
-        Index('ix_order_assignment_composite', 'employee_id', 'assigned_at'),
-    )
-    
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.String(50), db.ForeignKey('salla_orders.id'), nullable=True)   # ✅ صار nullable
     employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
@@ -644,15 +566,8 @@ class OrderAssignment(db.Model):
 
     custom_order_id = db.Column(db.Integer, db.ForeignKey('custom_orders.id'), nullable=True)  # ✅ لازم nullable
     custom_order = relationship('CustomOrder', back_populates='assignments', foreign_keys=[custom_order_id])
-
 class OrderDelivery(db.Model):
     __tablename__ = 'order_delivery'
-    __table_args__ = (
-        Index('ix_order_delivery_order', 'order_id'),
-        Index('ix_order_delivery_employee', 'employee_id'),
-        Index('ix_order_delivery_delivered', 'delivered_at'),
-    )
-    
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.String(50), nullable=False)
     employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
@@ -661,11 +576,8 @@ class OrderDelivery(db.Model):
 class OrderEmployeeStatus(db.Model):
     __tablename__ = 'order_employee_status'
     __table_args__ = (
-        Index('ix_order_employee_status_order_id', 'order_id'),
-        Index('ix_order_employee_status_created_at', 'created_at'),
-        Index('ix_order_employee_status_status', 'status_id'),
-        Index('ix_order_employee_status_custom', 'custom_order_id'),
-        Index('ix_order_employee_status_composite', 'order_id', 'created_at'),
+        db.Index('ix_order_employee_status_order_id', 'order_id'),
+        db.Index('ix_order_employee_status_created_at', 'created_at'),
     )
 
     id = db.Column(db.Integer, primary_key=True)
@@ -682,13 +594,6 @@ class OrderEmployeeStatus(db.Model):
 
 class OrderStatus(db.Model):
     __tablename__ = 'order_statuses'
-    __table_args__ = (
-        Index('ix_order_statuses_store', 'store_id'),
-        Index('ix_order_statuses_type', 'type'),
-        Index('ix_order_statuses_active', 'is_active'),
-        Index('ix_order_statuses_parent', 'parent_id'),
-        Index('ix_order_statuses_sort', 'sort'),
-    )
     
     id = db.Column(db.String(50), primary_key=True)
     name = db.Column(db.String(100))
@@ -707,15 +612,11 @@ class OrderStatus(db.Model):
     
     def __repr__(self):
         return f'<OrderStatus {self.name} ({self.type})>'
-
 class OrderProductStatus(db.Model):
     __tablename__ = 'order_product_status'
     __table_args__ = (
-        Index('ix_order_product_status_order_id', 'order_id'),
-        Index('ix_order_product_status_product_id', 'product_id'),
-        Index('ix_order_product_status_employee', 'employee_id'),
-        Index('ix_order_product_status_created', 'created_at'),
-        Index('ix_order_product_status_composite', 'order_id', 'product_id'),
+        db.Index('ix_order_product_status_order_id', 'order_id'),
+        db.Index('ix_order_product_status_product_id', 'product_id'),
     )
     
     id = db.Column(db.Integer, primary_key=True)
@@ -736,12 +637,6 @@ class OrderProductStatus(db.Model):
         
 class OrderAddress(db.Model):
     __tablename__ = 'order_addresses'
-    __table_args__ = (
-        Index('ix_order_addresses_city', 'city'),
-        Index('ix_order_addresses_city_type', 'city', 'address_type'),
-        Index('ix_order_addresses_country', 'country'),
-        Index('ix_order_addresses_order', 'order_id'),
-    )
     
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.String(50), db.ForeignKey('salla_orders.id'), nullable=False, unique=True)
@@ -753,11 +648,16 @@ class OrderAddress(db.Model):
     address_type = db.Column(db.String(10), default='receiver')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # إضافة فهرس للحقل city لتحسين أداء الاستعلامات
+    __table_args__ = (
+        db.Index('ix_order_addresses_city', 'city'),
+        db.Index('ix_order_addresses_city_type', 'city', 'address_type'),
+    )
+    
     order = relationship('SallaOrder', backref='address', lazy=True)
     
     def __repr__(self):
         return f'<OrderAddress {self.name} ({self.address_type})>'
-
 # تبقى أحداث SQLAlchemy كما هي
 @event.listens_for(User, 'before_insert')
 def validate_user(mapper, connection, target):
@@ -768,7 +668,6 @@ def validate_user(mapper, connection, target):
 def validate_employee(mapper, connection, target):
     if not target.email:
         raise ValueError("البريد الإلكتروني مطلوب")
-
 # أضف هذه الدالة في نهاية الملف
 def ensure_default_statuses_for_existing_employees():
     """ضمان وجود الحالات الافتراضية لجميع الموظفين الحاليين"""
@@ -800,4 +699,4 @@ def ensure_default_statuses_for_existing_employees():
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"فشل إنشاء الحالات التلقائية للموظفين الحاليين: {str(e)}")
-        return False
+        return False 
