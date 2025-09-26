@@ -17,40 +17,13 @@ from app.token_utils import refresh_salla_token
 from app.config import Config
 from flask import send_file
 from io import BytesIO
-
+import pandas as pd
 from concurrent import futures
 
 import logging
 
 # إعداد المسجل للإنتاج
 logger = logging.getLogger('salla_app')
-
-def get_cipher():
-    key = base64.urlsafe_b64encode(Config.SECRET_KEY[:32].encode().ljust(32, b'0'))
-    return Fernet(key)
-
-# دوال التشفير وفك التشفير
-def encrypt_data(data):
-    """تشفير البيانات النصية"""
-    if not data:
-        return data
-    try:
-        cipher = get_cipher()
-        return cipher.encrypt(data.encode()).decode()
-    except Exception as e:
-        logger.error(f"خطأ في تشفير البيانات: {str(e)}")
-        return data
-
-def decrypt_data(encrypted_data):
-    """فك تشفير البيانات"""
-    if not encrypted_data:
-        return encrypted_data
-    try:
-        cipher = get_cipher()
-        return cipher.decrypt(encrypted_data.encode()).decode()
-    except Exception as e:
-        logger.error(f"خطأ في فك تشفير البيانات: {str(e)}")
-        return encrypted_data
 
 @orders_bp.route('/')
 def index():
@@ -356,7 +329,6 @@ def index():
 
 import copy
 
-
 @orders_bp.route('/<int:order_id>')
 def order_details(order_id):
     user, current_employee = get_user_from_cookies()
@@ -567,26 +539,6 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
-        
-
-def verify_order_storage(order_id):
-    """دالة مساعدة للتحقق من تخزين البيانات بشكل صحيح"""
-    try:
-        order = SallaOrder.query.get(str(order_id))
-        if order and order.full_order_data:
-            items_count = len(order.full_order_data.get('items', []))
-            has_items = items_count > 0
-            print(f"🔍 تحقق التخزين للطلب {order_id}:")
-            print(f"   - يوجد بيانات كاملة: ✅")
-            print(f"   - عدد العناصر: {items_count}")
-            print(f"   - يحتوي على عناصر: {'✅' if has_items else '❌'}")
-            return has_items
-        else:
-            print(f"🔍 تحقق التخزين للطلب {order_id}: ❌ لا يوجد بيانات")
-            return False
-    except Exception as e:
-        print(f"❌ خطأ في التحقق من التخزين: {str(e)}")
-        return False
 import hmac
 import hashlib
 
@@ -643,7 +595,6 @@ def extract_store_id_from_webhook(webhook_data):
 from flask_wtf.csrf import CSRFProtect, CSRFError
 
 csrf = CSRFProtect()
-
 def handle_order_creation(data, webhook_version='2'):
     try:
         print(f"🔔 بدء معالجة ويب هوك - الإصدار: {webhook_version}")
@@ -687,10 +638,6 @@ def handle_order_creation(data, webhook_version='2'):
                 print(f"📍 بيانات العنوان المستخرجة: {address_info}")
                 
                 if address_info:  # التأكد من وجود بيانات العنوان
-                    # تشفير البيانات الحساسة قبل الحفظ
-                    address_info['name'] = encrypt_data(address_info.get('name', ''))
-                    address_info['phone'] = encrypt_data(address_info.get('phone', ''))
-                    
                     new_address = OrderAddress(
                         order_id=order_id,
                         **address_info
@@ -745,9 +692,6 @@ def handle_order_creation(data, webhook_version='2'):
             customer_name = order_data.get('customer_name', 'عميل غير معروف')
         print(f"👤 اسم العميل: {customer_name}")
 
-        # --- تشفير اسم العميل قبل الحفظ ---
-        encrypted_customer_name = encrypt_data(customer_name)
-
         # --- تحديد حالة الطلب ---
         status_id = None
         status_info = order_data.get('status', {})
@@ -773,11 +717,11 @@ def handle_order_creation(data, webhook_version='2'):
                 status_id = default_status.id
                 print(f"🔧 استخدام الحالة الافتراضية: {status_id}")
 
-        # --- إنشاء الطلب أولاً ---
+        # --- إنشاء الطلب ---
         new_order = SallaOrder(
             id=order_id,
             store_id=store_id,
-            customer_name=encrypted_customer_name,
+            customer_name=customer_name,
             created_at=created_at or datetime.utcnow(),
             total_amount=total_amount,
             currency=currency,
@@ -785,41 +729,27 @@ def handle_order_creation(data, webhook_version='2'):
             raw_data=json.dumps(order_data, ensure_ascii=False),
             status_id=status_id
         )
-        
-        try:
-            db.session.add(new_order)
-            db.session.commit()  # حفظ الطلب أولاً
-            print("✅ تم إنشاء الطلب في قاعدة البيانات")
-        except Exception as e:
-            db.session.rollback()
-            print(f"❌ فشل في إنشاء الطلب: {str(e)}")
-            return False
+        db.session.add(new_order)
+        db.session.flush()
+        print("✅ تم إنشاء الطلب في قاعدة البيانات")
 
-        # --- إضافة العنوان بعد التأكد من وجود الطلب ---
+        # --- إضافة العنوان (التصحيح: دائمًا نضيف العنوان للطلبات الجديدة) ---
         address_info = extract_order_address(order_data)
         print(f"📍 بيانات العنوان المستخرجة للطلب الجديد: {address_info}")
         
         if address_info:
-            try:
-                # تشفير البيانات الحساسة قبل الحفظ
-                address_info['name'] = encrypt_data(address_info.get('name', ''))
-                address_info['phone'] = encrypt_data(address_info.get('phone', ''))
-                
-                new_address = OrderAddress(
-                    order_id=order_id,
-                    **address_info
-                )
-                db.session.add(new_address)
-                db.session.commit()
-                print("✅ تم إضافة العنوان للطلب الجديد")
-            except Exception as e:
-                db.session.rollback()
-                print(f"⚠️ فشل في إضافة العنوان، لكن الطلب تم إنشاؤه: {str(e)}")
-                # لا نعيد False هنا لأن الطلب تم إنشاؤه بنجاح
+            new_address = OrderAddress(
+                order_id=order_id,
+                **address_info
+            )
+            db.session.add(new_address)
+            print("✅ تم إضافة العنوان للطلب الجديد")
         else:
             print("⚠️ لا توجد بيانات عنوان للطلب الجديد")
 
-        print("🎉 تم معالجة الطلب بنجاح")
+        # --- حفظ كل شيء ---
+        db.session.commit()
+        print("🎉 تم حفظ الطلب والعنوان بنجاح")
         return True
 
     except Exception as e:
@@ -885,7 +815,6 @@ def order_status_webhook():
         elif event in ['order.status.updated', 'order.updated'] and order_data:
             order_id = str(order_data.get('id'))
             
-            # تحديث حالة الطلب (الكود الحالي)
             if event == 'order.status.updated':
                 status_data = order_data.get('status', {})
             else:
@@ -905,18 +834,7 @@ def order_status_webhook():
 
                     if status:
                         order.status_id = status.id
-                        print(f"✅ تم تحديث حالة الطلب {order_id} إلى {status_slug}")
-
-            # ⭐⭐ إضافة تحديث العنوان عند حدث order.updated ⭐⭐
-            if event == 'order.updated' and order_data:
-                print(f"🔄 معالجة تحديث الطلب والعنوان للطلب {order_id}")
-                update_success = update_order_address(order_id, order_data)
-                if update_success:
-                    print(f"✅ تم تحديث بيانات العنوان للطلب {order_id}")
-                else:
-                    print(f"⚠️ فشل في تحديث العنوان للطلب {order_id}")
-
-            db.session.commit()
+                        db.session.commit()
 
         return jsonify({'success': True, 'message': 'تم استقبال البيانات بنجاح'}), 200
 
@@ -988,7 +906,7 @@ def extract_order_address(order_data):
     
     print(f"📋 النتيجة النهائية للعنوان: {result}")
     return result
-    
+
 def update_order_address(order_id, order_data):
     """
     تحديث عنوان الطلب في قاعدة البيانات
