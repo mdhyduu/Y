@@ -556,7 +556,7 @@ def fetch_order_data_from_api(user, order_id):
 def fetch_order_items_from_api(user, order_id):
     """جلب عناصر الطلب من API مع معالجة الأخطاء المحسنة"""
     try:
-        access_token = refresh_salla_token(user)
+        access_token = ensure_valid_access_token(user)
         if not access_token:
             print("❌ لا يوجد access token")
             return []
