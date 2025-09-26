@@ -17,6 +17,9 @@ from sqlalchemy.orm import relationship, backref, validates
 from sqlalchemy.dialects.postgresql import JSONB
 # Local application imports
 from . import db
+from sqlalchemy.dialects.postgresql import JSONB
+
+# ثم في نموذج SallaOrder، غير السطر إلى:
 
 def repair_encrypted_token(token):
     """إصلاح تام للتوكنات التالفة"""
@@ -410,7 +413,7 @@ class SallaOrder(db.Model):
     last_synced = db.Column(db.DateTime, nullable=True)
     # العمود الأساسي للربط
     status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'), nullable=True)
-    full_order_data = db.Column(db.JSON, nullable=True)
+    full_order_data = db.Column(JSONB, nullable=True)
     # العلاقة الصحيحة مع OrderStatus
     status = db.relationship('OrderStatus', backref='salla_orders', lazy='selectin')
 
