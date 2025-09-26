@@ -447,7 +447,7 @@ def order_details(order_id):
         processed_order.update({
             'id': order_id,
             'reference_id': order_data.get('reference_id') or order_data.get('id') or 'غير متوفر',
-            'customer_name': decrypt_data(order.customer_name) if order and order.customer_name else 'عميل غير معروف',
+      
             'status': {
                 'name': order_data.get('status', {}).get('name', 'غير معروف'),
                 'slug': order_data.get('status', {}).get('slug', 'unknown')
@@ -483,7 +483,7 @@ def order_details(order_id):
 
 # 🔥 تعريف الدوال المساعدة المطلوبة
 
-def refresh_salla_token_if_needed(user):
+def refresh_salla_token(user):
     """تجديد token سلة إذا لزم الأمر"""
     try:
         if not user.salla_access_token:
@@ -517,7 +517,7 @@ def refresh_salla_token_if_needed(user):
 def fetch_order_data_from_api(user, order_id):
     """جلب بيانات الطلب من API مع تضمين العناصر في البيانات الرئيسية"""
     try:
-        access_token = refresh_salla_token_if_needed(user)
+        access_token = refresh_salla_token(user)
         if not access_token:
             return None, []
             
@@ -559,7 +559,7 @@ def fetch_order_data_from_api(user, order_id):
 def fetch_order_items_from_api(user, order_id):
     """جلب عناصر الطلب من API مع معالجة الأخطاء المحسنة"""
     try:
-        access_token = refresh_salla_token_if_needed(user)
+        access_token = refresh_salla_token(user)
         if not access_token:
             print("❌ لا يوجد access token")
             return []
