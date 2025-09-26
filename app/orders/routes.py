@@ -483,11 +483,41 @@ def order_details(order_id):
 
 # 🔥 تعريف الدوال المساعدة المطلوبة
 
+def refresh_salla_token_if_needed(user):
+    """تجديد token سلة إذا لزم الأمر"""
+    try:
+        if not user.salla_access_token:
+            return None
+            
+        # التحقق إذا كان الـ token منتهي الصلاحية
+        headers = {
+            'Authorization': f'Bearer {user.salla_access_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        # طلب بسيط للتحقق من صلاحية الـ token
+        test_response = requests.get(
+            f"{Config.SALLA_BASE_URL}/orders",
+            params={'limit': 1},
+            headers=headers,
+            timeout=10
+        )
+        
+        if test_response.status_code != 401:
+            return user.salla_access_token
+        
+        # إذا كان الـ token منتهي الصلاحية، نجده
+        new_token = refresh_salla_token(user)
+        return new_token
+        
+    except Exception as e:
+        print(f"❌ خطأ في التحقق من صلاحية الـ token: {str(e)}")
+        return user.salla_access_token  # نعيد الـ token القديم على أمل أنه يعمل
 
 def fetch_order_data_from_api(user, order_id):
     """جلب بيانات الطلب من API مع تضمين العناصر في البيانات الرئيسية"""
     try:
-        access_token = refresh_salla_token(user)
+        access_token = refresh_salla_token_if_needed(user)
         if not access_token:
             return None, []
             
@@ -529,7 +559,7 @@ def fetch_order_data_from_api(user, order_id):
 def fetch_order_items_from_api(user, order_id):
     """جلب عناصر الطلب من API مع معالجة الأخطاء المحسنة"""
     try:
-        access_token = refresh_salla_token(user)
+        access_token = refresh_salla_token_if_needed(user)
         if not access_token:
             print("❌ لا يوجد access token")
             return []
