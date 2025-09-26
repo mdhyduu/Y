@@ -483,36 +483,7 @@ def order_details(order_id):
 
 # 🔥 تعريف الدوال المساعدة المطلوبة
 
-def refresh_salla_token(user):
-    """تجديد token سلة إذا لزم الأمر"""
-    try:
-        if not user.salla_access_token:
-            return None
-            
-        # التحقق إذا كان الـ token منتهي الصلاحية
-        headers = {
-            'Authorization': f'Bearer {user.salla_access_token}',
-            'Content-Type': 'application/json'
-        }
-        
-        # طلب بسيط للتحقق من صلاحية الـ token
-        test_response = requests.get(
-            f"{Config.SALLA_BASE_URL}/orders",
-            params={'limit': 1},
-            headers=headers,
-            timeout=10
-        )
-        
-        if test_response.status_code != 401:
-            return user.salla_access_token
-        
-        # إذا كان الـ token منتهي الصلاحية، نجده
-        new_token = refresh_salla_token(user)
-        return new_token
-        
-    except Exception as e:
-        print(f"❌ خطأ في التحقق من صلاحية الـ token: {str(e)}")
-        return user.salla_access_token  # نعيد الـ token القديم على أمل أنه يعمل
+
 
 def fetch_order_data_from_api(user, order_id):
     """جلب بيانات الطلب من API مع تضمين العناصر في البيانات الرئيسية"""
@@ -715,62 +686,6 @@ def fetch_additional_order_data(store_id, order_id_str):
             'product_statuses': {}
         }
 
-def extract_order_address(order_data):
-    """
-    استخراج بيانات العنوان مع الأولوية للمتسلم
-    يرجع: اسم كامل، هاتف، بلد، مدينة، عنوان كامل
-    """
-    print("🔍 بدء استخراج العنوان من بيانات الطلب...")
-    
-    shipping_data = order_data.get('shipping', {}) or {}
-    customer_data = order_data.get('customer', {}) or {}
-    
-    # الأولوية للمتسلم (receiver)
-    receiver_data = shipping_data.get('receiver', {}) or {}
-    address_data = shipping_data.get('address') or shipping_data.get('pickup_address', {}) or {}
-    
-    if receiver_data.get('name') or address_data:
-        print("✅ استخدام بيانات المتسلم والعنوان")
-        name = receiver_data.get('name', '').strip()
-        phone = receiver_data.get('phone') or f"{customer_data.get('mobile_code', '')}{customer_data.get('mobile', '')}"
-        country = address_data.get('country', customer_data.get('country', ''))
-        city = address_data.get('city', customer_data.get('city', ''))
-        full_address = address_data.get('shipping_address', '') or customer_data.get('location', '')
-        
-        if not name:
-            name = customer_data.get('full_name') or f"{customer_data.get('first_name', '')} {customer_data.get('last_name', '')}".strip()
-        
-        address_type = 'receiver'
-    
-    else:
-        print("🔍 استخدام بيانات العميل كبديل")
-        name = customer_data.get('full_name') or f"{customer_data.get('first_name', '')} {customer_data.get('last_name', '')}".strip()
-        phone = f"{customer_data.get('mobile_code', '')}{customer_data.get('mobile', '')}"
-        country = customer_data.get('country', '')
-        city = customer_data.get('city', '')
-        full_address = customer_data.get('location', '')
-        address_type = 'customer'
-    
-    if not name:
-        name = 'عميل غير معروف'
-        print("⚠️ استخدام اسم افتراضي: عميل غير معروف")
-    
-    if not full_address:
-        parts = [p for p in [country, city] if p]
-        full_address = ' - '.join(parts) if parts else 'لم يتم تحديد العنوان'
-        print("⚠️ استخدام عنوان مبني من البلد والمدينة")
-    
-    result = {
-        'name': name,
-        'phone': phone,
-        'country': country,
-        'city': city,
-        'full_address': full_address,
-        'address_type': address_type
-    }
-    
-    print(f"📋 النتيجة النهائية للعنوان: {result}")
-    return result
 
 def verify_order_storage(order_id):
     """دالة مساعدة للتحقق من تخزين البيانات بشكل صحيح"""
