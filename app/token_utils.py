@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 from .config import Config
 import logging
 from .models import db, User
-
 from flask import current_app
+
 logger = logging.getLogger(__name__)
 
 def exchange_code_for_token(code):
@@ -59,50 +59,64 @@ def refresh_salla_token(user):
     """تجديد توكن الوصول باستخدام توكن التحديث"""
     try:
         if not user or not user.salla_refresh_token:
-            logger.error("No user or refresh token provided")
+            logger.error("❌ لا يوجد مستخدم أو توكن تحديث")
             return None
             
         refresh_token = user.salla_refresh_token
         if not refresh_token:
-            logger.error("No refresh token available for user %s", user.id)
+            logger.error("❌ لا يوجد توكن تحديث للمستخدم %s", user.id)
             return None
-            
-        # إعداد بيانات الطلب
+        
+        logger.info("🔄 محاولة تجديد التوكن للمستخدم %s", user.id)
+        
+        # إعداد بيانات الطلب باستخدام Config مباشرة
         data = {
             'grant_type': 'refresh_token',
             'refresh_token': refresh_token,
-            'client_id': current_app.config['SALLA_CLIENT_ID'],
-            'client_secret': current_app.config['SALLA_CLIENT_SECRET']
+            'client_id': Config.SALLA_CLIENT_ID,
+            'client_secret': Config.SALLA_CLIENT_SECRET
         }
         
-        # إرسال طلب التجديد - استخدام نفس endpoint الأول
+        logger.debug("📤 إرسال طلب تجديد التوكن إلى: %s", Config.SALLA_TOKEN_URL)
+        
+        # إرسال طلب التجديد
         response = requests.post(
-            Config.SALLA_TOKEN_URL,  # Changed from API_BASE_URL to TOKEN_URL
+            Config.SALLA_TOKEN_URL,
             data=data,
-            headers={'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'},
+            headers={
+                'Content-Type': 'application/x-www-form-urlencoded', 
+                'Accept': 'application/json'
+            },
             timeout=30
         )
         
-        logger.info("Refresh token response status: %s", response.status_code)
+        logger.info("📥 استجابة تجديد التوكن: %s", response.status_code)
         
         if response.status_code != 200:
-            error_msg = f"Token refresh failed: {response.text}"
+            error_msg = f"❌ فشل تجديد التوكن: {response.status_code} - {response.text}"
             logger.error(error_msg)
             
-            # إذا كان الخطأ بسبب توكن التحديث غير الصالح، نحذف التوكنات
+            # إذا كان الخطأ بسبب توكن التحديث غير الصالح
             if response.status_code == 400:
                 error_data = response.json()
                 if error_data.get('error') == 'invalid_grant':
-                    logger.error("Refresh token invalid or expired for user %s", user.id)
-                    # نحذف التوكنات من قاعدة البيانات
+                    logger.error("🚫 توكن التحديث غير صالح أو منتهي للمستخدم %s", user.id)
+                    # إزالة التوكنات من قاعدة البيانات
                     user._salla_access_token = None
                     user._salla_refresh_token = None
                     user.token_expires_at = None
                     db.session.commit()
+                    logger.info("✅ تم إزالة التوكنات المنتهية")
                     
             return None
         
         token_data = response.json()
+        logger.debug("✅ تم تجديد التوكن بنجاح: %s", token_data.keys())
+        
+        # التحقق من وجود البيانات المطلوبة
+        if not all(key in token_data for key in ['access_token', 'refresh_token', 'expires_in']):
+            logger.error("❌ بيانات التوكن غير مكتملة: %s", token_data.keys())
+            return None
         
         # تحديث التوكنات في قاعدة البيانات
         success = user.set_tokens(
@@ -112,12 +126,34 @@ def refresh_salla_token(user):
         )
         
         if success:
-            logger.info("Token refreshed successfully for user %s", user.id)
+            logger.info("✅ تم حفظ التوكنات الجديدة للمستخدم %s", user.id)
             return token_data['access_token']
         else:
-            logger.error("Failed to save new tokens for user %s", user.id)
+            logger.error("❌ فشل في حفظ التوكنات الجديدة للمستخدم %s", user.id)
             return None
             
-    except Exception as e:
-        logger.error("Error refreshing token: %s", str(e), exc_info=True)
+    except requests.exceptions.Timeout:
+        logger.error("⏰ انتهت مهلة تجديد التوكن")
         return None
+    except requests.exceptions.ConnectionError:
+        logger.error("🌐 خطأ في الاتصال خلال تجديد التوكن")
+        return None
+    except Exception as e:
+        logger.error("❌ خطأ غير متوقع في تجديد التوكن: %s", str(e), exc_info=True)
+        return None
+
+def verify_token_validity(access_token):
+    """التحقق من صلاحية توكن الوصول"""
+    try:
+        response = requests.get(
+            f"{Config.SALLA_BASE_URL}/store/info",
+            headers={
+                'Authorization': f'Bearer {access_token}',
+                'Accept': 'application/json'
+            },
+            timeout=10
+        )
+        return response.status_code == 200
+    except Exception as e:
+        logger.error("❌ خطأ في التحقق من صلاحية التوكن: %s", str(e))
+        return False

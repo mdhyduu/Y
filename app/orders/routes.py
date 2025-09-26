@@ -482,22 +482,24 @@ def order_details(order_id):
         return redirect(url_for('orders.index'))
 
 # 🔥 تعريف الدوال المساعدة المطلوبة
-def refresh_salla_token(user):
-    """تجديد token سلة إذا لزم الأمر"""
+def ensure_valid_access_token(user):
+    """التأكد من وجود توكن وصول صالح مع معالجة الأخطاء"""
     try:
-        if not user or not user.salla_access_token:
-            logger.error("❌ لا يوجد مستخدم أو توكن وصول")
+        if not user:
+            logger.error("❌ لا يوجد مستخدم للمصادقة")
             return None
             
-        # التحقق من صلاحية التوكن باستخدام دالة User المضمنة
-        if user.has_valid_tokens:
-            logger.info("✅ التوكن لا يزال صالحاً")
+        # التحقق من صلاحية التوكنات باستخدام الدالة من النموذج
+        if user.tokens_are_valid:
+            logger.debug("✅ التوكنات صالحة")
             return user.salla_access_token
         
-        logger.warning("🔄 التوكن منتهي الصلاحية، جاري التجديد...")
+        logger.warning("🔄 التوكنات منتهية، جاري التجديد...")
         
-        # استخدام الدالة من token_utils لتجديد التوكن
-        new_token = refresh_salla_token(user)  # هذه الدالة من token_utils
+        # استخدام الدالة من token_utils
+        from app.token_utils import refresh_salla_token
+        new_token = refresh_salla_token(user)
+        
         if new_token:
             logger.info("✅ تم تجديد التوكن بنجاح")
             return new_token
@@ -506,13 +508,14 @@ def refresh_salla_token(user):
             return None
             
     except Exception as e:
-        logger.error(f"❌ خطأ في تجديد التوكن: {str(e)}")
+        logger.error(f"❌ خطأ في التأكد من صلاحية التوكن: {str(e)}")
         return None
 def fetch_order_data_from_api(user, order_id):
     """جلب بيانات الطلب من API مع تضمين العناصر في البيانات الرئيسية"""
     try:
-        access_token = refresh_salla_token(user)
+        access_token = ensure_valid_access_token(user)
         if not access_token:
+            logger.error("❌ لا يمكن الحصول على توكن وصول صالح")
             return None, []
             
         headers = {
@@ -529,27 +532,27 @@ def fetch_order_data_from_api(user, order_id):
         )
         
         if order_response.status_code != 200:
-            print(f"❌ خطأ في جلب بيانات الطلب من API: {order_response.status_code}")
+            logger.error(f"❌ خطأ في جلب بيانات الطلب من API: {order_response.status_code}")
             return None, []
         
         order_data = order_response.json().get('data', {})
+        logger.info(f"✅ تم جلب بيانات الطلب {order_id} من API")
         
         # جلب عناصر الطلب
         items_data = fetch_order_items_from_api(user, order_id)
         
-        # ✅ دمج العناصر مع البيانات الرئيسية للتخزين
+        # دمج العناصر مع البيانات الرئيسية للتخزين
         if items_data:
             order_data['items'] = items_data
-            print(f"✅ تم دمج {len(items_data)} عنصر مع بيانات الطلب")
+            logger.info(f"✅ تم دمج {len(items_data)} عنصر مع بيانات الطلب")
         else:
-            print("⚠️ لم يتم العثور على عناصر للطلب")
+            logger.warning("⚠️ لم يتم العثور على عناصر للطلب")
         
         return order_data, items_data
         
     except Exception as e:
-        print(f"❌ خطأ في جلب بيانات الطلب من API: {str(e)}")
+        logger.error(f"❌ خطأ في جلب بيانات الطلب من API: {str(e)}")
         return None, []
-
 def fetch_order_items_from_api(user, order_id):
     """جلب عناصر الطلب من API مع معالجة الأخطاء المحسنة"""
     try:
