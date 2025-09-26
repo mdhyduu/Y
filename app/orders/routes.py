@@ -638,6 +638,10 @@ def handle_order_creation(data, webhook_version='2'):
                 print(f"📍 بيانات العنوان المستخرجة: {address_info}")
                 
                 if address_info:  # التأكد من وجود بيانات العنوان
+                    # تشفير البيانات الحساسة قبل الحفظ
+                    address_info['name'] = encrypt_data(address_info.get('name', ''))
+                    address_info['phone'] = encrypt_data(address_info.get('phone', ''))
+                    
                     new_address = OrderAddress(
                         order_id=order_id,
                         **address_info
@@ -692,6 +696,9 @@ def handle_order_creation(data, webhook_version='2'):
             customer_name = order_data.get('customer_name', 'عميل غير معروف')
         print(f"👤 اسم العميل: {customer_name}")
 
+        # --- تشفير اسم العميل قبل الحفظ ---
+        encrypted_customer_name = encrypt_data(customer_name)
+
         # --- تحديد حالة الطلب ---
         status_id = None
         status_info = order_data.get('status', {})
@@ -717,11 +724,11 @@ def handle_order_creation(data, webhook_version='2'):
                 status_id = default_status.id
                 print(f"🔧 استخدام الحالة الافتراضية: {status_id}")
 
-        # --- إنشاء الطلب ---
+        # --- إنشاء الطلب أولاً ---
         new_order = SallaOrder(
             id=order_id,
             store_id=store_id,
-            customer_name=customer_name,
+            customer_name=encrypted_customer_name,
             created_at=created_at or datetime.utcnow(),
             total_amount=total_amount,
             currency=currency,
@@ -729,27 +736,41 @@ def handle_order_creation(data, webhook_version='2'):
             raw_data=json.dumps(order_data, ensure_ascii=False),
             status_id=status_id
         )
-        db.session.add(new_order)
-        db.session.flush()
-        print("✅ تم إنشاء الطلب في قاعدة البيانات")
+        
+        try:
+            db.session.add(new_order)
+            db.session.commit()  # حفظ الطلب أولاً
+            print("✅ تم إنشاء الطلب في قاعدة البيانات")
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ فشل في إنشاء الطلب: {str(e)}")
+            return False
 
-        # --- إضافة العنوان (التصحيح: دائمًا نضيف العنوان للطلبات الجديدة) ---
+        # --- إضافة العنوان بعد التأكد من وجود الطلب ---
         address_info = extract_order_address(order_data)
         print(f"📍 بيانات العنوان المستخرجة للطلب الجديد: {address_info}")
         
         if address_info:
-            new_address = OrderAddress(
-                order_id=order_id,
-                **address_info
-            )
-            db.session.add(new_address)
-            print("✅ تم إضافة العنوان للطلب الجديد")
+            try:
+                # تشفير البيانات الحساسة قبل الحفظ
+                address_info['name'] = encrypt_data(address_info.get('name', ''))
+                address_info['phone'] = encrypt_data(address_info.get('phone', ''))
+                
+                new_address = OrderAddress(
+                    order_id=order_id,
+                    **address_info
+                )
+                db.session.add(new_address)
+                db.session.commit()
+                print("✅ تم إضافة العنوان للطلب الجديد")
+            except Exception as e:
+                db.session.rollback()
+                print(f"⚠️ فشل في إضافة العنوان، لكن الطلب تم إنشاؤه: {str(e)}")
+                # لا نعيد False هنا لأن الطلب تم إنشاؤه بنجاح
         else:
             print("⚠️ لا توجد بيانات عنوان للطلب الجديد")
 
-        # --- حفظ كل شيء ---
-        db.session.commit()
-        print("🎉 تم حفظ الطلب والعنوان بنجاح")
+        print("🎉 تم معالجة الطلب بنجاح")
         return True
 
     except Exception as e:
