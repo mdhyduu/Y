@@ -21,35 +21,38 @@ def login_required(view_func):
         return view_func(*args, **kwargs)
     return wrapper
 
+from flask import session
+
 @auth_bp.route('/link_store')
 @login_required
 def link_store():
-    
     user_id = request.cookies.get('user_id')
     user = User.query.get(user_id)
-    
-    # تحقق شامل من صحة التوكن
-     
-    # إعادة عملية الربط إذا كانت هناك مشكلة
-    oauth_state = secrets.token_urlsafe(32)
-    response = make_response(redirect(
-        f"{Config.SALLA_AUTH_URL}?client_id={Config.SALLA_CLIENT_ID}&response_type=code&scope=offline_access%20orders.read&redirect_uri={Config.REDIRECT_URI}&state={oauth_state}"
-    ))
-    response.set_cookie('oauth_state', oauth_state, max_age=600, httponly=True, secure=True)
-    response.delete_cookie('store_linked')  # مسح حالة الربط القديمة
-    return response
 
+    # توليد state وتخزينه في session
+    oauth_state = secrets.token_urlsafe(32)
+    session['oauth_state'] = oauth_state
+
+    # إعادة التوجيه لسلة
+    response = redirect(
+        f"{Config.SALLA_AUTH_URL}?client_id={Config.SALLA_CLIENT_ID}&response_type=code&scope=offline_access%20orders.read&redirect_uri={Config.REDIRECT_URI}&state={oauth_state}"
+    )
+    return response
 @auth_bp.route('/callback')
 @login_required
 def callback():
-    """معالجة رد سلة بعد المصادقة"""
-    expected_state = request.cookies.get('oauth_state')
+    expected_state = session.get('oauth_state')
     state = request.args.get('state')
 
     if not state or state != expected_state:
         logger.error("عدم تطابق state")
         flash("خطأ أمان: عملية الربط غير صالحة", "error")
         return redirect(url_for('dashboard.index'))
+
+    # بعد التحقق امسح الـ state من السيشن
+    session.pop('oauth_state', None)
+
+    # باقي الكود زي ما هو (التوكنات والتخزين ...)
 
     if 'error' in request.args:
         error_desc = request.args.get('error_description', 'لا يوجد وصف للخطأ')
