@@ -939,6 +939,69 @@ def handle_order_creation(data, webhook_version='2'):
         print(error_msg)
         logger.error(error_msg, exc_info=True)
         return False
+        
+        
+def update_order_items_from_webhook(order, order_data):
+    """
+    تحديث المنتجات داخل full_order_data عند استلام order.updated
+    - يستبدل items بالقائمة الجديدة
+    - يقارن القديمة مع الجديدة
+    - يسجل المنتجات المحذوفة والمضافة في OrderProductStatus
+    """
+    try:
+        old_items = order.full_order_data.get('items', []) if order.full_order_data else []
+        new_items = order_data.get('items', [])
+
+        # استخراج IDs للمنتجات القديمة والجديدة
+        old_ids = {str(i.get('id')) for i in old_items if i.get('id')}
+        new_ids = {str(i.get('id')) for i in new_items if i.get('id')}
+
+        removed_ids = old_ids - new_ids
+        added_ids = new_ids - old_ids
+
+        print(f"🔄 تحديث عناصر الطلب {order.id}: removed={removed_ids}, added={added_ids}")
+
+        # تحديث full_order_data بالكامل
+        order.full_order_data = order_data
+
+        # تحديث raw_data كنسخة أصلية
+        order.raw_data = json.dumps(order_data, ensure_ascii=False)
+
+        # تسجيل المنتجات المحذوفة
+        for pid in removed_ids:
+            rec = OrderProductStatus.query.filter_by(order_id=order.id, product_id=pid).first()
+            if rec:
+                rec.status = 'removed'
+                rec.notes = (rec.notes or '') + ' | removed via webhook'
+                rec.updated_at = datetime.utcnow()
+            else:
+                db.session.add(OrderProductStatus(
+                    order_id=order.id,
+                    product_id=pid,
+                    status='removed',
+                    notes='Removed via webhook',
+                    updated_at=datetime.utcnow()
+                ))
+
+        # تسجيل المنتجات المضافة
+        for pid in added_ids:
+            db.session.add(OrderProductStatus(
+                order_id=order.id,
+                product_id=pid,
+                status='added',
+                notes='Added via webhook',
+                updated_at=datetime.utcnow()
+            ))
+
+        db.session.commit()
+        return True
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ خطأ في تحديث المنتجات للطلب {order.id}: {str(e)}")
+        return False
+
+
 @orders_bp.route('/webhook/orders', methods=['POST'])
 @csrf.exempt
 def order_status_webhook():
@@ -974,60 +1037,46 @@ def order_status_webhook():
             event = data.get('event')
             webhook_data = data.get('data', {})
             merchant_id = data.get('merchant')
-            
-            if merchant_id is None:
-                merchant_id = webhook_data.get('merchant') or webhook_data.get('store_id')
-                if merchant_id is None:
-                    return jsonify({'success': False, 'error': 'لا يوجد معرف متجر'}), 400
-            
             order_data = webhook_data
         else:
             event = data.get('event')
             order_data = data.get('data', {})
             merchant_id = order_data.get('merchant_id')
 
+        # إنشاء طلب جديد
         if event == 'order.created' and order_data:
             success = handle_order_creation(data if webhook_version == '2' else order_data, webhook_version)
             if success:
                 return jsonify({'success': True, 'message': 'تم إنشاء الطلب بنجاح'}), 200
             else:
                 return jsonify({'success': False, 'error': 'فشل في إنشاء الطلب'}), 500
-            
+
+        # تحديث حالة أو بيانات الطلب
         elif event in ['order.status.updated', 'order.updated'] and order_data:
             order_id = str(order_data.get('id'))
-            
-            # تحديث حالة الطلب (الكود الحالي)
+            order = SallaOrder.query.get(order_id)
+
+            if not order:
+                return jsonify({'success': False, 'error': 'الطلب غير موجود'}), 404
+
             if event == 'order.status.updated':
-                status_data = order_data.get('status', {})
-            else:
+                # تحديث حالة الطلب فقط
                 status_data = order_data.get('status', {}) or order_data.get('current_status', {})
-            
-            if order_id and status_data:
-                order = SallaOrder.query.get(order_id)
-                if order:
+                if status_data:
                     status_slug = status_data.get('slug', '').lower().replace('-', '_')
                     if not status_slug and status_data.get('name'):
                         status_slug = status_data['name'].lower().replace(' ', '_')
-                    
-                    status = OrderStatus.query.filter_by(
-                        slug=status_slug,
-                        store_id=order.store_id
-                    ).first()
-
+                    status = OrderStatus.query.filter_by(slug=status_slug, store_id=order.store_id).first()
                     if status:
                         order.status_id = status.id
-                        print(f"✅ تم تحديث حالة الطلب {order_id} إلى {status_slug}")
+                        db.session.commit()
 
-            # ⭐⭐ إضافة تحديث العنوان عند حدث order.updated ⭐⭐
-            if event == 'order.updated' and order_data:
-                print(f"🔄 معالجة تحديث الطلب والعنوان للطلب {order_id}")
-                update_success = update_order_address(order_id, order_data)
-                if update_success:
-                    print(f"✅ تم تحديث بيانات العنوان للطلب {order_id}")
-                else:
-                    print(f"⚠️ فشل في تحديث العنوان للطلب {order_id}")
+            elif event == 'order.updated':
+                # ⭐ تحديث المنتجات باستخدام الدالة الجديدة
+                update_order_items_from_webhook(order, order_data)
 
-            db.session.commit()
+                # ⭐ تحديث العنوان إذا تغير
+                update_order_address(order_id, order_data)
 
         return jsonify({'success': True, 'message': 'تم استقبال البيانات بنجاح'}), 200
 
@@ -1036,7 +1085,6 @@ def order_status_webhook():
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         db.session.close()
-        
 def extract_order_address(order_data):
     """
     استخراج بيانات العنوان مع الأولوية للمتسلم
