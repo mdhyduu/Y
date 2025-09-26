@@ -142,49 +142,38 @@ class User(db.Model):
         except Exception as e:
             current_app.logger.error(f"خطأ في فك التشفير: {str(e)}")
             return None
+    
     def set_tokens(self, access_token, refresh_token, expires_in=None):
-        """حفظ التوكنات مع صلاحية افتراضية 12 يوم"""
+        """دالة معدلة لحفظ التوكنات مع صلاحية 12 يوم بشكل افتراضي"""
         try:
-            self.salla_access_token = access_token
-            self.salla_refresh_token = refresh_token
+            fernet = Fernet(current_app.config['ENCRYPTION_KEY'])
+            self._salla_access_token = fernet.encrypt(access_token.encode('utf-8'))
+            self._salla_refresh_token = fernet.encrypt(refresh_token.encode('utf-8'))
             
+            # لو المستخدم مدخلش expires_in → نخليها 12 يوم
             if expires_in is None:
                 self.token_expires_at = datetime.utcnow() + timedelta(days=12)
             else:
                 self.token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
-            
+    
             db.session.commit()
             return True
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"خطأ في حفظ التوكنات: {str(e)}")
             return False
-
-
         def refresh_access_token(self, new_access_token, new_expires_in):
             """تحديث توكن الوصول فقط"""
             try:
                 self.salla_access_token = new_access_token
                 self.token_expires_at = datetime.utcnow() + timedelta(seconds=new_expires_in)
                 self.token_refreshed_at = datetime.utcnow()
-                
                 db.session.commit()
                 return True
             except Exception as e:
                 db.session.rollback()
                 current_app.logger.error(f"فشل تحديث توكن الوصول: {str(e)}")
                 return False
-
-
-    @hybrid_property
-    def tokens_are_valid(self):
-        """التحقق من صلاحية التوكنات مع هامش أمان 5 دقائق"""
-        return (
-            self.salla_access_token is not None and
-            self.salla_refresh_token is not None and
-            self.token_expires_at is not None and
-            datetime.utcnow() < (self.token_expires_at - timedelta(minutes=5))
-        )
         
     @hybrid_property
     def tokens_are_valid(self):
