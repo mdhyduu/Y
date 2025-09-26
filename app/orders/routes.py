@@ -483,7 +483,7 @@ def order_details(order_id):
 
 # 🔥 تعريف الدوال المساعدة المطلوبة
 
-def refresh_salla_token_if_needed(user):
+def refresh_salla_token(user):
     """تجديد token سلة إذا لزم الأمر"""
     try:
         if not user.salla_access_token:
@@ -517,7 +517,7 @@ def refresh_salla_token_if_needed(user):
 def fetch_order_data_from_api(user, order_id):
     """جلب بيانات الطلب من API مع تضمين العناصر في البيانات الرئيسية"""
     try:
-        access_token = refresh_salla_token_if_needed(user)
+        access_token = refresh_salla_token(user)
         if not access_token:
             return None, []
             
@@ -559,7 +559,7 @@ def fetch_order_data_from_api(user, order_id):
 def fetch_order_items_from_api(user, order_id):
     """جلب عناصر الطلب من API مع معالجة الأخطاء المحسنة"""
     try:
-        access_token = refresh_salla_token_if_needed(user)
+        access_token = refresh_salla_token(user)
         if not access_token:
             print("❌ لا يوجد access token")
             return []
