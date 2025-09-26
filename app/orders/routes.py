@@ -829,32 +829,25 @@ def handle_order_creation(data, webhook_version='2'):
         existing_order = SallaOrder.query.get(order_id)
         if existing_order:
             print(f"✅ الطلب موجود مسبقاً في قاعدة البيانات")
-            
-            # التصحيح: التحقق من وجود العنوان في جدول OrderAddress
+
+            # تحديث full_order_data إذا كان ناقص
+            if not existing_order.full_order_data:
+                existing_order.full_order_data = order_data
+                db.session.commit()
+                print("✅ تم تحديث الطلب ببيانات كاملة (full_order_data)")
+
+            # التحقق من وجود العنوان
             existing_address = OrderAddress.query.filter_by(order_id=order_id).first()
-            print(f"📫 العنوان الموجود: {existing_address}")
-            
-            if not existing_address:  # إذا لم يكن هناك عنوان نضيفه
-                print("📝 لم يتم العثور على عنوان، جاري استخراج العنوان من البيانات...")
+            if not existing_address:
+                print("📝 لم يتم العثور على عنوان، جاري إضافته...")
                 address_info = extract_order_address(order_data)
-                print(f"📍 بيانات العنوان المستخرجة: {address_info}")
-                
-                if address_info:  # التأكد من وجود بيانات العنوان
-                    # تشفير البيانات الحساسة قبل الحفظ
+                if address_info:
                     address_info['name'] = encrypt_data(address_info.get('name', ''))
                     address_info['phone'] = encrypt_data(address_info.get('phone', ''))
-                    
-                    new_address = OrderAddress(
-                        order_id=order_id,
-                        **address_info
-                    )
+                    new_address = OrderAddress(order_id=order_id, **address_info)
                     db.session.add(new_address)
                     db.session.commit()
                     print("✅ تم حفظ العنوان الجديد بنجاح")
-                else:
-                    print("⚠️ لا توجد بيانات عنوان لاحفظها")
-            else:
-                print("✅ العنوان موجود مسبقاً، لا حاجة للإضافة")
             return True
 
         print("🆕 طلب جديد، جاري إنشاؤه...")
@@ -862,7 +855,6 @@ def handle_order_creation(data, webhook_version='2'):
         # --- ربط الطلب بالمستخدم (store owner) ---
         user = User.query.filter_by(store_id=store_id).first()
         if not user:
-            print("🔍 البحث عن مستخدم بديل...")
             user_with_salla = User.query.filter(
                 User._salla_access_token.isnot(None),
                 User.store_id.isnot(None)
@@ -880,25 +872,19 @@ def handle_order_creation(data, webhook_version='2'):
             try:
                 date_str = date_info['date'].split('.')[0]
                 created_at = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
-                print(f"📅 تاريخ الإنشاء: {created_at}")
             except Exception:
                 created_at = datetime.utcnow()
-                print("⚠️ استخدام التاريخ الحالي بسبب خطأ في التحليل")
 
         # --- المبلغ والعملة ---
         total_info = order_data.get('total') or order_data.get('amounts', {}).get('total', {})
         total_amount = float(total_info.get('amount', 0))
         currency = total_info.get('currency', 'SAR')
-        print(f"💰 المبلغ: {total_amount} {currency}")
 
         # --- بيانات العميل ---
         customer = order_data.get('customer', {})
         customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip()
         if not customer_name:
             customer_name = order_data.get('customer_name', 'عميل غير معروف')
-        print(f"👤 اسم العميل: {customer_name}")
-
-        # --- تشفير اسم العميل قبل الحفظ ---
         encrypted_customer_name = encrypt_data(customer_name)
 
         # --- تحديد حالة الطلب ---
@@ -908,61 +894,43 @@ def handle_order_creation(data, webhook_version='2'):
             status_slug = status_info.get('slug', '').lower().replace('-', '_')
             if not status_slug and status_info.get('name'):
                 status_slug = status_info['name'].lower().replace(' ', '_')
-
-            status = OrderStatus.query.filter_by(
-                slug=status_slug,
-                store_id=store_id
-            ).first()
+            status = OrderStatus.query.filter_by(slug=status_slug, store_id=store_id).first()
             if status:
                 status_id = status.id
-                print(f"🏷️ حالة الطلب: {status_slug} (ID: {status_id})")
 
         if not status_id:
             default_status = OrderStatus.query.filter_by(
-                store_id=store_id,
-                is_active=True
+                store_id=store_id, is_active=True
             ).order_by(OrderStatus.sort).first()
             if default_status:
                 status_id = default_status.id
-                print(f"🔧 استخدام الحالة الافتراضية: {status_id}")
 
-        # --- إنشاء الطلب ---
+        # --- إنشاء الطلب الجديد ---
         new_order = SallaOrder(
             id=order_id,
             store_id=store_id,
-            customer_name=encrypted_customer_name,  # حفظ الاسم مشفر
+            customer_name=encrypted_customer_name,
             created_at=created_at or datetime.utcnow(),
             total_amount=total_amount,
             currency=currency,
             payment_method=order_data.get('payment_method', ''),
             raw_data=json.dumps(order_data, ensure_ascii=False),
+            full_order_data=order_data,   # ✅ تخزين البيانات الكاملة
             status_id=status_id
         )
         db.session.add(new_order)
         db.session.flush()
-        print("✅ تم إنشاء الطلب في قاعدة البيانات")
 
-        # --- إضافة العنوان (مع التشفير) ---
+        # --- إضافة العنوان ---
         address_info = extract_order_address(order_data)
-        print(f"📍 بيانات العنوان المستخرجة للطلب الجديد: {address_info}")
-        
         if address_info:
-            # تشفير البيانات الحساسة قبل الحفظ
             address_info['name'] = encrypt_data(address_info.get('name', ''))
             address_info['phone'] = encrypt_data(address_info.get('phone', ''))
-            
-            new_address = OrderAddress(
-                order_id=order_id,
-                **address_info
-            )
+            new_address = OrderAddress(order_id=order_id, **address_info)
             db.session.add(new_address)
-            print("✅ تم إضافة العنوان للطلب الجديد")
-        else:
-            print("⚠️ لا توجد بيانات عنوان للطلب الجديد")
 
-        # --- حفظ كل شيء ---
         db.session.commit()
-        print("🎉 تم حفظ الطلب والعنوان بنجاح")
+        print("🎉 تم حفظ الطلب مع full_order_data والعنوان بنجاح")
         return True
 
     except Exception as e:
