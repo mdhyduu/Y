@@ -328,7 +328,6 @@ def index():
         return redirect(url_for('orders.index'))
 
 import copy
-
 @orders_bp.route('/<int:order_id>')
 def order_details(order_id):
     user, current_employee = get_user_from_cookies()
@@ -338,6 +337,8 @@ def order_details(order_id):
         current_employee = db.session.query(Employee).options(
             selectinload(Employee.custom_statuses)
         ).get(current_employee.id)
+
+    # باقي الكود الحالي يبقى كما هو...
     
     if not user:
         flash("الرجاء تسجيل الدخول أولاً", "error")
@@ -467,40 +468,96 @@ def order_details(order_id):
             db_data = db_future.result()
 
         processed_order = process_order_data(order_id, items_data)
-        
-        # جلب العنوان مباشرة من قاعدة البيانات
-        order_address = OrderAddress.query.filter_by(order_id=str(order_id)).first()
-        print(f"🔍 في order_details - العنوان من DB: {order_address}")
-        
-        # استخدام البيانات المحفوظة فقط - إزالة جزء API
-        if order_address:
-            print("✅ استخدام العنوان المحفوظ في قاعدة البيانات")
-            full_address = order_address.full_address or 'لم يتم تحديد العنوان'
-            receiver_info = {
-                'name': order_address.name or '',
-                'phone': order_address.phone or '',
 
+        address_data = {}
+        full_address = 'لم يتم تحديد العنوان'
+
+        shipping_data = order_data.get('shipping', {})
+        if shipping_data and 'address' in shipping_data:
+            address_data = shipping_data.get('address', {})
+
+        if not address_data and 'ship_to' in order_data:
+            address_data = order_data.get('ship_to', {})
+
+        if not address_data and 'customer' in order_data:
+            customer = order_data.get('customer', {})
+            address_data = {
+                'country': customer.get('country', ''),
+                'city': customer.get('city', ''),
+                'description': customer.get('location', '')
             }
-        else:
-            print("❌ لا يوجد عنوان محفوظ")
-            full_address = 'لم يتم تحديد العنوان'
+
+        if address_data:
+            parts = []
+            if address_data.get('name'):
+                parts.append(f"الاسم: {address_data['name']}")
+            if address_data.get('country'):
+                parts.append(f"الدولة: {address_data['country']}")
+            if address_data.get('city'):
+                parts.append(f"المدينة: {address_data['city']}")
+            if address_data.get('district'):
+                parts.append(f"الحي: {address_data['district']}")
+            if address_data.get('street'):
+                parts.append(f"الشارع: {address_data['street']}")
+            if address_data.get('street_number'):
+                parts.append(f"رقم الشارع: {address_data['street_number']}")
+            if address_data.get('block'):
+                parts.append(f"القطعة: {address_data['block']}")
+            if address_data.get('description'):
+                parts.append(f"وصف إضافي: {address_data['description']}")
+            if address_data.get('postal_code'):
+                parts.append(f"الرمز البريدي: {address_data['postal_code']}")
+            if parts:
+                full_address = "، ".join(parts)
+
+        receiver_info = {
+            'name': address_data.get('name', ''),
+            'phone': address_data.get('phone', ''),
+            'email': address_data.get('email', '')
+        }
+        if not receiver_info['name']:
+            customer_info = order_data.get('customer', {})
             receiver_info = {
-                'name': '',
-                'phone': '',
-            
+                'name': f"{customer_info.get('first_name', '')} {customer_info.get('last_name', '')}".strip(),
+                'phone': f"{customer_info.get('mobile_code', '')}{customer_info.get('mobile', '')}",
+                'email': customer_info.get('email', '')
             }
 
         processed_order.update({
             'id': order_id,
             'reference_id': order_data.get('reference_id') or 'غير متوفر',
-
+            'customer': {
+                'first_name': order_data.get('customer', {}).get('first_name', ''),
+                'last_name': order_data.get('customer', {}).get('last_name', ''),
+                'email': order_data.get('customer', {}).get('email', ''),
+                'phone': f"{order_data.get('customer', {}).get('mobile_code', '')}{order_data.get('customer', {}).get('mobile', '')}"
+            },
             'status': {
                 'name': order_data.get('status', {}).get('name', 'غير معروف'),
                 'slug': order_data.get('status', {}).get('slug', 'unknown')
             },
             'created_at': format_date(order_data.get('created_at', '')),
-
-
+            'payment_method': order_data.get('payment_method', 'غير محدد'),
+            'receiver': receiver_info,
+            'shipping': {
+                'customer_name': receiver_info.get('name', ''),
+                'phone': receiver_info.get('phone', ''),
+                'method': order_data.get('shipping', {}).get('courier_name', 'غير محدد'),
+                'tracking_number': order_data.get('shipping', {}).get('tracking_number', ''),
+                'tracking_link': order_data.get('shipping', {}).get('tracking_link', ''),
+                'address': full_address,
+                'country': address_data.get('country', ''),
+                'city': address_data.get('city', ''),
+                'district': address_data.get('district', ''),
+                'street': address_data.get('street', ''),
+                'description': address_data.get('description', ''),
+                'postal_code': address_data.get('postal_code', ''),
+                'raw_data': address_data
+            },
+            'payment': {
+                'status': order_data.get('payment', {}).get('status', ''),
+                'method': order_data.get('payment', {}).get('method', '')
+            },
             'amount': {
                 'sub_total': order_data.get('amounts', {}).get('sub_total', {'amount': 0, 'currency': 'SAR'}),
                 'shipping_cost': order_data.get('amounts', {}).get('shipping_cost', {'amount': 0, 'currency': 'SAR'}),
@@ -511,7 +568,6 @@ def order_details(order_id):
 
         return render_template('order_details.html', 
             order=processed_order,
-            order_address=order_address,  # تمرير العنوان المحفوظ للقالب
             status_notes=db_data['status_notes'],
             employee_statuses=db_data['employee_statuses'],
             custom_note_statuses=db_data['custom_note_statuses'],
@@ -539,6 +595,7 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
+
 import hmac
 import hashlib
 
