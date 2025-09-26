@@ -483,7 +483,7 @@ def order_details(order_id):
 
 # 🔥 تعريف الدوال المساعدة المطلوبة
 def ensure_valid_access_token(user):
-    """التأكد من وجود توكن وصول صالح مع معالجة الأخطاء"""
+    """التأكد من وجود توكن وصول صالح مع معالجة الأخطاء المحسنة"""
     try:
         if not user:
             logger.error("❌ لا يوجد مستخدم للمصادقة")
@@ -496,19 +496,28 @@ def ensure_valid_access_token(user):
         
         logger.warning("🔄 التوكنات منتهية، جاري التجديد...")
         
-        # استخدام الدالة من token_utils
+        # استخدام الدالة من token_utils مع معالجة أفضل للأخطاء
         from app.token_utils import refresh_salla_token
-        new_token = refresh_salla_token(user)
+        success = refresh_salla_token(user)
         
-        if new_token:
+        if success and user.tokens_are_valid:
             logger.info("✅ تم تجديد التوكن بنجاح")
-            return new_token
+            # إعادة تحميل المستخدم من الجلسة للحصول على أحدث البيانات
+            db.session.refresh(user)
+            return user.salla_access_token
         else:
             logger.error("❌ فشل في تجديد التوكن")
+            # محاولة استخدام التوكن الحالي كحل أخير
+            if user.salla_access_token:
+                logger.warning("⚠️ استخدام التوكن الحالي رغم انتهاء صلاحيته")
+                return user.salla_access_token
             return None
             
     except Exception as e:
         logger.error(f"❌ خطأ في التأكد من صلاحية التوكن: {str(e)}")
+        # محاولة استخدام التوكن الحالي كحل أخير
+        if user and user.salla_access_token:
+            return user.salla_access_token
         return None
 def fetch_order_data_from_api(user, order_id):
     """جلب بيانات الطلب من API مع تضمين العناصر في البيانات الرئيسية"""
