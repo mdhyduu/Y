@@ -482,38 +482,32 @@ def order_details(order_id):
         return redirect(url_for('orders.index'))
 
 # 🔥 تعريف الدوال المساعدة المطلوبة
-
 def refresh_salla_token(user):
     """تجديد token سلة إذا لزم الأمر"""
     try:
-        if not user.salla_access_token:
+        if not user or not user.salla_access_token:
+            logger.error("❌ لا يوجد مستخدم أو توكن وصول")
             return None
             
-        # التحقق إذا كان الـ token منتهي الصلاحية
-        headers = {
-            'Authorization': f'Bearer {user.salla_access_token}',
-            'Content-Type': 'application/json'
-        }
-        
-        # طلب بسيط للتحقق من صلاحية الـ token
-        test_response = requests.get(
-            f"{Config.SALLA_BASE_URL}/orders",
-            params={'limit': 1},
-            headers=headers,
-            timeout=10
-        )
-        
-        if test_response.status_code != 401:
+        # التحقق من صلاحية التوكن باستخدام دالة User المضمنة
+        if user.has_valid_tokens:
+            logger.info("✅ التوكن لا يزال صالحاً")
             return user.salla_access_token
         
-        # إذا كان الـ token منتهي الصلاحية، نجده
-        new_token = refresh_salla_token(user)
-        return new_token
+        logger.warning("🔄 التوكن منتهي الصلاحية، جاري التجديد...")
         
+        # استخدام الدالة من token_utils لتجديد التوكن
+        new_token = refresh_salla_token(user)  # هذه الدالة من token_utils
+        if new_token:
+            logger.info("✅ تم تجديد التوكن بنجاح")
+            return new_token
+        else:
+            logger.error("❌ فشل في تجديد التوكن")
+            return None
+            
     except Exception as e:
-        print(f"❌ خطأ في التحقق من صلاحية الـ token: {str(e)}")
-        return user.salla_access_token  # نعيد الـ token القديم على أمل أنه يعمل
-
+        logger.error(f"❌ خطأ في تجديد التوكن: {str(e)}")
+        return None
 def fetch_order_data_from_api(user, order_id):
     """جلب بيانات الطلب من API مع تضمين العناصر في البيانات الرئيسية"""
     try:
