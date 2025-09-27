@@ -122,7 +122,10 @@
         <i class="fas fa-download me-1"></i> 
         <span id="selected-orders-count-html">0</span> تحميل 
     </button> 
-
+    <button type="button" class="btn btn-warning rounded-pill px-3 me-2" id="print-by-product-btn" disabled>
+        <i class="fas fa-boxes me-1"></i> 
+        <span id="selected-orders-count-product">0</span> طباعة  المنتج
+    </button>
             <button type="button" class="btn btn-info rounded-pill px-3 me-2" id="change-status-btn" disabled>
                 <i class="fas fa-tag me-1"></i> 
                 <span id="selected-orders-count-2">0</span> تغيير الحالة
@@ -545,22 +548,24 @@ $(document).ready(function () {
         });
     }
     
-    function updateAssignButtonState() {
-        const checkedCount = $('.order-checkbox:checked').length;
-        $('#selected-orders-count').text(checkedCount);
-        $('#selected-orders-count-2').text(checkedCount);
-        $('#selected-orders-count-print').text(checkedCount);
-        $('#selected-orders-count-html').text(checkedCount);
-        
-        const buttons = $('#assign-orders-btn, #change-status-btn, #print-orders-btn, #download-html-btn, #quickListViewBtn');
-        buttons.prop('disabled', checkedCount === 0);
-        
-        if (checkedCount > 0) {
-            buttons.addClass('pulse-effect');
-            setTimeout(() => buttons.removeClass('pulse-effect'), 1000);
-        }
-    }
+ function updateAssignButtonState() {
+    const checkedCount = $('.order-checkbox:checked').length;
+    $('#selected-orders-count').text(checkedCount);
+    $('#selected-orders-count-2').text(checkedCount);
+    $('#selected-orders-count-print').text(checkedCount);
+    $('#selected-orders-count-html').text(checkedCount);
+    // ⭐⭐ إضافة تحديث العدد على زر الطباعة حسب المنتج ⭐⭐
+    $('#selected-orders-count-product').text(checkedCount);
     
+    // ⭐⭐ إضافة الزر الجديد إلى قائمة الأزرار ⭐⭐
+    const buttons = $('#assign-orders-btn, #change-status-btn, #print-orders-btn, #download-html-btn, #quickListViewBtn, #print-by-product-btn');
+    buttons.prop('disabled', checkedCount === 0);
+    
+    if (checkedCount > 0) {
+        buttons.addClass('pulse-effect');
+        setTimeout(() => buttons.removeClass('pulse-effect'), 1000);
+    }
+}    
     function buildQueryParams() {
         const params = new URLSearchParams();
         
@@ -740,7 +745,37 @@ $(document).ready(function () {
         updateAssignButtonState();
         toggleQuickListButton();
     });
-
+$(document).on('contextmenu', '#print-by-product-btn', function(e) {
+    e.preventDefault();
+    
+    const selectedOrders = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
+    
+    if (selectedOrders.length === 0) {
+        showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للتحميل');
+        return;
+    }
+    
+    Swal.fire({
+        title: 'تحميل PDF حسب المنتج',
+        html: `سيتم تحميل تقرير المنتجات من <span class="fw-bold text-primary">${selectedOrders.length}</span> طلب كملف PDF.<br>
+              <small class="text-muted">انقر بزر الماوس الأيمن للتحميل المباشر</small>`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'تحميل PDF',
+        cancelButtonText: 'إلغاء',
+        customClass: {
+            confirmButton: 'btn btn-success',
+            cancelButton: 'btn btn-outline-secondary ms-2'
+        },
+        buttonsStyling: false
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // تحميل PDF مباشرة
+            const url = `{{ url_for('orders.download_products_pdf') }}?order_ids=${selectedOrders.join(',')}`;
+            window.location.href = url;
+        }
+    });
+});
     // 3. إسناد الطلبات المحددة
     $(document).on('click', '#assign-orders-btn', function() {
         const selectedOrders = getSelectedOrders();
