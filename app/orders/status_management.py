@@ -691,7 +691,7 @@ def check_status_conflict(order_id, new_status_type, custom_status_id=None):
 
 @orders_bp.route('/<order_id>/product/<product_id>/update_status', methods=['POST'])
 def update_product_status(order_id, product_id):
-    """تحديث حالة منتج معين داخل الطلب + تحديث حالة الطلب إذا كل المنتجات تم تنفيذها"""
+    """تحديث حالة منتج معين داخل الطلب + تحديث حالة الطلب داخلياً إذا كل المنتجات تم تنفيذها"""
     user, employee = get_user_from_cookies()
     if not user:
         return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
@@ -736,59 +736,20 @@ def update_product_status(order_id, product_id):
 
         db.session.commit()
 
-        # ✅ التحقق السريع: إذا ما فيه أي منتج غير "تم التنفيذ"
+        # ✅ التحقق: إذا كل المنتجات "تم التنفيذ"
         not_done = OrderProductStatus.query.filter(
             OrderProductStatus.order_id == str(order_id),
             OrderProductStatus.status != "تم التنفيذ"
         ).first()
 
-        # إذا كل المنتجات تم تنفيذها
         if not not_done:
             try:
-                # 1. تحديث حالة الطلب في سلة عبر API
-                if user.salla_access_token:
-                    headers = {
-                        'Authorization': f'Bearer {user.salla_access_token}',
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-
-                    # البحث عن slug حالة "تم التنفيذ" في إعدادات المتجر
-                    from app.models import OrderStatus
-                    done_status = OrderStatus.query.filter_by(
-                        store_id=user.store_id,
-                        name="تم التنفيذ"
-                    ).first()
-
-                    if done_status:
-                        payload = {
-                            'slug': done_status.slug,
-                            'note': 'تم تحديث الحالة تلقائياً بعد تنفيذ جميع المنتجات'
-                        }
-
-                        try:
-                            response = requests.post(
-                                f"{Config.SALLA_ORDERS_API}/{order_id}/status",
-                                headers=headers,
-                                json=payload,
-                                timeout=10
-                            )
-                            response.raise_for_status()
-                            logger.info(f"✅ تم تحديث حالة الطلب {order_id} في سلة إلى 'تم التنفيذ'")
-                        except requests.exceptions.HTTPError as http_err:
-                            if http_err.response.status_code == 401:
-                                logger.error("انتهت صلاحية الجلسة، لا يمكن تحديث حالة الطلب في سلة")
-                            else:
-                                logger.error(f"خطأ في تحديث حالة الطلب في سلة: {http_err}")
-                        except Exception as e:
-                            logger.error(f"خطأ في الاتصال بسلة: {str(e)}")
-
-                # 2. تحديث الحالة المخصصة في النظام الداخلي
+                # ✅ تحديث الحالة المخصصة في النظام الداخلي فقط
                 done_status_id = None
                 if employee:
                     done_status_id = get_done_status_id(employee.id)
                 else:
-                    # في حالة الأدمن -> أنشئ حالة تم التنفيذ إذا غير موجودة
+                    # في حالة الأدمن -> أنشئ حالة "تم التنفيذ" إذا غير موجودة
                     from app.models import EmployeeCustomStatus
                     admin_status = EmployeeCustomStatus.query.filter_by(
                         name="تم التنفيذ",
