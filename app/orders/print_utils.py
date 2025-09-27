@@ -517,91 +517,80 @@ from urllib.parse import quote
 from sqlalchemy.sql import text
 
 def group_products_by_sku_db(order_ids, store_id):
-    """تجميع المنتجات مباشرة من قاعدة البيانات (PostgreSQL JSONB)"""
+    """تجميع المنتجات مباشرة من قاعدة البيانات (بديل مبسط)"""
     engine = get_postgres_engine()
     
-    # استعلام معدل للتعامل مع أنواع البيانات بشكل صحيح
     query = text("""
         SELECT 
-            COALESCE(
-                CASE 
-                    WHEN jsonb_typeof(item->'sku') = 'string' THEN item->>'sku'
-                    ELSE 'unknown_' || (item->>'id')
-                END, 
-                'unknown_' || (item->>'id')
-            ) AS sku,
-            item->>'name' AS name,
-            COALESCE(
-                item->>'product_thumbnail', 
-                item->>'thumbnail', 
-                item->>'image',
-                ''
-            ) AS thumbnail,
-            SUM(COALESCE(
-                CASE 
-                    WHEN jsonb_typeof(item->'quantity') = 'number' THEN (item->>'quantity')::numeric
-                    WHEN jsonb_typeof(item->'quantity') = 'string' THEN (item->>'quantity')::numeric
-                    ELSE 0
-                END, 
-                0
-            )) AS total_quantity,
-            json_agg(
-                json_build_object(
-                    'order_id', o.id,
-                    'customer_name', COALESCE(o.customer_name, ''),
-                    'quantity', COALESCE(
-                        CASE 
-                            WHEN jsonb_typeof(item->'quantity') = 'number' THEN (item->>'quantity')::numeric
-                            WHEN jsonb_typeof(item->'quantity') = 'string' THEN (item->>'quantity')::numeric
-                            ELSE 0
-                        END, 
-                        0
-                    ),
-                    'created_at', o.created_at,
-                    'barcode', o.barcode_data,
-                    'options_text', (
-                        SELECT string_agg(
-                            COALESCE(opt->>'name', '') || ': ' || COALESCE(opt->>'value', ''), 
-                            ' | '
-                        )
-                        FROM jsonb_array_elements(
-                            CASE 
-                                WHEN jsonb_typeof(COALESCE(item->'options', '[]'::jsonb)) = 'array' 
-                                THEN COALESCE(item->'options', '[]'::jsonb)
-                                ELSE '[]'::jsonb
-                            END
-                        ) AS opt
-                    )
-                )
-            ) AS orders
-        FROM salla_orders o,
-        LATERAL jsonb_array_elements(
-            CASE 
-                WHEN jsonb_typeof(o.full_order_data->'items') = 'array' 
-                THEN o.full_order_data->'items'
-                ELSE '[]'::jsonb
-            END
-        ) AS item
+            o.id as order_id,
+            o.customer_name,
+            o.created_at,
+            o.barcode_data,
+            o.full_order_data
+        FROM salla_orders o
         WHERE o.id = ANY(:order_ids) AND o.store_id = :store_id
-        GROUP BY 
-            CASE 
-                WHEN jsonb_typeof(item->'sku') = 'string' THEN item->>'sku'
-                ELSE 'unknown_' || (item->>'id')
-            END, 
-            item->>'name',
-            COALESCE(
-                item->>'product_thumbnail', 
-                item->>'thumbnail', 
-                item->>'image',
-                ''
-            )
+        ORDER BY o.created_at DESC
     """)
     
     try:
         with engine.connect() as conn:
             result = conn.execute(query, {"order_ids": order_ids, "store_id": store_id}).mappings().all()
         
-        return [dict(row) for row in result]
+        # معالجة البيانات في Python بدلاً من SQL
+        products_dict = {}
+        
+        for row in result:
+            order_data = dict(row)
+            full_order_data = order_data.get('full_order_data', {})
+            
+            if isinstance(full_order_data, str):
+                try:
+                    full_order_data = json.loads(full_order_data)
+                except json.JSONDecodeError:
+                    continue
+            
+            items = full_order_data.get('items', [])
+            
+            for item in items:
+                sku = item.get('sku') or f"unknown_{item.get('id', 'temp')}"
+                product_name = item.get('name', 'غير معروف')
+                thumbnail = item.get('product_thumbnail') or item.get('thumbnail') or item.get('image') or ''
+                quantity = int(item.get('quantity', 0))
+                
+                if sku not in products_dict:
+                    products_dict[sku] = {
+                        'name': product_name,
+                        'sku': sku,
+                        'thumbnail': thumbnail,
+                        'total_quantity': 0,
+                        'orders': []
+                    }
+                
+                products_dict[sku]['total_quantity'] += quantity
+                
+                # معالجة الخيارات
+                options_text = ""
+                options = item.get('options', [])
+                if isinstance(options, list):
+                    option_parts = []
+                    for opt in options:
+                        opt_name = opt.get('name', '')
+                        opt_value = opt.get('value', '')
+                        if isinstance(opt_value, dict):
+                            opt_value = opt_value.get('name') or opt_value.get('value') or str(opt_value)
+                        option_parts.append(f"{opt_name}: {opt_value}")
+                    options_text = " | ".join(option_parts)
+                
+                products_dict[sku]['orders'].append({
+                    'order_id': order_data['order_id'],
+                    'customer_name': order_data.get('customer_name', ''),
+                    'quantity': quantity,
+                    'created_at': order_data.get('created_at'),
+                    'barcode': order_data.get('barcode_data'),
+                    'options_text': options_text
+                })
+        
+        return list(products_dict.values())
         
     except Exception as e:
         logger.error(f"❌ خطأ في تجميع المنتجات من قاعدة البيانات: {str(e)}")
