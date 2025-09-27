@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>منتج {{ product.sku }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 0.3cm;
+        }
+        body {
+            font-family: 'DejaVu Sans', Arial, sans-serif;
+            line-height: 1.2;
+            margin: 0;
+            padding: 5px;
+            color: #000;
+            background: white;
+            font-size: 10px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #000;
+        }
+        .header h1 {
+            font-size: 14px;
+            margin: 2px 0;
+        }
+        .header p {
+            font-size: 9px;
+            margin: 1px 0;
+        }
+        .product-summary {
+            text-align: right;
+            margin-bottom: 8px;
+            padding: 1px;
+            background: #f0f0f0;
+            border-radius: 3px;
+            font-size: 9px;
+        }
+        .orders-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin: 0 auto;
+        }
+        .order-item {
+            border: 1px solid #000;
+            border-radius: 3px;
+            padding: 4px;
+            text-align: center;
+            background: white;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .order-number {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 3px;
+            background: #e0e0e0;
+            padding: 2px;
+            border-radius: 2px;
+        }
+        .product-image-container {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 3px auto;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+            overflow: hidden;
+            background: white;
+            flex-shrink: 0;
+        }
+.product-image-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* يخلي الصورة تملأ الحاوي بالكامل */
+}
+        .no-image {
+            width: 100%;
+            height: 100%;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 8px;
+        }
+        .options {
+            font-size: 8px;
+            color: #333;
+            margin: 2px 0;
+            line-height: 1.1;
+            min-height: 20px;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .barcode-container {
+            margin-top: 2px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .barcode {
+            max-width: 80px;
+            max-height: 25px;
+            border: 1px solid #eee;
+            padding: 1px;
+            background: white;
+        }
+        .no-barcode {
+            font-size: 7px;
+            color: #999;
+            margin: 2px 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 8px;
+            font-size: 8px;
+            color: #666;
+            border-top: 1px solid #ddd;
+            padding-top: 4px;
+        }
+        .page-break {
+            page-break-after: always;
+        }
+        
+        /* تحسينات للطباعة */
+        @media print {
+            body {
+                margin: 0;
+                padding: 3px;
+            }
+            .order-item {
+                border: 1px solid #000;
+            }
+            .orders-container {
+                gap: 3px;
+            }
+        }
+        
+        /* تكييف عدد الأعمدة حسب حجم الصفحة */
+        @media (max-width: 21cm) {
+            .orders-container {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- الرأس -->
+    <div class="header">
+        <h1>{{ product.name }}</h1>
+        <p>SKU: {{ product.sku }} | تاريخ الإنشاء: {{ current_time }}</p>
+    </div>
+
+    <!-- ملخص المنتج -->
+    <div class="product-summary">
+        <strong>الكمية الإجمالية: {{ product.total_quantity }}</strong> | 
+        عدد الطلبات: {{ product.orders|length }}
+    </div>
+
+    <!-- شبكة الطلبات -->
+    <div class="orders-container">
+        {% for order in product.orders %}
+        <div class="order-item">
+            <!-- رقم الطلب -->
+            <div class="order-number">{{ order.reference_id }}</div>
+            
+            <!-- صورة المنتج -->
+            <div class="product-image-container">
+                {% if product.thumbnail %}
+                <img src="{{ product.thumbnail }}" alt="{{ product.name }}"
+                     onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'no-image\'>لا توجد صورة</div>';">
+                {% else %}
+                <div class="no-image">لا توجد صورة</div>
+                {% endif %}
+            </div>
+            
+            <!-- خيارات المنتج -->
+            <div class="options">
+                {% if order.options_text and order.options_text[0] != "لا توجد خيارات" %}
+                    {% for option_text in order.options_text %}
+                    <div>{{ option_text }}</div>
+                    {% if not loop.last %}<br>{% endif %}
+                    {% endfor %}
+                {% else %}
+                    <div>لا توجد خيارات</div>
+                {% endif %}
+            </div>
+            
+            <!-- الباركود -->
+            <div class="barcode-container">
+                {% if order.barcode and not order.barcode.startswith('data:image/png;base64,') %}
+                <img src="{{ order.barcode }}" class="barcode" 
+                     alt="باركود {{ order.reference_id }}"
+                     onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'no-barcode\'>لا يوجد باركود</div>';">
+                {% else %}
+                <div class="no-barcode">لا يوجد باركود</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- فاصل الصفحة بعد كل 21 طلب (3 أعمدة × 7 صفوف) -->
+        {% if loop.index % 21 == 0 and not loop.last %}
+        <div class="page-break"></div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- التذييل -->
+    <div class="footer">
+        <p>تم الإنشاء: {{ current_time }} | {{ product.name }} ({{ product.sku }})</p>
+    </div>
+
+    <script>
+    // معالجة أخطاء الصور والباركود
+    document.addEventListener('DOMContentLoaded', function() {
+        // معالجة أخطاء الصور
+        const images = document.querySelectorAll('.product-image-container img');
+        images.forEach(img => {
+            img.addEventListener('error', function() {
+                this.style.display = 'none';
+                const container = this.parentElement;
+                if (container) {
+                    container.innerHTML = '<div class="no-image">لا توجد صورة</div>';
+                }
+            });
+        });
+        
+        // معالجة أخطاء الباركود
+        const barcodes = document.querySelectorAll('.barcode');
+        barcodes.forEach(barcode => {
+            barcode.addEventListener('error', function() {
+                this.style.display = 'none';
+                const container = this.parentElement;
+                if (container) {
+                    container.innerHTML = '<div class="no-barcode">لا يوجد باركود</div>';
+                }
+            });
+        });
+    });
+    </script>
+</body>
+</html>
