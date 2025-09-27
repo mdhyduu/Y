@@ -195,16 +195,15 @@
                 {% endif %}
             </div>
             
-            <!-- الباركود -->
-            <div class="barcode-container">
-                {% if order.barcode and not order.barcode.startswith('data:image/png;base64,') %}
-                <img src="{{ order.barcode }}" class="barcode" 
-                     alt="باركود {{ order.reference_id }}"
-                     onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'no-barcode\'>لا يوجد باركود</div>';">
-                {% else %}
-                <div class="no-barcode">لا يوجد باركود</div>
-                {% endif %}
-            </div>
+<div class="barcode-container">
+    {% if order.barcode %}
+    <img src="{{ order.barcode }}" class="barcode" 
+         alt="باركود {{ order.reference_id }}"
+         onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'no-barcode\'>خطأ في تحميل الباركود</div>';">
+    {% else %}
+    <div class="no-barcode">لا يوجد باركود</div>
+    {% endif %}
+</div>
         </div>
         
         <!-- فاصل الصفحة بعد كل 21 طلب (3 أعمدة × 7 صفوف) -->
