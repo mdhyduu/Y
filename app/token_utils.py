@@ -41,19 +41,6 @@ def get_store_info(access_token):
     response.raise_for_status()
     return response.json().get('data', {})
 
-def set_token_cookies(response, access_token, refresh_token, expires_at):
-    """تعيين كوكيز التوكنات في الرد"""
-    response.set_cookie('salla_access_token', access_token, 
-                      max_age=timedelta(days=30).total_seconds(), 
-                      httponly=True, secure=True)
-    response.set_cookie('salla_refresh_token', refresh_token, 
-                       max_age=timedelta(days=30).total_seconds(), 
-                       httponly=True, secure=True)
-    response.set_cookie('token_expires_at', expires_at.isoformat(), 
-                       max_age=timedelta(days=30).total_seconds())
-    response.set_cookie('store_linked', 'true', 
-                       max_age=timedelta(days=30).total_seconds())
-    return response
 
 def refresh_salla_token(user):
     """تجديد توكن الوصول باستخدام توكن التحديث"""
