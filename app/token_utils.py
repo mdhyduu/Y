@@ -41,6 +41,50 @@ def get_store_info(access_token):
     response.raise_for_status()
     return response.json().get('data', {})
 
+ 
+def set_token_cookies(response, access_token, refresh_token):
+    """
+    تعيين كوكيز التوكنات في الرد بطريقة آمنة.
+    """
+    # Access Token قصير الأجل (15 دقيقة)
+    access_expires_seconds = timedelta(minutes=15).total_seconds()
+    access_expires_at = datetime.utcnow() + timedelta(minutes=15)
+    
+    # Refresh Token طويل الأجل (30 يومًا)
+    refresh_expires_seconds = timedelta(days=30).total_seconds()
+
+    response.set_cookie(
+        'salla_access_token',
+        access_token, 
+        max_age=access_expires_seconds,
+        httponly=True,
+        secure=True,
+        samesite='Lax'  # إضافة samesite للحماية من CSRF
+    )
+    
+    response.set_cookie(
+        'salla_refresh_token',
+        refresh_token, 
+        max_age=refresh_expires_seconds,
+        httponly=True,
+        secure=True,
+        samesite='Lax' # إضافة samesite للحماية من CSRF
+    )
+    
+    # هذا الكوكي يمكن للـ JavaScript قراءته لمعرفة متى ينتهي التوكن
+    response.set_cookie(
+        'token_expires_at',
+        access_expires_at.isoformat(),
+        max_age=refresh_expires_seconds # يمكن أن يكون طويل الأمد ليبقى مع الـ refresh token
+    )
+    
+    response.set_cookie(
+        'store_linked',
+        'true',
+        max_age=refresh_expires_seconds
+    )
+    
+    return response
 
 def refresh_salla_token(user):
     """تجديد توكن الوصول باستخدام توكن التحديث"""
