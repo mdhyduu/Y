@@ -41,7 +41,7 @@ def get_store_info(access_token):
     response.raise_for_status()
     return response.json().get('data', {})
 
- 
+
 def set_token_cookies(response, access_token, refresh_token):
     """
     تعيين كوكيز التوكنات في الرد بطريقة آمنة.
