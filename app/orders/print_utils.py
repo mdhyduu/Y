@@ -513,67 +513,40 @@ def download_pdf():
 import re
 import unicodedata
 from urllib.parse import quote
-def group_products_by_sku(orders):
-    """تجميع الطلبات حسب المنتج مع عرض كامل الخيارات"""
-    products_dict = {}
+from sqlalchemy.sql import text
+
+def group_products_by_sku_db(order_ids, store_id):
+    """تجميع المنتجات مباشرة من قاعدة البيانات"""
+    engine = get_postgres_engine()
+    query = text("""
+        SELECT 
+            item->>'sku' AS sku,
+            item->>'name' AS name,
+            COALESCE(item->>'product_thumbnail', item->>'thumbnail') AS thumbnail,
+            SUM((item->>'quantity')::int) AS total_quantity,
+            json_agg(
+                json_build_object(
+                    'reference_id', o.reference_id,
+                    'customer_name', o.customer_name,
+                    'quantity', (item->>'quantity')::int,
+                    'created_at', o.created_at,
+                    'barcode', o.barcode_data,
+                    'options_text', (
+                        SELECT string_agg(opt->>'name' || ': ' || opt->>'value', ' | ')
+                        FROM json_array_elements(item->'options') opt
+                    )
+                )
+            ) AS orders
+        FROM salla_orders o,
+        LATERAL json_array_elements(o.full_order_data->'items') item
+        WHERE o.id = ANY(:order_ids) AND o.store_id = :store_id
+        GROUP BY sku, name, thumbnail
+    """)
     
-    for order in orders:
-        for item in order.get('order_items', []):
-            try:
-                sku = item.get('sku', '').strip()
-                if not sku:
-                    sku = f"unknown_{item.get('id', '')}"
-                
-                product_name = item.get('name', '')
-                thumbnail = item.get('main_image') or item.get('thumbnail', '')
-                
-                if sku not in products_dict:
-                    products_dict[sku] = {
-                        'name': product_name,
-                        'sku': sku,
-                        'thumbnail': thumbnail,
-                        'total_quantity': 0,
-                        'orders': []
-                    }
-                
-                quantity = item.get('quantity', 0)
-                products_dict[sku]['total_quantity'] += quantity
-                
-                # 🔥 التعديل: عرض كامل الخيارات بدون تقصير
-                options_text = "لا توجد خيارات"
-                options = item.get('options', [])
-                
-                if options and isinstance(options, list):
-                    options_list = []
-                    for option in options:
-                        option_name = option.get('name', '').strip()
-                        option_value = option.get('value', '').strip()
-                        
-                        if option_name and option_value:
-                            # ✅ إزالة جميع حدود الطول - عرض كامل النص
-                            options_list.append(f"{option_name}: {option_value}")
-                    
-                    if options_list:
-                        # ✅ تحويل القائمة إلى سلسلة نصية واحدة بدون تقصير
-                        options_text = " | ".join(options_list)
-                
-                # إضافة الطلب إلى المنتج
-                order_data = {
-                    'reference_id': order.get('reference_id', order.get('id', '')),
-                    'customer_name': order.get('customer', {}).get('name', ''),
-                    'quantity': quantity,
-                    'created_at': order.get('created_at', ''),
-                    'barcode': order.get('barcode', ''),
-                    'options_text': options_text  # ← نص كامل بدون تقصير
-                }
-                
-                products_dict[sku]['orders'].append(order_data)
-                
-            except Exception as e:
-                logger.error(f"❌ خطأ في تجميع المنتج: {str(e)}")
-                continue
+    with engine.connect() as conn:
+        result = conn.execute(query, {"order_ids": order_ids, "store_id": store_id}).mappings().all()
     
-    return products_dict
+    return [dict(row) for row in result]
 def safe_filename(filename):
     """إنشاء اسم ملف آمن بدون أحرف خاصة"""
     try:
@@ -636,7 +609,7 @@ def download_products_pdf():
             return redirect(url_for('orders.index'))
         
         # تجميع الطلبات حسب المنتج
-        products_dict = group_products_by_sku(orders)
+        products_dict_list = group_products_by_sku_db(order_ids, user.store_id)
         
         if not products_dict:
             flash('لم يتم العثور على أي منتجات في الطلبات المحددة', 'error')
