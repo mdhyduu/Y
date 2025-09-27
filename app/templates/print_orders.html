@@ -9,7 +9,20 @@
             size: A4;
             margin: 0.5cm;
         }
-
+/* تحسينات للأداء في الطباعة */
+@media print {
+    img {
+        max-width: 100px;
+        height: auto;
+    }
+    .barcode {
+        max-width: 150px;
+    }
+    /* تجنب كسر الصفحات داخل العناصر المهمة */
+    .order-item, .product-item {
+        page-break-inside: avoid;
+    }
+}
         body {
             font-family: 'Tajawal', 'Segoe UI', sans-serif;
             margin: 0;
