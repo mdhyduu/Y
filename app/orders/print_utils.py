@@ -570,13 +570,14 @@ def download_pdf():
                              orders=optimized_orders, 
                              current_time=current_time)
         
-        # تحسين إعدادات WeasyPrint للأداء
+        # تحسين إعدادات WeasyPrint للأداء - التصحيح هنا
         pdf = HTML(
             string=html,
             base_url=request.host_url
         ).write_pdf(
             optimize_size=('fonts', 'images'),
-            jpeg_quality=80
+            # إزالة jpeg_quality واستخدام المعلمات الصحيحة
+            compress=True  # بدلاً من jpeg_quality
         )
         
         # استخدام اسم ملف آمن بدون أحرف عربية
@@ -595,6 +596,42 @@ def download_pdf():
         logger.error(traceback.format_exc())
         flash('حدث خطأ أثناء إنشاء PDF', 'error')
         return redirect(url_for('orders.index'))
+
+def generate_product_pdf(product_data, product_sku):
+    """إنشاء PDF للمنتج بالتخطيط المضغوط"""
+    try:
+        # تحسين البيانات للتخطيط الجديد
+        enhanced_product = {
+            'name': product_data.get('name', 'غير معروف'),
+            'sku': product_data.get('sku', product_sku),
+            'thumbnail': product_data.get('thumbnail', ''),
+            'total_quantity': product_data.get('total_quantity', 0),
+            'orders': product_data.get('orders', [])
+        }
+        
+        # إنشاء HTML بالتخطيط الجديد
+        html_content = render_template('print_product.html', 
+                                     product=enhanced_product,
+                                     current_time=datetime.now().strftime('%H:%M:%S %d-%m-%Y'))
+        
+        # إعدادات PDF محسنة للكثافة - التصحيح هنا
+        pdf = HTML(
+            string=html_content,
+            base_url=request.host_url
+        ).write_pdf(
+            optimize_size=('fonts', 'images', 'backgrounds'),
+            # إزالة jpeg_quality واستخدام المعلمات الصحيحة
+            compress=True,  # بدلاً من jpeg_quality
+            dpi=150,
+            presentational_hints=True
+        )
+        
+        logger.info(f"✅ تم إنشاء PDF مضغوط للمنتج {product_sku}")
+        return pdf
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في إنشاء PDF مضغوط: {str(e)}")
+        return None
 
 @orders_bp.route('/download_products_pdf')
 def download_products_pdf():
@@ -687,41 +724,7 @@ def download_products_pdf():
         flash('حدث خطأ أثناء إنشاء ملف المنتجات', 'error')
         return redirect(url_for('orders.index'))
 
-# وأيضاً تعديل دالة generate_product_pdf لاستخدام اسم آمن
-def generate_product_pdf(product_data, product_sku):
-    """إنشاء PDF للمنتج بالتخطيط المضغوط"""
-    try:
-        # تحسين البيانات للتخطيط الجديد
-        enhanced_product = {
-            'name': product_data.get('name', 'غير معروف'),
-            'sku': product_data.get('sku', product_sku),
-            'thumbnail': product_data.get('thumbnail', ''),
-            'total_quantity': product_data.get('total_quantity', 0),
-            'orders': product_data.get('orders', [])
-        }
-        
-        # إنشاء HTML بالتخطيط الجديد
-        html_content = render_template('print_product.html', 
-                                     product=enhanced_product,
-                                     current_time=datetime.now().strftime('%H:%M:%S %d-%m-%Y'))
-        
-        # إعدادات PDF محسنة للكثافة
-        pdf = HTML(
-            string=html_content,
-            base_url=request.host_url
-        ).write_pdf(
-            optimize_size=('fonts', 'images', 'backgrounds'),
-            jpeg_quality=70,
-            dpi=150,
-            presentational_hints=True
-        )
-        
-        logger.info(f"✅ تم إنشاء PDF مضغوط للمنتج {product_sku}")
-        return pdf
-        
-    except Exception as e:
-        logger.error(f"❌ خطأ في إنشاء PDF مضغوط: {str(e)}")
-        return None
+
 def optimize_orders_layout(orders, orders_per_page=8):
     """تحسين تخطيط الطلبات للعرض الشبكي"""
     try:
