@@ -1037,6 +1037,12 @@ def order_status_webhook():
             event = data.get('event')
             webhook_data = data.get('data', {})
             merchant_id = data.get('merchant')
+            
+            if merchant_id is None:
+                merchant_id = webhook_data.get('merchant') or webhook_data.get('store_id')
+                if merchant_id is None:
+                    return jsonify({'success': False, 'error': 'لا يوجد معرف متجر'}), 400
+            
             order_data = webhook_data
         else:
             event = data.get('event')
@@ -1060,7 +1066,7 @@ def order_status_webhook():
                 return jsonify({'success': False, 'error': 'الطلب غير موجود'}), 404
 
             if event == 'order.status.updated':
-                # تحديث حالة الطلب فقط
+                # تحديث حالة الطلب فقط - الإصلاح: نقل commit خارج الشرط
                 status_data = order_data.get('status', {}) or order_data.get('current_status', {})
                 if status_data:
                     status_slug = status_data.get('slug', '').lower().replace('-', '_')
@@ -1069,14 +1075,23 @@ def order_status_webhook():
                     status = OrderStatus.query.filter_by(slug=status_slug, store_id=order.store_id).first()
                     if status:
                         order.status_id = status.id
-                        db.session.commit()
+                        print(f"✅ تم تحديث حالة الطلب {order_id} إلى {status_slug}")
+                
+                # ⭐⭐ الإصلاح: نقل commit خارج الشرط لضمان حفظ التغييرات دائمًا ⭐⭐
+                db.session.commit()
 
             elif event == 'order.updated':
                 # ⭐ تحديث المنتجات باستخدام الدالة الجديدة
                 update_order_items_from_webhook(order, order_data)
 
                 # ⭐ تحديث العنوان إذا تغير
-                update_order_address(order_id, order_data)
+                update_success = update_order_address(order_id, order_data)
+                if update_success:
+                    print(f"✅ تم تحديث بيانات العنوان للطلب {order_id}")
+                else:
+                    print(f"⚠️ فشل في تحديث العنوان للطلب {order_id}")
+                
+                db.session.commit()
 
         return jsonify({'success': True, 'message': 'تم استقبال البيانات بنجاح'}), 200
 
