@@ -53,7 +53,7 @@
             background: white;
             page-break-inside: avoid;
             break-inside: avoid;
-            min-height: 120px;
+            min-height: 140px; /* زيادة الارتفاع لاستيعاب الباركود الأكبر */
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -76,11 +76,11 @@
             background: white;
             flex-shrink: 0;
         }
-.product-image-container img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover; /* يخلي الصورة تملأ الحاوي بالكامل */
-}
+        .product-image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
         .no-image {
             width: 100%;
             height: 100%;
@@ -106,13 +106,26 @@
             margin-top: 2px;
             text-align: center;
             flex-shrink: 0;
+            /* تحسينات لحاوية الباركود */
+            width: 100%;
+            height: 40px; /* زيادة ارتفاع الحاوية */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border: 1px solid #eee;
+            border-radius: 2px;
+            padding: 2px;
         }
         .barcode {
-            max-width: 80px;
-            max-height: 25px;
-            border: 1px solid #eee;
-            padding: 1px;
-            background: white;
+            /* تحسينات كبيرة للباركود */
+            width: 120px !important; /* زيادة العرض بشكل كبير */
+            height: 35px !important; /* زيادة الارتفاع بشكل كبير */
+            max-width: none !important; /* إلغاء الحد الأقصى */
+            max-height: none !important; /* إلغاء الحد الأقصى */
+            object-fit: contain; /* الحفاظ على النسب مع ملء المساحة */
+            image-rendering: crisp-edges; /* تحسين الحدة */
+            image-rendering: -webkit-optimize-contrast; /* تحسين التباين للمتصفحات */
         }
         .no-barcode {
             font-size: 7px;
@@ -143,6 +156,12 @@
             .orders-container {
                 gap: 3px;
             }
+            .barcode {
+                width: 110px !important; /* حجم مختلف للطباعة */
+                height: 32px !important;
+                -webkit-print-color-adjust: exact; /* ضمان طباعة الألوان بدقة */
+                print-color-adjust: exact;
+            }
         }
         
         /* تكييف عدد الأعمدة حسب حجم الصفحة */
@@ -152,16 +171,16 @@
             }
         }
         .options-multiline {
-    white-space: normal !important;
-    word-wrap: break-word !important;
-    font-size: 14px;
-    line-height: 1.6;
-    padding: 8px;
-    background-color: #f5f5f5;
-    border-radius: 4px;
-    border-left: 3px solid #007bff;
-    margin: 5px 0;
-}
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            font-size: 14px;
+            line-height: 1.6;
+            padding: 8px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+            border-left: 3px solid #007bff;
+            margin: 5px 0;
+        }
     </style>
 </head>
 <body>
@@ -195,18 +214,21 @@
             </div>
             
             <!-- خيارات المنتج -->
-  <div class="options-multiline">
-    {{ order.options_text | replace(' | ', '<br>') | safe }}
-</div>
-<div class="barcode-container">
-    {% if order.barcode %}
-    <img src="{{ order.barcode }}" class="barcode" 
-         alt="باركود {{ order.reference_id }}"
-         onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'no-barcode\'>خطأ في تحميل الباركود</div>';">
-    {% else %}
-    <div class="no-barcode">لا يوجد باركود</div>
-    {% endif %}
-</div>
+            <div class="options-multiline">
+                {{ order.options_text | replace(' | ', '<br>') | safe }}
+            </div>
+            
+            <!-- الباركود - التحسينات الرئيسية هنا -->
+            <div class="barcode-container">
+                {% if order.barcode %}
+                <img src="{{ order.barcode }}" class="barcode" 
+                     alt="باركود {{ order.reference_id }}"
+                     onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'no-barcode\'>خطأ في تحميل الباركود</div>';"
+                     style="width: 120px; height: 35px; object-fit: contain;">
+                {% else %}
+                <div class="no-barcode">لا يوجد باركود</div>
+                {% endif %}
+            </div>
         </div>
         
         <!-- فاصل الصفحة بعد كل 21 طلب (3 أعمدة × 7 صفوف) -->
@@ -236,15 +258,33 @@
             });
         });
         
-        // معالجة أخطاء الباركود
+        // معالجة أخطاء الباركود مع تحسينات الدقة
         const barcodes = document.querySelectorAll('.barcode');
         barcodes.forEach(barcode => {
+            // إضافة تحميل ناجح للتحقق من الجودة
+            barcode.addEventListener('load', function() {
+                console.log('✅ الباركود تم تحميله بنجاح:', this.src);
+                // التأكد من أن الباركود يعرض بالحجم الصحيح
+                this.style.width = '120px';
+                this.style.height = '35px';
+                this.style.objectFit = 'contain';
+            });
+            
             barcode.addEventListener('error', function() {
+                console.error('❌ خطأ في تحميل الباركود:', this.src);
                 this.style.display = 'none';
                 const container = this.parentElement;
                 if (container) {
                     container.innerHTML = '<div class="no-barcode">لا يوجد باركود</div>';
                 }
+            });
+        });
+        
+        // تحسين دقة الباركود للطباعة
+        window.addEventListener('beforeprint', function() {
+            document.querySelectorAll('.barcode').forEach(barcode => {
+                barcode.style.width = '110px';
+                barcode.style.height = '32px';
             });
         });
     });
