@@ -519,35 +519,94 @@ from sqlalchemy.sql import text
 def group_products_by_sku_db(order_ids, store_id):
     """تجميع المنتجات مباشرة من قاعدة البيانات (PostgreSQL JSONB)"""
     engine = get_postgres_engine()
+    
+    # استعلام معدل للتعامل مع أنواع البيانات بشكل صحيح
     query = text("""
         SELECT 
-            COALESCE(item->> 'sku', 'unknown_' || (item->> 'id')) AS sku,
-            item->> 'name' AS name,
-            COALESCE(item->> 'product_thumbnail', item->> 'thumbnail', '') AS thumbnail,
-            SUM(COALESCE((item->> 'quantity')::int, 0)) AS total_quantity,
+            COALESCE(
+                CASE 
+                    WHEN jsonb_typeof(item->'sku') = 'string' THEN item->>'sku'
+                    ELSE 'unknown_' || (item->>'id')
+                END, 
+                'unknown_' || (item->>'id')
+            ) AS sku,
+            item->>'name' AS name,
+            COALESCE(
+                item->>'product_thumbnail', 
+                item->>'thumbnail', 
+                item->>'image',
+                ''
+            ) AS thumbnail,
+            SUM(COALESCE(
+                CASE 
+                    WHEN jsonb_typeof(item->'quantity') = 'number' THEN (item->>'quantity')::numeric
+                    WHEN jsonb_typeof(item->'quantity') = 'string' THEN (item->>'quantity')::numeric
+                    ELSE 0
+                END, 
+                0
+            )) AS total_quantity,
             json_agg(
                 json_build_object(
                     'order_id', o.id,
-                    'customer_name', o.customer_name,
-                    'quantity', COALESCE((item->> 'quantity')::int, 0),
+                    'customer_name', COALESCE(o.customer_name, ''),
+                    'quantity', COALESCE(
+                        CASE 
+                            WHEN jsonb_typeof(item->'quantity') = 'number' THEN (item->>'quantity')::numeric
+                            WHEN jsonb_typeof(item->'quantity') = 'string' THEN (item->>'quantity')::numeric
+                            ELSE 0
+                        END, 
+                        0
+                    ),
                     'created_at', o.created_at,
                     'barcode', o.barcode_data,
                     'options_text', (
-                        SELECT string_agg(opt->> 'name' || ': ' || opt->> 'value', ' | ')
-                        FROM jsonb_array_elements(COALESCE(item->'options', '[]'::jsonb)) opt
+                        SELECT string_agg(
+                            COALESCE(opt->>'name', '') || ': ' || COALESCE(opt->>'value', ''), 
+                            ' | '
+                        )
+                        FROM jsonb_array_elements(
+                            CASE 
+                                WHEN jsonb_typeof(COALESCE(item->'options', '[]'::jsonb)) = 'array' 
+                                THEN COALESCE(item->'options', '[]'::jsonb)
+                                ELSE '[]'::jsonb
+                            END
+                        ) AS opt
                     )
                 )
             ) AS orders
-        FROM salla_orders o
-        , LATERAL jsonb_array_elements(o.full_order_data->'items') AS item
+        FROM salla_orders o,
+        LATERAL jsonb_array_elements(
+            CASE 
+                WHEN jsonb_typeof(o.full_order_data->'items') = 'array' 
+                THEN o.full_order_data->'items'
+                ELSE '[]'::jsonb
+            END
+        ) AS item
         WHERE o.id = ANY(:order_ids) AND o.store_id = :store_id
-        GROUP BY sku, name, thumbnail
+        GROUP BY 
+            CASE 
+                WHEN jsonb_typeof(item->'sku') = 'string' THEN item->>'sku'
+                ELSE 'unknown_' || (item->>'id')
+            END, 
+            item->>'name',
+            COALESCE(
+                item->>'product_thumbnail', 
+                item->>'thumbnail', 
+                item->>'image',
+                ''
+            )
     """)
     
-    with engine.connect() as conn:
-        result = conn.execute(query, {"order_ids": order_ids, "store_id": store_id}).mappings().all()
-    
-    return [dict(row) for row in result]
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(query, {"order_ids": order_ids, "store_id": store_id}).mappings().all()
+        
+        return [dict(row) for row in result]
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في تجميع المنتجات من قاعدة البيانات: {str(e)}")
+        logger.error(traceback.format_exc())
+        return []
 def safe_filename(filename):
     """إنشاء اسم ملف آمن بدون أحرف خاصة"""
     try:
