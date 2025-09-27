@@ -1216,39 +1216,68 @@ def verify_barcode_order_ids():
     except Exception as e:
         logger.error(f"Error in verify_barcode_order_ids: {str(e)}")
         return []
-# إضافة هذه الدالة إلى ملف utils.py إذا لم تكن موجودة
-def get_main_image_from_local(item):
-    """استخراج الصورة الرئيسية من البيانات المحلية"""
+def get_orders_from_local_database(order_ids, store_id):
+    """جلب الطلبات من قاعدة البيانات المحلية باستخدام full_order_data"""
     try:
-        image_sources = [
-            item.get('product_thumbnail'),
-            item.get('thumbnail'),
-            item.get('image'),
-            item.get('url'),
-            item.get('image_url'),
-            item.get('picture')
-        ]
+        logger.info(f"🔍 جلب {len(order_ids)} طلب من قاعدة البيانات المحلية")
         
-        for image_url in image_sources:
-            if image_url and isinstance(image_url, str) and image_url.strip():
-                final_url = image_url.strip()
-                if not final_url.startswith(('http://', 'https://')):
-                    return f"https://cdn.salla.sa{final_url}"
-                return final_url
+        # تصفية order_ids لضمان أنها نصية
+        order_ids_str = [str(oid).strip() for oid in order_ids if str(oid).strip()]
         
-        images = item.get('images', [])
-        if images and isinstance(images, list):
-            for image in images:
-                if isinstance(image, dict):
-                    image_url = image.get('image') or image.get('url')
-                    if image_url and isinstance(image_url, str) and image_url.strip():
-                        final_url = image_url.strip()
-                        if not final_url.startswith(('http://', 'https://')):
-                            return f"https://cdn.salla.sa{final_url}"
-                        return final_url
+        if not order_ids_str:
+            logger.warning("❌ لا توجد معرفات طلبات صالحة")
+            return []
         
-        return ''
+        # جلب الطلبات من قاعدة البيانات
+        salla_orders = SallaOrder.query.filter(
+            SallaOrder.id.in_(order_ids_str),
+            SallaOrder.store_id == store_id
+        ).all()
+        
+        logger.info(f"✅ تم العثور على {len(salla_orders)} طلب في قاعدة البيانات")
+        
+        processed_orders = []
+        
+        for order in salla_orders:
+            try:
+                # استخدام full_order_data المخزن محلياً
+                order_data = order.full_order_data
+                
+                if not order_data:
+                    logger.warning(f"⚠️ الطلب {order.id} لا يحتوي على full_order_data")
+                    # يمكننا إنشاء بيانات أساسية من المعلومات المتاحة
+                    order_data = {
+                        'customer': {
+                            'first_name': '',
+                            'last_name': decrypt_data(order.customer_name) if order.customer_name else 'عميل غير معروف'
+                        },
+                        'reference_id': order.id,
+                        'amounts': {
+                            'total': {'amount': order.total_amount, 'currency': order.currency}
+                        },
+                        'status': {'name': 'غير معروف'}
+                    }
+                    items_data = []
+                else:
+                    # استخراج العناصر من البيانات المحلية
+                    items_data = order_data.get('items', [])
+                
+                # معالجة بيانات الطلب باستخدام البيانات المحلية
+                processed_order = process_order_from_local_data(order, order_data, items_data)
+                
+                if processed_order:
+                    processed_orders.append(processed_order)
+                    logger.info(f"✅ تم معالجة الطلب {order.id} من البيانات المحلية")
+                else:
+                    logger.warning(f"❌ فشل في معالجة الطلب {order.id}")
+                    
+            except Exception as e:
+                logger.error(f"❌ خطأ في معالجة الطلب {order.id}: {str(e)}")
+                continue
+        
+        logger.info(f"🎉 تم معالجة {len(processed_orders)} طلب بنجاح من البيانات المحلية")
+        return processed_orders
         
     except Exception as e:
-        logger.error(f"❌ خطأ في استخراج الصورة: {str(e)}")
-        return ''
+        logger.error(f"❌ خطأ في جلب الطلبات من قاعدة البيانات: {str(e)}")
+        return []

@@ -146,15 +146,29 @@ def process_order_from_local_data(order, order_data, items_data):
                 logger.error(f"❌ خطأ في معالجة العنصر {index}: {str(item_error)}")
                 continue
         
-        # الحصول على الباركود من قاعدة البيانات
-        barcode_data = order.barcode_data
-        if not barcode_data and barcode_data.startswith('iVBOR'):
-            barcode_data = f"data:image/png;base64,{barcode_data}"
+        # الحصول على الباركود من قاعدة البيانات - التصحيح هنا
+        barcode_data = order.barcode_data if order else None
+        
+        # معالجة الباركود بشكل آمن
+        if barcode_data:
+            if isinstance(barcode_data, str):
+                if barcode_data.startswith('iVBOR'):
+                    barcode_data = f"data:image/png;base64,{barcode_data}"
+                elif not barcode_data.startswith('data:image'):
+                    # إذا كان الباركود ليس بصيغة صحيحة، نستخدم رقم الطلب لإنشاء باركود جديد
+                    logger.warning(f"⚠️ تنسيق الباركود غير صحيح للطلب {order.id if order else 'unknown'}")
+                    barcode_data = generate_barcode(order.id if order else 'unknown')
+            else:
+                # إذا لم يكن الباركود نصاً، نستخدم رقم الطلب لإنشاء باركود جديد
+                barcode_data = generate_barcode(order.id if order else 'unknown')
+        else:
+            # إذا لم يكن هناك باركود، ننشئ واحداً
+            barcode_data = generate_barcode(order.id if order else 'unknown')
         
         # إنشاء كائن الطلب النهائي
         processed_order = {
-            'id': order.id,
-            'reference_id': order_data.get('reference_id', order.id),
+            'id': order.id if order else 'unknown',
+            'reference_id': order_data.get('reference_id', order.id if order else 'unknown'),
             'order_items': processed_items,
             'barcode': barcode_data,
             'customer': {
@@ -162,7 +176,7 @@ def process_order_from_local_data(order, order_data, items_data):
                 'email': customer.get('email', ''),
                 'mobile': customer.get('mobile', '')
             },
-            'created_at': format_date(order_data.get('created_at', order.created_at)),
+            'created_at': format_date(order_data.get('created_at', order.created_at if order else None)),
             'amounts': order_data.get('amounts', {}),
             'status': order_data.get('status', {})
         }
@@ -172,7 +186,46 @@ def process_order_from_local_data(order, order_data, items_data):
     except Exception as e:
         logger.error(f"❌ خطأ في معالجة البيانات المحلية: {str(e)}")
         return None
-
+def generate_barcode(data):
+    """إنشاء باركود بسيط للمعالجة المحلية"""
+    try:
+        if not data:
+            return None
+            
+        # استخدام مكتبة barcode إذا كانت متاحة
+        try:
+            import barcode
+            from barcode.writer import ImageWriter
+            from io import BytesIO
+            import base64
+            
+            barcode_class = barcode.get_barcode_class('code128')
+            writer = ImageWriter()
+            
+            # إعدادات بسيطة للباركود
+            writer.set_options({
+                'write_text': False,
+                'module_width': 0.5,
+                'module_height': 15,
+                'quiet_zone': 2
+            })
+            
+            barcode_obj = barcode_class(str(data), writer=writer)
+            buffer = BytesIO()
+            barcode_obj.write(buffer)
+            
+            buffer.seek(0)
+            barcode_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            return f"data:image/png;base64,{barcode_base64}"
+            
+        except ImportError:
+            # إذا لم تكن المكتبة متاحة، نرجع باركود بسيط كنص
+            logger.warning("⚠️ مكتبة barcode غير متاحة، استخدام باركود نصي")
+            return f"BARCODE:{data}"
+            
+    except Exception as e:
+        logger.error(f"❌ خطأ في إنشاء الباركود: {str(e)}")
+        return None
 def get_main_image_from_local(item):
     """استخراج الصورة الرئيسية من البيانات المحلية"""
     try:
