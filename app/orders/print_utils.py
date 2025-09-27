@@ -514,7 +514,7 @@ import re
 import unicodedata
 from urllib.parse import quote
 def group_products_by_sku(orders):
-    """تجميع الطلبات حسب المنتج مع تحسينات للتخطيط الجديد"""
+    """تجميع الطلبات حسب المنتج مع عرض كامل الخيارات"""
     products_dict = {}
     
     for order in orders:
@@ -536,27 +536,26 @@ def group_products_by_sku(orders):
                         'orders': []
                     }
                 
-                # تحديث الكمية الإجمالية
                 quantity = item.get('quantity', 0)
                 products_dict[sku]['total_quantity'] += quantity
                 
-                # تجميع الخيارات بشكل مضغوط
-                options_text = []
+                # 🔥 التعديل: عرض كامل الخيارات بدون تقصير
+                options_text = "لا توجد خيارات"
                 options = item.get('options', [])
                 
-                for option in options:
-                    option_name = option.get('name', '').strip()
-                    option_value = option.get('value', '').strip()
+                if options and isinstance(options, list):
+                    options_list = []
+                    for option in options:
+                        option_name = option.get('name', '').strip()
+                        option_value = option.get('value', '').strip()
+                        
+                        if option_name and option_value:
+                            # ✅ إزالة جميع حدود الطول - عرض كامل النص
+                            options_list.append(f"{option_name}: {option_value}")
                     
-                    if option_name and option_value:
-                        # تقليل طول النص إذا كان طويلاً
-                        if len(option_value) > 20:
-                            option_value = option_value[:20] + "..."
-                        options_text.append(f"{option_name}: {option_value}")
-                
-                # إذا لم توجد خيارات
-                if not options_text:
-                    options_text = ["لا توجد خيارات"]
+                    if options_list:
+                        # ✅ تحويل القائمة إلى سلسلة نصية واحدة بدون تقصير
+                        options_text = " | ".join(options_list)
                 
                 # إضافة الطلب إلى المنتج
                 order_data = {
@@ -565,7 +564,7 @@ def group_products_by_sku(orders):
                     'quantity': quantity,
                     'created_at': order.get('created_at', ''),
                     'barcode': order.get('barcode', ''),
-                    'options_text': options_text
+                    'options_text': options_text  # ← نص كامل بدون تقصير
                 }
                 
                 products_dict[sku]['orders'].append(order_data)
@@ -575,7 +574,6 @@ def group_products_by_sku(orders):
                 continue
     
     return products_dict
-
 def safe_filename(filename):
     """إنشاء اسم ملف آمن بدون أحرف خاصة"""
     try:
