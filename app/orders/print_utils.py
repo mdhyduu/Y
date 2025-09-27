@@ -513,32 +513,33 @@ def download_pdf():
 import re
 import unicodedata
 from urllib.parse import quote
+
 from sqlalchemy.sql import text
 
 def group_products_by_sku_db(order_ids, store_id):
-    """تجميع المنتجات مباشرة من قاعدة البيانات"""
+    """تجميع المنتجات مباشرة من قاعدة البيانات (PostgreSQL JSONB)"""
     engine = get_postgres_engine()
     query = text("""
         SELECT 
-            item->>'sku' AS sku,
+            COALESCE(item->>'sku', CONCAT('unknown_', item->>'id')) AS sku,
             item->>'name' AS name,
             COALESCE(item->>'product_thumbnail', item->>'thumbnail') AS thumbnail,
-            SUM((item->>'quantity')::int) AS total_quantity,
+            SUM(COALESCE((item->>'quantity')::int, 0)) AS total_quantity,
             json_agg(
                 json_build_object(
                     'reference_id', o.reference_id,
                     'customer_name', o.customer_name,
-                    'quantity', (item->>'quantity')::int,
+                    'quantity', COALESCE((item->>'quantity')::int, 0),
                     'created_at', o.created_at,
                     'barcode', o.barcode_data,
                     'options_text', (
                         SELECT string_agg(opt->>'name' || ': ' || opt->>'value', ' | ')
-                        FROM json_array_elements(item->'options') opt
+                        FROM json_array_elements((item->'options')::json) opt
                     )
                 )
             ) AS orders
         FROM salla_orders o,
-        LATERAL json_array_elements(o.full_order_data->'items') item
+        LATERAL json_array_elements((o.full_order_data::jsonb)->'items') item
         WHERE o.id = ANY(:order_ids) AND o.store_id = :store_id
         GROUP BY sku, name, thumbnail
     """)
