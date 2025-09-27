@@ -43,7 +43,8 @@ setuptools==80.0.0
 gunicorn==21.2.0
 APScheduler==3.10.1
 psycopg2-binary==2.9.9
-weasyprint==57.0
+# بدلاً من weasyprint==57.0
+weasyprint==61.0
 pydyf==0.7.0
 webcolors
 Flask-Mail==0.9.1
