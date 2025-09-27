@@ -45,7 +45,7 @@ APScheduler==3.10.1
 psycopg2-binary==2.9.9
 # بدلاً من weasyprint==57.0
 weasyprint
-pydyf==0.7.0
+pydyf
 webcolors
 Flask-Mail==0.9.1
 

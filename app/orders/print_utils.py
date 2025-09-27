@@ -433,6 +433,82 @@ def get_quick_list_data():
         logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': 'حدث خطأ أثناء جلب البيانات'}), 500
 
+@orders_bp.route('/download_pdf')
+def download_pdf():
+    """تحميل الطلبات كملف PDF باستخدام البيانات المحلية"""
+    logger.info("بدء تحميل الطلبات كملف PDF (باستخدام البيانات المحلية)")
+    
+    try:
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            flash('الرجاء تسجيل الدخول أولاً', 'error')
+            return redirect(url_for('user_auth.login'))
+        
+        order_ids = request.args.get('order_ids', '').split(',')
+        
+        # تصفية القائمة من القيم الفارغة
+        order_ids = [order_id.strip() for order_id in order_ids if order_id.strip()]
+        
+        if not order_ids:
+            flash('لم يتم تحديد أي طلبات للتحميل', 'error')
+            return redirect(url_for('orders.index'))
+        
+        logger.info(f"🔄 معالجة {len(order_ids)} طلب لتحويل PDF من البيانات المحلية")
+        
+        # استخدام البيانات المحلية بدلاً من API
+        orders = get_orders_from_local_database(order_ids, user.store_id)
+        
+        if not orders:
+            logger.warning("⚠️ لم يتم العثور على طلبات في البيانات المحلية، جاري استخدام API كبديل")
+            # العودة إلى الطريقة القديمة كبديل
+            access_token = user.salla_access_token
+            if not access_token:
+                flash('يجب ربط المتجر مع سلة أولاً', 'error')
+                return redirect(url_for('auth.link_store'))
+            
+            max_workers = max(1, min(current_app.config.get('MAX_WORKERS', 10), len(order_ids)))
+            orders = process_orders_concurrently(order_ids, access_token, max_workers)
+        
+        if not orders:
+            flash('لم يتم العثور على أي طلبات للتحميل', 'error')
+            return redirect(url_for('orders.index'))
+        
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # تحسين أداء إنشاء PDF
+        optimized_orders = optimize_pdf_generation(orders)
+        
+        # إنشاء HTML مع تحسينات الأداء
+        html = render_template('print_orders.html', 
+                             orders=optimized_orders, 
+                             current_time=current_time)
+        
+        # تحسين إعدادات WeasyPrint للأداء
+        pdf = HTML(
+            string=html,
+            base_url=request.host_url
+        ).write_pdf(
+            optimize_size=('fonts', 'images'),
+            jpeg_quality=80
+        )
+        
+        filename = f"orders_{current_time.replace(':', '-').replace(' ', '_')}.pdf"
+        
+        response = make_response(pdf)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        response.headers['Content-Length'] = len(pdf)
+        
+        logger.info(f"✅ تم إنشاء PDF بنجاح: {filename} بحجم {len(pdf)} بايت")
+        return response
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في إنشاء PDF: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash('حدث خطأ أثناء إنشاء PDF', 'error')
+        return redirect(url_for('orders.index'))
+
 # باقي الدوال تبقى كما هي...
 import re
 import unicodedata
@@ -519,82 +595,6 @@ def safe_filename(filename):
         logger.error(f"Error creating safe filename: {str(e)}")
         return f"file_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-@orders_bp.route('/download_pdf')
-def download_pdf():
-    """تحميل الطلبات كملف PDF باستخدام البيانات المحلية"""
-    logger.info("بدء تحميل الطلبات كملف PDF (باستخدام البيانات المحلية)")
-    
-    try:
-        user, employee = get_user_from_cookies()
-        
-        if not user:
-            flash('الرجاء تسجيل الدخول أولاً', 'error')
-            return redirect(url_for('user_auth.login'))
-        
-        order_ids = request.args.get('order_ids', '').split(',')
-        
-        # تصفية القائمة من القيم الفارغة
-        order_ids = [order_id.strip() for order_id in order_ids if order_id.strip()]
-        
-        if not order_ids:
-            flash('لم يتم تحديد أي طلبات للتحميل', 'error')
-            return redirect(url_for('orders.index'))
-        
-        logger.info(f"🔄 معالجة {len(order_ids)} طلب لتحويل PDF من البيانات المحلية")
-        
-        # استخدام البيانات المحلية بدلاً من API
-        orders = get_orders_from_local_database(order_ids, user.store_id)
-        
-        if not orders:
-            logger.warning("⚠️ لم يتم العثور على طلبات في البيانات المحلية، جاري استخدام API كبديل")
-            # العودة إلى الطريقة القديمة كبديل
-            access_token = user.salla_access_token
-            if not access_token:
-                flash('يجب ربط المتجر مع سلة أولاً', 'error')
-                return redirect(url_for('auth.link_store'))
-            
-            max_workers = max(1, min(current_app.config.get('MAX_WORKERS', 10), len(order_ids)))
-            orders = process_orders_concurrently(order_ids, access_token, max_workers)
-        
-        if not orders:
-            flash('لم يتم العثور على أي طلبات للتحميل', 'error')
-            return redirect(url_for('orders.index'))
-        
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
-        # تحسين أداء إنشاء PDF
-        optimized_orders = optimize_pdf_generation(orders)
-        
-        # إنشاء HTML مع تحسينات الأداء
-        html = render_template('print_orders.html', 
-                             orders=optimized_orders, 
-                             current_time=current_time)
-        
-        # تحسين إعدادات WeasyPrint للأداء
-        pdf = HTML(
-            string=html,
-            base_url=request.host_url
-        ).write_pdf(
-            optimize_size=('fonts', 'images'),
-            jpeg_quality=80
-        )
-        
-        # استخدام اسم ملف آمن بدون أحرف عربية
-        filename = f"orders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        
-        response = make_response(pdf)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
-        response.headers['Content-Length'] = len(pdf)
-        
-        logger.info(f"✅ تم إنشاء PDF بنجاح: {filename} بحجم {len(pdf)} بايت")
-        return response
-        
-    except Exception as e:
-        logger.error(f"❌ خطأ في إنشاء PDF: {str(e)}")
-        logger.error(traceback.format_exc())
-        flash('حدث خطأ أثناء إنشاء PDF', 'error')
-        return redirect(url_for('orders.index'))
 
 @orders_bp.route('/download_products_pdf')
 def download_products_pdf():
@@ -711,7 +711,7 @@ def generate_product_pdf(product_data, product_sku):
             base_url=request.host_url
         ).write_pdf(
             optimize_size=('fonts', 'images', 'backgrounds'),
-            jpeg_quality=70,
+            jpeg_quality=80,
             dpi=150,
             presentational_hints=True
         )
