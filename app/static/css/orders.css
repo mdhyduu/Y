@@ -51,9 +51,7 @@
     .table td, .table th { white-space: nowrap; }
     
     /* إخفاء بعض الأعمدة في الشاشات الصغيرة */
-
-    .table th:nth-child(3),
-    .table td:nth-child(3),
+    /* إزالة إخفاء عمود الحالة الأصلية (العمود الثالث) */
     .table th:nth-child(7),
     .table td:nth-child(7) {
         display: none;
@@ -64,16 +62,16 @@
     .table td:nth-child(4) {
         display: none;
     }
-    {% endif }
+    {% endif %}
 
-    
     /* تحسين عرض الأعمدة في الشاشات الصغيرة */
     .table th:nth-child(1) { width: 8%; } /* عمود التحديد */
-    .table th:nth-child(2) { width: 17%; } /* رقم الطلب */
-    .table th:nth-child(4) { width: 17%; } 
-    .table th:nth-child(5) { width: 17%; }  
-    .table th:nth-child(6) { width: 16%; } /* العلامات */
-    .table th:last-child { width: 25%; } /* الإجراءات */
+    .table th:nth-child(2) { width: 15%; } /* رقم الطلب */
+    .table th:nth-child(3) { width: 15%; } /* الحالة الأصلية */
+    .table th:nth-child(4) { width: 15%; } /* الحالة المخصصة */
+    .table th:nth-child(5) { width: 15%; } /* التنبيهات */
+    .table th:nth-child(6) { width: 12%; } /* التاريخ */
+    .table th:last-child { width: 20%; } /* الإجراءات */
     
     /* تحسين شريط الإجراءات السريعة */
     #quick-actions {
@@ -90,6 +88,17 @@
     #advanced-filters .col-md-3,
     #advanced-filters .col-md-2 {
         margin-bottom: 15px;
+    }
+    
+    /* تحسين عرض الحالة الأصلية في الشاشات الصغيرة */
+    .status-badge {
+        font-size: 0.7rem;
+        padding: 3px 6px;
+    }
+    
+    .status-badge i.fas {
+        font-size: 0.5rem;
+        margin-right: 2px;
     }
 }
 

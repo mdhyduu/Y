@@ -92,25 +92,28 @@
             margin-top: 10px;
         }
 
+        /* تحسين تخطيط الطلبات باستخدام Grid */
         .orders-container {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 20px;
             justify-content: center;
+            align-items: start;
         }
 
         .order {
-            width: calc(50% - 20px);
-            min-width: 300px;
-            max-width: 500px;
+            min-height: 200px;
             margin-bottom: 20px;
             padding: 18px;
             border: 1.5px solid #000;
             border-radius: 6px;
             background-color: #fff;
             page-break-inside: avoid;
+            break-inside: avoid;
             box-sizing: border-box;
             box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
         }
 
         .order-header {
@@ -133,14 +136,19 @@
             margin-top: 5px;
         }
 
+        .products-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
         .product {
-            margin-bottom: 16px;
             padding-bottom: 12px;
             border-bottom: 1px dashed #ccc;
         }
 
         .product:last-child {
-            margin-bottom: 12px;
             padding-bottom: 0;
             border-bottom: none;
         }
@@ -155,16 +163,16 @@
             text-align: center;
         }
 
-.product-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover; /* أو contain حسب رغبتك */
-    border: 1.5px solid #ddd;
-    border-radius: 4px;
-    padding: 4px;
-    background-color: #fff;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
+        .product-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border: 1.5px solid #ddd;
+            border-radius: 4px;
+            padding: 4px;
+            background-color: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
 
         .no-image {
             width: 100px;
@@ -234,7 +242,7 @@
 
         .barcode-section {
             text-align: center;
-            margin-top: 18px;
+            margin-top: auto;
             padding-top: 12px;
             border-top: 1.5px dashed #000;
         }
@@ -268,18 +276,14 @@
         .compact-view .option { font-size: 11px; }
         .compact-view .barcode-image { width: 160px; height: 50px; }
 
-        /* Page Breaks */
-        .page-break {
-            page-break-before: always;
-            margin: 20px 0;
-            border: none;
-            height: 0;
-        }
+        /* High Resolution View */
+        .high-resolution .product-image { width: 120px; height: 120px; }
+        .high-resolution .barcode-image { width: 200px; height: 70px; }
 
         /* Responsive */
         @media (max-width: 768px) {
-            .order {
-                width: 100%;
+            .orders-container {
+                grid-template-columns: 1fr;
             }
 
             .print-btn {
@@ -303,13 +307,18 @@
                 display: none !important;
             }
 
+            .orders-container {
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 15px;
+            }
+
             .order {
-                width: calc(50% - 10px);
                 border: 1.5px solid #000;
                 box-shadow: none;
                 page-break-inside: avoid;
                 break-inside: avoid;
                 margin-bottom: 15px;
+                min-height: unset;
             }
 
             .product {
@@ -374,53 +383,47 @@
                     <div class="order-date">تاريخ الطلب: {{ order.created_at }}</div>
                 </div>
 
-                {% for item in order.order_items %}
-                <div class="product">
-                    <div class="product-content">
-                        <div class="product-image-container">
-                            {% if item.main_image %}
-                                <img src="{{ item.main_image }}" alt="{{ item.name }}" class="product-image" onload="handleImageLoad(this)" onerror="handleImageError(this)">
-                            {% else %}
-                                <div class="no-image">لا توجد صورة</div>
-                            {% endif %}
-                        </div>
-                        <div class="product-details">
-                            <div class="product-name">{{ item.name }}</div>
-                            <div class="product-info"><strong>الكمية:</strong> {{ item.quantity }}</div>
-
-
-                            {% if item.options %}
-                            <div class="product-options">
-                                <div class="options-title">الخيارات</div>
-                                {% for option in item.options %}
-                                <div class="option">
-                                    <span class="option-name">{{ option.name }}:</span>
-                                    <span class="option-value">{{ option.value }}</span>
-                                </div>
-                                {% endfor %}
+                <div class="products-container">
+                    {% for item in order.order_items %}
+                    <div class="product">
+                        <div class="product-content">
+                            <div class="product-image-container">
+                                {% if item.main_image %}
+                                    <img src="{{ item.main_image }}" alt="{{ item.name }}" class="product-image" onload="handleImageLoad(this)" onerror="handleImageError(this)">
+                                {% else %}
+                                    <div class="no-image">لا توجد صورة</div>
+                                {% endif %}
                             </div>
-                            {% endif %}
+                            <div class="product-details">
+                                <div class="product-name">{{ item.name }}</div>
+                                <div class="product-info"><strong>الكمية:</strong> {{ item.quantity }}</div>
+
+                                {% if item.options %}
+                                <div class="product-options">
+                                    <div class="options-title">الخيارات</div>
+                                    {% for option in item.options %}
+                                    <div class="option">
+                                        <span class="option-name">{{ option.name }}:</span>
+                                        <span class="option-value">{{ option.value }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
 
                 <div class="barcode-section">
-<!-- تأكد من أنك تستخدم الباركود بهذه الطريقة -->
-
-    {% if order.barcode %}
-        <img src="{{ order.barcode }}" alt="باركود الطلب {{ order.id }}" 
-             style="max-width: 200px; height: auto;">
-    {% else %}
-        <p>⚠️ لا يتوفر باركود لهذا الطلب</p>
-    {% endif %}
+                    {% if order.barcode %}
+                        <img src="{{ order.barcode }}" alt="باركود الطلب {{ order.id }}" class="barcode-image">
+                        <div class="barcode-number">{{ order.reference_id }}</div>
+                    {% else %}
+                        <p>⚠️ لا يتوفر باركود لهذا الطلب</p>
+                    {% endif %}
                 </div>
             </div>
-
-            <!-- صفحة جديدة كل صف من طلبين -->
-            {% if not loop.last and loop.index % 2 == 0 %}
-                <div class="page-break"></div>
-            {% endif %}
             {% endfor %}
         </div>
     </div>
@@ -429,7 +432,6 @@
         // طباعة تلقائية بعد التحميل
         window.onload = function() {
             setTimeout(() => {
-
                 window.print();
             }, 1000);
         };
@@ -456,28 +458,9 @@
             if (container.classList.contains('high-resolution')) {
                 container.classList.remove('high-resolution');
                 info.textContent = 'وضع الدقة الحالي: قياسي';
-
-                document.querySelectorAll('.product-image').forEach(img => {
-                    img.style.width = '';
-                    img.style.height = '';
-                });
-                document.querySelectorAll('.barcode-image').forEach(img => {
-                    img.style.width = '';
-                    img.style.height = '';
-                });
-
             } else {
                 container.classList.add('high-resolution');
                 info.textContent = 'وضع الدقة الحالي: عالي';
-
-                document.querySelectorAll('.product-image').forEach(img => {
-                    img.style.width = '120px';
-                    img.style.height = '120px';
-                });
-                document.querySelectorAll('.barcode-image').forEach(img => {
-                    img.style.width = '200px';
-                    img.style.height = '70px';
-                });
             }
         }
 
