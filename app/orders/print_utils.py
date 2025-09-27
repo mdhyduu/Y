@@ -521,25 +521,25 @@ def group_products_by_sku_db(order_ids, store_id):
     engine = get_postgres_engine()
     query = text("""
         SELECT 
-            COALESCE(item->>'sku', CONCAT('unknown_', item->>'id')) AS sku,
-            item->>'name' AS name,
-            COALESCE(item->>'product_thumbnail', item->>'thumbnail') AS thumbnail,
-            SUM(COALESCE((item->>'quantity')::int, 0)) AS total_quantity,
+            COALESCE(item->> 'sku', 'unknown_' || (item->> 'id')) AS sku,
+            item->> 'name' AS name,
+            COALESCE(item->> 'product_thumbnail', item->> 'thumbnail', '') AS thumbnail,
+            SUM(COALESCE((item->> 'quantity')::int, 0)) AS total_quantity,
             json_agg(
                 json_build_object(
                     'reference_id', o.reference_id,
                     'customer_name', o.customer_name,
-                    'quantity', COALESCE((item->>'quantity')::int, 0),
+                    'quantity', COALESCE((item->> 'quantity')::int, 0),
                     'created_at', o.created_at,
                     'barcode', o.barcode_data,
                     'options_text', (
-                        SELECT string_agg(opt->>'name' || ': ' || opt->>'value', ' | ')
-                        FROM json_array_elements((item->'options')::json) opt
+                        SELECT string_agg(opt->> 'name' || ': ' || opt->> 'value', ' | ')
+                        FROM jsonb_array_elements(COALESCE(item->'options', '[]'::jsonb)) opt
                     )
                 )
             ) AS orders
-        FROM salla_orders o,
-        LATERAL json_array_elements((o.full_order_data::jsonb)->'items') item
+        FROM salla_orders o
+        , LATERAL jsonb_array_elements(o.full_order_data->'items') AS item
         WHERE o.id = ANY(:order_ids) AND o.store_id = :store_id
         GROUP BY sku, name, thumbnail
     """)
