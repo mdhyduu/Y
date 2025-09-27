@@ -618,27 +618,19 @@ def download_products_pdf():
         
         logger.info(f"🔄 معالجة {len(order_ids)} طلب لتجميع المنتج من قاعدة البيانات")
         
-        # ✅ التجميع مباشرة من قاعدة البيانات
-        products_rows = group_products_by_sku_db(order_ids, user.store_id)
+        # ✅ استخدام الدالة المحسنة
+        products_list = group_products_by_sku_db(order_ids, user.store_id)
         
-        if not products_rows:
+        if not products_list:
             flash('لم يتم العثور على أي منتجات في الطلبات المحددة', 'error')
             return redirect(url_for('orders.index'))
         
-        # نحول النتائج لقاموس بنفس شكل group_products_by_sku القديم
-        products_dict = {}
-        for row in products_rows:
-            products_dict[row['sku']] = {
-                'name': row['name'],
-                'sku': row['sku'],
-                'thumbnail': row['thumbnail'],
-                'total_quantity': row['total_quantity'],
-                'orders': row['orders']
-            }
+        # تحويل القائمة إلى قاموس للتطابق مع الكود الحالي
+        products_dict = {product['sku']: product for product in products_list}
         
         logger.info(f"📊 تم تجميع {len(products_dict)} منتج مختلف")
         
-        # إنشاء ملف ZIP يحتوي على جميع ملفات PDF
+        # باقي الكود يبقى كما هو...
         import zipfile
         import tempfile
         import os
@@ -656,7 +648,6 @@ def download_products_pdf():
                         zip_file.writestr(pdf_filename, pdf_content)
                         logger.info(f"✅ تم إنشاء PDF للمنتج {sku}")
             
-            # قراءة محتوى ZIP
             with open(zip_path, 'rb') as f:
                 zip_data = f.read()
             
