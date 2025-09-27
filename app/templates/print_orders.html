@@ -92,7 +92,7 @@
             margin-top: 10px;
         }
 
-        /* تخطيط الطلبات باستخدام Grid مع تحسينات للطباعة */
+        /* تحسين تخطيط الطلبات باستخدام Grid */
         .orders-container {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -108,14 +108,12 @@
             border: 1.5px solid #000;
             border-radius: 6px;
             background-color: #fff;
+            page-break-inside: avoid;
+            break-inside: avoid;
             box-sizing: border-box;
             box-shadow: 0 2px 6px rgba(0,0,0,0.1);
             display: flex;
             flex-direction: column;
-            
-            /* منع تقسيم الطلب بين صفحتين في وضع الطباعة */
-            page-break-inside: avoid;
-            break-inside: avoid;
         }
 
         .order-header {
@@ -148,10 +146,6 @@
         .product {
             padding-bottom: 12px;
             border-bottom: 1px dashed #ccc;
-            
-            /* السماح بتقسيم المنتجات داخل الطلب الكبير */
-            page-break-inside: auto;
-            break-inside: auto;
         }
 
         .product:last-child {
@@ -251,10 +245,6 @@
             margin-top: auto;
             padding-top: 12px;
             border-top: 1.5px dashed #000;
-            
-            /* منع فصل الباركود عن الطلب */
-            page-break-before: avoid;
-            break-before: avoid;
         }
 
         .barcode-image {
@@ -274,17 +264,6 @@
             letter-spacing: 1.5px;
             color: #000;
             margin: 0;
-        }
-
-        /* فئة للطلبات الكبيرة التي تحتاج أكثر من صفحة */
-        .large-order {
-            /* إزالة خاصية منع التقسيم للطلبات الكبيرة */
-            page-break-inside: auto;
-            break-inside: auto;
-            
-            /* إضافة حدود مميزة للطلبات الكبيرة */
-            border-width: 2px;
-            border-color: #2c3e50;
         }
 
         /* Compact View */
@@ -312,14 +291,12 @@
             }
         }
 
-        /* Print Styles - تحسينات للطباعة */
+        /* Print Styles */
         @media print {
             body {
                 font-size: 12px;
                 color: #000;
                 background: white;
-                margin: 0;
-                padding: 0;
             }
 
             .print-container {
@@ -331,26 +308,17 @@
             }
 
             .orders-container {
-                display: block !important; /* تعطيل Grid في الطباعة للتحكم الدقيق */
-                width: 100%;
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 15px;
             }
 
             .order {
-                width: 100%;
                 border: 1.5px solid #000;
                 box-shadow: none;
-                margin-bottom: 15px;
-                min-height: unset;
-                
-                /* تأكد من منع تقسيم الطلب العادي */
                 page-break-inside: avoid;
                 break-inside: avoid;
-            }
-
-            .order.large-order {
-                /* السماح بتقسيم الطلبات الكبيرة */
-                page-break-inside: auto;
-                break-inside: auto;
+                margin-bottom: 15px;
+                min-height: unset;
             }
 
             .product {
@@ -392,7 +360,7 @@
     <div class="print-container">
         <div class="header no-print">
             <h1>طباعة الطلبات</h1>
-            <p>تم الإنشاء في: <span id="current-time">{{ current_time }}</span></p>
+            <p>تم الإنشاء في: {{ current_time }}</p>
             <div class="print-controls">
                 <button onclick="window.print()" class="print-btn">
                     <i class="fas fa-print"></i> طباعة
@@ -403,25 +371,16 @@
                 <button onclick="increaseResolution()" class="print-btn tertiary">
                     <i class="fas fa-search-plus"></i> تحسين الدقة
                 </button>
-                <button onclick="toggleLargeOrders()" class="print-btn" style="background: #e74c3c;">
-                    <i class="fas fa-arrows-alt-v"></i> تمكين الطلبات الكبيرة
-                </button>
             </div>
-            <p id="resolution-info">وضع الدقة الحالي: قياسي | الطلبات الكبيرة: معطلة</p>
+            <p id="resolution-info">وضع الدقة الحالي: قياسي</p>
         </div>
 
         <div class="orders-container" id="orders-container">
             {% for order in orders %}
-            <div class="order {% if order.order_items|length > 3 %}potential-large{% endif %}" 
-                 data-items-count="{{ order.order_items|length }}">
+            <div class="order">
                 <div class="order-header">
                     <div class="order-id">الطلب #{{ order.reference_id }}</div>
                     <div class="order-date">تاريخ الطلب: {{ order.created_at }}</div>
-                    {% if order.order_items|length > 3 %}
-                    <div class="order-size-indicator" style="font-size: 12px; color: #e74c3c; margin-top: 5px;">
-                        ⚠️ طلب كبير ({{ order.order_items|length }} عناصر)
-                    </div>
-                    {% endif %}
                 </div>
 
                 <div class="products-container">
@@ -472,10 +431,6 @@
     <script>
         // طباعة تلقائية بعد التحميل
         window.onload = function() {
-            // تحديث الوقت الحالي
-            const now = new Date();
-            document.getElementById('current-time').textContent = now.toLocaleString('ar-EG');
-            
             setTimeout(() => {
                 window.print();
             }, 1000);
@@ -502,36 +457,10 @@
 
             if (container.classList.contains('high-resolution')) {
                 container.classList.remove('high-resolution');
-                info.textContent = info.textContent.replace('وضع الدقة الحالي: عالي', 'وضع الدقة الحالي: قياسي');
+                info.textContent = 'وضع الدقة الحالي: قياسي';
             } else {
                 container.classList.add('high-resolution');
-                info.textContent = info.textContent.replace('وضع الدقة الحالي: قياسي', 'وضع الدقة الحالي: عالي');
-            }
-        }
-
-        // دالة لتمكين/تعطيل الطلبات الكبيرة
-        function toggleLargeOrders() {
-            const container = document.getElementById('orders-container');
-            const info = document.getElementById('resolution-info');
-            const btn = document.querySelector('.print-btn[style*="background: #e74c3c"]');
-            const largeOrders = document.querySelectorAll('.order.potential-large');
-            
-            if (container.classList.contains('large-orders-enabled')) {
-                container.classList.remove('large-orders-enabled');
-                largeOrders.forEach(order => {
-                    order.classList.remove('large-order');
-                });
-                info.textContent = info.textContent.replace('الطلبات الكبيرة: مفعلة', 'الطلبات الكبيرة: معطلة');
-                btn.innerHTML = '<i class="fas fa-arrows-alt-v"></i> تمكين الطلبات الكبيرة';
-                btn.style.background = '#e74c3c';
-            } else {
-                container.classList.add('large-orders-enabled');
-                largeOrders.forEach(order => {
-                    order.classList.add('large-order');
-                });
-                info.textContent = info.textContent.replace('الطلبات الكبيرة: معطلة', 'الطلبات الكبيرة: مفعلة');
-                btn.innerHTML = '<i class="fas fa-arrows-alt-v"></i> تعطيل الطلبات الكبيرة';
-                btn.style.background = '#3498db';
+                info.textContent = 'وضع الدقة الحالي: عالي';
             }
         }
 
