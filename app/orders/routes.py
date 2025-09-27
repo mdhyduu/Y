@@ -1037,13 +1037,6 @@ def order_status_webhook():
             event = data.get('event')
             webhook_data = data.get('data', {})
             merchant_id = data.get('merchant')
-            
-            # ⭐⭐ إضافة معالجة إضافية لـ merchant_id من الكود الثاني ⭐⭐
-            if merchant_id is None:
-                merchant_id = webhook_data.get('merchant') or webhook_data.get('store_id')
-                if merchant_id is None:
-                    return jsonify({'success': False, 'error': 'لا يوجد معرف متجر'}), 400
-            
             order_data = webhook_data
         else:
             event = data.get('event')
@@ -1076,7 +1069,6 @@ def order_status_webhook():
                     status = OrderStatus.query.filter_by(slug=status_slug, store_id=order.store_id).first()
                     if status:
                         order.status_id = status.id
-                        print(f"✅ تم تحديث حالة الطلب {order_id} إلى {status_slug}")  # ⭐ من الكود الثاني
                         db.session.commit()
 
             elif event == 'order.updated':
@@ -1084,13 +1076,7 @@ def order_status_webhook():
                 update_order_items_from_webhook(order, order_data)
 
                 # ⭐ تحديث العنوان إذا تغير
-                update_success = update_order_address(order_id, order_data)
-                if update_success:
-                    print(f"✅ تم تحديث بيانات العنوان للطلب {order_id}")  # ⭐ من الكود الثاني
-                else:
-                    print(f"⚠️ فشل في تحديث العنوان للطلب {order_id}")  # ⭐ من الكود الثاني
-                
-                db.session.commit()
+                update_order_address(order_id, order_data)
 
         return jsonify({'success': True, 'message': 'تم استقبال البيانات بنجاح'}), 200
 
