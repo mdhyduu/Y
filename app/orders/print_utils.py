@@ -709,8 +709,8 @@ def generate_product_pdf(product_data, product_sku):
             base_url=request.host_url
         ).write_pdf(
             optimize_size=('fonts', 'images', 'backgrounds'),
-            jpeg_quality=80,
-            dpi=150,
+            jpeg_quality=95,
+            dpi=300,
             presentational_hints=True
         )
         
