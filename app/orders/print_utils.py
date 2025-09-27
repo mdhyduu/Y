@@ -527,7 +527,7 @@ def group_products_by_sku_db(order_ids, store_id):
             SUM(COALESCE((item->> 'quantity')::int, 0)) AS total_quantity,
             json_agg(
                 json_build_object(
-                    'reference_id', o.reference_id,
+                    'order_id', o.id,
                     'customer_name', o.customer_name,
                     'quantity', COALESCE((item->> 'quantity')::int, 0),
                     'created_at', o.created_at,
