@@ -1000,8 +1000,6 @@ def update_order_items_from_webhook(order, order_data):
         db.session.rollback()
         print(f"❌ خطأ في تحديث المنتجات للطلب {order.id}: {str(e)}")
         return False
-
-
 @orders_bp.route('/webhook/orders', methods=['POST'])
 @csrf.exempt
 def order_status_webhook():
@@ -1038,6 +1036,7 @@ def order_status_webhook():
             webhook_data = data.get('data', {})
             merchant_id = data.get('merchant')
             
+            # ⭐⭐ إضافة معالجة إضافية لـ merchant_id من الكود الثاني ⭐⭐
             if merchant_id is None:
                 merchant_id = webhook_data.get('merchant') or webhook_data.get('store_id')
                 if merchant_id is None:
@@ -1065,8 +1064,11 @@ def order_status_webhook():
             if not order:
                 return jsonify({'success': False, 'error': 'الطلب غير موجود'}), 404
 
+            # ⭐⭐ الإصلاح: تحديث الحالة في كلا الحدثين ⭐⭐
+            status_updated = False
+            
+            # تحديث حالة الطلب في حدث order.status.updated
             if event == 'order.status.updated':
-                # تحديث حالة الطلب فقط - الإصلاح: نقل commit خارج الشرط
                 status_data = order_data.get('status', {}) or order_data.get('current_status', {})
                 if status_data:
                     status_slug = status_data.get('slug', '').lower().replace('-', '_')
@@ -1075,23 +1077,36 @@ def order_status_webhook():
                     status = OrderStatus.query.filter_by(slug=status_slug, store_id=order.store_id).first()
                     if status:
                         order.status_id = status.id
+                        status_updated = True
                         print(f"✅ تم تحديث حالة الطلب {order_id} إلى {status_slug}")
-                
-                # ⭐⭐ الإصلاح: نقل commit خارج الشرط لضمان حفظ التغييرات دائمًا ⭐⭐
-                db.session.commit()
 
+            # ⭐⭐ تحديث الحالة أيضاً في حدث order.updated (من الكود الثاني) ⭐⭐
             elif event == 'order.updated':
-                # ⭐ تحديث المنتجات باستخدام الدالة الجديدة
+                status_data = order_data.get('status', {}) or order_data.get('current_status', {})
+                if status_data:
+                    status_slug = status_data.get('slug', '').lower().replace('-', '_')
+                    if not status_slug and status_data.get('name'):
+                        status_slug = status_data['name'].lower().replace(' ', '_')
+                    status = OrderStatus.query.filter_by(slug=status_slug, store_id=order.store_id).first()
+                    if status:
+                        order.status_id = status.id
+                        status_updated = True
+                        print(f"✅ تم تحديث حالة الطلب {order_id} إلى {status_slug}")
+
+                # تحديث المنتجات باستخدام الدالة الجديدة
                 update_order_items_from_webhook(order, order_data)
 
-                # ⭐ تحديث العنوان إذا تغير
+                # تحديث العنوان إذا تغير
                 update_success = update_order_address(order_id, order_data)
                 if update_success:
                     print(f"✅ تم تحديث بيانات العنوان للطلب {order_id}")
                 else:
                     print(f"⚠️ فشل في تحديث العنوان للطلب {order_id}")
-                
+
+            # حفظ التغييرات في قاعدة البيانات
+            if status_updated:
                 db.session.commit()
+                print(f"💾 تم حفظ تغييرات حالة الطلب {order_id} في قاعدة البيانات")
 
         return jsonify({'success': True, 'message': 'تم استقبال البيانات بنجاح'}), 200
 
@@ -1100,6 +1115,7 @@ def order_status_webhook():
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         db.session.close()
+
 def extract_order_address(order_data):
     """
     استخراج بيانات العنوان مع الأولوية للمتسلم
