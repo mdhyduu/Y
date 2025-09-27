@@ -570,15 +570,11 @@ def download_pdf():
                              orders=optimized_orders, 
                              current_time=current_time)
         
-        # تحسين إعدادات WeasyPrint للأداء - التصحيح هنا
+        # استخدام الإعدادات الأساسية لـ WeasyPrint
         pdf = HTML(
             string=html,
             base_url=request.host_url
-        ).write_pdf(
-            optimize_size=('fonts', 'images'),
-            # إزالة jpeg_quality واستخدام المعلمات الصحيحة
-            compress=True  # بدلاً من jpeg_quality
-        )
+        ).write_pdf()  # إزالة جميع المعلمات الإضافية
         
         # استخدام اسم ملف آمن بدون أحرف عربية
         filename = f"orders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
@@ -614,17 +610,11 @@ def generate_product_pdf(product_data, product_sku):
                                      product=enhanced_product,
                                      current_time=datetime.now().strftime('%H:%M:%S %d-%m-%Y'))
         
-        # إعدادات PDF محسنة للكثافة - التصحيح هنا
+        # استخدام الإعدادات الأساسية لـ WeasyPrint
         pdf = HTML(
             string=html_content,
             base_url=request.host_url
-        ).write_pdf(
-            optimize_size=('fonts', 'images', 'backgrounds'),
-            # إزالة jpeg_quality واستخدام المعلمات الصحيحة
-            compress=True,  # بدلاً من jpeg_quality
-            dpi=150,
-            presentational_hints=True
-        )
+        ).write_pdf()  # إزالة جميع المعلمات الإضافية
         
         logger.info(f"✅ تم إنشاء PDF مضغوط للمنتج {product_sku}")
         return pdf
@@ -632,7 +622,6 @@ def generate_product_pdf(product_data, product_sku):
     except Exception as e:
         logger.error(f"❌ خطأ في إنشاء PDF مضغوط: {str(e)}")
         return None
-
 @orders_bp.route('/download_products_pdf')
 def download_products_pdf():
     """تحميل الطلبات مجمعة حسب المنتج كملف ZIP يحتوي على PDF لكل منتج"""
