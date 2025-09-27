@@ -580,40 +580,31 @@ def download_products_pdf():
             return redirect(url_for('user_auth.login'))
         
         order_ids = request.args.get('order_ids', '').split(',')
-        
-        # تصفية القائمة من القيم الفارغة
         order_ids = [order_id.strip() for order_id in order_ids if order_id.strip()]
         
         if not order_ids:
             flash('لم يتم تحديد أي طلبات للتحميل', 'error')
             return redirect(url_for('orders.index'))
         
-        logger.info(f"🔄 معالجة {len(order_ids)} طلب لتجميع المنتج من البيانات المحلية")
+        logger.info(f"🔄 معالجة {len(order_ids)} طلب لتجميع المنتج من قاعدة البيانات")
         
-        # استخدام البيانات المحلية بدلاً من API
-        orders = get_orders_from_local_database(order_ids, user.store_id)
+        # ✅ التجميع مباشرة من قاعدة البيانات
+        products_rows = group_products_by_sku_db(order_ids, user.store_id)
         
-        if not orders:
-            logger.warning("⚠️ لم يتم العثور على طلبات في البيانات المحلية، جاري استخدام API كبديل")
-            # العودة إلى الطريقة القديمة كبديل
-            access_token = user.salla_access_token
-            if not access_token:
-                flash('يجب ربط المتجر مع سلة أولاً', 'error')
-                return redirect(url_for('auth.link_store'))
-            
-            max_workers = max(1, min(current_app.config.get('MAX_WORKERS', 10), len(order_ids)))
-            orders = process_orders_concurrently(order_ids, access_token, max_workers)
-        
-        if not orders:
-            flash('لم يتم العثور على أي طلبات للتحميل', 'error')
-            return redirect(url_for('orders.index'))
-        
-        # تجميع الطلبات حسب المنتج
-        products_dict_list = group_products_by_sku_db(order_ids, user.store_id)
-        
-        if not products_dict:
+        if not products_rows:
             flash('لم يتم العثور على أي منتجات في الطلبات المحددة', 'error')
             return redirect(url_for('orders.index'))
+        
+        # نحول النتائج لقاموس بنفس شكل group_products_by_sku القديم
+        products_dict = {}
+        for row in products_rows:
+            products_dict[row['sku']] = {
+                'name': row['name'],
+                'sku': row['sku'],
+                'thumbnail': row['thumbnail'],
+                'total_quantity': row['total_quantity'],
+                'orders': row['orders']
+            }
         
         logger.info(f"📊 تم تجميع {len(products_dict)} منتج مختلف")
         
@@ -622,19 +613,15 @@ def download_products_pdf():
         import tempfile
         import os
         
-        # إنشاء مجلد مؤقت
         with tempfile.TemporaryDirectory() as temp_dir:
-            # استخدام اسم ملف آمن بدون أحرف عربية
             zip_filename = f"products_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
             zip_path = os.path.join(temp_dir, zip_filename)
             
             with zipfile.ZipFile(zip_path, 'w') as zip_file:
                 for sku, product_data in products_dict.items():
-                    # إنشاء PDF للمنتج
                     pdf_content = generate_product_pdf(product_data, sku)
                     
                     if pdf_content:
-                        # استخدام اسم ملف آمن
                         pdf_filename = f"product_{safe_filename(sku)}_{len(product_data['orders'])}_orders.pdf"
                         zip_file.writestr(pdf_filename, pdf_content)
                         logger.info(f"✅ تم إنشاء PDF للمنتج {sku}")
@@ -643,7 +630,6 @@ def download_products_pdf():
             with open(zip_path, 'rb') as f:
                 zip_data = f.read()
             
-            # إرسال الاستجابة
             response = make_response(zip_data)
             response.headers['Content-Type'] = 'application/zip'
             response.headers['Content-Disposition'] = f'attachment; filename="{zip_filename}"'
@@ -657,8 +643,6 @@ def download_products_pdf():
         logger.error(traceback.format_exc())
         flash('حدث خطأ أثناء إنشاء ملف المنتجات', 'error')
         return redirect(url_for('orders.index'))
-
-# وأيضاً تعديل دالة generate_product_pdf لاستخدام اسم آمن
 def generate_product_pdf(product_data, product_sku):
     """إنشاء PDF للمنتج بالتخطيط المضغوط"""
     try:
