@@ -11,7 +11,8 @@ from app.utils import (
     db_session_scope, 
     process_orders_concurrently,
     get_barcodes_for_orders,
-    get_postgres_engine
+    get_postgres_engine,
+    generate_barcode
 )
 from app.models import SallaOrder, CustomOrder  # إضافة الاستيراد
 from app.config import Config
@@ -186,46 +187,7 @@ def process_order_from_local_data(order, order_data, items_data):
     except Exception as e:
         logger.error(f"❌ خطأ في معالجة البيانات المحلية: {str(e)}")
         return None
-def generate_barcode(data):
-    """إنشاء باركود بسيط للمعالجة المحلية"""
-    try:
-        if not data:
-            return None
-            
-        # استخدام مكتبة barcode إذا كانت متاحة
-        try:
-            import barcode
-            from barcode.writer import ImageWriter
-            from io import BytesIO
-            import base64
-            
-            barcode_class = barcode.get_barcode_class('code128')
-            writer = ImageWriter()
-            
-            # إعدادات بسيطة للباركود
-            writer.set_options({
-                'write_text': False,
-                'module_width': 0.5,
-                'module_height': 15,
-                'quiet_zone': 2
-            })
-            
-            barcode_obj = barcode_class(str(data), writer=writer)
-            buffer = BytesIO()
-            barcode_obj.write(buffer)
-            
-            buffer.seek(0)
-            barcode_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            return f"data:image/png;base64,{barcode_base64}"
-            
-        except ImportError:
-            # إذا لم تكن المكتبة متاحة، نرجع باركود بسيط كنص
-            logger.warning("⚠️ مكتبة barcode غير متاحة، استخدام باركود نصي")
-            return f"BARCODE:{data}"
-            
-    except Exception as e:
-        logger.error(f"❌ خطأ في إنشاء الباركود: {str(e)}")
-        return None
+
 def get_main_image_from_local(item):
     """استخراج الصورة الرئيسية من البيانات المحلية"""
     try:
