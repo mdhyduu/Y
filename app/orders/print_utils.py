@@ -489,7 +489,7 @@ def download_pdf():
             string=html,
             base_url=request.host_url
         ).write_pdf(
-            optimize_size=('fonts', 'images'),
+            optimize_size=(),
             jpeg_quality=80
         )
         
@@ -708,7 +708,7 @@ def generate_product_pdf(product_data, product_sku):
             string=html_content,
             base_url=request.host_url
         ).write_pdf(
-            optimize_size=('fonts', 'images', 'backgrounds'),
+            optimize_size=(),
             jpeg_quality=95,
             dpi=300,
             presentational_hints=True

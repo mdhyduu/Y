@@ -7,160 +7,216 @@
         @page {
             size: A4;
             margin: 0.3cm;
+            /* إعدادات متقدمة للجودة */
+            marks: crop;
+            bleed: 0.5cm;
+            -ps-print-quality: high;
         }
+        
         body {
-            font-family: 'DejaVu Sans', Arial, sans-serif;
-            line-height: 1.2;
+            font-family: 'DejaVu Sans', 'Arial', sans-serif;
+            line-height: 1.3;
             margin: 0;
-            padding: 5px;
+            padding: 8px;
             color: #000;
             background: white;
-            font-size: 10px;
+            font-size: 11px; /* زيادة حجم الخط قليلاً */
+            /* تحسينات الجودة */
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            image-rendering: crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
         }
+        
         .header {
             text-align: center;
-            margin-bottom: 8px;
-            padding-bottom: 5px;
-            border-bottom: 1px solid #000;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #000; /* زيادة سماكة الخط */
         }
+        
         .header h1 {
-            font-size: 14px;
-            margin: 2px 0;
+            font-size: 18px; /* زيادة حجم الخط */
+            margin: 5px 0;
+            font-weight: bold;
         }
+        
         .header p {
-            font-size: 9px;
-            margin: 1px 0;
+            font-size: 12px;
+            margin: 3px 0;
         }
+        
         .product-summary {
             text-align: right;
-            margin-bottom: 8px;
-            padding: 1px;
-            background: #f0f0f0;
-            border-radius: 3px;
-            font-size: 9px;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: #f8f8f8;
+            border-radius: 5px;
+            font-size: 12px;
+            border: 1px solid #ddd;
         }
+        
         .orders-container {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 5px;
+            gap: 8px; /* زيادة المسافة بين العناصر */
             margin: 0 auto;
         }
+        
         .order-item {
-            border: 1px solid #000;
-            border-radius: 3px;
-            padding: 4px;
+            border: 2px solid #000; /* زيادة سماكة الحدود */
+            border-radius: 5px;
+            padding: 8px;
             text-align: center;
             background: white;
             page-break-inside: avoid;
             break-inside: avoid;
-            min-height: 140px; /* زيادة الارتفاع لاستيعاب الباركود الأكبر */
+            min-height: 200px; /* زيادة الارتفاع */
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+            /* تحسينات الجودة */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+        
         .order-number {
-            font-size: 12px;
+            font-size: 14px;
             font-weight: bold;
-            margin-bottom: 3px;
-            background: #e0e0e0;
-            padding: 2px;
-            border-radius: 2px;
-        }
-        .product-image-container {
-            width: 100px;
-            height: 100px;
-            margin: 0 auto 3px auto;
+            margin-bottom: 5px;
+            background: #e8e8e8;
+            padding: 5px;
+            border-radius: 3px;
             border: 1px solid #ccc;
-            border-radius: 2px;
+        }
+        
+        .product-image-container {
+            width: 120px; /* زيادة الحجم */
+            height: 120px;
+            margin: 5px auto;
+            border: 2px solid #ccc;
+            border-radius: 3px;
             overflow: hidden;
             background: white;
             flex-shrink: 0;
         }
+        
         .product-image-container img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain; /* تغيير إلى contain للحفاظ على النسب */
+            image-rendering: crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
         }
+        
         .no-image {
             width: 100%;
             height: 100%;
-            background: #f5f5f5;
+            background: #f9f9f9;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #666;
-            font-size: 8px;
+            color: #777;
+            font-size: 10px;
+            border: 1px dashed #ccc;
         }
-        .options {
-            font-size: 8px;
-            color: #333;
-            margin: 2px 0;
-            line-height: 1.1;
-            min-height: 20px;
+        
+        .options-multiline {
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            font-size: 12px; /* زيادة حجم الخط */
+            line-height: 1.4;
+            padding: 8px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+            margin: 5px 0;
             flex-grow: 1;
             display: flex;
             align-items: center;
             justify-content: center;
+            text-align: center;
         }
+        
         .barcode-container {
-            margin-top: 2px;
+            margin-top: 5px;
             text-align: center;
             flex-shrink: 0;
-            /* تحسينات لحاوية الباركود */
             width: 100%;
-            height: 40px; /* زيادة ارتفاع الحاوية */
+            height: 60px; /* زيادة الارتفاع بشكل كبير */
             display: flex;
             align-items: center;
             justify-content: center;
             background: white;
             border: 1px solid #eee;
-            border-radius: 2px;
+            border-radius: 3px;
+            padding: 3px;
+        }
+        
+        .barcode {
+            width: 160px !important;  /* زيادة الحجم */
+            height: 50px !important;
+            max-width: none !important;
+            max-height: none !important;
+            object-fit: contain;
+            image-rendering: crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
+            /* تحسينات إضافية */
+            border: 1px solid #f0f0f0;
+            background: white;
             padding: 2px;
         }
-        .barcode {
-            /* تحسينات كبيرة للباركود */
-            width: 120px !important; /* زيادة العرض بشكل كبير */
-            height: 35px !important; /* زيادة الارتفاع بشكل كبير */
-            max-width: none !important; /* إلغاء الحد الأقصى */
-            max-height: none !important; /* إلغاء الحد الأقصى */
-            object-fit: contain; /* الحفاظ على النسب مع ملء المساحة */
-            image-rendering: crisp-edges; /* تحسين الحدة */
-            image-rendering: -webkit-optimize-contrast; /* تحسين التباين للمتصفحات */
-        }
+        
         .no-barcode {
-            font-size: 7px;
+            font-size: 10px;
             color: #999;
-            margin: 2px 0;
+            margin: 5px 0;
+            padding: 5px;
+            background: #f5f5f5;
+            border-radius: 3px;
         }
+        
         .footer {
             text-align: center;
-            margin-top: 8px;
-            font-size: 8px;
+            margin-top: 15px;
+            font-size: 10px;
             color: #666;
-            border-top: 1px solid #ddd;
-            padding-top: 4px;
+            border-top: 2px solid #ddd;
+            padding-top: 8px;
         }
+        
         .page-break {
             page-break-after: always;
         }
         
-        /* تحسينات للطباعة */
+        /* تحسينات متقدمة للطباعة */
         @media print {
             body {
                 margin: 0;
-                padding: 3px;
-            }
-            .order-item {
-                border: 1px solid #000;
-            }
-            .orders-container {
-                gap: 3px;
-            }
-            .barcode {
-                width: 110px !important; /* حجم مختلف للطباعة */
-                height: 32px !important;
-                -webkit-print-color-adjust: exact; /* ضمان طباعة الألوان بدقة */
+                padding: 5px;
+                -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
+            }
+            
+            .order-item {
+                border: 2px solid #000;
+                box-shadow: none; /* إزالة الظل في الطباعة */
+            }
+            
+            .orders-container {
+                gap: 6px;
+            }
+            
+            .barcode {
+                width: 150px !important;
+                height: 45px !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            
+            /* منع تقسيم العناصر بين الصفحات */
+            .order-item {
+                page-break-inside: avoid;
+                break-inside: avoid;
             }
         }
         
@@ -169,17 +225,6 @@
             .orders-container {
                 grid-template-columns: repeat(3, 1fr);
             }
-        }
-        .options-multiline {
-            white-space: normal !important;
-            word-wrap: break-word !important;
-            font-size: 14px;
-            line-height: 1.6;
-            padding: 8px;
-            background-color: #f5f5f5;
-            border-radius: 4px;
-            border-left: 3px solid #007bff;
-            margin: 5px 0;
         }
     </style>
 </head>
@@ -218,13 +263,12 @@
                 {{ order.options_text | replace(' | ', '<br>') | safe }}
             </div>
             
-            <!-- الباركود - التحسينات الرئيسية هنا -->
+            <!-- الباركود -->
             <div class="barcode-container">
                 {% if order.barcode %}
                 <img src="{{ order.barcode }}" class="barcode" 
                      alt="باركود {{ order.reference_id }}"
-                     onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'no-barcode\'>خطأ في تحميل الباركود</div>';"
-                     style="width: 120px; height: 35px; object-fit: contain;">
+                     onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'no-barcode\'>خطأ في تحميل الباركود</div>';">
                 {% else %}
                 <div class="no-barcode">لا يوجد باركود</div>
                 {% endif %}
@@ -244,49 +288,33 @@
     </div>
 
     <script>
-    // معالجة أخطاء الصور والباركود
+    // تحسين جودة الصور والباركود
     document.addEventListener('DOMContentLoaded', function() {
-        // معالجة أخطاء الصور
-        const images = document.querySelectorAll('.product-image-container img');
-        images.forEach(img => {
-            img.addEventListener('error', function() {
-                this.style.display = 'none';
-                const container = this.parentElement;
-                if (container) {
-                    container.innerHTML = '<div class="no-image">لا توجد صورة</div>';
+        // تأخير تحميل الصور لضمان الجودة
+        setTimeout(function() {
+            const images = document.querySelectorAll('img');
+            images.forEach(img => {
+                // إضافة طابع زمني لمنع التخزين المؤقت
+                if (img.src && !img.src.includes('?')) {
+                    img.src = img.src + '?t=' + new Date().getTime();
                 }
+                
+                img.addEventListener('load', function() {
+                    console.log('✅ الصورة/الباركود تم تحميله بنجاح:', this.src);
+                });
+                
+                img.addEventListener('error', function() {
+                    console.error('❌ خطأ في التحميل:', this.src);
+                    if (this.classList.contains('barcode')) {
+                        this.style.display = 'none';
+                        this.parentElement.innerHTML = '<div class="no-barcode">لا يوجد باركود</div>';
+                    } else {
+                        this.style.display = 'none';
+                        this.parentElement.innerHTML = '<div class="no-image">لا توجد صورة</div>';
+                    }
+                });
             });
-        });
-        
-        // معالجة أخطاء الباركود مع تحسينات الدقة
-        const barcodes = document.querySelectorAll('.barcode');
-        barcodes.forEach(barcode => {
-            // إضافة تحميل ناجح للتحقق من الجودة
-            barcode.addEventListener('load', function() {
-                console.log('✅ الباركود تم تحميله بنجاح:', this.src);
-                // التأكد من أن الباركود يعرض بالحجم الصحيح
-                this.style.width = '120px';
-                this.style.height = '35px';
-                this.style.objectFit = 'contain';
-            });
-            
-            barcode.addEventListener('error', function() {
-                console.error('❌ خطأ في تحميل الباركود:', this.src);
-                this.style.display = 'none';
-                const container = this.parentElement;
-                if (container) {
-                    container.innerHTML = '<div class="no-barcode">لا يوجد باركود</div>';
-                }
-            });
-        });
-        
-        // تحسين دقة الباركود للطباعة
-        window.addEventListener('beforeprint', function() {
-            document.querySelectorAll('.barcode').forEach(barcode => {
-                barcode.style.width = '110px';
-                barcode.style.height = '32px';
-            });
-        });
+        }, 100);
     });
     </script>
 </body>
