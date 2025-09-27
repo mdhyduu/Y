@@ -1216,3 +1216,39 @@ def verify_barcode_order_ids():
     except Exception as e:
         logger.error(f"Error in verify_barcode_order_ids: {str(e)}")
         return []
+# إضافة هذه الدالة إلى ملف utils.py إذا لم تكن موجودة
+def get_main_image_from_local(item):
+    """استخراج الصورة الرئيسية من البيانات المحلية"""
+    try:
+        image_sources = [
+            item.get('product_thumbnail'),
+            item.get('thumbnail'),
+            item.get('image'),
+            item.get('url'),
+            item.get('image_url'),
+            item.get('picture')
+        ]
+        
+        for image_url in image_sources:
+            if image_url and isinstance(image_url, str) and image_url.strip():
+                final_url = image_url.strip()
+                if not final_url.startswith(('http://', 'https://')):
+                    return f"https://cdn.salla.sa{final_url}"
+                return final_url
+        
+        images = item.get('images', [])
+        if images and isinstance(images, list):
+            for image in images:
+                if isinstance(image, dict):
+                    image_url = image.get('image') or image.get('url')
+                    if image_url and isinstance(image_url, str) and image_url.strip():
+                        final_url = image_url.strip()
+                        if not final_url.startswith(('http://', 'https://')):
+                            return f"https://cdn.salla.sa{final_url}"
+                        return final_url
+        
+        return ''
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في استخراج الصورة: {str(e)}")
+        return ''
