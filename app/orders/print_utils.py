@@ -517,79 +517,60 @@ from urllib.parse import quote
 from sqlalchemy.sql import text
 
 def group_products_by_sku_db(order_ids, store_id):
-    """تجميع المنتجات مباشرة من قاعدة البيانات - الإصدار الأسرع"""
+    """تجميع المنتجات مباشرة من قاعدة البيانات (PostgreSQL JSONB) - الإصدار المصحح"""
     engine = get_postgres_engine()
     
-    # استعلام محسن للأداء
+    # استعلام معدل بشكل صحيح لجلب جميع المنتجات
     query = text("""
         SELECT 
             COALESCE(item->>'sku', 'unknown_' || (item->>'id')) AS sku,
             item->>'name' AS name,
-            COALESCE(item->>'product_thumbnail', item->>'thumbnail', item->>'image', '') AS thumbnail,
+            COALESCE(item->>'product_thumbnail', item->>'thumbnail', '') AS thumbnail,
             SUM(COALESCE((item->>'quantity')::integer, 0)) AS total_quantity,
             COUNT(DISTINCT o.id) AS order_count,
             json_agg(
                 DISTINCT json_build_object(
                     'order_id', o.id,
-                    'customer_name', COALESCE(o.customer_name, o.full_order_data->'customer'->>'name', ''),
+                    'customer_name', COALESCE(o.customer_name, ''),
                     'quantity', COALESCE((item->>'quantity')::integer, 0),
                     'created_at', o.created_at,
                     'barcode', o.barcode_data,
                     'options_text', (
                         SELECT string_agg(
-                            COALESCE(opt->>'name', '') || ': ' || 
-                            COALESCE(
-                                CASE 
-                                    WHEN jsonb_typeof(opt->'value') = 'object' THEN opt->'value'->>'name'
-                                    WHEN jsonb_typeof(opt->'value') = 'array' THEN (
-                                        SELECT string_agg(COALESCE(v->>'name', v::text), ', ')
-                                        FROM jsonb_array_elements(opt->'value') v
-                                    )
-                                    ELSE opt->>'value'
-                                END, 
-                                ''
-                            ), 
+                            COALESCE(opt->>'name', '') || ': ' || COALESCE(opt->>'value', ''), 
                             ' | '
                         )
                         FROM jsonb_array_elements(
                             CASE 
                                 WHEN jsonb_typeof(COALESCE(item->'options', '[]'::jsonb)) = 'array' 
-                                THEN item->'options'
+                                THEN COALESCE(item->'options', '[]'::jsonb)
                                 ELSE '[]'::jsonb
                             END
                         ) AS opt
-                        WHERE opt IS NOT NULL
                     )
                 )
             ) AS orders
-        FROM salla_orders o
-        CROSS JOIN LATERAL jsonb_array_elements(
+        FROM salla_orders o,
+        LATERAL jsonb_array_elements(
             CASE 
                 WHEN jsonb_typeof(o.full_order_data->'items') = 'array' 
                 THEN o.full_order_data->'items'
                 ELSE '[]'::jsonb
             END
         ) AS item
-        WHERE o.id = ANY(:order_ids) 
-            AND o.store_id = :store_id
+        WHERE o.id = ANY(:order_ids) AND o.store_id = :store_id
             AND o.full_order_data IS NOT NULL
-            AND jsonb_array_length(
-                CASE 
-                    WHEN jsonb_typeof(o.full_order_data->'items') = 'array' 
-                    THEN o.full_order_data->'items'
-                    ELSE '[]'::jsonb
-                END
-            ) > 0
+            AND jsonb_typeof(o.full_order_data->'items') = 'array'
         GROUP BY 
             COALESCE(item->>'sku', 'unknown_' || (item->>'id')),
             item->>'name',
-            COALESCE(item->>'product_thumbnail', item->>'thumbnail', item->>'image', '')
+            COALESCE(item->>'product_thumbnail', item->>'thumbnail', '')
         HAVING SUM(COALESCE((item->>'quantity')::integer, 0)) > 0
-        ORDER BY total_quantity DESC
     """)
     
     try:
         with engine.connect() as conn:
+            # تحويل order_ids إلى قائمة نصية إذا لم تكن كذلك
             order_ids_str = [str(oid).strip() for oid in order_ids if str(oid).strip()]
             
             if not order_ids_str:
@@ -608,18 +589,6 @@ def group_products_by_sku_db(order_ids, store_id):
     except Exception as e:
         logger.error(f"❌ خطأ في تجميع المنتجات من قاعدة البيانات: {str(e)}")
         logger.error(traceback.format_exc())
-        
-        # كبديل آمن، استخدم الدالة الثانية
-        logger.info("🔄 محاولة استخدام الطريقة البديلة...")
-        return group_products_by_sku_db_v2(order_ids, store_id)
-
-def group_products_by_sku_db_v2(order_ids, store_id):
-    """النسخة البديلة (للطوارئ فقط)"""
-    try:
-        # ... كود النسخة الثانية كما هو ...
-        pass
-    except Exception as e:
-        logger.error(f"❌ فشلت الطريقة البديلة أيضاً: {str(e)}")
         return []
 
 def get_options_text(options):
@@ -643,7 +612,7 @@ def get_options_text(options):
     return " | ".join(options_text)
 def safe_filename(filename):
     """إنشاء اسم ملف آمن بدون أحرف خاصة"""
-    try:
+    try: 
         # تحويل الأحرف العربية إلى مقابلاتها اللاتينية إن أمكن
         normalized = unicodedata.normalize('NFKD', filename)
         ascii_name = normalized.encode('ascii', 'ignore').decode('ascii')
