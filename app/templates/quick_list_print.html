@@ -493,10 +493,10 @@ body {
                             <div class="product-info">
                                 <h2>${product.name}</h2>
                                 <div class="product-stats">
-                                    <span class="product-badge">SKU: ${product.sku}</span>
+                           
                                     <span class="">الكمية: ${product.total_quantity}</span>
                                     <span class="product-badge">الطلبات: ${product.orders.length}</span>
-                                    ${product.price ? `<span class="product-badge">السعر: ${product.price} ر.س</span>` : ''}
+
                                 </div>
                             </div>
                         </div>
@@ -512,15 +512,10 @@ body {
                             <div class="order-card">
                                 <div class="order-header">
                                     <span class="order-number">الطلب #${order.reference_id}</span>
-                                    <span class="order-date">${order.created_at}</span>
+
                                 </div>
                                 
-                                ${order.customer_name ? `
-                                    <div class="customer-info">
-                                        <i class="fas fa-user"></i> ${order.customer_name}
-                                        ${order.customer_mobile ? ` | <i class="fas fa-phone"></i> ${order.customer_mobile}` : ''}
-                                    </div>
-                                ` : ''}
+
                                 
                                 <div class="order-details">
                                     <div>
