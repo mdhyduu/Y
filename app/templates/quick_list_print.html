@@ -237,27 +237,29 @@
             word-wrap: break-word;
         }
 
-        .barcode-section {
-            text-align: center;
-            margin-top: 8px;
-            padding: 3px; /* تم تقليل الحشوة */
-            background: #f8f9fa;
-            border-radius: 4px;
-            max-width: 100%; /* تم تحديد عرض أقصى */
-            height: 70px; /* ارتفاع ثابت للقسم */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+      .barcode-section {
+    text-align: center;
+    margin-top: 8px;
+    padding: 3px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
-        .barcode-image {
-            max-width: 220px; /* تم تصغير العرض الأقصى */
-            height: 60px; /* تم تصغير الارتفاع */
-            object-fit: contain;
-            border: 1px solid #ddd;
-            background: white;
-            margin: 0 auto; /* توسيط الباركود */
-        }
+/* للعرض في الشاشة */
+.barcode-image {
+    max-width: 220px; /* في العرض العادي تصغير مناسب */
+    height: auto;     /* الارتفاع يتعدل تلقائي */
+    border: 1px solid #ddd;
+    background: white;
+    margin: 0 auto;
+    display: block;
+    object-fit: contain;
+}
+
+/* للطباعة: يظهر بالحجم الطبيعي حسب الـ DPI */
 
         .no-orders {
             text-align: center;
@@ -345,24 +347,15 @@
                 grid-template-columns: 70px 1fr;
             } 
             
-        .barcode-section {
-            text-align: center;
-            margin-top: auto;
-            padding-top: 12px;
-            border-top: 1.5px dashed #000;
-        }
 
-        .barcode-image {
-            width: 180px;
-            height: 60px;
-            border: 1.5px solid #000;
-            padding: 4px;
-            background-color: #fff;
-            image-rendering: pixelated;
-            margin: 0 auto 6px;
-            display: block;
-        }
-
+@media print {
+    .barcode-image {
+        max-width: none;
+        height: auto;
+        border: none;   /* يشيل الإطار */
+        background: none;
+    }
+}
             
             .notes-text {
                 font-size: 12px;
