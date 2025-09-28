@@ -447,6 +447,9 @@
                             <button type="button" class="btn btn-success w-100" id="quickListDownloadBtn">
                                 <i class="fas fa-download me-1"></i> تحميل كـ PDF
                             </button>
+                                <button type="button" class="btn btn-outline-secondary w-100" id="toggleAllOrdersBtn">
+        <i class="fas fa-eye me-1"></i> إظهار/إخفاء جميع الطلبات
+    </button>
                         </div>
                     </div>
                 </div>
@@ -1062,6 +1065,7 @@ function openQuickListPrint() {
             data: JSON.stringify({ order_ids: selectedOrders })
         })
 // في جزء إنشاء القائمة السريعة، عدل كود عرض المنتج ليصبح كالتالي:
+<!-- في جزء إنشاء القائمة السريعة في JavaScript، عدل كود عرض المنتج ليصبح كالتالي: -->
 .done(function(data) {
     if (data.success) {
         let html = '';
@@ -1093,13 +1097,22 @@ function openQuickListPrint() {
                 </div>
             </div>
         </div>
-        <div class="product-selection-info">
-            <small class="text-muted selected-orders-count" data-sku="${product.sku}">
-                ${product.order_appearances.length}/${product.order_appearances.length} محدد
-            </small>
+        <div class="d-flex align-items-center">
+            <div class="product-selection-info me-3">
+                <small class="text-muted selected-orders-count" data-sku="${product.sku}">
+                    ${product.order_appearances.length}/${product.order_appearances.length} محدد
+                </small>
+            </div>
+            <!-- زر إظهار/إخفاء الطلبات -->
+            <button class="btn btn-sm btn-outline-primary toggle-orders-btn" 
+                    type="button" 
+                    data-sku="${product.sku}"
+                    title="إظهار/إخفاء الطلبات">
+                <i class="fas fa-chevron-down"></i>
+            </button>
         </div>
     </div>
-    <div class="card-body">
+    <div class="card-body orders-container" id="orders-${product.sku}" style="display: none;">
         <h6 class="border-bottom pb-2 mb-3">تفاصيل الطلبات:</h6>
                 `;
 
@@ -1217,6 +1230,46 @@ function openQuickListPrint() {
             `);
         });
     });
+    
+// 21. أحداث إظهار/إخفاء الطلبات لكل منتج
+$(document).on('click', '.toggle-orders-btn', function() {
+    const sku = $(this).data('sku');
+    const ordersContainer = $(`#orders-${sku}`);
+    const icon = $(this).find('i');
+    
+    if (ordersContainer.is(':visible')) {
+        ordersContainer.slideUp(300);
+        icon.removeClass('fa-chevron-up').addClass('fa-chevron-down');
+        $(this).attr('title', 'إظهار الطلبات');
+    } else {
+        ordersContainer.slideDown(300);
+        icon.removeClass('fa-chevron-down').addClass('fa-chevron-up');
+        $(this).attr('title', 'إخفاء الطلبات');
+    }
+});
+
+// 22. إظهار/إخفاء جميع الطلبات
+$(document).on('click', '#toggleAllOrdersBtn', function() {
+    const allContainers = $('.orders-container');
+    const allButtons = $('.toggle-orders-btn');
+    const icon = $(this).find('i');
+    
+    if (allContainers.first().is(':visible')) {
+        // إخفاء جميع الطلبات
+        allContainers.slideUp(300);
+        allButtons.find('i').removeClass('fa-chevron-up').addClass('fa-chevron-down');
+        allButtons.attr('title', 'إظهار الطلبات');
+        icon.removeClass('fa-eye-slash').addClass('fa-eye');
+        $(this).attr('title', 'إظهار جميع الطلبات');
+    } else {
+        // إظهار جميع الطلبات
+        allContainers.slideDown(300);
+        allButtons.find('i').removeClass('fa-chevron-down').addClass('fa-chevron-up');
+        allButtons.attr('title', 'إخفاء الطلبات');
+        icon.removeClass('fa-eye').addClass('fa-eye-slash');
+        $(this).attr('title', 'إخفاء جميع الطلبات');
+    }
+});
     // 16. أحداث تحديد المنتج والطلبات
 $(document).on('change', '.product-checkbox', function() {
     const productSku = $(this).data('sku');
