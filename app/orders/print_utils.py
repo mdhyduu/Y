@@ -423,7 +423,9 @@ def get_quick_list_data():
                         'created_at': order.get('created_at', ''),
                         'quantity': item.get('quantity', 0),
                         'options': item.get('options', []),
-                        'barcode': order.get('barcode', '')
+                        'barcode': order.get('barcode', ''),
+                        'notes': order.get('notes', '')
+                        
                     }
                     
                     products_by_sku[sku]['order_appearances'].append(order_appearance)
