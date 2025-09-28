@@ -194,6 +194,7 @@ body {
     border: 1px solid #ffeaa7;
     border-radius: 5px;
     padding: 8px;
+    
     margin-top: 8px;
 }
 
@@ -201,6 +202,7 @@ body {
     font-weight: 600;
     margin-bottom: 5px;
     color: #856404;
+
     font-size: 11px;
 }
 
@@ -211,7 +213,7 @@ body {
     margin: 2px;
     border-radius: 3px;
     font-size: 15px;
-    font-weight: bold;
+    font-weight:bold;
     border: 1px solid #ffeaa7;
 }
 
@@ -255,8 +257,8 @@ body {
 @media print {
     body {
         margin: 0;
-        padding: 5px;
-        font-size: 18px;
+        padding: 10px;
+        font-size: 11px;
     }
     
     .report-header {
@@ -316,23 +318,63 @@ body {
     /* تكبير الباركود بشكل ملحوظ للطباعة */
             .barcode-image {
                 width: 170px !important;
-                 height: 55px !important;
+                height: 55px !important;
                 image-rendering: crisp-edges;
             
         object-fit: contain !important;
         border: 1px solid #000 !important;
         background: white !important;
-        padding: 5px !important;
+        padding: 8px !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
     
     .barcode-section {
-        padding: 2px !important; /* زيادة حشوة القسم للطباعة */
+        padding: 5px !important; /* زيادة حشوة القسم للطباعة */
         background: white !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
+    .notes-section {
+    border-right: 3px solid #17a2b8;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.notes-text {
+    color: #495057;
+    line-height: 1.4;
+    font-size: 14px;
+    white-space: pre-line;
+    word-wrap: break-word;
+}
+
+/* تنس
+    .notes-section {
+        background: #f8f9fa !important;
+        border: 1px solid #dee2e6 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    .notes-text {
+        font-size: 12px;
+    }
+}
+
+/* تنسيق للعرض في القائمة السريعة */
+.options-section {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 5px;
+    padding: 8px;
+}
+
+.notes-section {
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    border-radius: 5px;
+    padding: 8px;
+
 }
 
 .text-primary { color: #667eea; }
@@ -502,17 +544,30 @@ body {
                                             </div>
                                         `}
                                     </div>
-                                    <div class="detail-content">
-                                        <div class="">الكمية: ${order.quantity}</div>
-                                        
-                                        ${order.options && order.options.length > 0 ? `
-                                            <div class="options-section">
-                                                <div class="options-title">الخيارات:</div>
-                                                ${order.options.map(opt => `
-                                                    <span class="option-item">${opt.name}: ${opt.value}</span>
-                                                `).join('')}
-                                            </div>
-                                        ` : ''}
+                          <!-- ... داخل قسم order-details ... -->
+
+<div class="detail-content">
+    <div class="quantity-badge">الكمية: ${order.quantity}</div>
+    
+    ${order.options && order.options.length > 0 ? `
+        <div class="options-section">
+            <div class="options-title">الخيارات:</div>
+            ${order.options.map(opt => `
+                <span class="option-item">${opt.name}: ${opt.value}</span>
+            `).join('')}
+        </div>
+    ` : ''}
+    
+    <!-- إضافة قسم الملاحظات للطباعة -->
+    ${order.notes ? `
+        <div class="notes-section mt-2 p-2 bg-info bg-opacity-10 border border-info rounded">
+            <strong class="small d-block mb-1 text-info">
+                <i class="fas fa-sticky-note me-1"></i>ملاحظات:
+            </strong>
+            <span class="notes-text small">${order.notes}</span>
+        </div>
+    ` : ''}
+</div>
                                     </div>
                                 </div>
                                 

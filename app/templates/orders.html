@@ -731,7 +731,11 @@ function collectQuickListPrintData() {
                     customerMobile = text.replace('الجوال:', '').trim();
                 }
             });
-            
+            let notes = '';
+            const notesSection = orderAppearance.find('.notes-section .notes-text');
+            if (notesSection.length > 0) {
+                notes = notesSection.text().trim();
+            }
             const createdAt = orderAppearance.find('small:contains("التاريخ")').text().replace('التاريخ: ', '').trim();
             const quantityText = orderAppearance.find('small:contains("الكمية")').text().replace('الكمية: ', '').trim();
             const quantity = parseInt(quantityText) || 0;
@@ -769,7 +773,8 @@ function collectQuickListPrintData() {
                 created_at: createdAt,
                 quantity: quantity,
                 options: options,
-                barcode: barcode
+                barcode: barcode,
+                notes: notes
             });
             
             totalQuantity += quantity;
@@ -1076,7 +1081,8 @@ function openQuickListPrint() {
             <img src="${product.main_image || '/static/images/no-image.png'}" 
                  alt="${product.name}" 
                  class="img-thumbnail me-3" 
-                 style="width: 60px; height: 60px; object-fit: cover;">
+                 style="width: 60px; height: 60px; object-fit: cover;"
+                 onerror="this.src='/static/images/no-image.png'">
             <div>
                 <h6 class="mb-1 fw-bold">${product.name}</h6>
                 <small class="text-muted">SKU: ${product.sku}</small>
@@ -1099,7 +1105,7 @@ function openQuickListPrint() {
 
                 // عرض كل ظهور للمنتج في الطلبات المختلفة
                 product.order_appearances.forEach((appearance, index) => {
-                    // 🔴 تخزين بيانات الباركود في العنصر
+                    // تخزين بيانات الباركود في العنصر
                     const barcodeData = appearance.barcode || '';
                     
                     html += `
@@ -1121,18 +1127,23 @@ function openQuickListPrint() {
                     </div>
                     <div class="ms-4 mt-2">
                         <small class="text-muted d-block">
-                            <i class="fas fa-user me-1"></i> ${appearance.customer_name}
+                            <i class="fas fa-user me-1"></i> العميل: ${appearance.customer_name || 'غير محدد'}
                         </small>
                         <small class="text-muted d-block">
-                            <i class="fas fa-calendar me-1"></i> ${appearance.created_at}
+                            <i class="fas fa-calendar me-1"></i> التاريخ: ${appearance.created_at}
                         </small>
                         <small class="text-muted d-block">
                             <i class="fas fa-box me-1"></i> الكمية: ${appearance.quantity}
                         </small>
+                        ${appearance.customer_mobile ? `
+                        <small class="text-muted d-block">
+                            <i class="fas fa-phone me-1"></i> الجوال: ${appearance.customer_mobile}
+                        </small>
+                        ` : ''}
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <div class="options-section">
+                    <div class="options-section mb-2">
                         <strong class="small d-block mb-1">الخيارات:</strong>
                         `;
 
@@ -1151,6 +1162,16 @@ function openQuickListPrint() {
 
                     html += `
                     </div>
+                    
+                    <!-- قسم الملاحظات -->
+                    ${appearance.notes ? `
+                    <div class="notes-section mt-2 p-2 bg-info bg-opacity-10 border border-info rounded">
+                        <strong class="small d-block mb-1 text-info">
+                            <i class="fas fa-sticky-note me-1"></i>ملاحظات:
+                        </strong>
+                        <span class="notes-text small">${appearance.notes}</span>
+                    </div>
+                    ` : ''}
                 </div>
             </div>
         </div>
@@ -1163,19 +1184,33 @@ function openQuickListPrint() {
                 `;
             });
         } else {
-            html = `<div class="alert alert-warning text-center">لا توجد منتجات في الطلبات المحددة</div>`;
+            html = `
+            <div class="alert alert-warning text-center py-4">
+                <i class="fas fa-box-open fa-2x mb-3 text-warning"></i>
+                <h5 class="alert-heading">لا توجد منتجات</h5>
+                <p class="mb-0">لم يتم العثور على أي منتجات في الطلبات المحددة</p>
+            </div>
+            `;
         }
         
         $('#quickListContent').html(html);
         updateQuickListSelectionCount();
-        updateProductSelectionCounts(); // تحديث عداد كل منتج
-    
-            } else {
-                $('#quickListContent').html(`
-                    <div class="alert alert-danger">${data.error || 'حدث خطأ أثناء جلب البيانات'}</div>
-                `);
-            }
-        })
+        updateProductSelectionCounts();
+        
+        // إظهار إحصائيات النتائج
+        showSweetAlert('success', 'تم التحميل بنجاح', 
+            `تم تحميل ${data.products?.length || 0} منتج من ${data.stats?.successful_orders || 0} طلب`);
+        
+    } else {
+        $('#quickListContent').html(`
+            <div class="alert alert-danger text-center py-4">
+                <i class="fas fa-exclamation-triangle fa-2x mb-3 text-danger"></i>
+                <h5 class="alert-heading">حدث خطأ</h5>
+                <p class="mb-0">${data.error || 'حدث خطأ أثناء جلب البيانات'}</p>
+            </div>
+        `);
+    }
+})
         .fail(function(error) {
             $('#quickListContent').html(`
                 <div class="alert alert-danger">حدث خطأ في الاتصال: ${error.statusText}</div>

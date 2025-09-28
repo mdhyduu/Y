@@ -102,7 +102,7 @@ def process_order_from_local_data(order, order_data, items_data):
                 
                 # استخراج الصورة الرئيسية
                 main_image = get_main_image_from_local(item)
-                
+                notes = item.get('notes', '') or item.get('note', '') or ''
                 # معالجة الخيارات
                 options = []
                 item_options = item.get('options', [])
@@ -138,7 +138,8 @@ def process_order_from_local_data(order, order_data, items_data):
                         'currency': item.get('currency', 'SAR')
                     },
                     'main_image': main_image,
-                    'options': options
+                    'options': options,
+                    'notes': notes
                 }
                 
                 processed_items.append(item_data)
