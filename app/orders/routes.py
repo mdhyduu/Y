@@ -454,14 +454,31 @@ def order_details(order_id):
         else:
             payment_method_name = str(payment_method) if payment_method else 'غير محدد'
 
-        # ⭐⭐ الخطوة 4: معالجة البيانات (سواء كانت محلية أو من API) ⭐⭐
-        processed_order = process_order_data(order_id, items_data)
-        
-        # ⭐⭐ إضافة الملاحظات وطريقة الدفع إلى processed_order ⭐⭐
+        # ⭐⭐ الخطوة 6: معالجة العناصر مع الملاحظات ⭐⭐
+        processed_items = []
+        for item in items_data:
+            # ✅ استخراج ملاحظات المنتج من الحقل notes في كل عنصر
+            product_notes = item.get('notes', '')  # هذا هو الحقل الجديد الذي نريده
+            
+            processed_item = {
+                'id': item.get('id'),
+                'name': item.get('name', ''),
+                'quantity': item.get('quantity', 1),
+                'price': item.get('amounts', {}).get('total', {}).get('amount', 0),
+                'currency': item.get('amounts', {}).get('total', {}).get('currency', 'SAR'),
+                'notes': product_notes,  # ✅ إضافة ملاحظات المنتج هنا
+                'product_type': item.get('product_type', ''),
+                'product_thumbnail': item.get('product_thumbnail', ''),
+                'options': item.get('options', []),
+                'sku': item.get('sku', '')
+            }
+            processed_items.append(processed_item)
+
+        # ⭐⭐ الخطوة 7: تحديث processed_order بالبيانات الكاملة ⭐⭐
         processed_order.update({
             'id': order_id,
             'reference_id': order_data.get('reference_id') or order_data.get('id') or 'غير متوفر',
-            'notes': notes,  # ✅ إضافة الملاحظات
+            'notes': notes,  # ✅ إضافة ملاحظات الطلب العامة
             'payment_method': payment_method_name,  # ✅ إضافة طريقة الدفع
             'status': {
                 'name': order_data.get('status', {}).get('name', 'غير معروف'),
@@ -473,7 +490,8 @@ def order_details(order_id):
                 'shipping_cost': order_data.get('amounts', {}).get('shipping_cost', {'amount': 0, 'currency': 'SAR'}),
                 'discount': order_data.get('amounts', {}).get('discount', {'amount': 0, 'currency': 'SAR'}),
                 'total': order_data.get('amounts', {}).get('total', {'amount': 0, 'currency': 'SAR'})
-            }
+            },
+            'items': processed_items  # ✅ إضافة العناصر المعالجة مع الملاحظات
         })
 
         db_data = fetch_additional_order_data(user.store_id, str(order_id))
@@ -489,15 +507,11 @@ def order_details(order_id):
             product_statuses=db_data['product_statuses']
         )
 
-
     except Exception as e:
         error_msg = f"حدث خطأ غير متوقع: {str(e)}"
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
-
-# 🔥 تعريف الدوال المساعدة المطلوبة
-
 
 # 🔥 تعريف الدوال المساعدة المطلوبة
 def ensure_valid_access_token(user):
