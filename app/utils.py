@@ -163,13 +163,13 @@ def generate_barcode(data):
             # إعدادات محسنة للكاتب
             writer.set_options({
                 'write_text': True,
-                'module_width': 5,  # تقليل العرض قليلاً
-                'module_height': 18,   # تقليل الارتفاع قليلاً
-                'quiet_zone': 3,      # منطقة هادئة أصغر
-                'font_size': 8,       # حجم خط أصغر
-                'text_distance': 3,   # تقليل المسافة بين النص والباركود
-                'dpi': 96,            # زيادة الدقة
-                'text': cleaned_data  # استخدام البيانات المنظفة
+                'module_width': 0.4,    # عرض الوحدات (أكثر تناسق)
+                'module_height': 20,    # ارتفاع مناسب يخلي الشكل مستطيل
+                'quiet_zone': 6,        # مسافة هادئة أكبر تعطي وضوح
+                'font_size': 10,        # حجم خط مناسب للقراءة
+                'text_distance': 2,     # المسافة بين النص والباركود
+                'dpi': 300,             # دقة عالية للطباعة
+                'text': cleaned_data    # النص اللي أسفل الباركود
             })
             
             # التأكد من أن البيانات مناسبة لنوع الباركود
@@ -216,15 +216,14 @@ def generate_barcode_with_code39(data):
         
         writer.set_options({
             'write_text': True,
-            'module_width': 5,
-            'module_height': 18,
-            'quiet_zone': 3,
-            'font_size': 10,
-            'text_distance': 5,
-            'dpi': 72,
-            'text': data
+            'module_width': 0.4,    # عرض الوحدات (أكثر تناسق)
+            'module_height': 20,    # ارتفاع مناسب يخلي الشكل مستطيل
+            'quiet_zone': 6,        # مسافة هادئة أكبر تعطي وضوح
+            'font_size': 10,        # حجم خط مناسب للقراءة
+            'text_distance': 2,     # المسافة بين النص والباركود
+            'dpi': 300,             # دقة عالية للطباعة
+            'text': cleaned_data    # النص اللي أسفل الباركود
         })
-        
         # استخدام add_checksum=False لمنع إضافة أحرف التحقق
         barcode_instance = code_class(data, writer=writer, add_checksum=False)
         buffer = BytesIO()
@@ -251,14 +250,14 @@ def generate_barcode_alternative(data):
         writer = AltImageWriter()
         writer.set_options({
             'write_text': True,
-            'text': data,
-            'quiet_zone': 3,
-            'module_width': 5,
-            'module_height': 18,
-            'font_size': 9,
-            'text_distance': 2
+            'module_width': 0.4,    # عرض الوحدات (أكثر تناسق)
+            'module_height': 20,    # ارتفاع مناسب يخلي الشكل مستطيل
+            'quiet_zone': 6,        # مسافة هادئة أكبر تعطي وضوح
+            'font_size': 10,        # حجم خط مناسب للقراءة
+            'text_distance': 2,     # المسافة بين النص والباركود
+            'dpi': 300,             # دقة عالية للطباعة
+            'text': cleaned_data    # النص اللي أسفل الباركود
         })
-        
         code128 = Code128(data, writer=writer)
         buffer = BytesIO()
         code128.write(buffer)
