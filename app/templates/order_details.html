@@ -46,25 +46,7 @@
         </div>
         
         <!-- ملاحظات الطلب -->
-        {% if order.notes %}
-        <div class="row">
-            <div class="col-12">
-                <strong>ملاحظات الطلب:</strong>
-                <div class="alert alert-info mt-2">
-                    {{ order.notes }}
-                </div>
-            </div>
-        </div>
-        {% else %}
-        <div class="row">
-            <div class="col-12">
-                <strong>ملاحظات الطلب:</strong>
-                <div class="text-muted mt-2">
-                    لا توجد ملاحظات
-                </div>
-            </div>
-        </div>
-        {% endif %}
+
     </div>
 </div>
           <!-- جدول المنتجات -->
@@ -144,6 +126,16 @@
                     </div>
                   </td>
                 </tr>
+                <tr > <td>  {% if item.notes and item.notes.strip() %}
+                            <div class="product-notes bg-light p-2 rounded">
+                                <small class="text-primary">
+                                    <i class="fas fa-sticky-note me-1"></i>
+                                    {{ item.notes }}
+                                </small>
+                            </div>
+                            {% else %}
+                            <span class="text-muted">لا توجد ملاحظات</span>
+                            {% endif %}</td></tr>
                 {% endfor %}
               </tbody>
             </table>
