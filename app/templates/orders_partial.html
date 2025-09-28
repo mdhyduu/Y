@@ -1,30 +1,41 @@
 <div class="row">
-    {% for order in filtered_orders %}
+    {% for order in orders %}
     <div class="col-md-6 col-lg-4 mb-3">
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <div class="form-check">
                     <input class="form-check-input order-checkbox" type="checkbox" data-order-id="{{ order.id }}">
-                    <strong>#{{ order.id}}</strong>
+                    <strong>#{{ order.reference_id }}</strong>
                 </div>
                 <div>
-                    {% if order.current_status %}
-                    <span class="badge me-2" style="background-color: {{ order.current_status.color }}; color: white;">
-                        {{ order.current_status.name }}
+                    {% if order.status %}
+                    <span class="badge me-2" style="background-color: {% if order.status.slug == 'new' %}#28a745{% elif order.status.slug == 'processing' %}#17a2b8{% elif order.status.slug == 'completed' %}#6c757d{% else %}#6c757d{% endif %}; color: white;">
+                        {{ order.status.name }}
                     </span>
                     {% endif %}
-                    <small class="text-muted"><i class="fas fa-clock me-1"></i> {{ order.created_at|time_ago }}</small>
+                    <small class="text-muted"><i class="fas fa-clock me-1"></i> {{ order.created_at }}</small>
                 </div>
             </div>
             <div class="card-body">
                 <p class="card-text"><i class="fas fa-user me-2 text-muted"></i> {{ order.customer_name or 'غير معروف' }}</p>
-                <p class="card-text"><i class="fas fa-phone me-2 text-muted"></i> {{ order.customer_phone or 'غير متوفر' }}</p>
-                <p class="card-text"><i class="fas fa-map-marker-alt me-2 text-muted"></i> {{ order.customer_address or 'غير متوفر' }}</p>
+                <p class="card-text">
+                    <i class="fas fa-box me-2 text-muted"></i> 
+                    {% if order.type == 'salla' %}طلب سلة{% else %}طلب مخصص{% endif %}
+                </p>
+                {% if order.assignments %}
+                <p class="card-text">
+                    <i class="fas fa-user-tie me-2 text-muted"></i> 
+                    {% for assignment in order.assignments %}
+                        {{ assignment.employee.name }}{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </p>
+                {% endif %}
             </div>
             <div class="card-footer d-flex justify-content-between align-items-center">
-                <span class="fw-bold text-primary">{{ order.total_amount }} ر.س</span>
+                <span class="fw-bold text-primary">
+                    {% if order.total_amount %}{{ order.total_amount }} {{ order.currency or 'ر.س' }}{% else %}غير محدد{% endif %}
+                </span>
                 <div>
-                    <button class="btn btn-primary btn-sm">تغيير الحالة</button>
                     <a href="{{ url_for('orders.order_details', order_id=order.id) }}" 
                        class="btn btn-sm btn-info mb-1" title="عرض التفاصيل">
                         <i class="fas fa-eye"></i> عرض
@@ -34,7 +45,7 @@
                             data-bs-toggle="modal" 
                             data-bs-target="#assignOrderModal">
                         <i class="fas fa-user-plus"></i> 
-                        {% if order.assigned_to %}تعديل{% else %}إسناد{% endif %}
+                        {% if order.assignments %}تعديل{% else %}إسناد{% endif %}
                     </button>
                 </div>
             </div>
@@ -47,6 +58,61 @@
     </div>
     {% endfor %}
 </div>
+
+{# قسم الترقيم مع الحفاظ على الفلترات #}
+{% if pagination and pagination.total_pages > 1 %}
+<div class="d-flex flex-column align-items-end mt-4">
+    {# بناء query string لجميع الفلترات بشكل آمن #}
+    {% set filter_query = '' %}
+    
+    {# استخدام request.args للوصول الآمن لمعاملات URL #}
+    {% for key in ['status', 'employee', 'custom_status', 'date_from', 'date_to', 'search', 'order_type', 'per_page'] %}
+        {% if request.args.get(key) %}
+            {% set filter_query = filter_query ~ '&' ~ key ~ '=' ~ request.args.get(key) %}
+        {% endif %}
+    {% endfor %}
+
+    <nav aria-label="Page navigation">
+        <ul class="pagination pagination-sm justify-content-center mb-1">
+            {# زر الصفحة السابقة #}
+            {% if pagination.has_prev %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ pagination.prev_page }}{{ filter_query }}">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><a class="page-link" href="#"><i class="fas fa-chevron-right"></i></a></li>
+            {% endif %}
+            
+            {# أرقام الصفحات #}
+            {% set start_page = [1, pagination.page - 2]|max %}
+            {% set end_page = [pagination.total_pages, pagination.page + 2]|min %}
+            {% for p in range(start_page, end_page + 1) %}
+                <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                    <a class="page-link" href="?page={{ p }}{{ filter_query }}">
+                        {{ p }}
+                    </a>
+                </li>
+            {% endfor %}
+
+            {# زر الصفحة التالية #}
+            {% if pagination.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ pagination.next_page }}{{ filter_query }}">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><a class="page-link" href="#"><i class="fas fa-chevron-left"></i></a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    <div class="text-muted small">
+        عرض {{ pagination.start_item }}-{{ pagination.end_item }} من {{ pagination.total_items }}
+    </div>
+</div>
+{% endif %}
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -74,5 +140,32 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof initOrderSelection === 'function') {
         initOrderSelection();
     }
+
+    // جعل روابط الترقيم تعمل عبر AJAX
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.page-link') && !e.target.closest('.page-link').parentElement.classList.contains('disabled')) {
+            e.preventDefault();
+            const url = e.target.closest('.page-link').getAttribute('href');
+            
+            // إظهار مؤشر تحميل
+            const ordersContainer = document.getElementById('orders-container');
+            ordersContainer.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">جاري التحميل...</p></div>';
+            
+            // تحميل المحتوى الجديد
+            fetch(url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.text())
+            .then(html => {
+                ordersContainer.innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                ordersContainer.innerHTML = '<div class="alert alert-danger">حدث خطأ أثناء تحميل البيانات</div>';
+            });
+        }
+    });
 });
 </script>
