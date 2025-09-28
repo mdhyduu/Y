@@ -130,11 +130,7 @@
         <span id="selected-orders-count-2">0</span> تغيير الحالة
     </button>
 
-    <!-- ⭐⭐ إضافة زر الطباعة حسب المنتج هنا ⭐⭐ -->
-    <button type="button" class="btn btn-warning rounded-pill px-3 me-2" id="print-by-product-btn" disabled>
-        <i class="fas fa-boxes me-1"></i> 
-        <span id="selected-orders-count-product">0</span> طباعة حسب المنتج
-    </button>
+ 
 
     <button type="button" class="btn btn-secondary mb-3" id="quickListViewBtn" disabled>
         <i class="fas fa-eye"></i> قائمة سريعة
@@ -157,7 +153,7 @@
                             </div>
                         </th>
                         <th>رقم الطلب</th>
-                        <th class="d-none d-md-table-cell">النوع</th>
+
                         <th class="d-none d-md-table-cell">الحالة</th>
                         <th>الحالة المخصصة</th>
                         <th>العلامات</th>
@@ -180,14 +176,7 @@
                         <td>
                             <span class="fw-bold">#{{ order.reference_id }}</span>
                         </td>
-                        <td class="d-none d-md-table-cell">
-                            {% if order.type == 'custom' %}
-                                <span class="badge bg-info">مخصص</span>
-                            {% else %}
-                                <span class="badge bg-primary">سلة</span>
-                            {% endif %}
-                        </td>
-                        <td class="d-none d-md-table-cell">
+         <td class="d-none d-md-table-cell">
                             {% if order.status %}
                                 <span class="status-badge status-{{ order.status.slug }}" 
                                       data-bs-toggle="tooltip" 
