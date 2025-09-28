@@ -131,12 +131,25 @@ def create_session():
     session.mount("http://", adapter)
     return session
 
+
+
+from barcode.writer import ImageWriter
+from PIL import Image
+
 def clean_data(data: str) -> str:
     """تنظيف البيانات من الرموز الغير مرغوبة"""
     return re.sub(r'[^A-Za-z0-9\s\-]', '', str(data)).strip()
 
-def generate_barcode(data):
-    """إنشاء باركود باستخدام code128 مع fallback للبدائل"""
+def save_with_dpi(buffer, dpi=300):
+    """تحويل الباركود إلى صورة PNG مع ضبط DPI"""
+    buffer.seek(0)
+    image = Image.open(buffer)
+    out_buffer = BytesIO()
+    image.save(out_buffer, format="PNG", dpi=(dpi, dpi))
+    return base64.b64encode(out_buffer.getvalue()).decode('utf-8')
+
+def generate_barcode(data, dpi=300):
+    """إنشاء باركود باستخدام code128 مع دقة عالية"""
     try:
         data_str = str(data).strip()
         if not data_str:
@@ -150,10 +163,8 @@ def generate_barcode(data):
 
         logger.info(f"Generating barcode for order ID: {cleaned_data} (original: {data_str})")
 
-        barcode_type = 'code128'
-        code_class = barcode.get_barcode_class(barcode_type)
+        code_class = barcode.get_barcode_class('code128')
         writer = ImageWriter()
-
         writer.set_options({
             'write_text': True,
             'module_width': 0.6,
@@ -167,29 +178,21 @@ def generate_barcode(data):
         buffer = BytesIO()
         barcode_instance.write(buffer)
 
-        buffer.seek(0)
-        image_data = buffer.getvalue()
-
-        if len(image_data) < 100:
-            logger.error("Generated barcode image is too small")
-            return None
-
-        barcode_base64 = base64.b64encode(image_data).decode('utf-8')
+        barcode_base64 = save_with_dpi(buffer, dpi)
         logger.info(f"Barcode generated successfully for order: {cleaned_data}")
         return f"data:image/png;base64,{barcode_base64}"
 
     except Exception as barcode_error:
         logger.warning(f"Failed with code128, trying code39: {barcode_error}")
-        return generate_barcode_with_code39(data_str)
+        return generate_barcode_with_code39(data, dpi)
 
 
-def generate_barcode_with_code39(data):
+def generate_barcode_with_code39(data, dpi=300):
     """إنشاء باركود باستخدام code39 كبديل"""
     try:
         cleaned_data = clean_data(data)
         code_class = barcode.get_barcode_class('code39')
         writer = ImageWriter()
-
         writer.set_options({
             'write_text': True,
             'module_width': 0.4,
@@ -203,18 +206,17 @@ def generate_barcode_with_code39(data):
         buffer = BytesIO()
         barcode_instance.write(buffer)
 
-        buffer.seek(0)
-        barcode_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        barcode_base64 = save_with_dpi(buffer, dpi)
         logger.info(f"Barcode generated with code39 for order: {cleaned_data}")
         return f"data:image/png;base64,{barcode_base64}"
 
     except Exception as e:
         logger.error(f"Failed to generate barcode with code39: {str(e)}")
-        return generate_barcode_alternative(data)
+        return generate_barcode_alternative(data, dpi)
 
 
-def generate_barcode_alternative(data):
-    """طريقة بديلة لإنشاء الباركود باستخدام code128 مرة أخرى"""
+def generate_barcode_alternative(data, dpi=300):
+    """طريقة بديلة باستخدام Code128 مع دقة عالية"""
     try:
         from barcode import Code128
         from barcode.writer import ImageWriter as AltImageWriter
@@ -234,8 +236,7 @@ def generate_barcode_alternative(data):
         buffer = BytesIO()
         code128.write(buffer)
 
-        buffer.seek(0)
-        barcode_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        barcode_base64 = save_with_dpi(buffer, dpi)
         logger.info(f"Barcode generated with alternative method for order: {cleaned_data}")
         return f"data:image/png;base64,{barcode_base64}"
 
