@@ -454,7 +454,7 @@
         display: table-cell !important;
     }
 }
-
+ 
 /* =================================== */
 /* General Styles             */
 /* =================================== */
@@ -507,18 +507,28 @@
     .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .table td, .table th { white-space: nowrap; }
     
-    /* إظهار جميع أعمدة الحالة في الشاشات الصغيرة */
-    /* تم إزالة إخفاء أعمدة الحالة */
+    /* إخفاء بعض الأعمدة في الشاشات الصغيرة */
+    /* إزالة إخفاء عمود الحالة الأصلية (العمود الثالث) */
+    .table th:nth-child(7),
+    .table td:nth-child(7) {
+        display: none;
+    }
     
+    {% if not is_reviewer %}
+    .table th:nth-child(4),
+    .table td:nth-child(4) {
+        display: none;
+    }
+    {% endif %}
+
     /* تحسين عرض الأعمدة في الشاشات الصغيرة */
     .table th:nth-child(1) { width: 8%; } /* عمود التحديد */
-    .table th:nth-child(2) { width: 12%; } /* رقم الطلب */
-    .table th:nth-child(3) { width: 14%; } /* الحالة الأصلية */
-    .table th:nth-child(4) { width: 14%; } /* الحالة المخصصة */
-    .table th:nth-child(5) { width: 14%; } /* التنبيهات */
+    .table th:nth-child(2) { width: 15%; } /* رقم الطلب */
+    .table th:nth-child(3) { width: 15%; } /* الحالة الأصلية */
+    .table th:nth-child(4) { width: 15%; } /* الحالة المخصصة */
+    .table th:nth-child(5) { width: 15%; } /* التنبيهات */
     .table th:nth-child(6) { width: 12%; } /* التاريخ */
-    .table th:nth-child(7) { width: 14%; } /* الحالة */
-    .table th:last-child { width: 12%; } /* الإجراءات */
+    .table th:last-child { width: 20%; } /* الإجراءات */
     
     /* تحسين شريط الإجراءات السريعة */
     #quick-actions {
@@ -537,7 +547,7 @@
         margin-bottom: 15px;
     }
     
-    /* تحسين عرض الحالة في الشاشات الصغيرة */
+    /* تحسين عرض الحالة الأصلية في الشاشات الصغيرة */
     .status-badge {
         font-size: 0.7rem;
         padding: 3px 6px;
@@ -551,8 +561,10 @@
 
 /* تحسينات للشاشات المتوسطة */
 @media (max-width: 992px) {
-    /* إظهار جميع الأعمدة في الشاشات المتوسطة */
-    /* تم إزالة إخفاء الأعمدة */
+    .table th:nth-child(7),
+    .table td:nth-child(7) {
+        display: none;
+    }
 }
 
 /* =================================== */
@@ -666,39 +678,37 @@ body.dark-mode .badge[style*="background-color"] {
 /* "No orders" state */
 body.dark-mode .text-gray-300 { color: #4b5563 !important; }
 body.dark-mode .text-gray-600 { color: #d1d5db !important; }
-
-/* تنسيقات الوضع الليلي للقائمة السريعة */
+    /* تنسيقات الوضع الليلي للقائمة السريعة */
 body.dark-mode #quickListModal .modal-content {
-    background-color: #333;
-    color: #fff;
-}
+            background-color: #333;
+            color: #fff;
+        }
 
 body.dark-mode #quickListModal .modal-header {
-    border-bottom: 1px solid #555;
-}
+            border-bottom: 1px solid #555;
+        }
 
 body.dark-mode #quickListModal .modal-footer {
-    border-top: 1px solid #555;
-}
+            border-top: 1px solid #555;
+        }
 
 body.dark-mode #quickListModal .card {
-    background-color: #444;
-    color: #fff;
-    border: 1px solid #555;
-}
+            background-color: #444;
+            color: #fff;
+            border: 1px solid #555;
+        }
 
 body.dark-mode #quickListModal .form-check-label {
-    color: #fff;
-}
-
+            color: #fff;
+        }
+ 
 body.dark-mode #quickListModal .text-muted {
-    color: #aaa !important;
-}
+            color: #aaa !important;
+        }
 
 body.dark-mode #quickListModal .border-top {
-    border-top: 1px solid #555 !important;
-}
-
+            border-top: 1px solid #555 !important;
+        }
 .status-badge {
     padding: 0.25rem 0.5rem;
     border-radius: 0.25rem;
@@ -774,4 +784,4 @@ body.dark-mode #quickListModal .border-top {
 .btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
-} 
+}
