@@ -31,7 +31,42 @@
           <h5 class="border-bottom pb-2 mb-2 fs-5">
             <i class="fas fa-boxes ms-2"></i>المنتجات ({{ order.order_items | length }})
           </h5>
-
+<!-- في ملف order_details.html -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">معلومات الدفع والملاحظات</h5>
+    </div>
+    <div class="card-body">
+        <!-- طريقة الدفع -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <strong>طريقة الدفع:</strong>
+                <span class="badge bg-primary">{{ order.payment_method }}</span>
+            </div>
+        </div>
+        
+        <!-- ملاحظات الطلب -->
+        {% if order.notes %}
+        <div class="row">
+            <div class="col-12">
+                <strong>ملاحظات الطلب:</strong>
+                <div class="alert alert-info mt-2">
+                    {{ order.notes }}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="row">
+            <div class="col-12">
+                <strong>ملاحظات الطلب:</strong>
+                <div class="text-muted mt-2">
+                    لا توجد ملاحظات
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
           <!-- جدول المنتجات -->
           <div class="table-responsive">
             <table class="table table-borderless">
