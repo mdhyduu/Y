@@ -1064,17 +1064,23 @@ function openQuickListPrint() {
             },
             data: JSON.stringify({ order_ids: selectedOrders })
         })
-        .done(function(data) {
-            if (data.success) {
-                let html = '';
-                
-                if (data.products && data.products.length > 0) {
-                    // عرض المنتجات المجمعة حسب SKU
-                    data.products.forEach(product => {
-                        html += `
+// في جزء إنشاء القائمة السريعة، عدل كود عرض المنتج ليصبح كالتالي:
+.done(function(data) {
+    if (data.success) {
+        let html = '';
+        
+        if (data.products && data.products.length > 0) {
+            data.products.forEach(product => {
+                html += `
 <div class="card mb-4 product-card" data-product-sku="${product.sku}">
     <div class="card-header bg-light d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center">
+            <!-- زر تحديد المنتج -->
+            <div class="form-check me-3">
+                <input class="form-check-input product-checkbox" type="checkbox" 
+                       id="product-${product.sku}" data-sku="${product.sku}" checked>
+                <label class="form-check-label" for="product-${product.sku}"></label>
+            </div>
             <img src="${product.main_image || '/static/images/no-image.png'}" 
                  alt="${product.name}" 
                  class="img-thumbnail me-3" 
@@ -1089,23 +1095,29 @@ function openQuickListPrint() {
                 </div>
             </div>
         </div>
+        <div class="product-selection-info">
+            <small class="text-muted selected-orders-count" data-sku="${product.sku}">
+                ${product.order_appearances.length}/${product.order_appearances.length} محدد
+            </small>
+        </div>
     </div>
     <div class="card-body">
         <h6 class="border-bottom pb-2 mb-3">تفاصيل الطلبات:</h6>
-                        `;
+                `;
 
-                        // عرض كل ظهور للمنتج في الطلبات المختلفة
-                        product.order_appearances.forEach((appearance, index) => {
-                            html += `
+                // عرض كل ظهور للمنتج في الطلبات المختلفة
+                product.order_appearances.forEach((appearance, index) => {
+                    html += `
         <div class="order-appearance mb-3 p-3 border rounded ${index > 0 ? 'mt-2' : ''}">
             <div class="row align-items-center">
                 <div class="col-md-8">
                     <div class="d-flex align-items-center">
-                        <input class="form-check-input me-2 quick-list-order" 
+                        <input class="form-check-input me-2 quick-list-order order-checkbox-${product.sku}" 
                                type="checkbox" 
                                value="${appearance.order_id}" 
                                id="order-${appearance.order_id}-${product.sku}"
                                data-order-id="${appearance.order_id}"
+                               data-product-sku="${product.sku}"
                                checked>
                         <label class="form-check-label fw-bold" for="order-${appearance.order_id}-${product.sku}">
                             الطلب #${appearance.reference_id}
@@ -1128,38 +1140,40 @@ function openQuickListPrint() {
                         <strong class="small d-block mb-1">الخيارات:</strong>
                         `;
 
-                            // عرض الخيارات إذا وجدت
-                            if (appearance.options && appearance.options.length > 0) {
-                                appearance.options.forEach(option => {
-                                    html += `
+                    // عرض الخيارات إذا وجدت
+                    if (appearance.options && appearance.options.length > 0) {
+                        appearance.options.forEach(option => {
+                            html += `
                         <span class="badge bg-light text-dark me-1 mb-1 small">
                             ${option.name}: ${option.value}
                         </span>
-                                    `;
-                                });
-                            } else {
-                                html += `<span class="text-muted small">لا توجد خيارات</span>`;
-                            }
+                            `;
+                        });
+                    } else {
+                        html += `<span class="text-muted small">لا توجد خيارات</span>`;
+                    }
 
-                            html += `
+                    html += `
                     </div>
                 </div>
             </div>
         </div>
-                            `;
-                        });
+                    `;
+                });
 
-                        html += `
+                html += `
     </div>
 </div>
-                        `;
-                    });
-                } else {
-                    html = `<div class="alert alert-warning text-center">لا توجد منتجات في الطلبات المحددة</div>`;
-                }
-                
-                $('#quickListContent').html(html);
-                updateQuickListSelectionCount();
+                `;
+            });
+        } else {
+            html = `<div class="alert alert-warning text-center">لا توجد منتجات في الطلبات المحددة</div>`;
+        }
+        
+        $('#quickListContent').html(html);
+        updateQuickListSelectionCount();
+        updateProductSelectionCounts(); // تحديث عداد كل منتج
+    
             } else {
                 $('#quickListContent').html(`
                     <div class="alert alert-danger">${data.error || 'حدث خطأ أثناء جلب البيانات'}</div>
@@ -1172,7 +1186,80 @@ function openQuickListPrint() {
             `);
         });
     });
+    // 16. أحداث تحديد المنتج والطلبات
+$(document).on('change', '.product-checkbox', function() {
+    const productSku = $(this).data('sku');
+    const isChecked = $(this).is(':checked');
     
+    // تحديد أو إلغاء تحديد جميع الطلبات التابعة لهذا المنتج
+    $(`.order-checkbox-${productSku}`).prop('checked', isChecked);
+    
+    // تحديث العداد لهذا المنتج
+    updateProductSelectionCount(productSku);
+    
+    // تحديث العداد العام
+    updateQuickListSelectionCount();
+});
+
+$(document).on('change', '.quick-list-order', function() {
+    const productSku = $(this).data('product-sku');
+    
+    // تحديث العداد للمنتج المحدد
+    updateProductSelectionCount(productSku);
+    
+    // تحديث حالة زر تحديد المنتج
+    updateProductCheckboxState(productSku);
+    
+    // تحديث العداد العام
+    updateQuickListSelectionCount();
+});
+
+// 17. دالة تحديث عداد منتج معين
+function updateProductSelectionCount(productSku) {
+    const totalOrders = $(`.order-checkbox-${productSku}`).length;
+    const selectedOrders = $(`.order-checkbox-${productSku}:checked`).length;
+    
+    $(`.selected-orders-count[data-sku="${productSku}"]`).text(`${selectedOrders}/${totalOrders} محدد`);
+}
+
+// 18. دالة تحديث جميع العدادات
+function updateProductSelectionCounts() {
+    $('.product-card').each(function() {
+        const productSku = $(this).data('product-sku');
+        updateProductSelectionCount(productSku);
+    });
+}
+
+// 19. دالة تحديث حالة زر تحديد المنتج
+function updateProductCheckboxState(productSku) {
+    const totalOrders = $(`.order-checkbox-${productSku}`).length;
+    const selectedOrders = $(`.order-checkbox-${productSku}:checked`).length;
+    const productCheckbox = $(`#product-${productSku}`);
+    
+    if (selectedOrders === 0) {
+        // لا توجد طلبات محددة
+        productCheckbox.prop('checked', false);
+        productCheckbox.prop('indeterminate', false);
+    } else if (selectedOrders === totalOrders) {
+        // جميع الطلبات محددة
+        productCheckbox.prop('checked', true);
+        productCheckbox.prop('indeterminate', false);
+    } else {
+        // بعض الطلبات محددة
+        productCheckbox.prop('checked', false);
+        productCheckbox.prop('indeterminate', true);
+    }
+}
+
+// 20. دالة تحديد/إلغاء تحديد جميع المنتج
+$(document).on('click', '.select-all-product', function() {
+    const productSku = $(this).data('sku');
+    const productCard = $(this).closest('.product-card');
+    const isCurrentlyChecked = productCard.find('.product-checkbox').is(':checked');
+    
+    // عكس حالة التحديد
+    productCard.find('.product-checkbox').prop('checked', !isCurrentlyChecked).trigger('change');
+});
     // 9. تحديد الكل في القائمة السريعة
     $(document).on('change', '#selectAllQuickList', function() {
         const isChecked = this.checked;
