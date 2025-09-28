@@ -444,10 +444,25 @@ def order_details(order_id):
             print("❌ لا يوجد عنوان محفوظ")
 
         # ⭐⭐ الخطوة 5: تحديث بيانات processed_order من order_data ⭐⭐
+
+        notes = order_data.get('notes', '')  # ملاحظات الطلب
+        payment_method = order_data.get('payment_method', {})  # طريقة الدفع
+        
+        # إذا كانت payment_method كائن، استخرج الاسم
+        if isinstance(payment_method, dict):
+            payment_method_name = payment_method.get('name', 'غير محدد')
+        else:
+            payment_method_name = str(payment_method) if payment_method else 'غير محدد'
+
+        # ⭐⭐ الخطوة 4: معالجة البيانات (سواء كانت محلية أو من API) ⭐⭐
+        processed_order = process_order_data(order_id, items_data)
+        
+        # ⭐⭐ إضافة الملاحظات وطريقة الدفع إلى processed_order ⭐⭐
         processed_order.update({
             'id': order_id,
             'reference_id': order_data.get('reference_id') or order_data.get('id') or 'غير متوفر',
-      
+            'notes': notes,  # ✅ إضافة الملاحظات
+            'payment_method': payment_method_name,  # ✅ إضافة طريقة الدفع
             'status': {
                 'name': order_data.get('status', {}).get('name', 'غير معروف'),
                 'slug': order_data.get('status', {}).get('slug', 'unknown')
@@ -461,7 +476,6 @@ def order_details(order_id):
             }
         })
 
-        # ⭐⭐ الخطوة 6: جلب البيانات الإضافية من قاعدة البيانات ⭐⭐
         db_data = fetch_additional_order_data(user.store_id, str(order_id))
 
         return render_template('order_details.html', 
@@ -475,11 +489,15 @@ def order_details(order_id):
             product_statuses=db_data['product_statuses']
         )
 
+
     except Exception as e:
         error_msg = f"حدث خطأ غير متوقع: {str(e)}"
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
+
+# 🔥 تعريف الدوال المساعدة المطلوبة
+
 
 # 🔥 تعريف الدوال المساعدة المطلوبة
 def ensure_valid_access_token(user):
