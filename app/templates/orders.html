@@ -745,37 +745,7 @@ $(document).ready(function () {
         updateAssignButtonState();
         toggleQuickListButton();
     });
-$(document).on('contextmenu', '#print-by-product-btn', function(e) {
-    e.preventDefault();
-    
-    const selectedOrders = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
-    
-    if (selectedOrders.length === 0) {
-        showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للتحميل');
-        return;
-    }
-    
-    Swal.fire({
-        title: 'تحميل PDF حسب المنتج',
-        html: `سيتم تحميل تقرير المنتجات من <span class="fw-bold text-primary">${selectedOrders.length}</span> طلب كملف PDF.<br>
-              <small class="text-muted">انقر بزر الماوس الأيمن للتحميل المباشر</small>`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'تحميل PDF',
-        cancelButtonText: 'إلغاء',
-        customClass: {
-            confirmButton: 'btn btn-success',
-            cancelButton: 'btn btn-outline-secondary ms-2'
-        },
-        buttonsStyling: false
-    }).then((result) => {
-        if (result.isConfirmed) {
-            // تحميل PDF مباشرة
-            const url = `{{ url_for('orders.download_products_pdf') }}?order_ids=${selectedOrders.join(',')}`;
-            window.location.href = url;
-        }
-    });
-});
+
     // 3. إسناد الطلبات المحددة
     $(document).on('click', '#assign-orders-btn', function() {
         const selectedOrders = getSelectedOrders();
