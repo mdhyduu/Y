@@ -165,15 +165,15 @@ def generate_barcode(data, dpi=300):
 
         code_class = barcode.get_barcode_class('code128')
         writer = ImageWriter()
+        
         writer.set_options({
             'write_text': True,
-            'module_width': 0.6,
-            'module_height': 20,
-            'quiet_zone': 6,
-            'font_size': 10,
-            'text_distance': 2
+            'module_width': 1.0,    # زيادة عرض الوحدات
+            'module_height': 40,    # زيادة الارتفاع
+            'quiet_zone': 10,       # زيادة المسافة حول الباركود
+            'font_size': 12,
+            'text_distance': 3
         })
-
         barcode_instance = code_class(cleaned_data, writer=writer)
         buffer = BytesIO()
         barcode_instance.write(buffer)
