@@ -424,7 +424,7 @@ def get_quick_list_data():
                         'quantity': item.get('quantity', 0),
                         'options': item.get('options', []),
                         'barcode': order.get('barcode', ''),
-                        'notes': order.get('notes', '')
+                        'notes': item.get('notes', '')
                         
                     }
                     
