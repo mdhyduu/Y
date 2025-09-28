@@ -516,67 +516,118 @@ from urllib.parse import quote
 
 from sqlalchemy.sql import text
 
-def group_products_by_sku_db(order_ids, store_id):
-    """تجميع المنتجات مباشرة من قاعدة البيانات (PostgreSQL JSONB)"""
-    engine = get_postgres_engine()
-    
-    # استعلام معدل مع GROUP BY صحيح
-    query = text("""
-        SELECT 
-            COALESCE(item->>'sku', 'unknown_' || (item->>'id')) AS sku,
-            item->>'name' AS name,
-            COALESCE(item->>'product_thumbnail', item->>'thumbnail', '') AS thumbnail,
-            SUM(COALESCE((item->>'quantity')::integer, 0)) AS total_quantity,
-            COUNT(DISTINCT o.id) AS order_count,
-            json_agg(
-                json_build_object(
-                    'order_id', o.id,
-                    'customer_name', COALESCE(o.customer_name, ''),
-                    'quantity', COALESCE((item->>'quantity')::integer, 0),
-                    'created_at', o.created_at,
-                    'barcode', o.barcode_data,
-                    'options_text', (
-                        SELECT string_agg(
-                            COALESCE(opt->>'name', '') || ': ' || COALESCE(opt->>'value', ''), 
-                            ' | '
-                        )
-                        FROM jsonb_array_elements(
-                            CASE 
-                                WHEN jsonb_typeof(COALESCE(item->'options', '[]'::jsonb)) = 'array' 
-                                THEN COALESCE(item->'options', '[]'::jsonb)
-                                ELSE '[]'::jsonb
-                            END
-                        ) AS opt
-                    )
-                )
-            ) AS orders
-        FROM salla_orders o,
-        LATERAL jsonb_array_elements(
-            CASE 
-                WHEN jsonb_typeof(o.full_order_data->'items') = 'array' 
-                THEN o.full_order_data->'items'
-                ELSE '[]'::jsonb
-            END
-        ) AS item
-        WHERE o.id = ANY(:order_ids) AND o.store_id = :store_id
-        GROUP BY 
-            item->>'sku',
-            item->>'id',
-            item->>'name',
-            item->>'product_thumbnail',
-            item->>'thumbnail'
-    """)
-    
+def group_products_by_sku_db_v2(order_ids, store_id):
+    """نسخة بديلة أكثر أماناً لتجميع المنتجات"""
     try:
-        with engine.connect() as conn:
-            result = conn.execute(query, {"order_ids": order_ids, "store_id": store_id}).mappings().all()
+        logger.info(f"🔍 تجميع المنتجات لـ {len(order_ids)} طلب للمتجر {store_id}")
         
-        return [dict(row) for row in result]
+        # تصفية order_ids لضمان أنها نصية
+        order_ids_str = [str(oid).strip() for oid in order_ids if str(oid).strip()]
+        
+        if not order_ids_str:
+            logger.warning("❌ لا توجد معرفات طلبات صالحة")
+            return []
+        
+        # جلب الطلبات من قاعدة البيانات أولاً
+        salla_orders = SallaOrder.query.filter(
+            SallaOrder.id.in_(order_ids_str),
+            SallaOrder.store_id == store_id,
+            SallaOrder.full_order_data.isnot(None)
+        ).all()
+        
+        logger.info(f"✅ تم العثور على {len(salla_orders)} طلب في قاعدة البيانات")
+        
+        # تجميع المنتجات يدوياً
+        products_dict = {}
+        
+        for order in salla_orders:
+            try:
+                order_data = order.full_order_data
+                if not order_data or 'items' not in order_data:
+                    continue
+                
+                items = order_data['items']
+                if not isinstance(items, list):
+                    continue
+                
+                for item in items:
+                    try:
+                        # استخراج SKU أو استخدام معرف بديل
+                        sku = item.get('sku')
+                        if not sku:
+                            sku = f"unknown_{item.get('id', 'temp')}"
+                        
+                        # إذا كان المنتج موجوداً بالفعل، نضيف الكمية
+                        if sku in products_dict:
+                            products_dict[sku]['total_quantity'] += item.get('quantity', 0)
+                            products_dict[sku]['order_count'] += 1
+                            
+                            # إضافة الطلب إلى القائمة إذا لم يكن موجوداً
+                            order_exists = any(o['order_id'] == order.id 
+                                            for o in products_dict[sku]['orders'])
+                            if not order_exists:
+                                products_dict[sku]['orders'].append({
+                                    'order_id': order.id,
+                                    'customer_name': order_data.get('customer', {}).get('name', ''),
+                                    'quantity': item.get('quantity', 0),
+                                    'created_at': order.created_at,
+                                    'barcode': order.barcode_data,
+                                    'options_text': get_options_text(item.get('options', []))
+                                })
+                        else:
+                            # إنشاء منتج جديد
+                            products_dict[sku] = {
+                                'sku': sku,
+                                'name': item.get('name', ''),
+                                'thumbnail': item.get('product_thumbnail') or item.get('thumbnail', ''),
+                                'total_quantity': item.get('quantity', 0),
+                                'order_count': 1,
+                                'orders': [{
+                                    'order_id': order.id,
+                                    'customer_name': order_data.get('customer', {}).get('name', ''),
+                                    'quantity': item.get('quantity', 0),
+                                    'created_at': order.created_at,
+                                    'barcode': order.barcode_data,
+                                    'options_text': get_options_text(item.get('options', []))
+                                }]
+                            }
+                            
+                    except Exception as item_error:
+                        logger.error(f"❌ خطأ في معالجة عنصر: {str(item_error)}")
+                        continue
+                        
+            except Exception as order_error:
+                logger.error(f"❌ خطأ في معالجة الطلب {order.id}: {str(order_error)}")
+                continue
+        
+        products_list = list(products_dict.values())
+        logger.info(f"🎉 تم تجميع {len(products_list)} منتج بنجاح")
+        return products_list
         
     except Exception as e:
-        logger.error(f"❌ خطأ في تجميع المنتجات من قاعدة البيانات: {str(e)}")
+        logger.error(f"❌ خطأ عام في تجميع المنتجات: {str(e)}")
         logger.error(traceback.format_exc())
         return []
+
+def get_options_text(options):
+    """تحويل الخيارات إلى نص مقروء"""
+    if not isinstance(options, list):
+        return ""
+    
+    options_text = []
+    for option in options:
+        if isinstance(option, dict):
+            name = option.get('name', '')
+            value = option.get('value', '')
+            if isinstance(value, dict):
+                value = value.get('name') or value.get('value') or str(value)
+            elif isinstance(value, list):
+                value = ', '.join([str(v) for v in value])
+            
+            if name and value:
+                options_text.append(f"{name}: {value}")
+    
+    return " | ".join(options_text)
 def safe_filename(filename):
     """إنشاء اسم ملف آمن بدون أحرف خاصة"""
     try:
@@ -618,8 +669,8 @@ def download_products_pdf():
         
         logger.info(f"🔄 معالجة {len(order_ids)} طلب لتجميع المنتج من قاعدة البيانات")
         
-        # ✅ استخدام الدالة المحسنة
-        products_list = group_products_by_sku_db(order_ids, user.store_id)
+        # ✅ استخدام الدالة المحسنة (اختر واحدة منهما)
+        products_list = group_products_by_sku_db_v2(order_ids, user.store_id)
         
         if not products_list:
             flash('لم يتم العثور على أي منتجات في الطلبات المحددة', 'error')
