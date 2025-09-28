@@ -152,7 +152,7 @@ body {
 
 .order-date {
     color: #6c757d;
-    font-size: 16px
+    font-size: 16px;
     font-weight: bold;
 }
 
@@ -194,7 +194,6 @@ body {
     border: 1px solid #ffeaa7;
     border-radius: 5px;
     padding: 8px;
-    
     margin-top: 8px;
 }
 
@@ -202,7 +201,6 @@ body {
     font-weight: 600;
     margin-bottom: 5px;
     color: #856404;
-
     font-size: 11px;
 }
 
@@ -217,21 +215,43 @@ body {
     border: 1px solid #ffeaa7;
 }
 
+.notes-section {
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    border-radius: 5px;
+    padding: 8px;
+    margin-top: 8px;
+}
+
+.notes-title {
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #0c5460;
+    font-size: 11px;
+}
+
+.notes-text {
+    color: #495057;
+    line-height: 1.4;
+    font-size: 14px;
+    white-space: pre-line;
+    word-wrap: break-word;
+}
+
 .barcode-section {
     text-align: center;
     margin-top: 8px;
-    padding: 10px; /* زيادة الحشوة */
+    padding: 10px;
     background: #f8f9fa;
     border-radius: 4px;
 }
 
 .barcode-image {
-    max-width: 500px; /* زيادة كبيرة من 150px */
-    height: 120px; /* زيادة كبيرة من 100px */
-    object-fit: contain; /* تغيير من cover إلى contain لضمان ظهور الباركود كاملاً */
-    border: 1px solid #ddd; /* إضافة حد للتوضيح */
-    background: white; /* خلفية بيضاء للباركود */
-
+    max-width: 500px;
+    height: 120px;
+    object-fit: contain;
+    border: 1px solid #ddd;
+    background: white;
 }
 
 .no-orders {
@@ -286,6 +306,13 @@ body {
         print-color-adjust: exact;
     }
     
+    .notes-section {
+        background: #d1ecf1 !important;
+        border-color: #bee5eb !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
     .print-controls {
         display: none;
     }
@@ -300,7 +327,6 @@ body {
         grid-template-columns: repeat(2, 1fr);
     }
     
-    /* تكبير الصور للطباعة */
     .product-image {
         width: 100px;
         height: 100px;
@@ -315,12 +341,10 @@ body {
         grid-template-columns: 70px 1fr;
     }
     
-    /* تكبير الباركود بشكل ملحوظ للطباعة */
-            .barcode-image {
-                width: 170px !important;
-                height: 55px !important;
-                image-rendering: crisp-edges;
-            
+    .barcode-image {
+        width: 170px !important;
+        height: 55px !important;
+        image-rendering: crisp-edges;
         object-fit: contain !important;
         border: 1px solid #000 !important;
         background: white !important;
@@ -330,29 +354,8 @@ body {
     }
     
     .barcode-section {
-        padding: 5px !important; /* زيادة حشوة القسم للطباعة */
+        padding: 5px !important;
         background: white !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-    }
-    .notes-section {
-    border-right: 3px solid #17a2b8;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-}
-
-.notes-text {
-    color: #495057;
-    line-height: 1.4;
-    font-size: 14px;
-    white-space: pre-line;
-    word-wrap: break-word;
-}
-
-/* تنسيق خاص للطباعة */
-
-    .notes-section {
-        background: #f8f9fa !important;
-        border: 1px solid #dee2e6 !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
@@ -360,22 +363,6 @@ body {
     .notes-text {
         font-size: 12px;
     }
-}
-
-/* تنسيق للعرض في القائمة السريعة */
-.options-section {
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
-    border-radius: 5px;
-    padding: 8px;
-}
-
-.notes-section {
-    background: #d1ecf1;
-    border: 1px solid #bee5eb;
-    border-radius: 5px;
-    padding: 8px;
-
 }
 
 .text-primary { color: #667eea; }
@@ -545,30 +532,26 @@ body {
                                             </div>
                                         `}
                                     </div>
-                                <!-- ... داخل قسم order-details ... -->
-
-<div class="detail-content">
-    <div class="quantity-badge">الكمية: ${order.quantity}</div>
-    
-    ${order.options && order.options.length > 0 ? `
-        <div class="options-section">
-            <div class="options-title">الخيارات:</div>
-            ${order.options.map(opt => `
-                <span class="option-item">${opt.name}: ${opt.value}</span>
-            `).join('')}
-        </div>
-    ` : ''}
-    
-    <!-- إضافة قسم الملاحظات للطباعة -->
-    ${order.notes ? `
-        <div class="notes-section mt-2 p-2 bg-info bg-opacity-10 border border-info rounded">
-            <strong class="small d-block mb-1 text-info">
-                <i class="fas fa-sticky-note me-1"></i>ملاحظات:
-            </strong>
-            <span class="notes-text small">${order.notes}</span>
-        </div>
-    ` : ''}
-</div>
+                                    <div class="detail-content">
+                                        <div class="quantity-badge">الكمية: ${order.quantity}</div>
+                                        
+                                        ${order.options && order.options.length > 0 ? `
+                                            <div class="options-section">
+                                                <div class="options-title">الخيارات:</div>
+                                                ${order.options.map(opt => `
+                                                    <span class="option-item">${opt.name}: ${opt.value}</span>
+                                                `).join('')}
+                                            </div>
+                                        ` : ''}
+                                        
+                                        ${order.notes ? `
+                                            <div class="notes-section">
+                                                <div class="notes-title">
+                                                    <i class="fas fa-sticky-note me-1"></i>ملاحظات:
+                                                </div>
+                                                <span class="notes-text">${order.notes}</span>
+                                            </div>
+                                        ` : ''}
                                     </div>
                                 </div>
                                 
