@@ -5,6 +5,7 @@
 {% endblock %}
 
 {% block content %} 
+
 <div class="card shadow-lg mb-4 border-0">
     <div class="card-header py-3 bg-gradient-primary text-white">
         <div class="d-flex justify-content-between align-items-center">
@@ -111,32 +112,34 @@
         </div>
         
         <!-- إضافة أزرار الإجراءات السريعة -->
-        <div class="d-flex p-3" class="card-body"  id="quick-actions">
-            {% if is_reviewer and employees %}
-            <button type="button" class="btn btn-success rounded-pill px-3 me-2" id="assign-orders-btn" disabled>
-                <i class="fas fa-user-check me-1"></i> 
-                <span id="selected-orders-count">0</span> إسناد
-            </button>
-            {% endif %}
-        <button type="button" class="btn btn-primary rounded-pill px-3 me-2" id="download-html-btn" disabled>
+    <!-- إضافة أزرار الإجراءات السريعة -->
+<div class="d-flex p-3" class="card-body"  id="quick-actions">
+    {% if is_reviewer and employees %}
+    <button type="button" class="btn btn-success rounded-pill px-3 me-2" id="assign-orders-btn" disabled>
+        <i class="fas fa-user-check me-1"></i> 
+        <span id="selected-orders-count">0</span> إسناد
+    </button>
+    {% endif %}
+    <button type="button" class="btn btn-primary rounded-pill px-3 me-2" id="download-html-btn" disabled>
         <i class="fas fa-download me-1"></i> 
         <span id="selected-orders-count-html">0</span> تحميل 
     </button> 
+
+    <button type="button" class="btn btn-info rounded-pill px-3 me-2" id="change-status-btn" disabled>
+        <i class="fas fa-tag me-1"></i> 
+        <span id="selected-orders-count-2">0</span> تغيير الحالة
+    </button>
+
+    <!-- ⭐⭐ إضافة زر الطباعة حسب المنتج هنا ⭐⭐ -->
     <button type="button" class="btn btn-warning rounded-pill px-3 me-2" id="print-by-product-btn" disabled>
         <i class="fas fa-boxes me-1"></i> 
-        <span id="selected-orders-count-product">0</span> طباعة  المنتج
+        <span id="selected-orders-count-product">0</span> طباعة حسب المنتج
     </button>
-            <button type="button" class="btn btn-info rounded-pill px-3 me-2" id="change-status-btn" disabled>
-                <i class="fas fa-tag me-1"></i> 
-                <span id="selected-orders-count-2">0</span> تغيير الحالة
-            </button>
 
-            <button type="button" class="btn btn-secondary mb-3" id="quickListViewBtn" disabled>
-                <i class="fas fa-eye"></i> قائمة سريعة
-            </button>
-
-        </div>
-
+    <button type="button" class="btn btn-secondary mb-3" id="quickListViewBtn" disabled>
+        <i class="fas fa-eye"></i> قائمة سريعة
+    </button>
+</div>
         {% if orders %}
         <div class="table-responsive position-relative">
             <div id="table-loading" class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center d-none" style="z-index: 10;">
@@ -154,10 +157,10 @@
                             </div>
                         </th>
                         <th>رقم الطلب</th>
-
+                        <th class="d-none d-md-table-cell">النوع</th>
                         <th class="d-none d-md-table-cell">الحالة</th>
                         <th>الحالة المخصصة</th>
-                        <th>تنبيهات</th>
+                        <th>العلامات</th>
                         <th class="d-none d-md-table-cell">التاريخ</th>
                         {% if is_reviewer %}
                         <th class="d-none d-md-table-cell">المسند إليه</th>
@@ -177,7 +180,13 @@
                         <td>
                             <span class="fw-bold">#{{ order.reference_id }}</span>
                         </td>
-
+                        <td class="d-none d-md-table-cell">
+                            {% if order.type == 'custom' %}
+                                <span class="badge bg-info">مخصص</span>
+                            {% else %}
+                                <span class="badge bg-primary">سلة</span>
+                            {% endif %}
+                        </td>
                         <td class="d-none d-md-table-cell">
                             {% if order.status %}
                                 <span class="status-badge status-{{ order.status.slug }}" 
@@ -265,39 +274,25 @@
                                     {% endif %}
                                 </div>
                             {% else %}
-                                <span class="badge  text-muted">غير مسند</span>
+                                <span class="badge bg-light text-muted">غير مسند</span>
                             {% endif %}
                         </td>
                         {% endif %}
                         <td class="text-end pe-4 actions-cell">
                             <div class="d-flex justify-content-end gap-2">
-                       {% if order.type == 'custom' %}
-    {% if order.id and order.id != 'None' and order.id != 'none' %}
-        <a href="{{ url_for('orders.custom_order_details', order_id=order.id) }}"
-           class="btn btn-sm btn-icon btn-outline-primary rounded-circle"
-           title="عرض التفاصيل">
-            <i class="fas fa-eye"></i>
-        </a>
-    {% else %}
-        <button class="btn btn-sm btn-icon btn-outline-secondary rounded-circle" 
-                title="عرض التفاصيل (غير متاح)" disabled>
-            <i class="fas fa-eye"></i>
-        </button>
-    {% endif %}
-{% else %}
-    {% if order.id and order.id != 'None' and order.id != 'none' %}
-        <a href="{{ url_for('orders.order_details', order_id=order.id) }}"
-           class="btn btn-sm btn-icon btn-outline-primary rounded-circle"
-           title="عرض التفاصيل">
-            <i class="fas fa-eye"></i>
-        </a>
-    {% else %}
-        <button class="btn btn-sm btn-icon btn-outline-secondary rounded-circle" 
-                title="عرض التفاصيل (غير متاح)" disabled>
-            <i class="fas fa-eye"></i>
-        </button>
-    {% endif %}
-{% endif %}
+                                {% if order.type == 'custom' %}
+                                    <a href="{{ url_for('orders.custom_order_details', order_id=order.id) }}"
+                                       class="btn btn-sm btn-icon btn-outline-primary rounded-circle"
+                                       title="عرض التفاصيل">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                {% else %}
+                                    <a href="{{ url_for('orders.order_details', order_id=order.id) }}"
+                                       class="btn btn-sm btn-icon btn-outline-primary rounded-circle"
+                                       title="عرض التفاصيل">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                {% endif %}
                                 
                                 {% if is_reviewer %}
                                 <button class="btn btn-sm btn-icon btn-outline-success rounded-circle assign-single-btn" 
@@ -413,8 +408,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <!-- باقي محتوى القائمة السريعة -->
-                       <div class="form-check mb-3">
+                <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" id="selectAllQuickList" checked>
                     <label class="form-check-label fw-bold" for="selectAllQuickList">
                         تحديد جميع الطلبات
@@ -426,14 +420,14 @@
                     <!-- سيتم ملء المحتوى هنا عبر JavaScript -->
                 </div>
                 
-                <!-- قسم إسناد الطلبات (يظهر فقط للمراجع) -->
-                {% if is_reviewer and employees %}
+                <!-- قسم الإجراءات السريعة - إضافة زر الطباعة هنا -->
                 <div class="mt-4 pt-3 border-top">
-                    <h6 class="mb-3"><i class="fas fa-user-check me-2"></i>إسناد الطلبات المحددة</h6>
-                    <div class="row align-items-end">
-                        <div class="col-md-8">
-                            <label for="quickListAssignSelect" class="form-label">اختر موظفًا للإسناد:</label>
-                            <select class="form-select" id="quickListAssignSelect">
+                    <h6 class="mb-3"><i class="fas fa-cogs me-2"></i>الإجراءات السريعة</h6>
+                    <div class="row">
+                        {% if is_reviewer and employees %}
+                        <div class="col-md-6 mb-2">
+                            <label for="quickListAssignSelect" class="form-label small">اختر موظفًا للإسناد:</label>
+                            <select class="form-select mb-2" id="quickListAssignSelect">
                                 <option value="">اختر موظفًا...</option>
                                 {% for employee in employees %}
                                     {% if employee.role == 'general' %}
@@ -441,32 +435,32 @@
                                     {% endif %}
                                 {% endfor %}
                             </select>
-                        </div>
-                        <div class="col-md-4">
                             <button type="button" class="btn btn-primary w-100" id="quickListAssignBtn">
                                 <i class="fas fa-user-plus me-1"></i> إسناد الطلبات المحددة
                             </button>
                         </div>
+                        {% endif %}
                         
-                    </div>
-                </div>
-                {% endif %}
-                
-                <!-- قسم الطباعة وتغيير الحالة (يظهر للموظفين العاديين) -->
-                {% if not is_reviewer %}
-                <div class="mt-4 pt-3 border-top">
-                    <h6 class="mb-3"><i class="fas fa-cogs me-2"></i>إجراءات سريعة</h6>
-                    <div class="row">
-                  
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small">طباعة المنتجات المحددة:</label>
+                            <button type="button" class="btn btn-warning w-100" id="quickListPrintBtn">
+                                <i class="fas fa-print me-1"></i> طباعة القائمة السريعة
+                            </button>
+                        </div>
+                        
                         <div class="col-md-6 mb-2">
                             <button type="button" class="btn btn-info w-100" id="quickListChangeStatusBtn">
                                 <i class="fas fa-tag me-1"></i> تغيير حالة الطلبات
                             </button>
                         </div>
+                        
+                        <div class="col-md-6 mb-2">
+                            <button type="button" class="btn btn-success w-100" id="quickListDownloadBtn">
+                                <i class="fas fa-download me-1"></i> تحميل كـ PDF
+                            </button>
+                        </div>
                     </div>
                 </div>
-                {% endif %}
-            </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
@@ -474,14 +468,13 @@
         </div>
     </div>
 </div>
+    </div>
+</div>
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js" integrity="sha384-DpVxUeeBWjUvUV1czyIHJAjh+jYUZFu2lLakbdua5vbwOrBGi1UgaKCHjTC+x3Ky" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js" integrity="sha384-ssUzPQXjLHLO39a9AiuwxnnyDxIvOMUxEQpqfreUaW7jLEdDAXiF6UooZRO53F6Z" crossorigin="anonymous"></script>
-
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/locale/ar.js" integrity="sha384-WOFOhfe03USRUKDbteptsFbkQE1Sisvl6Amq1jey7Pwrbr//TWZ676qtUweo1usp" crossorigin="anonymous"></script>
-
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" integrity="sha384-ms4yaO2qHEUIRbq8CXAqtz3qhnO7nYo/xAWv23Zx/iX9tT+nvVZP66kSXwT/7a0J" crossorigin="anonymous"></script>
-
 <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js" integrity="sha384-H6KKS1H1WwuERMSm+54dYLzjg0fKqRK5ZRyASdbrI/lwrCc6bXEmtGYr5SwvP1pZ" crossorigin="anonymous"></script>
 
 <script>
@@ -548,24 +541,21 @@ $(document).ready(function () {
         });
     }
     
- function updateAssignButtonState() {
-    const checkedCount = $('.order-checkbox:checked').length;
-    $('#selected-orders-count').text(checkedCount);
-    $('#selected-orders-count-2').text(checkedCount);
-    $('#selected-orders-count-print').text(checkedCount);
-    $('#selected-orders-count-html').text(checkedCount);
-    // ⭐⭐ إضافة تحديث العدد على زر الطباعة حسب المنتج ⭐⭐
-    $('#selected-orders-count-product').text(checkedCount);
-    
-    // ⭐⭐ إضافة الزر الجديد إلى قائمة الأزرار ⭐⭐
-    const buttons = $('#assign-orders-btn, #change-status-btn, #print-orders-btn, #download-html-btn, #quickListViewBtn, #print-by-product-btn');
-    buttons.prop('disabled', checkedCount === 0);
-    
-    if (checkedCount > 0) {
-        buttons.addClass('pulse-effect');
-        setTimeout(() => buttons.removeClass('pulse-effect'), 1000);
+    function updateAssignButtonState() {
+        const checkedCount = $('.order-checkbox:checked').length;
+        $('#selected-orders-count').text(checkedCount);
+        $('#selected-orders-count-2').text(checkedCount);
+        $('#selected-orders-count-html').text(checkedCount);
+        
+        const buttons = $('#assign-orders-btn, #change-status-btn, #download-html-btn, #quickListViewBtn');
+        buttons.prop('disabled', checkedCount === 0);
+        
+        if (checkedCount > 0) {
+            buttons.addClass('pulse-effect');
+            setTimeout(() => buttons.removeClass('pulse-effect'), 1000);
+        }
     }
-}    
+    
     function buildQueryParams() {
         const params = new URLSearchParams();
         
@@ -613,14 +603,20 @@ $(document).ready(function () {
     
     function updateQuickListSelectionCount() {
         const selectedCount = document.querySelectorAll('#quickListContent input.quick-list-order:checked').length;
-        document.getElementById('selectedOrdersCountQuick').textContent = `${selectedCount} طلب محدد`;
-
-        const assignBtn = document.getElementById('quickListAssignBtn');
-        if (assignBtn) {
-            assignBtn.disabled = selectedCount === 0;
-        }
-
         const totalOrders = document.querySelectorAll('#quickListContent input.quick-list-order').length;
+        
+        document.getElementById('selectedOrdersCountQuick').textContent = `${selectedCount} طلب محدد من ${totalOrders}`;
+
+        // تحديث حالة جميع الأزرار في القائمة السريعة
+        const buttons = ['quickListAssignBtn', 'quickListPrintBtn', 'quickListChangeStatusBtn', 'quickListDownloadBtn'];
+        
+        buttons.forEach(btnId => {
+            const button = document.getElementById(btnId);
+            if (button) {
+                button.disabled = selectedCount === 0;
+            }
+        });
+
         const selectAll = document.getElementById('selectAllQuickList');
         if (selectAll && totalOrders > 0) {
             selectAll.checked = selectedCount === totalOrders;
@@ -697,27 +693,142 @@ $(document).ready(function () {
         }).get();
     }
 
-    // --- معالجات الأحداث ---
+    // --- دوال القائمة السريعة الجديدة ---
     
-    // 1. مزامنة الطلبات والحالات
-    $(document).on('click', '#sync-orders-btn', function() {
-        syncData.call(
-            this, 
-            "{{ url_for('orders.sync_orders') }}", 
-            'نجحت المزامنة!', 
-            'فشلت المزامنة'
-        );
+    // دالة تجميع بيانات الطباعة من القائمة السريعة
+    // دالة تجميع بيانات الطباعة من القائمة السريعة - معدلة لتعتمد على التحديد
+function collectQuickListPrintData() {
+    const products = [];
+    let totalOrders = 0;
+    let totalQuantity = 0;
+    let totalItems = 0;
+
+    $('.product-card').each(function() {
+        const productCard = $(this);
+        const sku = productCard.data('product-sku');
+        const productName = productCard.find('h6').text();
+        const mainImage = productCard.find('img').attr('src') || '';
+        
+        // استخراج السعر إذا كان متوفراً
+        let price = 0;
+        const priceText = productCard.find('.badge.bg-warning').text();
+        if (priceText && priceText.includes('السعر:')) {
+            const priceMatch = priceText.match(/السعر:\s*([\d.,]+)/);
+            if (priceMatch) {
+                price = parseFloat(priceMatch[1].replace(',', '')) || 0;
+            }
+        }
+        
+        const orders = [];
+        
+        // فقط الطلبات المحددة (التي عليها علامة ✓)
+        productCard.find('.order-appearance').each(function() {
+            const orderAppearance = $(this);
+            const orderCheckbox = orderAppearance.find('input.quick-list-order');
+            
+            // التحقق إذا كان الطلب محدداً
+            if (!orderCheckbox.is(':checked')) {
+                return; // تخطي الطلبات غير المحددة
+            }
+            
+            const orderId = orderCheckbox.data('order-id');
+            const referenceId = orderAppearance.find('.form-check-label').text().replace('الطلب #', '').trim();
+            
+            // استخراج بيانات العميل
+            let customerName = '';
+            let customerMobile = '';
+            orderAppearance.find('small').each(function() {
+                const text = $(this).text();
+                if (text.includes('العميل:')) {
+                    customerName = text.replace('العميل:', '').trim();
+                }
+                if (text.includes('الجوال:')) {
+                    customerMobile = text.replace('الجوال:', '').trim();
+                }
+            });
+            
+            const createdAt = orderAppearance.find('small:contains("التاريخ")').text().replace('التاريخ: ', '').trim();
+            const quantityText = orderAppearance.find('small:contains("الكمية")').text().replace('الكمية: ', '').trim();
+            const quantity = parseInt(quantityText) || 0;
+            
+            // استخراج الخيارات
+            const options = [];
+            orderAppearance.find('.badge.bg-light').each(function() {
+                const optionText = $(this).text().trim();
+                if (optionText.includes(':')) {
+                    const parts = optionText.split(':');
+                    if (parts.length === 2) {
+                        options.push({
+                            name: parts[0].trim(),
+                            value: parts[1].trim()
+                        });
+                    }
+                }
+            });
+            
+            // الحصول على الباركود
+            let barcode = '';
+            
+            orders.push({
+                id: orderId,
+                reference_id: referenceId,
+                customer_name: customerName,
+                customer_mobile: customerMobile,
+                created_at: createdAt,
+                quantity: quantity,
+                options: options,
+                barcode: barcode
+            });
+            
+            totalQuantity += quantity;
+            totalItems++;
+        });
+        
+        // إذا كان هناك طلبات محددة لهذا المنتج، نضيفه للقائمة
+        if (orders.length > 0) {
+            totalOrders += orders.length;
+            
+            products.push({
+                sku: sku,
+                name: productName,
+                thumbnail: mainImage,
+                price: price,
+                total_quantity: orders.reduce((sum, order) => sum + order.quantity, 0),
+                orders: orders
+            });
+        }
     });
     
-    $(document).on('click', '#sync-statuses-btn', function() {
-        syncData.call(
-            this, 
-            "{{ url_for('orders.sync_order_statuses') }}", 
-            'نجحت مزامنة الحالات!', 
-            'فشلت مزامنة الحالات'
-        );
-    });
+    return {
+        products: products,
+        summary: {
+            totalProducts: products.length,
+            totalOrders: totalOrders,
+            totalQuantity: totalQuantity,
+            totalItems: totalItems
+        }
+    };
+}
+    // دالة فتح نافذة الطباعة للقائمة السريعة
+    // دالة محسنة فتح نافذة الطباعة
+// دالة فتح نافذة الطباعة للقائمة السريعة
+function openQuickListPrint() {
+    const printData = collectQuickListPrintData();
     
+    if (printData.products.length === 0) {
+        showSweetAlert('warning', 'تحذير', 'لا توجد بيانات للطباعة');
+        return;
+    }
+    
+    // حفظ البيانات في localStorage
+    localStorage.setItem('quickListPrintData', JSON.stringify(printData));
+    
+    // فتح نافذة الطباعة باستخدام route Flask
+    const printWindow = window.open("{{ url_for('orders.quick_list_print') }}", '_blank', 'width=1200,height=800');
+    
+    // إظهار رسالة نجاح
+    showSweetAlert('success', 'تم التجهيز للطباعة', 'يتم فتح نافذة الطباعة...');
+}
     // 2. تحديد الطلبات (الكل أو فردي)
     $(document).on('change', '#select-all, #select-all-header', function() {
         const isChecked = this.checked;
@@ -956,46 +1067,96 @@ $(document).ready(function () {
         .done(function(data) {
             if (data.success) {
                 let html = '';
-                data.orders.forEach(order => {
-                    html += `
-<div class="card mb-3" data-order-id="${order.id}" data-order-type="${order.type}">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <div class="form-check">
-            <input class="form-check-input quick-list-order" type="checkbox" 
-                   value="${order.id}" id="quick-order-${order.id}" checked>
-            <label class="form-check-label fw-bold" for="quick-order-${order.id}">
-                الطلب #${order.reference_id}
-            </label>
+                
+                if (data.products && data.products.length > 0) {
+                    // عرض المنتجات المجمعة حسب SKU
+                    data.products.forEach(product => {
+                        html += `
+<div class="card mb-4 product-card" data-product-sku="${product.sku}">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <img src="${product.main_image || '/static/images/no-image.png'}" 
+                 alt="${product.name}" 
+                 class="img-thumbnail me-3" 
+                 style="width: 60px; height: 60px; object-fit: cover;">
+            <div>
+                <h6 class="mb-1 fw-bold">${product.name}</h6>
+                <small class="text-muted">SKU: ${product.sku}</small>
+                <div class="mt-1">
+                    <span class="badge bg-primary">الكمية الإجمالية: ${product.total_quantity}</span>
+                    <span class="badge bg-secondary ms-2">موجود في ${product.appearances_count} طلب</span>
+                    ${product.price ? `<span class="badge bg-warning ms-2">السعر: ${product.price} ر.س</span>` : ''}
+                </div>
+            </div>
         </div>
-        <span class="badge bg-${order.status_class || 'secondary'}">${order.status_text || 'غير معروف'}</span>
     </div>
     <div class="card-body">
-        <div class="row">
-    `;
-                    
-                    if (order.items && order.items.length > 0) {
-                        order.items.forEach((item, index) => {
+        <h6 class="border-bottom pb-2 mb-3">تفاصيل الطلبات:</h6>
+                        `;
+
+                        // عرض كل ظهور للمنتج في الطلبات المختلفة
+                        product.order_appearances.forEach((appearance, index) => {
                             html += `
-                                <div class="col-3 mb-3 text-center">
-                                    <img src="${item.main_image || '/static/images/no-image.png'}" 
-                                         alt="${item.name}" 
-                                         class="img-fluid rounded border" 
-                                         style="max-height: 100px; object-fit: cover;">
-                                    <p class="mt-1 small text-truncate">${item.name}</p>
-                                    <p class="text-muted small">الكمية: ${item.quantity}</p>
-                                </div>
-                            `;
-                        });
-                    } else {
-                        html += `<div class="col-12"><p class="text-muted text-center">لا توجد منتجات في هذا الطلب</p></div>`;
-                    }
-                    
-                    html += `
-                        </div>
+        <div class="order-appearance mb-3 p-3 border rounded ${index > 0 ? 'mt-2' : ''}">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <div class="d-flex align-items-center">
+                        <input class="form-check-input me-2 quick-list-order" 
+                               type="checkbox" 
+                               value="${appearance.order_id}" 
+                               id="order-${appearance.order_id}-${product.sku}"
+                               data-order-id="${appearance.order_id}"
+                               checked>
+                        <label class="form-check-label fw-bold" for="order-${appearance.order_id}-${product.sku}">
+                            الطلب #${appearance.reference_id}
+                        </label>
+                    </div>
+                    <div class="ms-4 mt-2">
+                        <small class="text-muted d-block">
+                            <i class="fas fa-user me-1"></i> ${appearance.customer_name}
+                        </small>
+                        <small class="text-muted d-block">
+                            <i class="fas fa-calendar me-1"></i> ${appearance.created_at}
+                        </small>
+                        <small class="text-muted d-block">
+                            <i class="fas fa-box me-1"></i> الكمية: ${appearance.quantity}
+                        </small>
                     </div>
                 </div>
-                `;
-                });
+                <div class="col-md-4">
+                    <div class="options-section">
+                        <strong class="small d-block mb-1">الخيارات:</strong>
+                        `;
+
+                            // عرض الخيارات إذا وجدت
+                            if (appearance.options && appearance.options.length > 0) {
+                                appearance.options.forEach(option => {
+                                    html += `
+                        <span class="badge bg-light text-dark me-1 mb-1 small">
+                            ${option.name}: ${option.value}
+                        </span>
+                                    `;
+                                });
+                            } else {
+                                html += `<span class="text-muted small">لا توجد خيارات</span>`;
+                            }
+
+                            html += `
+                    </div>
+                </div>
+            </div>
+        </div>
+                            `;
+                        });
+
+                        html += `
+    </div>
+</div>
+                        `;
+                    });
+                } else {
+                    html = `<div class="alert alert-warning text-center">لا توجد منتجات في الطلبات المحددة</div>`;
+                }
                 
                 $('#quickListContent').html(html);
                 updateQuickListSelectionCount();
@@ -1029,12 +1190,16 @@ $(document).ready(function () {
         const employeeId = $('#quickListAssignSelect').val();
         const selectedOrders = [];
         
+        // جمع الطلبات المحددة من القائمة السريعة
         $('#quickListContent input.quick-list-order:checked').each(function() {
-            const card = $(this).closest('.card');
-            selectedOrders.push({
-                id: card.data('order-id'),
-                type: card.data('order-type')
-            });
+            const orderId = $(this).data('order-id');
+            // تجنب التكرار
+            if (!selectedOrders.find(order => order.id === orderId)) {
+                selectedOrders.push({
+                    id: orderId,
+                    type: 'salla'
+                });
+            }
         });
 
         if (!employeeId) {
@@ -1057,7 +1222,7 @@ $(document).ready(function () {
                     Swal.fire({
                         icon: 'success',
                         title: 'تم الإسناد بنجاح',
-                        text: data.message || 'تم إسناد الطلبات إلى الموظف المحدد',
+                        text: data.message || `تم إسناد ${selectedOrders.length} طلب إلى الموظف المحدد`,
                         confirmButtonText: 'موافق',
                         customClass: {
                             confirmButton: 'btn btn-success'
@@ -1146,6 +1311,54 @@ $(document).ready(function () {
             $('#changeStatusModal').data('selected-orders', selectedOrders);
             $('#changeStatusModal').modal('show');
         }, 300);
+    });
+
+    // 14. طباعة القائمة السريعة
+    $(document).on('click', '#quickListPrintBtn', function() {
+        const printBtn = $('#quickListPrintBtn');
+        const originalText = printBtn.html();
+        
+        printBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
+        
+        setTimeout(() => {
+            openQuickListPrint();
+            printBtn.prop('disabled', false).html(originalText);
+        }, 500);
+    });
+
+    // 15. تحميل PDF من القائمة السريعة
+    $(document).on('click', '#quickListDownloadBtn', function() {
+        const selectedOrders = [];
+        
+        $('#quickListContent input.quick-list-order:checked').each(function() {
+            const orderId = $(this).data('order-id');
+            if (!selectedOrders.includes(orderId)) {
+                selectedOrders.push(orderId);
+            }
+        });
+
+        if (selectedOrders.length === 0) {
+            showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للتحميل');
+            return;
+        }
+
+        const downloadBtn = $('#quickListDownloadBtn');
+        const originalText = downloadBtn.html();
+        downloadBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
+
+        // إنشاء رابط تحميل PDF
+        const downloadLink = document.createElement('a');
+        downloadLink.href = `{{ url_for('orders.download_pdf') }}?order_ids=${selectedOrders.join(',')}`;
+        downloadLink.style.display = 'none';
+        downloadLink.target = '_blank';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+
+        setTimeout(() => {
+            downloadBtn.prop('disabled', false).html(originalText);
+            showSweetAlert('success', 'تم البدء في التحميل', 'سيبدأ تحميل ملف PDF قريباً');
+        }, 1000);
     });
 
     // --- التشغيل عند تحميل الصفحة ---

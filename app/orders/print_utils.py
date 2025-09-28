@@ -340,7 +340,7 @@ def download_orders_html():
 
 @orders_bp.route('/get_quick_list_data', methods=['POST'])
 def get_quick_list_data():
-    """جلب بيانات القائمة السريعة باستخدام البيانات المحلية"""
+    """جلب بيانات القائمة السريعة مع تجميع المنتجات حسب SKU من جميع الطلبات"""
     try:
         with current_app.app_context():
             user, employee = get_user_from_cookies()
@@ -373,14 +373,15 @@ def get_quick_list_data():
             max_workers = max(1, min(current_app.config.get('MAX_WORKERS', 10), len(order_ids)))
             orders = process_orders_concurrently(order_ids, access_token, max_workers)
         
-        orders_result = []
+        # تجميع المنتجات حسب SKU من جميع الطلبات
+        products_by_sku = {}
         success_count = 0
         error_count = 0
         
         if not orders:
             return jsonify({
                 'success': True,
-                'orders': [],
+                'products': [],
                 'stats': {
                     'total': len(order_ids),
                     'successful': 0,
@@ -388,27 +389,45 @@ def get_quick_list_data():
                 }
             })
         
-        # معالجة النتائج
+        # تجميع جميع المنتجات من جميع الطلبات حسب SKU
         for order in orders:
             try:
-                processed_items = []
                 for item in order.get('order_items', []):
-                    processed_items.append({
-                        'name': item.get('name', ''),
+                    sku = item.get('sku', '')
+                    item_name = item.get('name', '')
+                    
+                    # استخدام الاسم إذا لم يكن هناك SKU
+                    if not sku:
+                        sku = item_name
+                    
+                    # إذا كان SKU لا يزال فارغاً، استخدم معرف العنصر
+                    if not sku:
+                        sku = f"item_{item.get('id', 'unknown')}"
+                    
+                    if sku not in products_by_sku:
+                        products_by_sku[sku] = {
+                            'sku': sku,
+                            'name': item_name,
+                            'main_image': item.get('main_image', ''),
+                            'price': item.get('price', {}).get('amount', 0),
+                            'total_quantity': 0,
+                            'order_appearances': []  # ظهور المنتج في الطلبات المختلفة
+                        }
+                    
+                    # إضافة ظهور المنتج في هذا الطلب
+                    order_appearance = {
+                        'order_id': order.get('id', ''),
+                        'reference_id': order.get('reference_id', order.get('id', '')),
+                        'customer_name': order.get('customer', {}).get('name', ''),
+                        'created_at': order.get('created_at', ''),
                         'quantity': item.get('quantity', 0),
-                        'main_image': item.get('main_image', ''),
-                        'price': item.get('price', {}).get('amount', 0)
-                    })
+                        'options': item.get('options', []),
+                        'barcode': order.get('barcode', '')
+                    }
+                    
+                    products_by_sku[sku]['order_appearances'].append(order_appearance)
+                    products_by_sku[sku]['total_quantity'] += item.get('quantity', 0)
                 
-                order_data = {
-                    'id': order.get('id', ''),
-                    'reference_id': order.get('reference_id', order.get('id', '')),
-                    'items': processed_items,
-                    'customer_name': order.get('customer', {}).get('name', ''),
-                    'created_at': order.get('created_at', '')
-                }
-                
-                orders_result.append(order_data)
                 success_count += 1
                 
             except Exception as e:
@@ -416,15 +435,36 @@ def get_quick_list_data():
                 logger.error(f"❌ خطأ في معالجة الطلب {order.get('id', '')}: {str(e)}")
                 continue
         
-        logger.info(f"✅ تم معالجة {success_count} طلب بنجاح، وفشل {error_count} طلب")
+        # تحويل القاموس إلى قائمة منتجات
+        products_result = []
+        for sku, product_data in products_by_sku.items():
+            # ترتيب الطلبات بحيث تكون الأحدث أولاً
+            product_data['order_appearances'].sort(key=lambda x: x.get('created_at', ''), reverse=True)
+            
+            products_result.append({
+                'sku': product_data['sku'],
+                'name': product_data['name'],
+                'main_image': product_data['main_image'],
+                'price': product_data['price'],
+                'total_quantity': product_data['total_quantity'],
+                'appearances_count': len(product_data['order_appearances']),
+                'order_appearances': product_data['order_appearances']
+            })
+        
+        # ترتيب المنتجات حسب الكمية الإجمالية (من الأكبر إلى الأصغر)
+        products_result.sort(key=lambda x: x['total_quantity'], reverse=True)
+        
+        logger.info(f"✅ تم تجميع {len(products_result)} منتج من {success_count} طلب بنجاح، وفشل {error_count} طلب")
         
         return jsonify({
             'success': True,
-            'orders': orders_result,
+            'products': products_result,
             'stats': {
-                'total': len(order_ids),
-                'successful': success_count,
-                'failed': error_count
+                'total_orders': len(order_ids),
+                'successful_orders': success_count,
+                'failed_orders': error_count,
+                'total_products': len(products_result),
+                'total_items': sum(product['total_quantity'] for product in products_result)
             }
         })
         
@@ -432,7 +472,12 @@ def get_quick_list_data():
         logger.error(f"❌ خطأ في جلب بيانات القائمة السريعة: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': 'حدث خطأ أثناء جلب البيانات'}), 500
-
+import re
+import unicodedata
+@orders_bp.route('/quick_list_print')
+def quick_list_print():
+    """عرض صفحة الطباعة للقائمة السريعة"""
+    return render_template('quick_list_print.html')
 @orders_bp.route('/download_pdf')
 def download_pdf():
     """تحميل الطلبات كملف PDF باستخدام البيانات المحلية"""
