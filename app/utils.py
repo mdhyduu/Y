@@ -168,8 +168,8 @@ def generate_barcode(data):
             'quiet_zone': 6,      # منطقة هادئة أصغر  
             'font_size': 8,       # حجم خط أصغر  
             'text_distance': 3,   # تقليل المسافة بين النص والباركود  
-            'dpi': 150,            # زيادة الدقة  
-            'text': cleaned_data  # استخدام البيانات المنظفة  
+             # زيادة الدقة  
+         # استخدام البيانات المنظفة  
         })
 
 
@@ -216,15 +216,15 @@ def generate_barcode_with_code39(data):
         code_class = barcode.get_barcode_class('code39')
         writer = ImageWriter()
         
-        writer.set_options({  
-            'write_text': True,  
-            'module_width': 0.6,  # تقليل العرض قليلاً  
-            'module_height': 20,   # تقليل الارتفاع قليلاً  
-            'quiet_zone': 6,      # منطقة هادئة أصغر  
-            'font_size': 8,       # حجم خط أصغر  
-            'text_distance': 3,   # تقليل المسافة بين النص والباركود  
-            'dpi': 150,            # زيادة الدقة  
-            'text': cleaned_data  # استخدام البيانات المنظفة  
+        writer.set_options({
+            'write_text': True,
+            'module_width': 0.4,    # عرض الوحدات (أكثر تناسق)
+            'module_height': 20,    # ارتفاع مناسب يخلي الشكل مستطيل
+            'quiet_zone': 6,        # مسافة هادئة أكبر تعطي وضوح
+            'font_size': 10,        # حجم خط مناسب للقراءة
+            'text_distance': 2,     # المسافة بين النص والباركود
+            'dpi': 300,             # دقة عالية للطباعة
+            'text': cleaned_data    # النص اللي أسفل الباركود
         })
         # استخدام add_checksum=False لمنع إضافة أحرف التحقق
         barcode_instance = code_class(data, writer=writer, add_checksum=False)
@@ -250,15 +250,15 @@ def generate_barcode_alternative(data):
         from barcode.writer import ImageWriter as AltImageWriter
         
         writer = AltImageWriter()
-        writer.set_options({  
-            'write_text': True,  
-            'module_width': 0.6,  # تقليل العرض قليلاً  
-            'module_height': 20,   # تقليل الارتفاع قليلاً  
-            'quiet_zone': 6,      # منطقة هادئة أصغر  
-            'font_size': 8,       # حجم خط أصغر  
-            'text_distance': 3,   # تقليل المسافة بين النص والباركود  
-            'dpi': 150,            # زيادة الدقة  
-            'text': cleaned_data  # استخدام البيانات المنظفة  
+        writer.set_options({
+            'write_text': True,
+            'module_width': 0.4,    # عرض الوحدات (أكثر تناسق)
+            'module_height': 20,    # ارتفاع مناسب يخلي الشكل مستطيل
+            'quiet_zone': 6,        # مسافة هادئة أكبر تعطي وضوح
+            'font_size': 10,        # حجم خط مناسب للقراءة
+            'text_distance': 2,     # المسافة بين النص والباركود
+            'dpi': 300,             # دقة عالية للطباعة
+            'text': cleaned_data    # النص اللي أسفل الباركود
         })
         code128 = Code128(data, writer=writer)
         buffer = BytesIO()
