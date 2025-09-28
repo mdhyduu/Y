@@ -692,11 +692,7 @@ $(document).ready(function () {
             };
         }).get();
     }
-
-    // --- دوال القائمة السريعة الجديدة ---
-    
-    // دالة تجميع بيانات الطباعة من القائمة السريعة
-    // دالة تجميع بيانات الطباعة من القائمة السريعة - معدلة لتعتمد على التحديد
+// دالة تجميع بيانات الطباعة من القائمة السريعة - معدلة لتضمين الباركود
 function collectQuickListPrintData() {
     const products = [];
     let totalOrders = 0;
@@ -766,8 +762,15 @@ function collectQuickListPrintData() {
                 }
             });
             
-            // الحصول على الباركود
+            // 🔴 التعديل الهام: الحصول على الباركود من البيانات المخزنة في العنصر
             let barcode = '';
+            const barcodeData = orderAppearance.data('barcode');
+            if (barcodeData) {
+                barcode = barcodeData;
+            } else {
+                // إذا لم يكن هناك باركود مخزن، ننشئ واحداً افتراضياً أو نستخدم الرقم المرجعي
+                barcode = `باركود_${referenceId}`;
+            }
             
             orders.push({
                 id: orderId,
@@ -1107,8 +1110,12 @@ function openQuickListPrint() {
 
                 // عرض كل ظهور للمنتج في الطلبات المختلفة
                 product.order_appearances.forEach((appearance, index) => {
+                    // 🔴 تخزين بيانات الباركود في العنصر
+                    const barcodeData = appearance.barcode || '';
+                    
                     html += `
-        <div class="order-appearance mb-3 p-3 border rounded ${index > 0 ? 'mt-2' : ''}">
+        <div class="order-appearance mb-3 p-3 border rounded ${index > 0 ? 'mt-2' : ''}" 
+             data-barcode="${barcodeData}">
             <div class="row align-items-center">
                 <div class="col-md-8">
                     <div class="d-flex align-items-center">
