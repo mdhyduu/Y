@@ -6,7 +6,7 @@ from flask import current_app, request
 from .models import db, User, Employee, CustomOrder, SallaOrder
 import logging
 from io import BytesIO
-import base64
+import re, base64
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -131,146 +131,114 @@ def create_session():
     session.mount("http://", adapter)
     return session
 
+def clean_data(data: str) -> str:
+    """تنظيف البيانات من الرموز الغير مرغوبة"""
+    return re.sub(r'[^A-Za-z0-9\s\-]', '', str(data)).strip()
+
 def generate_barcode(data):
-    """إنشاء باركود مع معالجة الأخطاء وضمان استخدام رقم الطلب الصحيح"""
+    """إنشاء باركود باستخدام code128 مع fallback للبدائل"""
     try:
-        # التأكد من أن البيانات هي رقم الطلب الحقيقي
         data_str = str(data).strip()
         if not data_str:
             logger.error("Empty data provided for barcode generation")
             return None
-        
-        # تنظيف البيانات من أي رموز غير مرغوب فيها
-        # إزالة أي رموز غير رقمية باستثناء الأحرف الأساسية
-        import re
-        cleaned_data = re.sub(r'[^\w\s-]', '', data_str)  # إزالة الرموز الخاصة
-        cleaned_data = cleaned_data.strip()
-        
+
+        cleaned_data = clean_data(data_str)
         if not cleaned_data:
             logger.error("Data is empty after cleaning")
             return None
-            
-        # تسجيل رقم الطلب المستخدم لإنشاء الباركود
+
         logger.info(f"Generating barcode for order ID: {cleaned_data} (original: {data_str})")
-        
-        # استخدام code128 كخيار أول (يدعم الأحرف الرقمية فقط بشكل أفضل)
+
         barcode_type = 'code128'
-        
-        try:
-            code_class = barcode.get_barcode_class(barcode_type)
-            writer = ImageWriter()
-            
-            # إعدادات محسنة للكاتب
-            writer.set_options({  
-            'write_text': True,  
-            'module_width': 0.6,  # تقليل العرض قليلاً  
-            'module_height': 20,   # تقليل الارتفاع قليلاً  
-            'quiet_zone': 6,      # منطقة هادئة أصغر  
-            'font_size': 8,       # حجم خط أصغر  
-            'text_distance': 3,   # تقليل المسافة بين النص والباركود  
-             # زيادة الدقة  
-         # استخدام البيانات المنظفة  
+        code_class = barcode.get_barcode_class(barcode_type)
+        writer = ImageWriter()
+
+        writer.set_options({
+            'write_text': True,
+            'module_width': 0.6,
+            'module_height': 20,
+            'quiet_zone': 6,
+            'font_size': 10,
+            'text_distance': 2
         })
 
+        barcode_instance = code_class(cleaned_data, writer=writer)
+        buffer = BytesIO()
+        barcode_instance.write(buffer)
 
-            
-            # التأكد من أن البيانات مناسبة لنوع الباركود
-            if barcode_type == 'code128':
-                # code128 يدعم الأحرف الرقمية والأبجدية الرقمية بشكل أفضل
-                if not re.match(r'^[\dA-Za-z\-\s]+$', cleaned_data):
-                    logger.warning(f"Data may not be optimal for code128: {cleaned_data}")
-            
-            barcode_instance = code_class(cleaned_data, writer=writer)
-            buffer = BytesIO()
-            barcode_instance.write(buffer)
-            
-            buffer.seek(0)
-            image_data = buffer.getvalue()
-            
-            if len(image_data) < 100:
-                logger.error("Generated barcode image is too small")
-                return None
-                
-            barcode_base64 = base64.b64encode(image_data).decode('utf-8')
-            result = f"data:image/png;base64,{barcode_base64}"
-            
-            # التحقق من أن الباركود لا يحتوي على رموز إضافية
-            if '+' in result[:100] or '/' in result[:100]:
-                logger.warning("Barcode contains special characters, trying alternative method")
-                return generate_barcode_alternative(cleaned_data)
-            
-            logger.info(f"Barcode generated successfully for order: {cleaned_data}")
-            return result
-            
-        except Exception as barcode_error:
-            logger.warning(f"Failed with {barcode_type}, trying code39: {barcode_error}")
-            return generate_barcode_with_code39(cleaned_data)
-                
-    except Exception as e:
-        logger.error(f"Error in generate_barcode: {str(e)}")
-        return None
+        buffer.seek(0)
+        image_data = buffer.getvalue()
+
+        if len(image_data) < 100:
+            logger.error("Generated barcode image is too small")
+            return None
+
+        barcode_base64 = base64.b64encode(image_data).decode('utf-8')
+        logger.info(f"Barcode generated successfully for order: {cleaned_data}")
+        return f"data:image/png;base64,{barcode_base64}"
+
+    except Exception as barcode_error:
+        logger.warning(f"Failed with code128, trying code39: {barcode_error}")
+        return generate_barcode_with_code39(data_str)
+
 
 def generate_barcode_with_code39(data):
     """إنشاء باركود باستخدام code39 كبديل"""
     try:
+        cleaned_data = clean_data(data)
         code_class = barcode.get_barcode_class('code39')
         writer = ImageWriter()
-        
+
         writer.set_options({
             'write_text': True,
-            'module_width': 0.4,    # عرض الوحدات (أكثر تناسق)
-            'module_height': 20,    # ارتفاع مناسب يخلي الشكل مستطيل
-            'quiet_zone': 6,        # مسافة هادئة أكبر تعطي وضوح
-            'font_size': 10,        # حجم خط مناسب للقراءة
-            'text_distance': 2,     # المسافة بين النص والباركود
-            'dpi': 300,             # دقة عالية للطباعة
-            'text': cleaned_data    # النص اللي أسفل الباركود
+            'module_width': 0.4,
+            'module_height': 20,
+            'quiet_zone': 6,
+            'font_size': 10,
+            'text_distance': 2
         })
-        # استخدام add_checksum=False لمنع إضافة أحرف التحقق
-        barcode_instance = code_class(data, writer=writer, add_checksum=False)
+
+        barcode_instance = code_class(cleaned_data, writer=writer, add_checksum=False)
         buffer = BytesIO()
         barcode_instance.write(buffer)
-        
+
         buffer.seek(0)
         barcode_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        result = f"data:image/png;base64,{barcode_base64}"
-        
-        logger.info(f"Barcode generated with code39 for order: {data}")
-        return result
-        
+        logger.info(f"Barcode generated with code39 for order: {cleaned_data}")
+        return f"data:image/png;base64,{barcode_base64}"
+
     except Exception as e:
         logger.error(f"Failed to generate barcode with code39: {str(e)}")
         return generate_barcode_alternative(data)
 
+
 def generate_barcode_alternative(data):
-    """طريقة بديلة لإنشاء الباركود باستخدام مكتبة مختلفة إذا لزم الأمر"""
+    """طريقة بديلة لإنشاء الباركود باستخدام code128 مرة أخرى"""
     try:
-        # محاولة استخدام مكتبة python-barcode مع إعدادات أكثر تحكماً
         from barcode import Code128
         from barcode.writer import ImageWriter as AltImageWriter
-        
+
+        cleaned_data = clean_data(data)
         writer = AltImageWriter()
         writer.set_options({
             'write_text': True,
-            'module_width': 0.4,    # عرض الوحدات (أكثر تناسق)
-            'module_height': 20,    # ارتفاع مناسب يخلي الشكل مستطيل
-            'quiet_zone': 6,        # مسافة هادئة أكبر تعطي وضوح
-            'font_size': 10,        # حجم خط مناسب للقراءة
-            'text_distance': 2,     # المسافة بين النص والباركود
-            'dpi': 300,             # دقة عالية للطباعة
-            'text': cleaned_data    # النص اللي أسفل الباركود
+            'module_width': 0.4,
+            'module_height': 20,
+            'quiet_zone': 6,
+            'font_size': 10,
+            'text_distance': 2
         })
-        code128 = Code128(data, writer=writer)
+
+        code128 = Code128(cleaned_data, writer=writer)
         buffer = BytesIO()
         code128.write(buffer)
-        
+
         buffer.seek(0)
         barcode_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        result = f"data:image/png;base64,{barcode_base64}"
-        
-        logger.info(f"Barcode generated with alternative method for order: {data}")
-        return result
-        
+        logger.info(f"Barcode generated with alternative method for order: {cleaned_data}")
+        return f"data:image/png;base64,{barcode_base64}"
+
     except Exception as e:
         logger.error(f"All barcode generation methods failed: {str(e)}")
         return None
