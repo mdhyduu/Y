@@ -86,8 +86,8 @@ body {
 }
 
 .product-image {
-    width: 150px; /* تكبير من 70px */
-    height: 150px; /* تكبير من 70px */
+    width: 150px;
+    height: 150px;
     border-radius: 8px;
     border: 2px solid rgba(255,255,255,0.3);
     object-fit: cover;
@@ -165,14 +165,14 @@ body {
 
 .order-details {
     display: grid;
-    grid-template-columns: 80px 1fr; /* تكبير من 60px */
+    grid-template-columns: 80px 1fr;
     gap: 10px;
     margin-bottom: 8px;
 }
 
 .detail-image {
-    width: 80px; /* تكبير من 60px */
-    height: 80px; /* تكبير من 60px */
+    width: 80px;
+    height: 80px;
     border-radius: 5px;
     border: 1px solid #dee2e6;
     object-fit: cover;
@@ -216,15 +216,18 @@ body {
 .barcode-section {
     text-align: center;
     margin-top: 8px;
-    padding: 6px;
+    padding: 10px; /* زيادة الحشوة */
     background: #f8f9fa;
     border-radius: 4px;
 }
 
 .barcode-image {
-    max-width: 150px; /* تكبير من 120px */
-    height: 100px; /* تكبير من 35px */
-    object-fit: cover;
+    max-width: 250px; /* زيادة كبيرة من 150px */
+    height: 120px; /* زيادة كبيرة من 100px */
+    object-fit: contain; /* تغيير من cover إلى contain لضمان ظهور الباركود كاملاً */
+    border: 1px solid #ddd; /* إضافة حد للتوضيح */
+    background: white; /* خلفية بيضاء للباركود */
+    padding: 5px; /* حشوة داخلية */
 }
 
 .no-orders {
@@ -295,22 +298,36 @@ body {
     
     /* تكبير الصور للطباعة */
     .product-image {
-        width: 90px; /* تكبير للطباعة */
-        height: 90px; /* تكبير للطباعة */
+        width: 90px;
+        height: 90px;
     }
     
     .detail-image {
-        width: 70px; /* تكبير للطباعة */
-        height: 70px; /* تكبير للطباعة */
+        width: 70px;
+        height: 70px;
     }
     
     .order-details {
-        grid-template-columns: 70px 1fr; /* تكبير للطباعة */
+        grid-template-columns: 70px 1fr;
     }
     
+    /* تكبير الباركود بشكل ملحوظ للطباعة */
     .barcode-image {
-        max-width: 140px; /* تكبير للطباعة */
-        height: 40px; /* تكبير للطباعة */
+        max-width: 280px !important; /* زيادة كبيرة للطباعة */
+        height: 150px !important; /* زيادة كبيرة للطباعة */
+        object-fit: contain !important;
+        border: 1px solid #000 !important;
+        background: white !important;
+        padding: 8px !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    
+    .barcode-section {
+        padding: 15px !important; /* زيادة حشوة القسم للطباعة */
+        background: white !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
     }
 }
 
@@ -318,8 +335,9 @@ body {
 .text-success { color: #28a745; }
 .text-warning { color: #ffc107; }
 .text-danger { color: #dc3545; }
-.text-muted { color: #6c757d; }}
+.text-muted { color: #6c757d; }
     </style>
+
 </head>
 <body>
     <!-- رأس التقرير -->
