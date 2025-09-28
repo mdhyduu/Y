@@ -240,15 +240,19 @@
         .barcode-section {
             text-align: center;
             margin-top: 8px;
-            padding: 5px; /* تم تقليل الحشوة */
+            padding: 3px; /* تم تقليل الحشوة */
             background: #f8f9fa;
             border-radius: 4px;
             max-width: 100%; /* تم تحديد عرض أقصى */
+            height: 70px; /* ارتفاع ثابت للقسم */
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .barcode-image {
-            max-width: 250px; /* تم تصغير العرض الأقصى */
-            height: 80px; /* تم تصغير الارتفاع */
+            max-width: 220px; /* تم تصغير العرض الأقصى */
+            height: 60px; /* تم تصغير الارتفاع */
             object-fit: contain;
             border: 1px solid #ddd;
             background: white;
@@ -347,11 +351,12 @@
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
                 max-width: 100% !important;
+                height: 55px !important; /* تم تقليل الارتفاع للطباعة */
             }
             
             .barcode-image {
-                width: 200px !important; /* تم تصغير العرض للطباعة */
-                height: 60px !important; /* تم تصغير الارتفاع للطباعة */
+                width: 180px !important; /* تم تصغير العرض للطباعة */
+                height: 50px !important; /* تم تصغير الارتفاع للطباعة */
                 image-rendering: crisp-edges;
                 object-fit: contain !important;
                 border: 1px solid #000 !important;
