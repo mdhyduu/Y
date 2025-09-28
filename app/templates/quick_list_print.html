@@ -222,12 +222,12 @@ body {
 }
 
 .barcode-image {
-    max-width: 100%; /* زيادة كبيرة من 150px */
-    height: 100%; /* زيادة كبيرة من 100px */
+    max-width: 250px; /* زيادة كبيرة من 150px */
+    height: 120px; /* زيادة كبيرة من 100px */
     object-fit: contain; /* تغيير من cover إلى contain لضمان ظهور الباركود كاملاً */
     border: 1px solid #ddd; /* إضافة حد للتوضيح */
     background: white; /* خلفية بيضاء للباركود */
-    padding: 5px; /* حشوة داخلية */
+
 }
 
 .no-orders {
@@ -458,7 +458,7 @@ body {
                             <div class="product-info">
                                 <h2>${product.name}</h2>
                                 <div class="product-stats">
-
+                                    <span class="product-badge">SKU: ${product.sku}</span>
                                     <span class="product-badge">الكمية: ${product.total_quantity}</span>
                                     <span class="product-badge">الطلبات: ${product.orders.length}</span>
                                     ${product.price ? `<span class="product-badge">السعر: ${product.price} ر.س</span>` : ''}
