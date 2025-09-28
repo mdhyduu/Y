@@ -163,8 +163,8 @@ def generate_barcode(data):
             # إعدادات محسنة للكاتب
             writer.set_options({
                 'write_text': True,
-                'module_width': 0.4,  # تقليل العرض قليلاً
-                'module_height': 15,   # تقليل الارتفاع قليلاً
+                'module_width': 0.6,  # تقليل العرض قليلاً
+                'module_height': 25,   # تقليل الارتفاع قليلاً
                 'quiet_zone': 3,      # منطقة هادئة أصغر
                 'font_size': 8,       # حجم خط أصغر
                 'text_distance': 3,   # تقليل المسافة بين النص والباركود
@@ -216,9 +216,9 @@ def generate_barcode_with_code39(data):
         
         writer.set_options({
             'write_text': True,
-            'module_width': 0.4,
-            'module_height': 15,
-            'quiet_zone': 4,
+            'module_width': 0.6,
+            'module_height': 25,
+            'quiet_zone': 3,
             'font_size': 10,
             'text_distance': 5,
             'dpi': 72,
@@ -252,9 +252,9 @@ def generate_barcode_alternative(data):
         writer.set_options({
             'write_text': True,
             'text': data,
-            'quiet_zone': 2,
-            'module_width': 0.35,
-            'module_height': 10,
+            'quiet_zone': 3,
+            'module_width': 0.6,
+            'module_height': 25,
             'font_size': 9,
             'text_distance': 2
         })
