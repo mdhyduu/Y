@@ -313,9 +313,11 @@ body {
     }
     
     /* تكبير الباركود بشكل ملحوظ للطباعة */
-    .barcode-image {
-        max-width: 280px !important; /* زيادة كبيرة للطباعة */
-        height: 150px !important; /* زيادة كبيرة للطباعة */
+            .barcode-image {
+                width: 170px !important;
+                height: 55px !important;
+                image-rendering: crisp-edges;
+            
         object-fit: contain !important;
         border: 1px solid #000 !important;
         background: white !important;
