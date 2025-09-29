@@ -108,21 +108,13 @@ def index():
             selectinload(SallaOrder.status),
             selectinload(SallaOrder.assignments).selectinload(OrderAssignment.employee)
         )
-        
-        # ✅ إضافة فلتر الرياض لموظفي التوصيل فقط
         if is_delivery_personnel:
             orders_query = orders_query.join(
-                OrderAddress, 
+                OrderAddress,
                 SallaOrder.id == OrderAddress.order_id
             ).filter(
-                or_(
-                    OrderAddress.city == 'الرياض',
-                    OrderAddress.city == 'رياض',
-                    OrderAddress.city.ilike('%الرياض%'),
-                    OrderAddress.city.ilike('%riyadh%'),
-                    OrderAddress.city == 'Riyadh',
-                    OrderAddress.city.is_(None)  # ✅ تضمين الطلبات بدون مدينة
-                )
+                OrderAddress.city == 'الرياض',
+                OrderAddress.address_type == 'receiver'
             )
             print(f"✅ تطبيق فلتر الرياض لموظف التوصيل: {employee.email}")
         
