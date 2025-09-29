@@ -432,7 +432,7 @@ class SallaOrder(db.Model):
                               order_by='OrderStatusNote.created_at.desc()')
     employee_statuses = relationship('OrderEmployeeStatus', back_populates='order', lazy='selectin')
     assignments = relationship('OrderAssignment', back_populates='order', lazy='selectin')
-
+    order = relationship('SallaOrder', backref='address', lazy=True)
 class CustomOrder(db.Model):
     __tablename__ = 'custom_orders'
     
@@ -757,7 +757,7 @@ class OrderAddress(db.Model):
     address_type = db.Column(db.String(10), default='receiver')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    order = relationship('SallaOrder', backref='address', lazy=True)
+
     
     def __repr__(self):
         return f'<OrderAddress {self.name} ({self.address_type})>'
