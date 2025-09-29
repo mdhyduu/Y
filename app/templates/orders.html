@@ -145,64 +145,91 @@
             </div>
             
             <table class="table table-hover mb-0" id="orders-table">
-                <thead class="table">
-                    <tr>
-                        <th width="5%" class="ps-4">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="select-all-header">
-                            </div>
-                        </th>
-                        <th>رقم الطلب</th>
+   <!-- في قسم thead -->
+<thead class="table">
+    <tr>
+        <th width="5%" class="ps-4">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="select-all-header">
+            </div>
+        </th>
+        <th>رقم الطلب</th>
+        <th class="d-none d-md-table-cell">الحالة</th>
+        <th>الحالة المخصصة</th>
+        <!-- ⭐⭐ إضافة عمود طريقة الدفع هنا ⭐⭐ -->
+        <th class="d-none d-lg-table-cell">طريقة الدفع</th>
+        <th>العلامات</th>
+        <th class="d-none d-md-table-cell">التاريخ</th>
+        {% if is_reviewer %}
+        <th class="d-none d-md-table-cell">المسند إليه</th>
+        {% endif %}
+        <th width="15%" class="text-end pe-4">الإجراءات</th>
+    </tr>
+</thead>
+             <tbody>
+    {% for order in orders %}
+    <tr data-order-id="{{ order.id }}" data-order-type="{{ order.type }}" data-order-status="{{ order.status.slug if order.status else 'unknown' }}" class="align-middle clickable-row">
+        <td class="ps-4">
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}" data-type="{{ order.type }}">
+            </div>
+        </td>
+        <td>
+            <span class="fw-bold">#{{ order.reference_id }}</span>
+        </td>
+        <td class="d-none d-md-table-cell">
+            {% if order.status %}
+                <span class="status-badge status-{{ order.status.slug }}" 
+                      data-bs-toggle="tooltip" 
+                      title="{{ order.status.name }} ({{ order.status.type }})">
+                    <i class="fas fa-circle me-1 small"></i>
+                    {{ order.status.name }}
+                </span>
+            {% else %}
+                <span class="status-badge status-unknown" data-bs-toggle="tooltip" title="حالة غير معروفة">
+                    <i class="fas fa-circle me-1 small"></i>
+                    غير محدد
+                </span>
+            {% endif %}
+        </td>
+        <td>
+            {% if order.employee_statuses %}
+                {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
+                <span class="badge rounded-pill" style="background-color: {{ last_custom_status.status.color }}; color: white">
+                    {{ last_custom_status.status.name }}
+                </span>
+            {% else %}
+                <span class="text-muted small">-</span>
+            {% endif %}
+        </td>
+        <!-- ⭐⭐ إضافة خلية طريقة الدفع هنا ⭐⭐ -->
+        <td class="d-none d-lg-table-cell">
+            {% if order.payment_method %}
+                {% set payment_class = "payment-" + (order.payment_method.replace('_', '-') if order.payment_method else 'unknown') %}
+                <span class="payment-method-badge {{ payment_class }}" data-bs-toggle="tooltip" title="{{ order.payment_method_name }}">
+                    {% if order.payment_method == 'tabby_installment' %}
+                        <i class="fas fa-credit-card payment-icon"></i>تابي
+                    {% elif order.payment_method == 'mada' %}
+                        <i class="fas fa-credit-card payment-icon"></i>مدى
+                    {% elif order.payment_method == 'visa' or order.payment_method == 'mastercard' %}
+                        <i class="fab fa-cc-visa payment-icon"></i>بطاقة
+                    {% elif order.payment_method == 'cash' %}
+                        <i class="fas fa-money-bill-wave payment-icon"></i>نقدي
+                    {% elif order.payment_method == 'bank' %}
+                        <i class="fas fa-university payment-icon"></i>بنكي
+                    {% else %}
+                        <i class="fas fa-wallet payment-icon"></i>{{ order.payment_method_name|default('غير محدد', true)|truncate(10) }}
+                    {% endif %}
+                </span>
+            {% else %}
+                <span class="payment-method-badge payment-unknown" data-bs-toggle="tooltip" title="طريقة دفع غير محددة">
+                    <i class="fas fa-wallet payment-icon"></i>غير محدد
+                </span>
+            {% endif %}
+        </td>
+        <td>
+            {% set last_note = order.status_notes | sort(attribute='created_at', reverse=true) | first %}
 
-                        <th class="d-none d-md-table-cell">الحالة</th>
-                        <th>الحالة المخصصة</th>
-                        <th>العلامات</th>
-                        <th class="d-none d-md-table-cell">التاريخ</th>
-                        {% if is_reviewer %}
-                        <th class="d-none d-md-table-cell">المسند إليه</th>
-                        {% endif %}
-                        <th width="15%" class="text-end pe-4">الإجراءات</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    {% for order in orders %}
-                    <tr data-order-id="{{ order.id }}" data-order-type="{{ order.type }}" data-order-status="{{ order.status.slug if order.status else 'unknown' }}" class="align-middle clickable-row">
-                        <td class="ps-4">
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}" data-type="{{ order.type }}">
-                            </div>
-                        </td>
-                        <td>
-                            <span class="fw-bold">#{{ order.reference_id }}</span>
-                        </td>
-         <td class="d-none d-md-table-cell">
-                            {% if order.status %}
-                                <span class="status-badge status-{{ order.status.slug }}" 
-                                      data-bs-toggle="tooltip" 
-                                      title="{{ order.status.name }} ({{ order.status.type }})">
-                                    <i class="fas fa-circle me-1 small"></i>
-                                    {{ order.status.name }}
-                                </span>
-                            {% else %}
-                                <span class="status-badge status-unknown" data-bs-toggle="tooltip" title="حالة غير معروفة">
-                                    <i class="fas fa-circle me-1 small"></i>
-                                    غير محدد
-                                </span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if order.employee_statuses %}
-                                {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
-                                <span class="badge rounded-pill" style="background-color: {{ last_custom_status.status.color }}; color: white">
-                                    {{ last_custom_status.status.name }}
-                                </span>
-                            {% else %}
-                                <span class="text-muted small">-</span>
-                            {% endif %}
-                        </td>
-                     <td>
-    {% set last_note = order.status_notes | sort(attribute='created_at', reverse=true) | first %}
     {% if last_note %}
         <div class="d-flex align-items-center">
             {% if last_note.custom_status %}

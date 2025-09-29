@@ -284,20 +284,27 @@
             container.innerHTML = html;
         }
 
-        window.addEventListener('load', function() {
+ window.addEventListener('load', function() {
             try {
                 const savedData = localStorage.getItem('quickListPrintData');
                 if (savedData) {
                     const data = JSON.parse(savedData);
                     initReport(data);
                     localStorage.removeItem('quickListPrintData');
-                } else if (window.opener && window.opener.quickListPrintData) {
-                   initReport(window.opener.quickListPrintData);
+                    
+                    setTimeout(() => {
+                        window.print(); // يمكن تفعيل الطباعة التلقائية بإزالة التعليق
+                    }, 1500);
+                } else {
+                    // محاولة تحميل البيانات من النافذة الأم كخيار بديل
+                    if (window.opener && window.opener.quickListPrintData) {
+                       initReport(window.opener.quickListPrintData);
+                    }
                 }
             } catch (error) {
                 console.error('Error loading print data:', error);
                 document.getElementById('orders-grid-container').innerHTML = 
-                    `<div class="no-data"><h3>خطأ في تحميل البيانات</h3></div>`;
+                    `<div class="no-data"><h3>خطأ في تحميل البيانات</h3><p>الرجاء المحاولة مرة أخرى.</p></div>`;
             }
         });
     </script>

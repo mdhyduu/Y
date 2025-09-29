@@ -258,47 +258,74 @@ def index():
                 last_note = OrderStatusNote.query.filter_by(order_id=order.id).order_by(OrderStatusNote.created_at.desc()).first()
                 last_emp_status = OrderEmployeeStatus.query.filter_by(order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
                 
-                processed_order = {
-                    'id': order.id,
-                    'reference_id': reference_id,
-                    'customer_name': order.customer_name,
-                    'created_at': humanize_time(order.created_at) if order.created_at else '',
-                    'status': {
-                        'slug': status_slug,
-                        'name': status_name
-                    },
-                    'status_obj': order.status,
-                    'raw_created_at': order.created_at,
-                    'type': 'salla',
-                    'assignments': order.assignments,
-                    'employee_statuses': [last_emp_status] if last_emp_status else [],
-                    'status_notes': [last_note] if last_note else []
-                } 
+                # في قسم معالجة الطلبات في دالة index
+                processed_orders = []
                 
-            else:
-                last_note = OrderStatusNote.query.filter_by(custom_order_id=order.id).order_by(OrderStatusNote.created_at.desc()).first()
-                last_emp_status = OrderEmployeeStatus.query.filter_by(custom_order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
-                
-                processed_order = {
-                    'id': order.id,
-                    'reference_id': order.order_number,
-                    'customer_name': order.customer_name,
-                    'created_at': humanize_time(order.created_at) if order.created_at else '',
-                    'status': {
-                        'slug': order.status_id or 'custom',
-                        'name': order.status.name if order.status else 'مخصص'
-                    },
-                    'status_obj': order.status,
-                    'raw_created_at': order.created_at,
-                    'type': 'custom',
-                    'total_amount': order.total_amount,
-                    'currency': order.currency,
-                    'assignments': order.assignments,
-                    'employee_statuses': [last_emp_status] if last_emp_status else [],
-                    'status_notes': [last_note] if last_note else []
-                }
-                    
-            processed_orders.append(processed_order)
+                for order in orders:
+                    if isinstance(order, SallaOrder):
+                        raw_data = json.loads(order.raw_data) if order.raw_data else {}
+                        reference_id = raw_data.get('reference_id', order.id)
+                        status_name = order.status.name if order.status else 'غير محدد'
+                        status_slug = order.status.slug if order.status else 'unknown'
+                        
+                        # ⭐⭐ استخراج طريقة الدفع ⭐⭐
+                        payment_method = order.payment_method or raw_data.get('payment_method', '')
+                        payment_method_name = get_payment_method_name(payment_method)
+                        
+                        last_note = OrderStatusNote.query.filter_by(order_id=order.id).order_by(OrderStatusNote.created_at.desc()).first()
+                        last_emp_status = OrderEmployeeStatus.query.filter_by(order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
+                        
+                        processed_order = {
+                            'id': order.id,
+                            'reference_id': reference_id,
+                            'customer_name': order.customer_name,
+                            'created_at': humanize_time(order.created_at) if order.created_at else '',
+                            'status': {
+                                'slug': status_slug,
+                                'name': status_name
+                            },
+                            'status_obj': order.status,
+                            'raw_created_at': order.created_at,
+                            'type': 'salla',
+                            'assignments': order.assignments,
+                            'employee_statuses': [last_emp_status] if last_emp_status else [],
+                            'status_notes': [last_note] if last_note else [],
+                            # ⭐⭐ إضافة بيانات طريقة الدفع ⭐⭐
+                            'payment_method': payment_method,
+                            'payment_method_name': payment_method_name
+                        }
+                        
+                    else:  # CustomOrder
+                        # ⭐⭐ إضافة طريقة الدفع للطلبات المخصصة ⭐⭐
+                        payment_method = order.payment_method or ''
+                        payment_method_name = get_payment_method_name(payment_method)
+                        
+                        last_note = OrderStatusNote.query.filter_by(custom_order_id=order.id).order_by(OrderStatusNote.created_at.desc()).first()
+                        last_emp_status = OrderEmployeeStatus.query.filter_by(custom_order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
+                        
+                        processed_order = {
+                            'id': order.id,
+                            'reference_id': order.order_number,
+                            'customer_name': order.customer_name,
+                            'created_at': humanize_time(order.created_at) if order.created_at else '',
+                            'status': {
+                                'slug': order.status_id or 'custom',
+                                'name': order.status.name if order.status else 'مخصص'
+                            },
+                            'status_obj': order.status,
+                            'raw_created_at': order.created_at,
+                            'type': 'custom',
+                            'total_amount': order.total_amount,
+                            'currency': order.currency,
+                            'assignments': order.assignments,
+                            'employee_statuses': [last_emp_status] if last_emp_status else [],
+                            'status_notes': [last_note] if last_note else [],
+                            # ⭐⭐ إضافة بيانات طريقة الدفع ⭐⭐
+                            'payment_method': payment_method,
+                            'payment_method_name': payment_method_name
+                        }
+                            
+                    processed_orders.append(processed_order)
         
         employees = []
         if is_reviewer:
@@ -1125,7 +1152,11 @@ def order_status_webhook():
                         status_updated = True
                         print(f"✅ تم تحديث حالة الطلب {order_id} إلى {status_slug}")
 
-                # تحديث المنتجات باستخدام الدالة الجديدة
+                if 'payment_method' in order_data:
+                    order.payment_method = order_data.get('payment_method')
+                    payment_updated = True
+                    print(f"✅ تم تحديث طريقة الدفع للطلب {order_id} إلى {order.payment_method}")
+                            # تحديث المنتجات باستخدام الدالة الجديدة
                 update_order_items_from_webhook(order, order_data)
 
                 # تحديث العنوان إذا تغير
@@ -1262,3 +1293,23 @@ def update_order_address(order_id, order_data):
         print(error_msg)
         logger.error(error_msg, exc_info=True)
         return False
+def get_payment_method_name(payment_method):
+    """تحويل رمز طريقة الدفع إلى اسم مفهوم"""
+    payment_methods = {
+        'tabby_installment': 'تابي بالتقسيط',
+        'mada': 'مدى',
+        'visa': 'فيزا / ماستركارد',
+        'mastercard': 'ماستركارد',
+        'apple_pay': 'Apple Pay',
+        'stc_pay': 'STC Pay',
+        'urpay': 'UrPay',
+        'cod': 'الدفع عند الاستلام',
+        'bank': 'تحويل بنكي',
+        'wallet': 'المحفظة',
+        '': 'غير محدد'
+    }
+    
+    if isinstance(payment_method, dict):
+        return payment_method.get('name', 'غير محدد')
+    
+    return payment_methods.get(payment_method, payment_method or 'غير محدد')
