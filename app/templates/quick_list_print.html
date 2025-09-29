@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تقرير الطلبات - مع باركود معدل للطباعة</title>
+    <title>تقرير طلبات مُحسَّن للطباعة</title>
     <style>
+        /* --- General Styles --- */
         @page {
             size: A4;
-            margin: 0.5cm;
+            margin: 1cm; /* هامش مناسب للطباعة */
         }
 
         body {
@@ -16,10 +17,10 @@
             margin: 0;
             padding: 15px;
             color: #2c3e50;
-            background: #fff;
-            font-size: 12px;
+            background: #f4f7f9;
         }
 
+        /* --- Screen-Only Styles --- */
         .report-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -33,352 +34,227 @@
         .report-header h1 {
             margin: 0;
             font-size: 24px;
-            font-weight: 600;
         }
 
         .report-summary {
-            background: #f8f9fa;
+            background: #fff;
             border: 1px solid #e9ecef;
             border-radius: 8px;
             padding: 15px;
             margin-bottom: 20px;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 15px;
             text-align: center;
         }
-
         .summary-item {
-            background: white;
             padding: 10px;
-            border-radius: 6px;
-            border-left: 4px solid #667eea;
         }
-
         .summary-item h3 {
-            margin: 0;
-            font-size: 18px;
-            color: #2c3e50;
+            margin: 0 0 5px 0;
+            font-size: 22px;
+            color: #667eea;
         }
-
         .summary-item p {
-            margin: 5px 0 0 0;
-            color: #6c757d;
-        }
-
-        .product-section {
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
-            margin-bottom: 25px;
-            padding: 0;
-            background: #fff;
-            break-inside: avoid;
-            page-break-inside: avoid;
-        }
-
-        .product-header {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-            padding: 15px;
-            border-radius: 10px 10px 0 0;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .product-image {
-            width: 150px;
-            height: 150px;
-            border-radius: 8px;
-            border: 2px solid rgba(255,255,255,0.3);
-            object-fit: cover;
-        }
-
-        .product-info {
-            flex: 1;
-        }
-
-        .product-info h2 {
             margin: 0;
-            font-size: 20px;
-        }
-
-        .product-stats {
-            display: flex;
-            gap: 10px;
-            margin-top: 8px;
-            flex-wrap: wrap;
-        }
-
-        .product-badge {
-            background: rgba(255,255,255,0.2);
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .orders-container {
-            padding: 15px;
-        }
-
-        .orders-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 12px;
-        }
-
-        .order-card {
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 12px;
-            background: #fff;
-            transition: all 0.3s ease;
-        }
-
-        .order-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .order-number {
-            font-size: 18px;
-            font-weight:bold ;
-            color: #2c3e50;
-        }
-
-        .order-date {
             color: #6c757d;
-            font-size: 16px;
-            font-weight: bold;
-        }
-
-        .customer-info {
-            background: #f8f9fa;
-            padding: 6px;
-            border-radius: 4px;
-            margin-bottom: 8px;
-            font-size: 11px;
-        }
-
-        .order-details {
-            display: grid;
-            grid-template-columns: 80px 1fr;
-            gap: 10px;
-            margin-bottom: 8px;
-        }
-
-        .detail-image {
-            width: 100px;
-            height: 100px;
-            border-radius: 5px;
-            border: 1px solid #dee2e6;
-            object-fit: cover;
-        }
-
-        .quantity-badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            width: fit-content;
-        }
-
-        .options-section {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 5px;
-            padding: 8px;
-            margin-top: 8px;
-        }
-
-        .options-title {
-            font-weight: 600;
-            margin-bottom: 5px;
-            color: #856404;
-            font-size: 11px;
-        }
-
-        .option-item {
-            display: inline-block;
-            background: white;
-            padding: 2px 6px;
-            margin: 2px;
-            border-radius: 3px;
-            font-size: 15px;
-            font-weight:bold;
-            border: 1px solid #ffeaa7;
-        }
-
-        .notes-section {
-            background: #d1ecf1;
-            border: 1px solid #bee5eb;
-            border-radius: 5px;
-            padding: 8px;
-            margin-top: 8px;
-        }
-
-        .notes-title {
-            font-weight: 600;
-            margin-bottom: 5px;
-            color: #0c5460;
-            font-size: 11px;
-        }
-
-        .notes-text {
-            color: #495057;
-            line-height: 1.4;
-            font-size: 14px;
-            white-space: pre-line;
-            word-wrap: break-word;
-        }
-
-      .barcode-section {
-    text-align: center;
-    margin-top: 8px;
-
-    background: #f8f9fa;
-    border-radius: 4px;
-    display: flex;
-  
-    justify-content: center;
-}
-
-/* للعرض في الشاشة */
-.barcode-image {
-    max-width: 220px; /* في العرض العادي تصغير مناسب */
-    height: auto;     /* الارتفاع يتعدل تلقائي */
-    border: 1px solid #ddd;
-    background: white;
-    margin: 0 auto;
-    display: block;
-    object-fit: contain;
-}
-
-/* للطباعة: يظهر بالحجم الطبيعي حسب الـ DPI */
-
-        .no-orders {
-            text-align: center;
-            padding: 20px;
-            color: #6c757d;
-            font-style: italic;
-            grid-column: 1 / -1;
-        }
-
-        .page-break {
-            page-break-after: always;
         }
 
         .print-controls {
             text-align: center;
-            margin-top: 20px;
+            margin: 20px 0;
             padding: 15px;
-            background: #f8f9fa;
+            background: #fff;
             border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .print-controls button {
+            padding: 12px 25px;
+            font-size: 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn-primary { background-color: #667eea; color: white; }
+        .btn-secondary { background-color: #6c757d; color: white; }
+
+
+        /* --- NEW Orders Grid (for both screen & print) --- */
+        #orders-grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); /* مرن للشاشة */
+            gap: 15px;
         }
 
+        .order-card {
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+            break-inside: avoid; /* الأهم: لمنع تقسيم البطاقة بين الصفحات */
+            page-break-inside: avoid;
+        }
+
+        .card-product-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+
+        .card-product-image {
+            width: 60px;
+            height: 60px;
+            border-radius: 6px;
+            object-fit: cover;
+            border: 1px solid #ddd;
+        }
+
+        .card-product-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #34495e;
+            flex: 1;
+        }
+
+        .card-order-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .card-order-ref {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .card-quantity {
+            background-color: #2c3e50;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .card-details {
+            flex-grow: 1; /* يسمح لهذا القسم بالنمو ليدفع الباركود للأسفل */
+        }
+
+        .options-section, .notes-section {
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .options-section {
+            background: #e9f5ff;
+            border: 1px solid #b3d7ff;
+        }
+
+        .options-title, .notes-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+        .options-title { color: #004085; }
+        .notes-title { color: #856404; }
+
+        .option-item {
+            display: block;
+            background: white;
+            padding: 4px 8px;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        .notes-section {
+            background: #fffbe6;
+            border: 1px solid #ffeccd;
+        }
+        .notes-text {
+            font-size: 16px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .barcode-section {
+            text-align: center;
+            margin-top: 15px; /* هامش علوي ثابت */
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+
+        .barcode-image {
+            width: 100%;
+            max-width: 280px;
+            height: 70px;
+            object-fit: contain;
+        }
+        
+        .no-data {
+            text-align: center; padding: 50px; color: #6c757d; background: #fff; border-radius: 8px;
+        }
+
+        /* --- Print-Specific Styles --- */
         @media print {
             body {
                 margin: 0;
-                padding: 10px;
-                font-size: 11px;
+                padding: 0;
+                background: #fff;
             }
             
-            .report-header {
-                background: #667eea !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
+            .report-header, .report-summary, .print-controls {
+                display: none; /* إخفاء كل شيء ما عدا شبكة الطلبات */
             }
-            
-            .product-header {
-                background: #f5576c !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            
-            .quantity-badge {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            
-            .options-section {
-                background: #fff3cd !important;
-                border-color: #ffeaa7 !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            
-            .notes-section {
-                background: #d1ecf1 !important;
-                border-color: #bee5eb !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            
-            .print-controls {
-                display: none;
-            }
-            
-            .product-section {
-                break-inside: avoid;
-                page-break-inside: avoid;
-                margin-bottom: 5px;
-            }
-            
-            .orders-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            
-            .product-image {
-                width: 100px;
-                height: 100px;
-            }
-            
-            .detail-image {
-                width: 70px;
-                height: 70px;
-            }
-            
-            .order-details {
-                grid-template-columns: 70px 1fr;
-            } 
-            
 
+            #orders-grid-container {
+                grid-template-columns: 1fr 1fr; /* عمودان في كل صفحة */
+                gap: 12px;
+                padding: 0;
+            }
 
-    .barcode-image {
-        max-width: 250px;
-        height: 150px;
-        border: none;   /* يشيل الإطار */
-        background: none;
-    }
-
+            .order-card {
+                border: 2px solid #333; /* حدود واضحة للقص */
+                box-shadow: none;
+                padding: 12px;
+                border-radius: 4px; /* تقليل الانحناء للطباعة */
+            }
             
-            .notes-text {
-                font-size: 12px;
+            .card-product-name { font-size: 15px; }
+            .card-order-ref { font-size: 22px; }
+            .card-quantity { font-size: 16px; padding: 5px 12px; }
+            .option-item, .notes-text { font-size: 14px; }
+            
+            .barcode-image {
+                height: 65px;
+            }
+
+            .options-section, .notes-section {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                border: 1px solid #ccc;
             }
         }
-
-        .text-primary { color: #667eea; }
-        .text-success { color: #28a745; }
-        .text-warning { color: #ffc107; }
-        .text-danger { color: #dc3545; }
-        .text-muted { color: #6c757d; }
     </style>
-
 </head>
 <body>
-    <!-- رأس التقرير -->
     <div class="report-header">
         <h1>تقرير القائمة السريعة</h1>
-        <p>تفاصيل المنتجات والطلبات المحددة</p>
         <p>تاريخ التقرير: <span id="report-date"></span></p>
     </div>
 
-    <!-- ملخص التقرير -->
     <div class="report-summary">
         <div class="summary-item">
             <h3 id="total-products">0</h3>
@@ -398,60 +274,33 @@
         </div>
     </div>
 
-    <!-- قسم المنتجات -->
-    <div id="products-container">
-        <!-- سيتم ملء المحتوى عبر JavaScript -->
-    </div>
-
-    <!-- تذييل التقرير -->
-    <div style="text-align: center; margin-top: 30px; padding-top: 15px; border-top: 2px solid #e9ecef; color: #6c757d; font-size: 11px;">
-        <p>تم إنشاء هذا التقرير تلقائياً من نظام إدارة الطلبات</p>
-        <p>الصفحة 1 من 1</p>
-    </div>
-
-    <!-- أزرار التحكم -->
+    <div id="orders-grid-container">
+        </div>
+    
     <div class="print-controls">
-        <button onclick="window.print()" class="btn btn-primary" style="padding: 10px 20px; font-size: 16px;">
-            <i class="fas fa-print"></i> طباعة التقرير
-        </button>
-        <button onclick="window.close()" class="btn btn-secondary" style="padding: 10px 20px; font-size: 16px; margin-right: 10px;">
-            <i class="fas fa-times"></i> إغلاق النافذة
-        </button>
+        <button onclick="window.print()" class="btn-primary">طباعة التقرير</button>
+        <button onclick="window.close()" class="btn-secondary">إغلاق النافذة</button>
     </div>
 
     <script>
-        // بيانات التقرير (سيتم تعبئتها من الصفحة الرئيسية)
         let reportData = {
             products: [],
-            summary: {
-                totalProducts: 0,
-                totalOrders: 0,
-                totalQuantity: 0,
-                totalItems: 0
-            }
+            summary: { totalProducts: 0, totalOrders: 0, totalQuantity: 0, totalItems: 0 }
         };
 
-        // تهيئة التقرير
         function initReport(data) {
             reportData = data;
             updateReportDate();
             updateSummary();
-            renderProducts();
+            renderOrdersGrid(); // استدعاء الدالة الجديدة
         }
 
-        // تحديث تاريخ التقرير
         function updateReportDate() {
             const now = new Date();
-            const options = { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric',
-                weekday: 'long'
-            };
+            const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
             document.getElementById('report-date').textContent = now.toLocaleDateString('ar-SA', options);
         }
 
-        // تحديث الملخص
         function updateSummary() {
             document.getElementById('total-products').textContent = reportData.summary.totalProducts;
             document.getElementById('total-orders').textContent = reportData.summary.totalOrders;
@@ -459,133 +308,67 @@
             document.getElementById('total-items').textContent = reportData.summary.totalItems;
         }
 
-        // عرض المنتجات
-        function renderProducts() {
-            const container = document.getElementById('products-container');
+        // --- الدالة الجديدة والمحورية: عرض كل الطلبات في شبكة واحدة ---
+        function renderOrdersGrid() {
+            const container = document.getElementById('orders-grid-container');
             
-            if (reportData.products.length === 0) {
-                container.innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: #6c757d;">
-                        <i class="fas fa-box-open fa-3x" style="margin-bottom: 15px;"></i>
-                        <h3>لا توجد بيانات للعرض</h3>
-                        <p>لم يتم العثور على أي منتجات في القائمة السريعة</p>
-                    </div>
-                `;
+            if (reportData.summary.totalOrders === 0) {
+                container.innerHTML = `<div class="no-data"><h3>لا توجد بيانات للعرض</h3><p>لم يتم العثور على أي طلبات في القائمة.</p></div>`;
                 return;
             }
 
             let html = '';
-            reportData.products.forEach((product, index) => {
-                html += `
-                    <div class="product-section">
-                        <div class="product-header">
-                            ${product.thumbnail ? `
-                                <img src="${product.thumbnail}" alt="${product.name}" class="product-image"
-                                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzAiIGhlaWdodD0iNzAiIHZpZXdCb3g9IjAgMCA3MCA3MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjcwIiBoZWlnaHQ9IjcwIiBmaWxsPSIjZGRkIi8+Cjx0ZXh0IHg9IjM1IiB5PSIzNSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgZmlsbD0iIzk5OSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEwIj5ObyBJbWFnZTwvdGV4dD4KPC9zdmc+'">
-                            ` : `
-                                <div class="product-image" style="background: rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center;">
-                                    <i class="fas fa-image" style="font-size: 24px;"></i>
-                                </div>
-                            `}
-                            <div class="product-info">
-                                <h2>${product.name}</h2>
-                                <div class="product-stats">
-                           
-                                    <span class="">الكمية: ${product.total_quantity}</span>
-                                    <span class="product-badge">الطلبات: ${product.orders.length}</span>
-
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="orders-container">
-                `;
-
-                if (product.orders.length > 0) {
-                    html += `<div class="orders-grid">`;
-                    
-                    product.orders.forEach(order => {
-                        html += `
-                            <div class="order-card">
-                                <div class="order-header">
-                                    <span class="order-number">الطلب #${order.reference_id}</span>
-
-                                </div>
-                                
-
-                                
-                                <div class="order-details">
-                                    <div>
-                                        ${product.thumbnail ? `
-                                            <img src="${product.thumbnail}" alt="${product.name}" class="detail-image"
-                                                 onerror="this.style.display='none'">
-                                        ` : `
-                                            <div class="detail-image" style="background: #f8f9fa; display: flex; align-items: center; justify-content: center; color: #6c757d; font-size: 10px;">
-                                                لا صورة
-                                            </div>
-                                        `}
-                                    </div>
-                                    <div class="detail-content">
-                                        <div class="quantity-badge">الكمية: ${order.quantity}</div>
-                                        
-                                        ${order.options && order.options.length > 0 ? `
-                                            <div class="options-section">
-                                                <div class="options-title">الخيارات:</div>
-                                                ${order.options.map(opt => `
-                                                    <span class="option-item">${opt.name}: ${opt.value}</span>
-                                                `).join('')}
-                                            </div>
-                                        ` : ''}
-                                        
-                                        ${order.notes ? `
-                                            <div class="notes-section">
-                                                <div class="notes-title">
-                                                    <i class="fas fa-sticky-note me-1"></i>ملاحظات:
-                                                </div>
-                                                <span class="notes-text">${order.notes}</span>
-                                            </div>
-                                        ` : ''}
-                                    </div>
-                                </div>
-                                
-                                <div class="barcode-section">
-                                    ${order.barcode ? `
-                                        <img src="${order.barcode}" alt="باركود" class="barcode-image"
-                                             onerror="this.style.display='none'">
-                                    ` : `
-                                        <span class="text-muted" style="font-size: 10px;">
-                                            <i class="fas fa-barcode"></i> لا يوجد باركود
-                                        </span>
-                                    `}
-                                </div>
-                            </div>
-                        `;
-                    });
-                    
-                    html += `</div>`;
-                } else {
+            // حلقة مزدوجة لجمع كل الطلبات من كل المنتجات
+            reportData.products.forEach(product => {
+                product.orders.forEach(order => {
                     html += `
-                        <div class="no-orders">
-                            <i class="fas fa-box-open fa-2x"></i>
-                            <p>لا توجد طلبات لهذا المنتج</p>
+                        <div class="order-card">
+                            <div class="card-product-header">
+                                ${product.thumbnail ? `
+                                    <img src="${product.thumbnail}" alt="${product.name}" class="card-product-image"
+                                         onerror="this.style.display='none'">
+                                ` : ''}
+                                <h2 class="card-product-name">${product.name}</h2>
+                            </div>
+                            
+                            <div class="card-order-info">
+                                <span class="card-order-ref">#${order.reference_id}</span>
+                                <span class="card-quantity">الكمية: ${order.quantity}</span>
+                            </div>
+                            
+                            <div class="card-details">
+                                ${order.options && order.options.length > 0 ? `
+                                    <div class="options-section">
+                                        <div class="options-title">الخيارات:</div>
+                                        ${order.options.map(opt => `<span class="option-item">${opt.name}: <strong>${opt.value}</strong></span>`).join('')}
+                                    </div>
+                                ` : ''}
+                                
+                                ${order.notes ? `
+                                    <div class="notes-section">
+                                        <div class="notes-title">ملاحظات:</div>
+                                        <p class="notes-text">${order.notes}</p>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            
+                            <div class="barcode-section">
+                                ${order.barcode ? `
+                                    <img src="${order.barcode}" alt="Barcode for order ${order.reference_id}" class="barcode-image">
+                                ` : `
+                                    <span style="color: #888; font-size: 12px;">لا يوجد باركود</span>
+                                `}
+                            </div>
                         </div>
                     `;
-                }
-                
-                html += `</div></div>`;
-                
-                // إضافة فاصل صفحات بعد كل 3 منتجات
-                if ((index + 1) % 3 === 0 && index !== reportData.products.length - 1) {
-                    html += `<div class="page-break"></div>`;
-                }
+                });
             });
             
             container.innerHTML = html;
         }
 
-        // طباعة تلقائية عند التحميل (اختياري)
+        // --- آلية تحميل البيانات (تبقى كما هي) ---
         window.addEventListener('load', function() {
-            // محاولة الحصول على البيانات من localStorage أو parent window
             try {
                 const savedData = localStorage.getItem('quickListPrintData');
                 if (savedData) {
@@ -593,25 +376,22 @@
                     initReport(data);
                     localStorage.removeItem('quickListPrintData');
                     
-                    // طباعة تلقائية بعد ثانيتين
                     setTimeout(() => {
-                        window.print();
-                    }, 2000);
+                        // window.print(); // يمكن تفعيل الطباعة التلقائية بإزالة التعليق
+                    }, 1500);
+                } else {
+                    // محاولة تحميل البيانات من النافذة الأم كخيار بديل
+                    if (window.opener && window.opener.quickListPrintData) {
+                       initReport(window.opener.quickListPrintData);
+                    }
                 }
             } catch (error) {
                 console.error('Error loading print data:', error);
+                document.getElementById('orders-grid-container').innerHTML = 
+                    `<div class="no-data"><h3>خطأ في تحميل البيانات</h3><p>الرجاء المحاولة مرة أخرى.</p></div>`;
             }
         });
-
-        // دالة مساعدة لتحميل البيانات من النافذة الأم
-        function loadDataFromParent() {
-            if (window.opener && window.opener.quickListPrintData) {
-                initReport(window.opener.quickListPrintData);
-            }
-        }
-
-        // محاولة تحميل البيانات من النافذة الأم
-        setTimeout(loadDataFromParent, 100);
     </script>
 </body>
 </html>
+
