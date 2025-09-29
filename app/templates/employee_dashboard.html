@@ -115,7 +115,7 @@
             <div class="stats-grid-compact">
                 {% if selected_employee %}
                     {% for item in default_status_stats %}
-                    <a href="{{ url_for('orders.index') }}?custom_status={{ item.id }}" class="text-decoration-none">
+                    <a href="{{ url_for('orders.index') }}?status_id={{ item.id }}" class="text-decoration-none">
                         <div class="stat-card-compact" style="--status-color: {{ item.color }};">
                             <div class="stat-content">
                                 <span class="stat-count">{{ item.count }}</span>
@@ -124,19 +124,9 @@
                         </div>
                     </a>
                     {% endfor %}
-                    {% for item in custom_status_stats_selected %}
-                    <a href="{{ url_for('orders.index') }}?custom_status={{ item.id }}" class="text-decoration-none">
-                        <div class="stat-card-compact" style="--status-color: {{ item.color }};">
-                             <div class="stat-content">
-                                <span class="stat-count">{{ item.count }}</span>
-                                <span class="stat-name">{{ item.name }}</span>
-                            </div>
-                        </div>
-                    </a>
-                    {% endfor %}
                 {% else %}
                     {% for item in all_employee_status_stats %}
-                    <a href="{{ url_for('orders.index') }}?custom_status={{ item.id }}" class="text-decoration-none">
+                    <a href="{{ url_for('orders.index') }}?status_id={{ item.id }}" class="text-decoration-none">
                         <div class="stat-card-compact" style="--status-color: {{ item.color }}; --status-color-rgb: {{ item.color | hex_to_rgb }};">
                              <div class="stat-content">
                                 <span class="stat-count">{{ item.count }}</span>
@@ -156,7 +146,7 @@
         <h5 class="mb-3 fw-bold"><i class="fas fa-stream me-2"></i>حالات المتابعة الخاصة بي</h5>
         <div class="stats-grid">
             {% for item in custom_status_stats %}
-            <a href="{{ url_for('orders.index') }}?custom_status={{ item.status.id }}" class="text-decoration-none">
+            <a href="{{ url_for('orders.index') }}?status_id={{ item.status.id }}" class="text-decoration-none">
                 <div class="stat-card-item">
                     <div class="stat-card h-100" style="background-color: {{ item.status.color }}; color: {{ item.status.color | get_text_color }};">
                         <div class="stat-card-content">
@@ -200,7 +190,13 @@
                                     </td>
                                     <td>{{ order.total_amount }} {{ order.currency }}</td>
                                     <td>
-                                        <span class="badge bg-{{ order.status_slug | get_status_badge }}">{{ order.status }}</span>
+                                        {% if order.status %}
+                                        <span class="badge" style="background-color: #6c757d; color: white;">
+                                            {{ order.status.name }}
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">-</span>
+                                        {% endif %}
                                     </td>
                                     <td class="text-center">
                                         <a href="{{ url_for('orders.order_details', order_id=order.id) }}" 
