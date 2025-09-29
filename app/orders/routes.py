@@ -1296,7 +1296,8 @@ def update_order_address(order_id, order_data):
 def get_payment_method_name(payment_method):
     """تحويل رمز طريقة الدفع إلى اسم مفهوم"""
     payment_methods = {
-        'tabby_installment': 'تابي بالتقسيط',
+        'tabby_installment': 'تابي ',
+        'tamara_installment': 'تامرا ',
         'mada': 'مدى',
         'visa': 'فيزا / ماستركارد',
         'mastercard': 'ماستركارد',

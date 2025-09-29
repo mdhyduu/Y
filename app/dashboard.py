@@ -1,3 +1,4 @@
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response
 from .models import (
     User, 
@@ -172,6 +173,39 @@ def _get_filtered_orders(store_id, status_id=None, for_delivery=False):
     
     return filtered_orders, all_orders
 
+def _get_delivery_status_stats(store_id, employee_id=None):
+    """إحصائيات الحالات الأصلية لفريق التوصيل"""
+    # الحصول على جميع الحالات الأصلية للمتجر
+    order_statuses = OrderStatus.query.filter_by(store_id=store_id).all()
+    
+    status_stats = []
+    for status in order_statuses:
+        # بناء الاستعلام الأساسي
+        query = SallaOrder.query.filter_by(
+            store_id=store_id,
+            status_id=status.id
+        ).join(OrderAddress).filter(
+            OrderAddress.city == 'الرياض',
+            OrderAddress.address_type == 'receiver'
+        )
+        
+        # إذا كان موظف محدد، نضيف التصفية بالطلبات المسندة له
+        if employee_id:
+            query = query.join(OrderAssignment).filter(
+                OrderAssignment.employee_id == employee_id
+            )
+        
+        count = query.count()
+        
+        status_stats.append({
+            'id': status.id,
+            'name': status.name,
+            'color': '#6c757d',  # لون افتراضي للحالات الأصلية
+            'count': count
+        })
+    
+    return status_stats
+
 @dashboard_bp.route('/')
 @login_required
 def index():
@@ -322,25 +356,11 @@ def index():
                     else:
                         filtered_orders, all_orders = [], []
                 
-                # حساب إحصائيات الحالات الأصلية للعرض في التبويبات
-                status_stats = {}
-                for order in all_orders:
-                    if order.status:  # استخدام الحالة الأصلية بدلاً من المخصصة
-                        status_id = order.status.id
-                        status_name = order.status.name
-                        status_color = '#6c757d'  # لون افتراضي للحالات الأصلية
-                        
-                        if status_id not in status_stats:
-                            status_stats[status_id] = {
-                                'id': status_id,
-                                'name': status_name,
-                                'color': status_color,
-                                'count': 1
-                            }
-                        else:
-                            status_stats[status_id]['count'] += 1
-                
-                default_status_stats = list(status_stats.values())
+                # استخدام الدالة الجديدة لإحصائيات الحالات الأصلية
+                default_status_stats = _get_delivery_status_stats(
+                    employee.store_id, 
+                    None if is_delivery_manager else employee.id
+                )
                 
                 # جلب مناديب التوصيل (للمدير فقط)
                 delivery_employees = []
