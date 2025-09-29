@@ -72,7 +72,6 @@ def index():
     date_to = request.args.get('date_to', '')
     search_query = request.args.get('search', '')
     
-    # إزالة order_type لأننا نعتمد على SallaOrder فقط
     if page < 1: 
         page = 1
     if per_page not in [10, 25, 50, 100]: 
@@ -80,6 +79,7 @@ def index():
     
     is_general_employee = False
     is_reviewer = False
+    is_delivery_personnel = False
     
     if request.cookies.get('is_admin') == 'true':
         is_reviewer = True
@@ -100,14 +100,32 @@ def index():
         
         is_general_employee = employee.role == 'general'
         is_reviewer = employee.role in ['reviewer', 'manager']
+        # ✅ تحديد إذا كان الموظف من فريق التوصيل (بدون استخدام region)
+        is_delivery_personnel = employee.role in ['delivery_manager', 'delivery']
     
     try:
         # استخدام SallaOrder فقط
         orders_query = SallaOrder.query.filter_by(store_id=user.store_id).options(
             selectinload(SallaOrder.status),
-            selectinload(SallaOrder.assignments).selectinload(OrderAssignment.employee)
+            selectinload(SallaOrder.assignments).selectinload(OrderAssignment.employee),
+            selectinload(SallaOrder.address)  # ✅ تحميل العنوان مسبقاً
         )
         
+        # ✅ إذا كان موظف توصيل، نفلتر الطلبات بالرياض فقط
+        if is_delivery_personnel:
+            # استخدام join مع OrderAddress للفلتر حسب المدينة
+            orders_query = orders_query.join(OrderAddress).filter(
+                or_(
+                    OrderAddress.city == 'الرياض',
+                    OrderAddress.city == 'رياض',
+                    OrderAddress.city.ilike('%الرياض%'),
+                    OrderAddress.city.ilike('%riyadh%'),
+                    OrderAddress.city == 'Riyadh'
+                )
+            )
+            print(f"✅ تطبيق فلتر الرياض لموظف التوصيل: {employee.email}")
+        
+        # الباقي يبقى كما هو...
         if not is_reviewer and employee:
             orders_query = orders_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee.id)
         
@@ -189,6 +207,11 @@ def index():
             payment_method = order.payment_method or raw_data.get('payment_method', '')
             payment_method_name = get_payment_method_name(payment_method)
             
+            # ✅ الحصول على بيانات المدينة للطلب
+            order_city = 'غير محدد'
+            if order.address:
+                order_city = order.address.city or 'غير محدد'
+            
             processed_order = {
                 'id': order.id,
                 'reference_id': reference_id,
@@ -205,7 +228,8 @@ def index():
                 'employee_statuses': [last_emp_status] if last_emp_status else [],
                 'status_notes': [last_note] if last_note else [],
                 'payment_method': payment_method,
-                'payment_method_name': payment_method_name
+                'payment_method_name': payment_method_name,
+                'city': order_city  # ✅ إضافة المدينة للطلب
             }
                 
             processed_orders.append(processed_order)
@@ -244,6 +268,7 @@ def index():
                                 pagination=pagination,
                                 filters=filters,
                                 is_reviewer=is_reviewer,
+                                is_delivery_personnel=is_delivery_personnel,  # ✅ تمرير المتغير للقالب
                                 current_employee=employee)
         
         return render_template('orders.html', 
@@ -254,6 +279,7 @@ def index():
                             filters=filters,
                             order_statuses=order_statuses,  
                             is_reviewer=is_reviewer,
+                            is_delivery_personnel=is_delivery_personnel,  # ✅ تمرير المتغير للقالب
                             current_employee=employee)
     
     except Exception as e:
