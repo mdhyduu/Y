@@ -168,11 +168,11 @@ def generate_barcode(data, dpi=300):
         
         writer.set_options({
             'write_text': True,
-            'module_width': 1.0,    # زيادة العرض (يجعل الباركود أعرض)
-            'module_height': 10,    # تقليل الارتفاع
-            'quiet_zone': 4,        # المسافة حول الباركود
-            'font_size': 10,
-            'text_distance': 2
+            'module_width': 0.2,    # جعل الشرائط أرفع (مثل الصورة)
+            'module_height': 6.0,   # زيادة ارتفاع الباركود
+            'quiet_zone': 2.0,      # تقليل المسافة البيضاء حول الباركود
+            'font_size': 8,         # تقليل حجم الخط
+            'text_distance': 1.0    # تقليل المسافة بين النص والباركود
         })
         barcode_instance = code_class(cleaned_data, writer=writer)
         buffer = BytesIO()
