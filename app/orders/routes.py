@@ -1,6 +1,7 @@
 # orders/routes.py
 import json
 import logging
+from sqlalchemy.dialects.postgresql import JSONB
 from math import ceil
 from datetime import datetime, timedelta
 from flask import (render_template, request, flash, redirect, url_for, jsonify, 
@@ -72,7 +73,6 @@ def index():
     date_to = request.args.get('date_to', '')
     search_query = request.args.get('search', '')
     
-    # إزالة order_type لأننا نعتمد على SallaOrder فقط
     if page < 1: 
         page = 1
     if per_page not in [10, 25, 50, 100]: 
@@ -133,10 +133,18 @@ def index():
         
         if search_query:
             search_filter = f'%{search_query}%'
+            
+            # 🔍 البحث في reference_id من full_order_data و raw_data
             orders_query = orders_query.filter(
                 or_(
+                    # البحث في customer_name
                     SallaOrder.customer_name.ilike(search_filter),
-                    SallaOrder.id.ilike(search_filter)
+                    # البحث في order id
+                    SallaOrder.id.ilike(search_filter),
+                    # 🔥 البحث في reference_id من full_order_data (الأولوية)
+                    db.cast(db.func.json_extract_path(SallaOrder.full_order_data, 'reference_id'), db.String).ilike(search_filter),
+                    # 🔥 البحث في reference_id من raw_data (كبديل)
+                    db.cast(db.func.json_extract_path(db.cast(SallaOrder.raw_data, JSONB), 'reference_id'), db.String).ilike(search_filter)
                 )
             )
         
@@ -177,8 +185,15 @@ def index():
         processed_orders = []
         
         for order in orders:
-            raw_data = json.loads(order.raw_data) if order.raw_data else {}
-            reference_id = raw_data.get('reference_id', order.id)
+            # 🔥 الأولوية لـ full_order_data، ثم raw_data
+            reference_id = order.id  # القيمة الافتراضية
+            
+            if order.full_order_data and 'reference_id' in order.full_order_data:
+                reference_id = order.full_order_data.get('reference_id', order.id)
+            elif order.raw_data:
+                raw_data = json.loads(order.raw_data) if isinstance(order.raw_data, str) else order.raw_data
+                reference_id = raw_data.get('reference_id', order.id)
+            
             status_name = order.status.name if order.status else 'غير محدد'
             status_slug = order.status.slug if order.status else 'unknown'
             
@@ -186,7 +201,14 @@ def index():
             last_emp_status = OrderEmployeeStatus.query.filter_by(order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
             
             # استخراج طريقة الدفع
-            payment_method = order.payment_method or raw_data.get('payment_method', '')
+            payment_method = order.payment_method
+            if not payment_method:
+                if order.full_order_data and 'payment_method' in order.full_order_data:
+                    payment_method = order.full_order_data.get('payment_method', '')
+                elif order.raw_data:
+                    raw_data = json.loads(order.raw_data) if isinstance(order.raw_data, str) else order.raw_data
+                    payment_method = raw_data.get('payment_method', '')
+            
             payment_method_name = get_payment_method_name(payment_method)
             
             processed_order = {
