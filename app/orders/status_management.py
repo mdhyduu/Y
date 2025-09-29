@@ -805,7 +805,6 @@ def update_product_status(order_id, product_id):
             'error': 'خطأ في تحديث حالة المنتج'
         }), 500
          
-        
 import concurrent.futures
 import threading
 from flask import current_app
@@ -840,8 +839,6 @@ def bulk_update_salla_status():
         'access_token': user.salla_access_token,
         'status_slug': status_slug,
         'note': note,
-        'employee_id': employee.id if employee else None,
-        'admin_id': user.id if not employee else None,
         'app': app  # تمرير التطبيق للخيوط
     }
     
@@ -912,27 +909,8 @@ def process_single_order(order_id, shared_data):
         )
         
         if response.status_code in [200, 201]:
-            # تحديث الحالة في النظام الداخلي باستخدام سياق التطبيق الصحيح
-            from app.models import OrderStatusNote
-            from app import db
-            
-            try:
-                status_note = OrderStatusNote(
-                    order_id=str(order_id),
-                    status_flag=shared_data['status_slug'],
-                    note=f"تم التحديث في سلة: {shared_data['note']}"
-                )
-                if shared_data['employee_id']:
-                    status_note.employee_id = shared_data['employee_id']
-                else:
-                    status_note.admin_id = shared_data['admin_id']
-                
-                db.session.add(status_note)
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                current_app.logger.warning(f"⚠️ فشل تحديث الحالة الداخلية للطلب {order_id}: {str(e)}")
-            
+            # ✅ تم التحديث في سلة بنجاح - بدون تخزين أي سجلات محلية
+            current_app.logger.info(f"✅ تم تحديث حالة الطلب {order_id} في سلة بنجاح")
             return {'success': True}
         else:
             error_message = f"كود الخطأ: {response.status_code}"
