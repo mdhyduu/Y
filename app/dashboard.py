@@ -9,7 +9,8 @@ from .models import (
     EmployeeCustomStatus,
     OrderEmployeeStatus,
     CustomNoteStatus,
-    OrderAddress
+    OrderAddress,
+    OrderStatus  # ✅ إضافة الاستيراد
 ) 
 from datetime import datetime
 from functools import wraps
@@ -66,72 +67,61 @@ def clear_cookies_and_redirect():
     return resp
 
 def _aggregate_default_statuses_for_store(store_id):
-    """تجمع الحالات التلقائية لكل الموظفين في المتجر"""
-    all_default_statuses = EmployeeCustomStatus.query.filter_by(
-        is_default=True
-    ).join(Employee).filter(
-        Employee.store_id == store_id
-    ).all()
-
+    """تجمع الحالات الأصلية لكل الطلبات في المتجر"""
+    # الحصول على جميع الحالات الأصلية للمتجر
+    order_statuses = OrderStatus.query.filter_by(store_id=store_id).all()
+    
     status_stats_dict = {}
-    for status in all_default_statuses:
-        count = OrderEmployeeStatus.query.filter(
-            OrderEmployeeStatus.status_id == status.id
+    for status in order_statuses:
+        # حساب عدد الطلبات لكل حالة
+        count = SallaOrder.query.filter_by(
+            store_id=store_id,
+            status_id=status.id
         ).count()
 
-        if status.name in status_stats_dict:
-            status_stats_dict[status.name]['count'] += count
-        else:
-            status_stats_dict[status.name] = {
-                'id': status.id,
-                'name': status.name,
-                'color': status.color,
-                'count': count
-            }
+        status_stats_dict[status.id] = {
+            'id': status.id,
+            'name': status.name,
+            'color': '#6c757d',  # لون افتراضي للحالات الأصلية
+            'count': count
+        }
 
     return list(status_stats_dict.values())
 
 def _get_employee_status_stats(employee_id):
-    """إحصاءات الحالات لموظف محدد"""
-    default_statuss = EmployeeCustomStatus.query.filter_by(
-        employee_id=employee_id,
-        is_default=True
-    ).all()
+    """إحصاءات الحالات الأصلية لموظف محدد"""
+    employee = Employee.query.get(employee_id)
+    if not employee:
+        return [], []
+
+    # الحصول على جميع الحالات الأصلية للمتجر
+    order_statuses = OrderStatus.query.filter_by(store_id=employee.store_id).all()
 
     default_status_stats = []
-    for s in default_statuss:
-        cnt = OrderEmployeeStatus.query.filter(
-            OrderEmployeeStatus.status_id == s.id
+    for status in order_statuses:
+        # حساب عدد الطلبات المسندة للموظف في كل حالة
+        count = SallaOrder.query.join(OrderAssignment).filter(
+            OrderAssignment.employee_id == employee_id,
+            SallaOrder.status_id == status.id
         ).count()
+        
         default_status_stats.append({
-            'id': s.id,
-            'name': s.name,
-            'color': s.color,
-            'count': cnt
+            'id': status.id,
+            'name': status.name,
+            'color': '#6c757d',  # لون افتراضي
+            'count': count
         })
 
-    custom_statuss = EmployeeCustomStatus.query.filter_by(
-        employee_id=employee_id,
-        is_default=False
-    ).all()
-
+    # في هذا السياق، لا نستخدم الحالات المخصصة، لذا نرجع قائمة فارغة للثانية
     custom_status_stats_selected = []
-    for s in custom_statuss:
-        cnt = OrderEmployeeStatus.query.filter(
-            OrderEmployeeStatus.status_id == s.id
-        ).count()
-        custom_status_stats_selected.append({
-            'id': s.id,
-            'name': s.name,
-            'color': s.color,
-            'count': cnt
-        })
 
     return default_status_stats, custom_status_stats_selected
+
 def _get_active_orders_count(employee_id):
     """حساب عدد الطلبات النشطة (التي لم يتم توصيلها) للموظف"""
-    delivered_status = EmployeeCustomStatus.query.filter_by(
-        employee_id=employee_id,
+    # استخدام الحالة الأصلية "تم التوصيل" بدلاً من المخصصة
+    delivered_status = OrderStatus.query.filter_by(
+        store_id=Employee.query.get(employee_id).store_id,
         name='تم التوصيل'
     ).first()
     
@@ -145,23 +135,17 @@ def _get_active_orders_count(employee_id):
     if not assigned_order_ids:
         return 0
         
-    # حساب الطلبات التي لم يتم توصيلها
+    # حساب الطلبات التي لم يتم توصيلها (ليست في حالة "تم التوصيل")
     active_orders_count = 0
     for order_id in assigned_order_ids:
-        # الحصول على آخر حالة للطلب
-        latest_status = OrderEmployeeStatus.query.filter_by(
-            order_id=order_id
-        ).order_by(OrderEmployeeStatus.created_at.desc()).first()
-        
-        # إذا لم تكن الحالة الأخيرة هي "تم التوصيل"، فإن الطلب لا يزال نشطًا
-        if not latest_status or latest_status.status_id != delivered_status.id:
+        order = SallaOrder.query.get(order_id)
+        if order and order.status_id != delivered_status.id:
             active_orders_count += 1
             
     return active_orders_count
 
 def _get_filtered_orders(store_id, status_id=None, for_delivery=False):
-    """دالة مساعدة للحصول على الطلبات المصفاة"""
-    # استخدام joinedload لتحميل جميع العلاقات المطلوبة
+    """دالة مساعدة للحصول على الطلبات المصفاة بناءً على الحالة الأصلية"""
     query = SallaOrder.query.filter_by(store_id=store_id)
     
     # إذا كان للعرض على فريق التوصيل، نضيف join مع OrderAddress للتصفية حسب المدينة
@@ -171,29 +155,23 @@ def _get_filtered_orders(store_id, status_id=None, for_delivery=False):
             OrderAddress.address_type == 'receiver'
         )
     
+    # تحميل العلاقات المطلوبة بما في ذلك الحالة الأصلية
     all_orders = query.options(
-        db.joinedload(SallaOrder.employee_statuses).joinedload(OrderEmployeeStatus.status),
+        db.joinedload(SallaOrder.status),  # الحالة الأصلية
         db.joinedload(SallaOrder.status_notes),
         db.joinedload(SallaOrder.assignments).joinedload(OrderAssignment.employee),
-        db.joinedload(SallaOrder.address)  # تحميل بيانات العنوان
+        db.joinedload(SallaOrder.address)
     ).all()
-    
-    # إضافة الحالة الحالية لكل طلب
-    for order in all_orders:
-        if order.employee_statuses:
-            sorted_statuses = sorted(order.employee_statuses, key=lambda x: x.created_at, reverse=True)
-            order.current_status = sorted_statuses[0].status
-        else:
-            order.current_status = None
     
     # تصفية الطلبات بناءً على الحالة المحددة
     if status_id:
         filtered_orders = [order for order in all_orders 
-                         if order.current_status and order.current_status.id == status_id]
+                         if order.status and order.status.id == status_id]
     else:
         filtered_orders = all_orders
     
     return filtered_orders, all_orders
+
 @dashboard_bp.route('/')
 @login_required
 def index():
@@ -201,7 +179,6 @@ def index():
     print(f"is_admin: {request.cookies.get('is_admin')}")
     print(f"employee_role: {request.cookies.get('employee_role')}")
     
-    # باقي الكود...
     """لوحة التحكم الرئيسية"""
     try:
         is_admin = request.cookies.get('is_admin') == 'true'
@@ -316,7 +293,6 @@ def index():
             selected_status_id = request.args.get('status_id', type=int)
             
             # إذا كان موظف توصيل أو مدير توصيل، نعرض لوحة التوصيل
-            # في قسم delivery و delivery_manager:
             if employee.role in ('delivery', 'delivery_manager'):
                 is_delivery_manager = (employee.role == 'delivery_manager')
                 
@@ -326,7 +302,7 @@ def index():
                     filtered_orders, all_orders = _get_filtered_orders(
                         employee.store_id, 
                         selected_status_id, 
-                        for_delivery=True  # تصفية لطلبات الرياض فقط
+                        for_delivery=True
                     )
                 else:
                     # الموظف العادي يرى فقط الطلبات المسندة إليه في الرياض فقط
@@ -339,22 +315,20 @@ def index():
                         _, store_orders = _get_filtered_orders(
                             employee.store_id, 
                             selected_status_id, 
-                            for_delivery=True  # تصفية لطلبات الرياض فقط
+                            for_delivery=True
                         )
                         filtered_orders = [order for order in store_orders if order.id in assigned_order_ids]
                         all_orders = filtered_orders
                     else:
                         filtered_orders, all_orders = [], []
-    
-    # باقي الكود كما هو...
                 
-                # حساب إحصائيات الحالات للعرض في التبويبات
+                # حساب إحصائيات الحالات الأصلية للعرض في التبويبات
                 status_stats = {}
                 for order in all_orders:
-                    if order.current_status:
-                        status_id = order.current_status.id
-                        status_name = order.current_status.name
-                        status_color = order.current_status.color
+                    if order.status:  # استخدام الحالة الأصلية بدلاً من المخصصة
+                        status_id = order.status.id
+                        status_name = order.status.name
+                        status_color = '#6c757d'  # لون افتراضي للحالات الأصلية
                         
                         if status_id not in status_stats:
                             status_stats[status_id] = {
@@ -377,11 +351,11 @@ def index():
                         is_active=True
                     ).all()
                 
-                # حساب الإحصائيات بناءً على الطلبات
+                # حساب الإحصائيات بناءً على الحالة الأصلية
                 in_progress_count = len([order for order in all_orders 
-                                       if order.current_status and order.current_status.name == 'قيد التنفيذ'])
+                                       if order.status and 'قيد' in order.status.name])
                 completed_count = len([order for order in all_orders 
-                                     if order.current_status and order.current_status.name == 'تم التنفيذ'])
+                                     if order.status and 'تم' in order.status.name])
                 
                 # حساب عدد الطلبات الجديدة اليوم
                 new_orders_today = len([o for o in filtered_orders if o.created_at and o.created_at.date() == datetime.now().date()])
@@ -440,16 +414,14 @@ def index():
                         ).count()
                     }
 
-                    default_statuses = EmployeeCustomStatus.query.filter_by(
-                        employee_id=employee.id,
-                        is_default=True
-                    ).all()
+                    # استخدام الحالات الأصلية بدلاً من المخصصة
+                    default_statuses = OrderStatus.query.filter_by(store_id=employee.store_id).all()
 
                     custom_status_stats = []
                     for status in default_statuses:
-                        count = OrderEmployeeStatus.query.filter(
-                            OrderEmployeeStatus.status_id == status.id,
-                            OrderEmployeeStatus.order_id.in_([o.id for o in all_orders])
+                        count = SallaOrder.query.filter_by(
+                            store_id=employee.store_id,
+                            status_id=status.id
                         ).count()
                         custom_status_stats.append({'status': status, 'count': count})
 
@@ -517,16 +489,14 @@ def index():
                         )])
                     }
 
-                    default_statuses = EmployeeCustomStatus.query.filter_by(
-                        employee_id=employee.id,
-                        is_default=True
-                    ).all()
+                    # استخدام الحالات الأصلية بدلاً من المخصصة
+                    default_statuses = OrderStatus.query.filter_by(store_id=employee.store_id).all()
 
                     custom_status_stats = []
                     for status in default_statuses:
-                        count = OrderEmployeeStatus.query.filter(
-                            OrderEmployeeStatus.status_id == status.id,
-                            OrderEmployeeStatus.order_id.in_(assigned_order_ids)
+                        count = SallaOrder.query.join(OrderAssignment).filter(
+                            OrderAssignment.employee_id == employee.id,
+                            SallaOrder.status_id == status.id
                         ).count() if assigned_order_ids else 0
 
                         custom_status_stats.append({
@@ -573,7 +543,7 @@ def settings():
 @dashboard_bp.route('/filter_orders')
 @login_required
 def filter_orders():
-    """إرجاع الطلبات المصفاة فقط (لطلبات AJAX)"""
+    """إرجاع الطلبات المصفاة فقط (لطلبات AJAX) بناءً على الحالة الأصلية"""
     try:
         is_admin = request.cookies.get('is_admin') == 'true'
         if is_admin:
@@ -583,16 +553,16 @@ def filter_orders():
         if not employee or employee.role not in ('delivery', 'delivery_manager'):
             return "غير مصرح", 403
             
-        # الحصول على الحالة المحددة من الباراميتر
-        selected_status_id = request.args.get('status_id', type=int)
+        # الحصول على الحالة المحددة من الباراميتر (الحالة الأصلية)
+        selected_status_id = request.args.get('status_id')
         
         # تحديد نطاق الطلبات بناءً على صلاحية الموظف مع التصفية للرياض فقط
         if employee.role == 'delivery_manager':
             # المدير يرى جميع طلبات المتجر في الرياض فقط
             filtered_orders, _ = _get_filtered_orders(
                 employee.store_id, 
-                selected_status_id, 
-                for_delivery=True  # تصفية لطلبات الرياض فقط
+                selected_status_id,
+                for_delivery=True
             )
         else:
             # الموظف العادي يرى فقط الطلبات المسندة إليه في الرياض فقط
@@ -604,8 +574,8 @@ def filter_orders():
                 # جلب جميع طلبات المتجر في الرياض ثم تصفيتها للموظف
                 _, store_orders = _get_filtered_orders(
                     employee.store_id, 
-                    selected_status_id, 
-                    for_delivery=True  # تصفية لطلبات الرياض فقط
+                    selected_status_id,
+                    for_delivery=True
                 )
                 filtered_orders = [order for order in store_orders if order.id in assigned_order_ids]
             else:
