@@ -108,7 +108,7 @@ def _get_employee_status_stats(employee_id):
         default_status_stats.append({
             'id': status.id,
             'name': status.name,
-          # لون افتراضي
+            'color': '#6c757d',  # لون افتراضي
             'count': count
         })
 
