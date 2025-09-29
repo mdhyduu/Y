@@ -168,9 +168,9 @@ def generate_barcode(data, dpi=300):
         
         writer.set_options({
             'write_text': True,
-            'module_width': 1.5,    # زيادة العرض (يجعل الباركود أعرض)
-            'module_height': 20,    # تقليل الارتفاع
-            'quiet_zone': 6,        # المسافة حول الباركود
+            'module_width': 1.0,    # زيادة العرض (يجعل الباركود أعرض)
+            'module_height': 10,    # تقليل الارتفاع
+            'quiet_zone': 4,        # المسافة حول الباركود
             'font_size': 10,
             'text_distance': 2
         })
