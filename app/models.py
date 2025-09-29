@@ -432,7 +432,7 @@ class SallaOrder(db.Model):
                               order_by='OrderStatusNote.created_at.desc()')
     employee_statuses = relationship('OrderEmployeeStatus', back_populates='order', lazy='selectin')
     assignments = relationship('OrderAssignment', back_populates='order', lazy='selectin')
-
+    address = relationship('OrderAddress', back_populates='order', uselist=False, lazy='selectin')
 class CustomOrder(db.Model):
     __tablename__ = 'custom_orders'
     

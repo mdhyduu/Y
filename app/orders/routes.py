@@ -72,6 +72,7 @@ def index():
     date_to = request.args.get('date_to', '')
     search_query = request.args.get('search', '')
     
+    # إزالة order_type لأننا نعتمد على SallaOrder فقط
     if page < 1: 
         page = 1
     if per_page not in [10, 25, 50, 100]: 
@@ -79,7 +80,6 @@ def index():
     
     is_general_employee = False
     is_reviewer = False
-    is_delivery_personnel = False
     
     if request.cookies.get('is_admin') == 'true':
         is_reviewer = True
@@ -100,37 +100,18 @@ def index():
         
         is_general_employee = employee.role == 'general'
         is_reviewer = employee.role in ['reviewer', 'manager']
-        is_delivery_personnel = employee.role in ['delivery_manager', 'delivery']
     
     try:
-        # ✅ استخدام SallaOrder مع join صحيح لـ OrderAddress
+        # استخدام SallaOrder فقط
         orders_query = SallaOrder.query.filter_by(store_id=user.store_id).options(
             selectinload(SallaOrder.status),
             selectinload(SallaOrder.assignments).selectinload(OrderAssignment.employee)
         )
         
-        # ✅ إضافة فلتر الرياض لموظفي التوصيل فقط
-        if is_delivery_personnel:
-            orders_query = orders_query.join(
-                OrderAddress, 
-                SallaOrder.id == OrderAddress.order_id
-            ).filter(
-                or_(
-                    OrderAddress.city == 'الرياض',
-                    OrderAddress.city == 'رياض',
-                    OrderAddress.city.ilike('%الرياض%'),
-                    OrderAddress.city.ilike('%riyadh%'),
-                    OrderAddress.city == 'Riyadh',
-                    OrderAddress.city.is_(None)  # ✅ تضمين الطلبات بدون مدينة
-                )
-            )
-            print(f"✅ تطبيق فلتر الرياض لموظف التوصيل: {employee.email}")
-        
-        # ✅ الباقي بدون تغيير
         if not is_reviewer and employee:
             orders_query = orders_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee.id)
         
-        # تطبيق الفلاتر الأخرى...
+        # تطبيق الفلاتر على SallaOrder فقط
         if status_filter in ['late', 'missing', 'not_shipped', 'refunded']:
             orders_query = orders_query.join(
                 OrderStatusNote, 
@@ -187,17 +168,12 @@ def index():
         elif employee:
             custom_statuses = EmployeeCustomStatus.query.filter_by(employee_id=employee.id).all()
         
-        # ✅ الحصول على العدد قبل التصفح للتحقق
-        total_orders_before_pagination = orders_query.count()
-        print(f"📊 عدد الطلبات قبل التصفح: {total_orders_before_pagination}")
-        
+        # تبسيط Pagination لاستخدام SallaOrder فقط
         orders_query = orders_query.order_by(nullslast(db.desc(SallaOrder.created_at)))
         pagination_obj = orders_query.paginate(page=page, per_page=per_page, error_out=False)
         orders = pagination_obj.items
         
-        print(f"📦 عدد الطلبات بعد التصفح: {len(orders)}")
-        
-        # ✅ معالجة الطلبات مع إصلاح استعلام المدينة
+        # معالجة الطلبات (SallaOrder فقط)
         processed_orders = []
         
         for order in orders:
@@ -209,12 +185,9 @@ def index():
             last_note = OrderStatusNote.query.filter_by(order_id=order.id).order_by(OrderStatusNote.created_at.desc()).first()
             last_emp_status = OrderEmployeeStatus.query.filter_by(order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
             
+            # استخراج طريقة الدفع
             payment_method = order.payment_method or raw_data.get('payment_method', '')
             payment_method_name = get_payment_method_name(payment_method)
-            
-            # ✅ إصلاح: استعلام منفصل للحصول على المدينة
-            order_address = OrderAddress.query.filter_by(order_id=order.id).first()
-            order_city = order_address.city if order_address else 'غير محدد'
             
             processed_order = {
                 'id': order.id,
@@ -232,8 +205,7 @@ def index():
                 'employee_statuses': [last_emp_status] if last_emp_status else [],
                 'status_notes': [last_note] if last_note else [],
                 'payment_method': payment_method,
-                'payment_method_name': payment_method_name,
-                'city': order_city
+                'payment_method_name': payment_method_name
             }
                 
             processed_orders.append(processed_order)
@@ -264,8 +236,6 @@ def index():
             'search': search_query
         }
         
-        print(f"🎯 جاهز للعرض: {len(processed_orders)} طلب")
-        
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return render_template('orders_partial.html', 
                                 orders=processed_orders, 
@@ -274,7 +244,6 @@ def index():
                                 pagination=pagination,
                                 filters=filters,
                                 is_reviewer=is_reviewer,
-                                is_delivery_personnel=is_delivery_personnel,
                                 current_employee=employee)
         
         return render_template('orders.html', 
@@ -285,15 +254,12 @@ def index():
                             filters=filters,
                             order_statuses=order_statuses,  
                             is_reviewer=is_reviewer,
-                            is_delivery_personnel=is_delivery_personnel,
                             current_employee=employee)
     
     except Exception as e:
         error_msg = f'حدث خطأ غير متوقع: {str(e)}'
         flash(error_msg, 'error')
         logger.exception(error_msg)
-        import traceback
-        print(f"❌ خطأ كامل: {traceback.format_exc()}")
         return redirect(url_for('orders.index'))
 import copy
 
