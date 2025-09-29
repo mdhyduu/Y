@@ -189,18 +189,19 @@
             word-wrap: break-word;
         }
 
+        /* --- MODIFIED BARCODE SECTION --- */
         .barcode-section {
             text-align: center;
-            margin-top: 15px; /* هامش علوي ثابت */
-            padding-top: 10px;
+            margin-top: auto;   /* يدفع الباركود لأسفل البطاقة تلقائياً */
+            padding-top: 8px;   /* حشو علوي بسيط للفصل */
             border-top: 1px solid #eee;
         }
 
         .barcode-image {
             width: 100%;
-            max-width: 280px;
-            height: 70px;
-            object-fit: contain;
+            max-width: 300px;
+            height: 85px;       /* تمت زيادة ارتفاع الباركود بشكل ملحوظ */
+            object-fit: contain; /* مهم للحفاظ على الأبعاد الصحيحة */
         }
         
         .no-data {
@@ -238,7 +239,7 @@
             .option-item, .notes-text { font-size: 14px; }
             
             .barcode-image {
-                height: 65px;
+                height: 80px;  /* زيادة الارتفاع في الطباعة أيضًا */
             }
 
             .options-section, .notes-section {
@@ -377,7 +378,7 @@
                     localStorage.removeItem('quickListPrintData');
                     
                     setTimeout(() => {
-                         window.print(); // يمكن تفعيل الطباعة التلقائية بإزالة التعليق
+                        window.print(); // يمكن تفعيل الطباعة التلقائية بإزالة التعليق
                     }, 1500);
                 } else {
                     // محاولة تحميل البيانات من النافذة الأم كخيار بديل
@@ -394,4 +395,3 @@
     </script>
 </body>
 </html>
-
