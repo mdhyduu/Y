@@ -507,6 +507,7 @@
     </div>
 </div>
 <!-- نافذة تحديث حالة سلة -->
+<!-- نافذة تحديث حالة سلة -->
 <div class="modal fade" id="updateSallaStatusModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -517,19 +518,40 @@
             <div class="modal-body">
                 <p>سيتم تحديث الحالة في منصة سلة لـ <span id="selected-count-salla-modal" class="fw-bold">0</span> طلب.</p>
                 
-                <div class="mb-3">
-                    <label for="salla-status-select" class="form-label">اختر حالة سلة:</label>
-                    <select class="form-select" id="salla-status-select">
-                        <option value="">اختر حالة...</option>
-                        <option value="pending">قيد الانتظار</option>
-                        <option value="processing">قيد المعالجة</option>
-                        <option value="shipped">تم الشحن</option>
-                        <option value="delivered">تم التوصيل</option>
-                        <option value="cancelled">ملغى</option>
-                        <option value="refunded">تم الاسترجاع</option>
-                        <option value="on-hold">موقوف</option>
-                    </select>
-                </div>
+   <div class="mb-3">
+    <label for="salla-status-select" class="form-label">اختر حالة سلة:</label>
+    <select class="form-select" id="salla-status-select">
+        <option value="">اختر حالة...</option>
+        
+        <!-- الحالات الأصلية من سلة -->
+        <optgroup label="🛒 الحالات الأصلية من سلة">
+            {% for status in order_statuses %}
+                {% if status.type == 'original' and status.is_active %}
+                    <option value="{{ status.slug }}" 
+                            data-bs-toggle="tooltip" 
+                            title="{{ status.name }} - {{ status.type }}">
+                        {{ status.name }}
+                    </option>
+                {% endif %}
+            {% endfor %}
+        </optgroup> 
+        
+        <!-- الحالات المخصصة (إذا أردت تضمينها) -->
+        <optgroup label="⚙️ الحالات المخصصة">
+            {% for status in order_statuses %}
+                {% if status.type == 'custom' and status.is_active %}
+                    <option value="{{ status.slug }}" 
+                            data-bs-toggle="tooltip" 
+                            title="{{ status.name }} - {{ status.type }}">
+                        {{ status.name }} (مخصص)
+                    </option>
+                {% endif %}
+            {% endfor %}
+        </optgroup>
+        
+    </select>
+    <div class="form-text">اختر الحالة المناسبة من قائمة حالات سلة</div>
+</div>
                 <div class="mb-3">
                     <label for="salla-status-note" class="form-label">ملاحظة (اختياري):</label>
                     <textarea class="form-control" id="salla-status-note" rows="2" placeholder="ملاحظة تظهر في سلة..."></textarea>
