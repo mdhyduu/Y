@@ -688,7 +688,6 @@ def check_status_conflict(order_id, new_status_type, custom_status_id=None):
         logger.error(f"Error in check_status_conflict: {str(e)}")
         return True, "حدث خطأ في التحقق من التعارض"
 
-
 @orders_bp.route('/<order_id>/product/<product_id>/update_status', methods=['POST'])
 def update_product_status(order_id, product_id):
     """تحديث حالة منتج معين داخل الطلب + تحديث حالة الطلب داخلياً إذا كل المنتجات تم تنفيذها"""
@@ -805,3 +804,117 @@ def update_product_status(order_id, product_id):
             'success': False, 
             'error': 'خطأ في تحديث حالة المنتج'
         }), 500
+        
+         
+@orders_bp.route('/bulk_update_salla_status', methods=['POST'])
+def bulk_update_salla_status():
+    """تحديث حالة عدة طلبات في سلة دفعة واحدة - بنفس منطق التحميل"""
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
+    
+    if not user.salla_access_token:
+        return jsonify({'success': False, 'error': 'يجب ربط متجرك مع سلة أولاً'}), 400
+    
+    data = request.get_json()
+    order_ids = data.get('order_ids', [])
+    status_slug = data.get('status_slug')
+    note = data.get('note', '')
+    
+    if not order_ids or not status_slug:
+        return jsonify({'success': False, 'error': 'بيانات ناقصة'}), 400
+    
+    current_app.logger.info(f"🔧 معالجة {len(order_ids)} طلب - بنفس منطق التحميل")
+    
+    try:
+        headers = {
+            'Authorization': f'Bearer {user.salla_access_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        updated_count = 0
+        failed_orders = []
+        
+        for order_id in order_ids:
+            try:
+                current_app.logger.info(f"🔄 معالجة الطلب: {order_id}")
+                
+                payload = {
+                    'slug': status_slug,
+                    'note': note
+                }
+                
+                api_url = f"https://api.salla.dev/admin/v2/orders/{order_id}/status"
+                current_app.logger.info(f"🌐 إرسال POST إلى: {api_url}")
+                
+                response = requests.post(
+                    api_url,
+                    headers=headers,
+                    json=payload,
+                    timeout=30
+                )
+                
+                current_app.logger.info(f"📡 استجابة السيرفر - الحالة: {response.status_code}")
+                
+                # ⭐⭐ التصحيح: اعتبار كود 201 نجاحاً أيضاً ⭐⭐
+                if response.status_code in [200, 201]:
+                    updated_count += 1
+                    current_app.logger.info(f"✅ تم تحديث الطلب {order_id} بنجاح (كود: {response.status_code})")
+                    
+                    # تحديث الحالة في النظام الداخلي
+                    try:
+                        from app.models import OrderStatusNote
+                        status_note = OrderStatusNote(
+                            order_id=str(order_id),
+                            status_flag=status_slug,
+                            note=f"تم التحديث في سلة: {note}"
+                        )
+                        if employee:
+                            status_note.employee_id = employee.id
+                        else:
+                            status_note.admin_id = user.id
+                        db.session.add(status_note)
+                    except Exception as e:
+                        current_app.logger.warning(f"⚠️ فشل تحديث الحالة الداخلية: {str(e)}")
+                    
+                else:
+                    error_message = f"كود الخطأ: {response.status_code}"
+                    try:
+                        error_data = response.json()
+                        error_message = error_data.get('error', {}).get('message', error_message)
+                    except:
+                        error_message = response.text[:100] + "..." if len(response.text) > 100 else response.text
+                    
+                    failed_orders.append(f"الطلب {order_id}: {error_message}")
+                    current_app.logger.error(f"❌ فشل تحديث {order_id}: {error_message}")
+                    
+            except requests.exceptions.RequestException as e:
+                error_msg = f"الطلب {order_id}: فشل الاتصال - {str(e)}"
+                failed_orders.append(error_msg)
+                current_app.logger.error(f"❌ {error_msg}")
+            except Exception as e:
+                error_msg = f"الطلب {order_id}: خطأ غير متوقع - {str(e)}"
+                failed_orders.append(error_msg)
+                current_app.logger.error(f"❌ {error_msg}")
+        
+        db.session.commit()
+        current_app.logger.info(f"📊 النتيجة: تم تحديث {updated_count} من أصل {len(order_ids)}")
+        
+        result = {
+            'success': updated_count > 0,
+            'message': f'تم تحديث {updated_count} طلب في سلة',
+            'updated_count': updated_count,
+            'failed_count': len(failed_orders),
+            'failed_orders': failed_orders
+        }
+        
+        if failed_orders:
+            result['error'] = 'فشل تحديث بعض الطلبات'
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"💥 خطأ عام: {str(e)}")
+        return jsonify({'success': False, 'error': f'حدث خطأ: {str(e)}'}), 500

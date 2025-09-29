@@ -113,13 +113,21 @@
         
         <!-- إضافة أزرار الإجراءات السريعة -->
     <!-- إضافة أزرار الإجراءات السريعة -->
-<div class="d-flex p-3" class="card-body"  id="quick-actions">
+<!-- في قسم أزرار الإجراءات السريعة - أضف هذا الزر -->
+<div class="d-flex p-3" class="card-body" id="quick-actions">
     {% if is_reviewer and employees %}
     <button type="button" class="btn btn-success rounded-pill px-3 me-2" id="assign-orders-btn" disabled>
         <i class="fas fa-user-check me-1"></i> 
         <span id="selected-orders-count">0</span> إسناد
     </button>
     {% endif %}
+    
+    <!-- ⭐⭐ زر تحديث حالة سلة الجديد ⭐⭐ -->
+    <button type="button" class="btn btn-warning rounded-pill px-3 me-2" id="update-salla-status-btn" disabled>
+        <i class="fas fa-sync-alt me-1"></i> 
+        <span id="selected-orders-count-salla">0</span> تحديث في سلة
+    </button>
+    
     <button type="button" class="btn btn-primary rounded-pill px-3 me-2" id="download-html-btn" disabled>
         <i class="fas fa-download me-1"></i> 
         <span id="selected-orders-count-html">0</span> تحميل 
@@ -129,8 +137,6 @@
         <i class="fas fa-tag me-1"></i> 
         <span id="selected-orders-count-2">0</span> تغيير الحالة
     </button>
-
- 
 
     <button type="button" class="btn btn-secondary mb-3" id="quickListViewBtn" disabled>
         <i class="fas fa-eye"></i> قائمة سريعة
@@ -500,6 +506,51 @@
 </div>
     </div>
 </div>
+<!-- نافذة تحديث حالة سلة -->
+<div class="modal fade" id="updateSallaStatusModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تحديث حالة الطلبات في سلة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>سيتم تحديث الحالة في منصة سلة لـ <span id="selected-count-salla-modal" class="fw-bold">0</span> طلب.</p>
+                
+                <div class="mb-3">
+                    <label for="salla-status-select" class="form-label">اختر حالة سلة:</label>
+                    <select class="form-select" id="salla-status-select">
+                        <option value="">اختر حالة...</option>
+                        <option value="pending">قيد الانتظار</option>
+                        <option value="processing">قيد المعالجة</option>
+                        <option value="shipped">تم الشحن</option>
+                        <option value="delivered">تم التوصيل</option>
+                        <option value="cancelled">ملغى</option>
+                        <option value="refunded">تم الاسترجاع</option>
+                        <option value="on-hold">موقوف</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="salla-status-note" class="form-label">ملاحظة (اختياري):</label>
+                    <textarea class="form-control" id="salla-status-note" rows="2" placeholder="ملاحظة تظهر في سلة..."></textarea>
+                </div>
+                
+                <div class="alert alert-info">
+                    <small>
+                        <i class="fas fa-info-circle me-1"></i>
+                        سيتم تحديث الحالة مباشرة في منصة سلة وقد تستغرق بضع ثوانٍ.
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-warning" id="confirm-salla-status-update">
+                    <i class="fas fa-sync-alt me-1"></i> تأكيد التحديث
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js" integrity="sha384-DpVxUeeBWjUvUV1czyIHJAjh+jYUZFu2lLakbdua5vbwOrBGi1UgaKCHjTC+x3Ky" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js" integrity="sha384-ssUzPQXjLHLO39a9AiuwxnnyDxIvOMUxEQpqfreUaW7jLEdDAXiF6UooZRO53F6Z" crossorigin="anonymous"></script>
@@ -572,20 +623,20 @@ $(document).ready(function () {
     }
     
     function updateAssignButtonState() {
-        const checkedCount = $('.order-checkbox:checked').length;
-        $('#selected-orders-count').text(checkedCount);
-        $('#selected-orders-count-2').text(checkedCount);
-        $('#selected-orders-count-html').text(checkedCount);
-        
-        const buttons = $('#assign-orders-btn, #change-status-btn, #download-html-btn, #quickListViewBtn');
-        buttons.prop('disabled', checkedCount === 0);
-        
-        if (checkedCount > 0) {
-            buttons.addClass('pulse-effect');
-            setTimeout(() => buttons.removeClass('pulse-effect'), 1000);
-        }
-    }
+    const checkedCount = $('.order-checkbox:checked').length;
+    $('#selected-orders-count').text(checkedCount);
+    $('#selected-orders-count-2').text(checkedCount);
+    $('#selected-orders-count-html').text(checkedCount);
+    $('#selected-orders-count-salla').text(checkedCount); // ⭐⭐ تحديث العداد الجديد
     
+    const buttons = $('#assign-orders-btn, #change-status-btn, #download-html-btn, #quickListViewBtn, #update-salla-status-btn');
+    buttons.prop('disabled', checkedCount === 0);
+    
+    if (checkedCount > 0) {
+        buttons.addClass('pulse-effect');
+        setTimeout(() => buttons.removeClass('pulse-effect'), 1000);
+    }
+}
     function buildQueryParams() {
         const params = new URLSearchParams();
         
@@ -711,17 +762,33 @@ $(document).ready(function () {
                 current_user_id: "{{ session.get('user_id') }}"
             })
         });
-    }
+    } 
     
     function getSelectedOrders() {
-        return $('.order-checkbox:checked').map((_, el) => {
-            const row = $(el).closest('tr');
-            return {
-                id: row.data('order-id'),
-                type: row.data('order-type')
-            };
-        }).get();
-    }
+    return $('.order-checkbox:checked').map((_, el) => {
+        const checkbox = $(el);
+        // استخدام قيمة الـ checkbox مباشرة (هذا ما تعمل به الطباعة)
+        const orderId = checkbox.val();
+        const row = checkbox.closest('tr');
+        const orderType = row.data('order-type') || 'salla';
+        
+        console.log('🎯 استخدام قيمة الـ checkbox:', {
+            checkboxValue: orderId,
+            dataOrderId: row.data('order-id'),
+            match: orderId === row.data('order-id')
+        });
+        
+        if (!orderId || orderId === 'None') {
+            console.error('❌ قيمة الـ checkbox غير صالحة:', orderId);
+            return null;
+        }
+        
+        return {
+            id: orderId,
+            type: orderType
+        };
+    }).get().filter(order => order !== null);
+}
 // دالة تجميع بيانات الطباعة من القائمة السريعة - معدلة لتضمين الباركود
 function collectQuickListPrintData() {
     const products = [];
@@ -1268,7 +1335,144 @@ function openQuickListPrint() {
             `);
         });
     });
+// دالة تحديث حالة سلة
+// دالة تحديث حالة سلة - محسنة
+// استبدال دالة getSelectedOrders بالمنطق البسيط الذي يعمل في التحميل
+function getSelectedOrdersForSalla() {
+    // نفس المنطق المستخدم في التحميل HTML
+    return $('.order-checkbox:checked').map((_, el) => {
+        return $(el).val(); // قيمة الـ checkbox مباشرة
+    }).get();
+}
+
+// تحديث دالة updateSallaOrdersStatus
+function updateSallaOrdersStatus(orderIds, statusSlug, note = '') {
+    const btn = $('#confirm-salla-status-update');
+    const originalText = btn.html();
     
+    btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التحديث في سلة');
+    
+    console.log('🔧 الطلبات المحددة (بنفس منطق التحميل):', orderIds);
+    
+    $.ajax({
+        url: "{{ url_for('orders.bulk_update_salla_status') }}",
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        data: JSON.stringify({
+            order_ids: orderIds,  // استخدام order_ids مباشرة كما في التحميل
+            status_slug: statusSlug,
+            note: note
+        }),
+        timeout: 60000
+    })
+    .done(function(response) {
+        console.log('🔧 استجابة السيرفر:', response);
+        
+        if (response.success) {
+            let successMessage = `تم تحديث ${response.updated_count} طلب بنجاح في سلة`;
+            
+            if (response.failed_orders && response.failed_orders.length > 0) {
+                successMessage += ` (فشل ${response.failed_count} طلب)`;
+                
+                setTimeout(() => {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'بعض الطلبات فشل تحديثها',
+                        html: `
+                            <div class="text-start" style="max-height: 300px; overflow-y: auto;">
+                                <p class="small text-muted mb-3">تفاصيل الأخطاء:</p>
+                                <ul class="list-unstyled mb-0">
+                                    ${response.failed_orders.map(order => 
+                                        `<li class="small text-danger mb-2">❌ ${order}</li>`
+                                    ).join('')}
+                                </ul>
+                            </div>
+                        `,
+                        confirmButtonText: 'موافق',
+                        width: '700px'
+                    });
+                }, 1500);
+            }
+            
+            showSweetAlert('success', 'تم التحديث', successMessage);
+            
+            setTimeout(() => {
+                $('#updateSallaStatusModal').modal('hide');
+                location.reload();
+            }, 3000);
+        } else {
+            let errorMessage = response.error || 'فشل التحديث';
+            
+            if (response.failed_orders && response.failed_orders.length > 0) {
+                errorMessage += `<br><small class="text-muted">${response.failed_orders[0]}</small>`;
+            }
+            
+            Swal.fire({
+                icon: 'error',
+                title: 'فشل التحديث',
+                html: errorMessage,
+                confirmButtonText: 'موافق'
+            });
+        }
+    })
+    .fail(function(xhr, status, error) {
+        console.error('💥 خطأ في الاتصال:', error);
+        
+        let errorMsg = 'فشل الاتصال بالخادم';
+        if (xhr.responseJSON && xhr.responseJSON.error) {
+            errorMsg = xhr.responseJSON.error;
+        } else if (status === 'timeout') {
+            errorMsg = 'انتهت مهلة الاتصال. حاول مرة أخرى.';
+        }
+        
+        Swal.fire({
+            icon: 'error',
+            title: 'خطأ في الاتصال',
+            text: errorMsg,
+            confirmButtonText: 'موافق'
+        });
+    })
+    .always(function() {
+        btn.prop('disabled', false).html(originalText);
+    });
+}
+
+// تحديث حدث النقر على زر تحديث سلة
+$(document).on('click', '#update-salla-status-btn', function() {
+    const selectedOrders = getSelectedOrdersForSalla();
+    
+    console.log('🔍 الطلبات المحددة بنفس منطق التحميل:', selectedOrders);
+    
+    if (selectedOrders.length === 0) {
+        showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات');
+        return;
+    }
+    
+    $('#selected-count-salla-modal').text(selectedOrders.length);
+    $('#updateSallaStatusModal').modal('show');
+});
+
+// تحديث حدث تأكيد التحديث
+$(document).on('click', '#confirm-salla-status-update', function() {
+    const selectedOrders = getSelectedOrdersForSalla();
+    const statusSlug = $('#salla-status-select').val();
+    const note = $('#salla-status-note').val();
+    
+    if (!statusSlug) {
+        showSweetAlert('warning', 'تحذير', 'يجب اختيار حالة سلة');
+        return;
+    }
+    
+    updateSallaOrdersStatus(selectedOrders, statusSlug, note);
+});
+// إعادة تعيين حقول النافذة عند فتحها
+$('#updateSallaStatusModal').on('show.bs.modal', function () {
+    $('#salla-status-select').val('');
+    $('#salla-status-note').val('');
+});
 // 21. أحداث إظهار/إخفاء الطلبات لكل منتج
 $(document).on('click', '.toggle-orders-btn', function() {
     const sku = $(this).data('sku');
