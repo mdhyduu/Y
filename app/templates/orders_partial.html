@@ -64,12 +64,11 @@
                             title="إسناد الطلب">
                         <i class="fas fa-user-plus"></i> {% if order.assignments %}تعديل{% else %}إسناد{% endif %}
                     </button>
-                    <a href="{{ url_for('orders.order_details', order_id=order.id) }}" 
-                       class="btn btn-sm btn-outline-info" 
-                       title="تفاصيل الطلب"
-                       target="_blank">
+                    <button class="btn btn-sm btn-outline-info view-order-btn" 
+                            data-order-id="{{ order.id }}"
+                            title="تفاصيل الطلب">
                         <i class="fas fa-eye"></i>
-                    </a>
+                    </button>
                     <button class="btn btn-sm btn-outline-success delivery-action-btn" 
                             data-order-id="{{ order.id }}"
                             data-action="deliver"
