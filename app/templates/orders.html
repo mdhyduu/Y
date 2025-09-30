@@ -1218,91 +1218,124 @@ function openQuickListPrint() {
         })
 // في جزء إنشاء القائمة السريعة، عدل كود عرض المنتج ليصبح كالتالي:
 <!-- في جزء إنشاء القائمة السريعة في JavaScript، عدل كود عرض المنتج ليصبح كالتالي: -->
+// في جزء إنشاء القائمة السريعة - استبدال الكود الموجود 
 .done(function(data) {
     if (data.success) {
         let html = '';
         
         if (data.products && data.products.length > 0) {
             data.products.forEach(product => {
+                // التحقق من وجود بيانات الطلبات
+                const hasValidAppearances = product.order_appearances && 
+                                           product.order_appearances.length > 0;
+                
+                // حساب العدد الفعلي للطلبات
+                const validAppearancesCount = hasValidAppearances ? 
+                    product.order_appearances.length : 0;
+                
+                // التحقق من وجود SKU
+                const productSku = product.sku || `unknown_${Date.now()}`;
+                
                 html += `
-<div class="card mb-4 product-card" data-product-sku="${product.sku}">
+<div class="card mb-4 product-card" data-product-sku="${productSku}">
     <div class="card-header bg-light d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center">
             <!-- زر تحديد المنتج -->
             <div class="form-check me-3">
                 <input class="form-check-input product-checkbox" type="checkbox" 
-                       id="product-${product.sku}" data-sku="${product.sku}" checked>
-                <label class="form-check-label" for="product-${product.sku}"></label>
+                       id="product-${productSku}" data-sku="${productSku}" 
+                       ${hasValidAppearances ? 'checked' : 'disabled'}>
+                <label class="form-check-label" for="product-${productSku}"></label>
             </div>
-            <img src="${product.main_image || '/static/images/no-image.png'}" 
+            <img src="${product.main_image || product.thumbnail || '/static/images/no-image.png'}" 
                  alt="${product.name}" 
                  class="img-thumbnail me-3" 
                  style="width: 60px; height: 60px; object-fit: cover;"
                  onerror="this.src='/static/images/no-image.png'">
             <div>
-                <h6 class="mb-1 fw-bold">${product.name}</h6>
-                <small class="text-muted">SKU: ${product.sku}</small>
+                <h6 class="mb-1 fw-bold">${product.name || 'منتج بدون اسم'}</h6>
+                <small class="text-muted">SKU: ${productSku}</small>
                 <div class="mt-1">
-                    <span class="badge bg-primary">الكمية الإجمالية: ${product.total_quantity}</span>
-                    <span class="badge bg-secondary ms-2">موجود في ${product.appearances_count} طلب</span>
+                    <span class="badge bg-primary">الكمية الإجمالية: ${product.total_quantity || 0}</span>
+                    <span class="badge bg-secondary ms-2">موجود في ${validAppearancesCount} طلب</span>
                     ${product.price ? `<span class="badge bg-warning ms-2">السعر: ${product.price} ر.س</span>` : ''}
                 </div>
             </div>
         </div>
         <div class="d-flex align-items-center">
             <div class="product-selection-info me-3">
-                <small class="text-muted selected-orders-count" data-sku="${product.sku}">
-                    ${product.order_appearances.length}/${product.order_appearances.length} محدد
+                <small class="text-muted selected-orders-count" data-sku="${productSku}">
+                    ${hasValidAppearances ? `${validAppearancesCount}/${validAppearancesCount} محدد` : '0/0 محدد'}
                 </small>
             </div>
+            ${hasValidAppearances ? `
             <!-- زر إظهار/إخفاء الطلبات -->
             <button class="btn btn-sm btn-outline-primary toggle-orders-btn" 
                     type="button" 
-                    data-sku="${product.sku}"
+                    data-sku="${productSku}"
                     title="إظهار/إخفاء الطلبات">
                 <i class="fas fa-chevron-down"></i>
             </button>
+            ` : ''}
         </div>
     </div>
-    <div class="card-body orders-container" id="orders-${product.sku}" style="display: none;">
-        <h6 class="border-bottom pb-2 mb-3">تفاصيل الطلبات:</h6>
-                `;
+    `;
 
-                // عرض كل ظهور للمنتج في الطلبات المختلفة
-                product.order_appearances.forEach((appearance, index) => {
-                    // تخزين بيانات الباركود في العنصر
-                    const barcodeData = appearance.barcode || '';
-                    
+                // عرض الطلبات فقط إذا كانت موجودة
+                if (hasValidAppearances) {
                     html += `
+    <div class="card-body orders-container" id="orders-${productSku}" style="display: none;">
+        <h6 class="border-bottom pb-2 mb-3">تفاصيل الطلبات:</h6>
+                    `;
+
+                    // عرض كل ظهور للمنتج في الطلبات المختلفة
+                    product.order_appearances.forEach((appearance, index) => {
+                        // التحقق من صحة بيانات الطلب
+                        const isValidAppearance = appearance && 
+                                                appearance.order_id && 
+                                                appearance.reference_id;
+                        
+                        if (!isValidAppearance) {
+                            console.warn('⚠️ بيانات طلب غير صالحة:', appearance);
+                            return; // تخطي البيانات غير الصالحة
+                        }
+
+                        const barcodeData = appearance.barcode || `باركود_${appearance.reference_id}`;
+                        const customerName = appearance.customer_name || 'غير محدد';
+                        const customerMobile = appearance.customer_mobile || '';
+                        const createdAt = appearance.created_at || 'غير محدد';
+                        const quantity = appearance.quantity || 1;
+                        
+                        html += `
         <div class="order-appearance mb-3 p-3 border rounded ${index > 0 ? 'mt-2' : ''}" 
              data-barcode="${barcodeData}">
             <div class="row align-items-center">
                 <div class="col-md-8">
                     <div class="d-flex align-items-center">
-                        <input class="form-check-input me-2 quick-list-order order-checkbox-${product.sku}" 
+                        <input class="form-check-input me-2 quick-list-order order-checkbox-${productSku}" 
                                type="checkbox" 
                                value="${appearance.order_id}" 
-                               id="order-${appearance.order_id}-${product.sku}"
+                               id="order-${appearance.order_id}-${productSku}"
                                data-order-id="${appearance.order_id}"
-                               data-product-sku="${product.sku}"
+                               data-product-sku="${productSku}"
                                checked>
-                        <label class="form-check-label fw-bold" for="order-${appearance.order_id}-${product.sku}">
+                        <label class="form-check-label fw-bold" for="order-${appearance.order_id}-${productSku}">
                             الطلب #${appearance.reference_id}
                         </label>
                     </div>
                     <div class="ms-4 mt-2">
                         <small class="text-muted d-block">
-                            <i class="fas fa-user me-1"></i> العميل: ${appearance.customer_name || 'غير محدد'}
+                            <i class="fas fa-user me-1"></i> العميل: ${customerName}
                         </small>
                         <small class="text-muted d-block">
-                            <i class="fas fa-calendar me-1"></i> التاريخ: ${appearance.created_at}
+                            <i class="fas fa-calendar me-1"></i> التاريخ: ${createdAt}
                         </small>
                         <small class="text-muted d-block">
-                            <i class="fas fa-box me-1"></i> الكمية: ${appearance.quantity}
+                            <i class="fas fa-box me-1"></i> الكمية: ${quantity}
                         </small>
-                        ${appearance.customer_mobile ? `
+                        ${customerMobile ? `
                         <small class="text-muted d-block">
-                            <i class="fas fa-phone me-1"></i> الجوال: ${appearance.customer_mobile}
+                            <i class="fas fa-phone me-1"></i> الجوال: ${customerMobile}
                         </small>
                         ` : ''}
                     </div>
@@ -1312,20 +1345,22 @@ function openQuickListPrint() {
                         <strong class="small d-block mb-1">الخيارات:</strong>
                         `;
 
-                    // عرض الخيارات إذا وجدت
-                    if (appearance.options && appearance.options.length > 0) {
-                        appearance.options.forEach(option => {
-                            html += `
+                        // عرض الخيارات إذا وجدت
+                        if (appearance.options && appearance.options.length > 0) {
+                            appearance.options.forEach(option => {
+                                if (option && option.name && option.value) {
+                                    html += `
                         <span class="badge bg-light text-dark me-1 mb-1 small">
                             ${option.name}: ${option.value}
                         </span>
-                            `;
-                        });
-                    } else {
-                        html += `<span class="text-muted small">لا توجد خيارات</span>`;
-                    }
+                                    `;
+                                }
+                            });
+                        } else {
+                            html += `<span class="text-muted small">لا توجد خيارات</span>`;
+                        }
 
-                    html += `
+                        html += `
                     </div>
                     
                     <!-- قسم الملاحظات -->
@@ -1340,11 +1375,25 @@ function openQuickListPrint() {
                 </div>
             </div>
         </div>
+                        `;
+                    });
+
+                    html += `
+    </div>
                     `;
-                });
+                } else {
+                    // رسالة عندما لا توجد طلبات
+                    html += `
+    <div class="card-body">
+        <div class="alert alert-warning text-center py-3">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            لا توجد بيانات طلبات متاحة لهذا المنتج
+        </div>
+    </div>
+                    `;
+                }
 
                 html += `
-    </div>
 </div>
                 `;
             });
@@ -1363,8 +1412,12 @@ function openQuickListPrint() {
         updateProductSelectionCounts();
         
         // إظهار إحصائيات النتائج
+        const successfulProducts = data.products ? data.products.filter(p => 
+            p.order_appearances && p.order_appearances.length > 0
+        ).length : 0;
+        
         showSweetAlert('success', 'تم التحميل بنجاح', 
-            `تم تحميل ${data.products?.length || 0} منتج من ${data.stats?.successful_orders || 0} طلب`);
+            `تم تحميل ${successfulProducts} منتج صالح من ${data.stats?.successful_orders || 0} طلب`);
         
     } else {
         $('#quickListContent').html(`
@@ -1588,13 +1641,20 @@ $(document).on('change', '.quick-list-order', function() {
 });
 
 // 17. دالة تحديث عداد منتج معين
+// 17. دالة تحديث عداد منتج معين - محسنة
 function updateProductSelectionCount(productSku) {
-    const totalOrders = $(`.order-checkbox-${productSku}`).length;
-    const selectedOrders = $(`.order-checkbox-${productSku}:checked`).length;
+    const orderCheckboxes = $(`.order-checkbox-${productSku}`);
+    const totalOrders = orderCheckboxes.length;
     
+    // التحقق من وجود أي checkboxes
+    if (totalOrders === 0) {
+        $(`.selected-orders-count[data-sku="${productSku}"]`).text('0/0 محدد');
+        return;
+    }
+    
+    const selectedOrders = orderCheckboxes.filter(':checked').length;
     $(`.selected-orders-count[data-sku="${productSku}"]`).text(`${selectedOrders}/${totalOrders} محدد`);
 }
-
 // 18. دالة تحديث جميع العدادات
 function updateProductSelectionCounts() {
     $('.product-card').each(function() {
@@ -1604,10 +1664,25 @@ function updateProductSelectionCounts() {
 }
 
 // 19. دالة تحديث حالة زر تحديد المنتج
+// 19. دالة تحديث حالة زر تحديد المنتج - محسنة
 function updateProductCheckboxState(productSku) {
-    const totalOrders = $(`.order-checkbox-${productSku}`).length;
-    const selectedOrders = $(`.order-checkbox-${productSku}:checked`).length;
+    const orderCheckboxes = $(`.order-checkbox-${productSku}`);
+    const totalOrders = orderCheckboxes.length;
+    
+    // إذا لم توجد checkboxes، تعطيل المنتج
+    if (totalOrders === 0) {
+        const productCheckbox = $(`#product-${productSku}`);
+        productCheckbox.prop('checked', false);
+        productCheckbox.prop('disabled', true);
+        productCheckbox.prop('indeterminate', false);
+        return;
+    }
+    
+    const selectedOrders = orderCheckboxes.filter(':checked').length;
     const productCheckbox = $(`#product-${productSku}`);
+    
+    // تمكين المنتج إذا كان هناك checkboxes
+    productCheckbox.prop('disabled', false);
     
     if (selectedOrders === 0) {
         // لا توجد طلبات محددة
@@ -1623,7 +1698,6 @@ function updateProductCheckboxState(productSku) {
         productCheckbox.prop('indeterminate', true);
     }
 }
-
 // 20. دالة تحديد/إلغاء تحديد جميع المنتج
 $(document).on('click', '.select-all-product', function() {
     const productSku = $(this).data('sku');
