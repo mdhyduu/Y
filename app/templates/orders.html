@@ -1953,7 +1953,14 @@ function cleanupOldPrintData() {
         console.error('❌ خطأ في تنظيف البيانات:', error);
     }
 }
-
+// دالة التحقق من صحة البيانات
+function validateProductData(product) {
+    return product && 
+           product.sku && 
+           product.order_appearances && 
+           Array.isArray(product.order_appearances) && 
+           product.order_appearances.length > 0;
+}
 // استدعاء التنظيف عند تحميل الصفحة
 $(document).ready(function() {
     cleanupOldPrintData();
