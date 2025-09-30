@@ -227,6 +227,7 @@
 {% block scripts %}
 <script>
 // دالة للحصول على CSRF token
+// دالة للحصول على CSRF token
 function getCSRFToken() {
     const csrfToken = document.querySelector('meta[name="csrf-token"]');
     return csrfToken ? csrfToken.getAttribute('content') : '';
@@ -276,9 +277,11 @@ function initOrderSelection() {
     updateAssignButton();
 }
 
-// التعامل مع أزرار الإسناد
+// التعامل مع أزرار الإسناد باستخدام event delegation
 function initAssignButtons() {
+    // استخدام event delegation للتعامل مع الأزرار التي يتم تحميلها ديناميكياً
     document.addEventListener('click', function(e) {
+        // التعامل مع أزرار الإسناد
         if (e.target.closest('.assign-btn')) {
             const button = e.target.closest('.assign-btn');
             const orderId = button.getAttribute('data-order-id');
@@ -287,12 +290,47 @@ function initAssignButtons() {
                 .then(response => response.text())
                 .then(html => {
                     document.getElementById('assignModalContent').innerHTML = html;
+                    // فتح المودال بعد تحميل المحتوى
+                    const modal = new bootstrap.Modal(document.getElementById('assignOrderModal'));
+                    modal.show();
                 })
                 .catch(error => {
                     console.error('Error:', error);
                     document.getElementById('assignModalContent').innerHTML = 
                         '<div class="alert alert-danger">حدث خطأ أثناء تحميل المحتوى</div>';
                 });
+        }
+        
+        // التعامل مع أزرار التسليم
+        if (e.target.closest('.delivery-action-btn')) {
+            const button = e.target.closest('.delivery-action-btn');
+            const orderId = button.getAttribute('data-order-id');
+            const action = button.getAttribute('data-action');
+            
+            if (action === 'deliver') {
+                if (confirm('هل تريد تأكيد تسليم هذا الطلب؟')) {
+                    fetch('/delivery/mark_delivered/' + orderId, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRFToken': getCSRFToken()
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            location.reload();
+                        } else {
+                            alert('فشل في تأكيد التسليم: ' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('حدث خطأ أثناء تأكيد التسليم');
+                    });
+                }
+            }
         }
     });
 }
@@ -301,6 +339,7 @@ function initAssignButtons() {
 function initOrderTabs() {
     const ordersTabs = document.getElementById('orders-tabs');
     if (ordersTabs) {
+        // استخدام event delegation للتبويبات
         ordersTabs.addEventListener('click', function(e) {
             e.preventDefault();
             const target = e.target.closest('a');
@@ -333,9 +372,8 @@ function initOrderTabs() {
                 .then(response => response.text())
                 .then(html => {
                     ordersContainer.innerHTML = html;
-                    // إعادة تهيئة الأحداث بعد تحميل المحتوى الجديد
-                    initOrderSelection();
-                    initAssignButtons();
+                    // لا حاجة لاستدعاء initOrderSelection() و initAssignButtons() هنا
+                    // لأننا نستخدم event delegation
                 })
                 .catch(error => {
                     console.error('Error:', error);
@@ -375,6 +413,9 @@ function initBulkAssignment() {
             .then(response => response.text())
             .then(html => {
                 document.getElementById('assignMultipleModalContent').innerHTML = html;
+                // فتح المودال بعد تحميل المحتوى
+                const modal = new bootstrap.Modal(document.getElementById('assignMultipleModal'));
+                modal.show();
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -440,14 +481,13 @@ function initModalReset() {
 document.addEventListener('DOMContentLoaded', function() {
     initAnimations();
     initOrderSelection();
-    initAssignButtons();
+    initAssignButtons(); // هذا هو الأهم - event delegation
     initOrderTabs();
     initBulkAssignment();
     initModalReset();
     
     // جعل الدوال متاحة عالمياً لاستدعائها من الملفات الجزئية
     window.initOrderSelection = initOrderSelection;
-    window.initAssignButtons = initAssignButtons;
 });
 </script>
 {% endblock %}
