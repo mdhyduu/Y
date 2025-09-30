@@ -964,22 +964,33 @@ function collectQuickListPrintData() {
     // دالة فتح نافذة الطباعة للقائمة السريعة
     // دالة محسنة فتح نافذة الطباعة
 // دالة فتح نافذة الطباعة للقائمة السريعة
+// دالة فتح نافذة الطباعة باستخدام المعالجة على الخادم
 function openQuickListPrint() {
-    const printData = collectQuickListPrintData();
-    
-    if (printData.products.length === 0) {
-        showSweetAlert('warning', 'تحذير', 'لا توجد بيانات للطباعة');
-        return;
+    try {
+        const selectedOrders = getSelectedOrdersForSalla();
+        
+        if (selectedOrders.length === 0) {
+            showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للطباعة');
+            return;
+        }
+        
+        console.log('🔄 استخدام المعالجة على الخادم للطلبات:', selectedOrders);
+        
+        // استخدام route الخادم الجديد
+        const printUrl = `{{ url_for('orders.server_quick_list_print') }}?order_ids=${selectedOrders.join(',')}`;
+        const printWindow = window.open(printUrl, '_blank', 'width=1400,height=900,scrollbars=yes,resizable=yes');
+        
+        if (!printWindow) {
+            throw new Error('تم منع النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة لهذا الموقع.');
+        }
+        
+        showSweetAlert('success', 'جاري المعالجة على الخادم', 
+            `يتم معالجة ${selectedOrders.length} طلب على الخادم...`);
+        
+    } catch (error) {
+        console.error('❌ خطأ في فتح نافذة الطباعة:', error);
+        showSweetAlert('error', 'خطأ', `فشل في فتح نافذة الطباعة: ${error.message}`);
     }
-    
-    // حفظ البيانات في localStorage
-    localStorage.setItem('quickListPrintData', JSON.stringify(printData));
-    
-    // فتح نافذة الطباعة باستخدام route Flask
-    const printWindow = window.open("{{ url_for('orders.quick_list_print') }}", '_blank', 'width=1200,height=800');
-    
-    // إظهار رسالة نجاح
-    showSweetAlert('success', 'تم التجهيز للطباعة', 'يتم فتح نافذة الطباعة...');
 }
     // 2. تحديد الطلبات (الكل أو فردي)
     $(document).on('change', '#select-all, #select-all-header', function() {

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تقرير الطلبات - معالجة خادم</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 0.5cm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.3;
+            margin: 0;
+            padding: 15px;
+            color: #2c3e50;
+            background: #f8f9fa;
+            font-size: 12px;
+        }
+
+        .report-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .report-header h1 { 
+            margin: 0 0 10px 0; 
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .report-summary {
+            background: #fff;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 25px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            text-align: center;
+        }
+
+        .summary-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+
+        .summary-item h3 {
+            margin: 0 0 8px 0;
+            font-size: 28px;
+            font-weight: 700;
+            color: #495057;
+        }
+
+        .summary-item p {
+            margin: 0;
+            color: #6c757d;
+            font-weight: 600;
+        }
+
+        .print-controls {
+            text-align: center;
+            margin: 25px 0;
+            padding: 20px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.08);
+        }
+
+        .print-controls button {
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            margin: 0 10px;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        #orders-grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 15px;
+        }
+
+        .order-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .card-product-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid #f0f0f0;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+        }
+
+        .card-product-image {
+            width: 80px;
+            height: 80px;
+            border-radius: 6px;
+            object-fit: cover;
+            border: 1px solid #ddd;
+        }
+
+        .card-order-info {
+            flex: 1;
+        }
+        
+        .card-order-ref {
+            font-size: 26px;
+            font-weight: bold;
+            color: #2c3e50;
+            display: block;
+        }
+
+        .card-quantity {
+            background: #2c3e50;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            display: inline-block;
+            margin-top: 8px;
+        }
+
+        .options-section, .notes-section {
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .options-section {
+            background: #e9f5ff;
+            border: 1px solid #b3d7ff;
+        }
+
+        .notes-section {
+            background: #fffbe6;
+            border: 1px solid #ffeccd;
+        }
+
+        .options-title, .notes-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+
+        .option-item {
+            display: block;
+            background: white;
+            padding: 4px 8px;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        .notes-text {
+            font-size: 16px;
+            white-space: pre-wrap;
+        }
+
+        .barcode-section {
+            text-align: center;
+            margin-top: 12px;
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+        }
+
+        .barcode-image {
+            width: 100%;
+            max-width: 200px;
+            height: 75px;
+            object-fit: contain;
+        }
+        
+        .no-data {
+            text-align: center;
+            padding: 50px;
+            color: #6c757d;
+            background: #fff;
+            border-radius: 8px;
+        }
+
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+                background: #fff;
+                font-size: 11px;
+            }
+            
+            .report-header, .report-summary, .print-controls {
+                display: none;
+            }
+
+            #orders-grid-container {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+                padding: 0;
+            }
+
+            .order-card {
+                border: 1.5px solid #555;
+                box-shadow: none;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            
+            .card-product-image {
+                width: 70px;
+                height: 70px;
+            }
+
+            .card-order-ref {
+                font-size: 20px;
+            }
+
+            .card-quantity {
+                font-size: 14px;
+                padding: 4px 10px;
+            }
+
+            .option-item, .notes-text {
+                font-size: 13px;
+            }
+
+            .options-section, .notes-section {
+                padding: 8px;
+                margin-top: 8px;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .barcode-image {
+                height: 65px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <h1>تقرير القائمة السريعة - معالجة خادم</h1>
+        <p>تاريخ التقرير: <span id="report-date"></span></p>
+    </div>
+
+    <div class="report-summary">
+        <div class="summary-item">
+            <h3 id="total-products">{{ print_data.summary.totalProducts }}</h3>
+            <p>عدد المنتجات</p>
+        </div>
+        <div class="summary-item">
+            <h3 id="total-orders">{{ print_data.summary.totalOrders }}</h3>
+            <p>عدد الطلبات</p>
+        </div>
+        <div class="summary-item">
+            <h3 id="total-quantity">{{ print_data.summary.totalQuantity }}</h3>
+            <p>إجمالي الكميات</p>
+        </div>
+        <div class="summary-item">
+            <h3 id="total-items">{{ print_data.summary.totalItems }}</h3>
+            <p>إجمالي العناصر</p>
+        </div>
+    </div>
+
+    <div id="orders-grid-container">
+        {% if print_data.products and print_data.products|length > 0 %}
+            {% for product in print_data.products %}
+                {% for order in product.orders %}
+                    <div class="order-card">
+                        <div class="card-product-header">
+                            {% if product.main_image %}
+                                <img src="{{ product.main_image }}" alt="{{ product.name }}" class="card-product-image">
+                            {% endif %}
+                            <div class="card-order-info">
+                                <span class="card-order-ref">#{{ order.reference_id }}</span>
+                                <span class="card-quantity">الكمية: {{ order.quantity }}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="card-details">
+                            {% if order.options and order.options|length > 0 %}
+                                <div class="options-section">
+                                    <div class="options-title">الخيارات:</div>
+                                    {% for option in order.options %}
+                                        <span class="option-item">{{ option.name }}: <strong>{{ option.value }}</strong></span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            
+                            {% if order.notes %}
+                                <div class="notes-section">
+                                    <div class="notes-title">ملاحظات:</div>
+                                    <p class="notes-text">{{ order.notes }}</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="barcode-section">
+                            {% if order.barcode %}
+                                <img src="{{ order.barcode }}" alt="Barcode" class="barcode-image">
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endfor %}
+        {% else %}
+            <div class="no-data">
+                <h3>لا توجد بيانات للعرض</h3>
+                <p>لم يتم العثور على أي طلبات للمعاينة</p>
+            </div>
+        {% endif %}
+    </div>
+    
+    <div class="print-controls">
+        <button onclick="window.print()" class="btn-primary">طباعة التقرير</button>
+        <button onclick="window.close()" class="btn-secondary">إغلاق النافذة</button>
+        <button onclick="downloadPDF()" class="btn-primary">تحميل PDF</button>
+    </div>
+
+    <script>
+        document.getElementById('report-date').textContent = new Date().toLocaleDateString('ar-SA', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'long'
+        });
+
+        function downloadPDF() {
+            const orderIds = new URLSearchParams(window.location.search).get('order_ids');
+            if (orderIds) {
+                window.open(`{{ url_for('orders.download_server_pdf') }}?order_ids=${orderIds}`, '_blank');
+            }
+        }
+
+        // الطباعة التلقائية بعد تحميل الصفحة
+        window.addEventListener('load', function() {
+            console.log('✅ تم تحميل جميع البيانات بنجاح من الخادم');
+        });
+    </script>
+</body>
+</html>

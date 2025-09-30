@@ -1,4 +1,4 @@
-from flask import request, redirect, url_for, flash, make_response, current_app, render_template, jsonify
+from flask import request, redirect, url_for, flash, make_response, current_app, render_template, jsonify, session
 import requests
 from datetime import datetime
 from weasyprint import HTML
@@ -14,13 +14,241 @@ from app.utils import (
     get_postgres_engine,
     generate_barcode
 )
-from app.models import SallaOrder, CustomOrder  # إضافة الاستيراد
+from app.models import SallaOrder, CustomOrder
 from app.config import Config
 import logging
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 import json
+import base64
+from io import BytesIO
+
+logger = logging.getLogger('salla_app')
+
+# ===== الدوال الجديدة للطباعة على الخادم =====
+
+def aggregate_products_for_printing(orders):
+    """تجميع المنتجات من جميع الطلبات حسب SKU"""
+    try:
+        products_by_sku = {}
+        
+        for order in orders:
+            for item in order.get('order_items', []):
+                sku = item.get('sku', '')
+                item_name = item.get('name', '')
+                
+                if not sku:
+                    sku = item_name
+                if not sku:
+                    sku = f"item_{item.get('id', 'unknown')}"
+                
+                if sku not in products_by_sku:
+                    products_by_sku[sku] = {
+                        'sku': sku,
+                        'name': item_name,
+                        'main_image': item.get('main_image', ''),
+                        'price': item.get('price', {}).get('amount', 0),
+                        'total_quantity': 0,
+                        'orders': []
+                    }
+                
+                order_appearance = {
+                    'order_id': order.get('id', ''),
+                    'reference_id': order.get('reference_id', order.get('id', '')),
+                    'customer_name': order.get('customer', {}).get('name', ''),
+                    'customer_mobile': order.get('customer', {}).get('mobile', ''),
+                    'created_at': order.get('created_at', ''),
+                    'quantity': item.get('quantity', 0),
+                    'options': item.get('options', []),
+                    'barcode': order.get('barcode', ''),
+                    'notes': item.get('notes', '')
+                }
+                
+                products_by_sku[sku]['orders'].append(order_appearance)
+                products_by_sku[sku]['total_quantity'] += item.get('quantity', 0)
+        
+        products_list = []
+        for sku, product_data in products_by_sku.items():
+            products_list.append({
+                'sku': product_data['sku'],
+                'name': product_data['name'],
+                'main_image': product_data['main_image'],
+                'price': product_data['price'],
+                'total_quantity': product_data['total_quantity'],
+                'orders': product_data['orders']
+            })
+        
+        products_list.sort(key=lambda x: x['total_quantity'], reverse=True)
+        
+        return products_list
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في تجميع المنتجات: {str(e)}")
+        return []
+
+def get_print_data_from_server(order_ids, user):
+    """جلب بيانات الطباعة من الخادم بالكامل"""
+    try:
+        logger.info(f"🔄 بدء معالجة {len(order_ids)} طلب على الخادم")
+        
+        orders = get_orders_from_local_database(order_ids, user.store_id)
+        
+        if not orders:
+            logger.warning("⚠️ لم يتم العثور على طلبات في البيانات المحلية، جاري استخدام API")
+            access_token = user.salla_access_token
+            if not access_token:
+                return None
+            
+            max_workers = max(1, min(current_app.config.get('MAX_WORKERS', 10), len(order_ids)))
+            orders = process_orders_concurrently(order_ids, access_token, max_workers)
+        
+        if not orders:
+            return None
+        
+        products = aggregate_products_for_printing(orders)
+        
+        total_orders = len(orders)
+        total_products = len(products)
+        total_quantity = sum(product['total_quantity'] for product in products)
+        total_items = total_quantity
+        
+        print_data = {
+            'products': products,
+            'summary': {
+                'totalProducts': total_products,
+                'totalOrders': total_orders,
+                'totalQuantity': total_quantity,
+                'totalItems': total_items
+            },
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        logger.info(f"✅ تم تجميع {total_products} منتج من {total_orders} طلب على الخادم")
+        return print_data
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في معالجة البيانات على الخادم: {str(e)}")
+        return None
+
+@orders_bp.route('/server_quick_list_print')
+def server_quick_list_print():
+    """عرض صفحة الطباعة مع البيانات المعالجة على الخادم"""
+    try:
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            flash('الرجاء تسجيل الدخول أولاً', 'error')
+            return redirect(url_for('user_auth.login'))
+        
+        order_ids = request.args.get('order_ids', '').split(',')
+        order_ids = [order_id.strip() for order_id in order_ids if order_id.strip()]
+        
+        if not order_ids:
+            flash('لم يتم تحديد أي طلبات للطباعة', 'error')
+            return redirect(url_for('orders.index'))
+        
+        logger.info(f"🔄 معالجة {len(order_ids)} طلب للطباعة على الخادم")
+        
+        print_data = get_print_data_from_server(order_ids, user)
+        
+        if not print_data:
+            flash('لم يتم العثور على بيانات للطباعة', 'error')
+            return redirect(url_for('orders.index'))
+        
+        # حفظ البيانات في الجلسة للوصول السريع
+        session_key = f"print_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        session[session_key] = print_data
+        session['last_print_session'] = session_key
+        
+        return render_template('server_quick_list_print.html', 
+                             print_data=print_data,
+                             session_key=session_key)
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في عرض صفحة الطباعة: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash('حدث خطأ أثناء تحضير صفحة الطباعة', 'error')
+        return redirect(url_for('orders.index'))
+
+@orders_bp.route('/get_print_data/<session_key>')
+def get_print_data(session_key):
+    """جلب بيانات الطباعة من الجلسة"""
+    try:
+        print_data = session.get(session_key)
+        if print_data:
+            return jsonify({'success': True, 'data': print_data})
+        else:
+            return jsonify({'success': False, 'error': 'بيانات الطباعة غير موجودة'}), 404
+    except Exception as e:
+        logger.error(f"❌ خطأ في جلب بيانات الطباعة: {str(e)}")
+        return jsonify({'success': False, 'error': 'حدث خطأ'}), 500
+
+@orders_bp.route('/download_server_pdf')
+def download_server_pdf():
+    """تحميل PDF مع البيانات المعالجة على الخادم"""
+    try:
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            flash('الرجاء تسجيل الدخول أولاً', 'error')
+            return redirect(url_for('user_auth.login'))
+        
+        order_ids = request.args.get('order_ids', '').split(',')
+        order_ids = [order_id.strip() for order_id in order_ids if order_id.strip()]
+        
+        if not order_ids:
+            flash('لم يتم تحديد أي طلبات للتحميل', 'error')
+            return redirect(url_for('orders.index'))
+        
+        logger.info(f"🔄 معالجة {len(order_ids)} طلب لتحويل PDF على الخادم")
+        
+        print_data = get_print_data_from_server(order_ids, user)
+        
+        if not print_data:
+            flash('لم يتم العثور على بيانات للتحميل', 'error')
+            return redirect(url_for('orders.index'))
+        
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        html = render_template('server_pdf_template.html', 
+                             print_data=print_data,
+                             current_time=current_time)
+        
+        pdf = HTML(
+            string=html,
+            base_url=request.host_url
+        ).write_pdf(
+            optimize_size=(),
+            jpeg_quality=80
+        )
+        
+        filename = f"orders_{current_time.replace(':', '-').replace(' ', '_')}.pdf"
+        
+        response = make_response(pdf)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        
+        logger.info(f"✅ تم إنشاء PDF بنجاح: {filename}")
+        return response
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في إنشاء PDF: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash('حدث خطأ أثناء إنشاء PDF', 'error')
+        return redirect(url_for('orders.index'))
+
+# ===== تحديث الدوال الحالية للحفاظ على التوافق =====
+
+
+# ===== الدوال الحالية تبقى كما هي =====
+
+# ... [كل الدوال الحالية الموجودة سابقاً تبقى دون تغيير] ...
+# مثل: get_orders_from_local_database, process_order_from_local_data, 
+# get_main_image_from_local, optimize_pdf_generation, download_orders_html, 
+# quick_list_print, download_pdf, إلخ.
+
+# تأكد من أن جميع الدوال الحالية موجودة هنا بالضبط كما كانت
 
 # إعداد المسجل للإنتاج
 logger = logging.getLogger('salla_app')
