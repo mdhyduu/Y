@@ -812,19 +812,29 @@ $(document).ready(function () {
     }).get().filter(order => order !== null);
 }
 // دالة تجميع بيانات الطباعة من القائمة السريعة - معدلة لتضمين الباركود
+// دالة محسنة لتجميع بيانات الطباعة مع التحقق
 function collectQuickListPrintData() {
     const products = [];
     let totalOrders = 0;
     let totalQuantity = 0;
     let totalItems = 0;
+    let collectedOrders = new Set(); // لمنع التكرار
+
+    console.log('🔄 بدء تجميع بيانات الطباعة...');
 
     $('.product-card').each(function() {
         const productCard = $(this);
         const sku = productCard.data('product-sku');
-        const productName = productCard.find('h6').text();
-        const mainImage = productCard.find('img').attr('src') || '';
         
-        // استخراج السعر إذا كان متوفراً
+        if (!sku) {
+            console.warn('⚠️ منتج بدون SKU:', productCard);
+            return;
+        }
+
+        const productName = productCard.find('h6').text();
+        const mainImage = productCard.find('img').attr('src') || '/static/images/no-image.png';
+        
+        // استخراج السعر
         let price = 0;
         const priceText = productCard.find('.badge.bg-warning').text();
         if (priceText && priceText.includes('السعر:')) {
@@ -836,12 +846,11 @@ function collectQuickListPrintData() {
         
         const orders = [];
         
-        // فقط الطلبات المحددة (التي عليها علامة ✓)
+        // تجميع الطلبات المحددة فقط
         productCard.find('.order-appearance').each(function() {
             const orderAppearance = $(this);
             const orderCheckbox = orderAppearance.find('input.quick-list-order');
             
-            // التحقق إذا كان الطلب محدداً
             if (!orderCheckbox.is(':checked')) {
                 return; // تخطي الطلبات غير المحددة
             }
@@ -849,27 +858,41 @@ function collectQuickListPrintData() {
             const orderId = orderCheckbox.data('order-id');
             const referenceId = orderAppearance.find('.form-check-label').text().replace('الطلب #', '').trim();
             
+            if (!orderId || !referenceId) {
+                console.warn('⚠️ طلب بدون معرف:', orderAppearance);
+                return;
+            }
+
+            // منع تكرار الطلبات
+            if (collectedOrders.has(orderId)) {
+                console.warn(`⚠️ طلب مكرر #${referenceId} (${orderId})`);
+                return;
+            }
+            collectedOrders.add(orderId);
+
             // استخراج بيانات العميل
-            let customerName = '';
+            let customerName = 'غير محدد';
             let customerMobile = '';
             orderAppearance.find('small').each(function() {
                 const text = $(this).text();
                 if (text.includes('العميل:')) {
-                    customerName = text.replace('العميل:', '').trim();
+                    customerName = text.replace('العميل:', '').trim() || 'غير محدد';
                 }
                 if (text.includes('الجوال:')) {
                     customerMobile = text.replace('الجوال:', '').trim();
                 }
             });
+
             let notes = '';
             const notesSection = orderAppearance.find('.notes-section .notes-text');
             if (notesSection.length > 0) {
                 notes = notesSection.text().trim();
             }
+
             const createdAt = orderAppearance.find('small:contains("التاريخ")').text().replace('التاريخ: ', '').trim();
             const quantityText = orderAppearance.find('small:contains("الكمية")').text().replace('الكمية: ', '').trim();
-            const quantity = parseInt(quantityText) || 0;
-            
+            const quantity = parseInt(quantityText) || 1;
+
             // استخراج الخيارات
             const options = [];
             orderAppearance.find('.badge.bg-light').each(function() {
@@ -884,18 +907,11 @@ function collectQuickListPrintData() {
                     }
                 }
             });
-            
-            // 🔴 التعديل الهام: الحصول على الباركود من البيانات المخزنة في العنصر
-            let barcode = '';
-            const barcodeData = orderAppearance.data('barcode');
-            if (barcodeData) {
-                barcode = barcodeData;
-            } else {
-                // إذا لم يكن هناك باركود مخزن، ننشئ واحداً افتراضياً أو نستخدم الرقم المرجعي
-                barcode = `باركود_${referenceId}`;
-            }
-            
-            orders.push({
+
+            // الحصول على الباركود
+            let barcode = orderAppearance.data('barcode') || `باركود_${referenceId}`;
+
+            const orderData = {
                 id: orderId,
                 reference_id: referenceId,
                 customer_name: customerName,
@@ -905,13 +921,14 @@ function collectQuickListPrintData() {
                 options: options,
                 barcode: barcode,
                 notes: notes
-            });
-            
+            };
+
+            orders.push(orderData);
             totalQuantity += quantity;
             totalItems++;
         });
         
-        // إذا كان هناك طلبات محددة لهذا المنتج، نضيفه للقائمة
+        // إضافة المنتج فقط إذا كان يحتوي على طلبات محددة
         if (orders.length > 0) {
             totalOrders += orders.length;
             
@@ -925,7 +942,14 @@ function collectQuickListPrintData() {
             });
         }
     });
-    
+
+    console.log('📊 نتائج التجميع:', {
+        products: products.length,
+        orders: totalOrders,
+        items: totalItems,
+        quantity: totalQuantity
+    });
+
     return {
         products: products,
         summary: {
@@ -933,7 +957,8 @@ function collectQuickListPrintData() {
             totalOrders: totalOrders,
             totalQuantity: totalQuantity,
             totalItems: totalItems
-        }
+        },
+        collectedOrderIds: Array.from(collectedOrders)
     };
 }
     // دالة فتح نافذة الطباعة للقائمة السريعة
@@ -1809,6 +1834,55 @@ $(document).on('click', '.select-all-product', function() {
         $('.sidebar').removeClass('show');
         $('.sidebar__backdrop').removeClass('show');
     }
+});
+// إضافة وظيفة استرجاع البيانات إذا فشلت الطباعة
+function restorePrintDataIfNeeded() {
+    try {
+        const lastKey = localStorage.getItem('lastPrintDataKey');
+        if (lastKey) {
+            const savedData = localStorage.getItem(lastKey);
+            if (savedData) {
+                console.log('🔄 بيانات طباعة سابقة موجودة:', lastKey);
+                return JSON.parse(savedData);
+            }
+        }
+    } catch (error) {
+        console.error('❌ خطأ في استرجاع البيانات:', error);
+    }
+    return null;
+}
+
+// تنظيف البيانات القديمة
+function cleanupOldPrintData() {
+    try {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('quickListPrintData_')) {
+                const data = localStorage.getItem(key);
+                if (data) {
+                    const parsed = JSON.parse(data);
+                    const age = Date.now() - new Date(parsed.timestamp).getTime();
+                    // حذف البيانات الأقدم من ساعة
+                    if (age > 60 * 60 * 1000) {
+                        keysToRemove.push(key);
+                    }
+                }
+            }
+        }
+        
+        keysToRemove.forEach(key => {
+            localStorage.removeItem(key);
+            console.log('🧹 بيانات قديمة تم مسحها:', key);
+        });
+    } catch (error) {
+        console.error('❌ خطأ في تنظيف البيانات:', error);
+    }
+}
+
+// استدعاء التنظيف عند تحميل الصفحة
+$(document).ready(function() {
+    cleanupOldPrintData();
 });
 </script>
 {% endblock %}
