@@ -9,59 +9,82 @@
                 </div>
                 <div>
                     {% if order.status %}
-                    <span class="badge me-2 bg-secondary">
+                    <span class="badge me-2" style="background-color: {{ order.status.color | default('#6c757d') }}; color: white;">
                         {{ order.status.name }}
                     </span>
                     {% endif %}
-                    <small class="text-muted"><i class="fas fa-clock me-1"></i> {{ order.created_at|time_ago }}</small>
+                    <small class="text-muted"><i class="fas fa-clock me-1"></i> {{ order.created_at.strftime('%Y-%m-%d %H:%M') if order.created_at else 'غير محدد' }}</small>
                 </div>
             </div>
             <div class="card-body">
                 <p class="card-text"><i class="fas fa-user me-2 text-muted"></i> {{ order.customer_name or 'غير معروف' }}</p>
-                <p class="card-text"><i class="fas fa-phone me-2 text-muted"></i> {{ order.customer_phone or 'غير متوفر' }}</p>
-                <p class="card-text"><i class="fas fa-map-marker-alt me-2 text-muted"></i> {{ order.customer_address or 'غير متوفر' }}</p>
                 
-                <!-- إظهار جميع الموظفين المسندين للطلب -->
-                {% if order.assignments %}
-                    <div class="mt-3">
-                        <h6 class="text-muted mb-2">
-                            <i class="fas fa-user-tie me-1"></i>
-                            مسند إلى:
-                        </h6>
-                        <div class="d-flex flex-wrap gap-2">
-                            {% for assignment in order.assignments %}
-                                {% if assignment.employee %}
-                                    <div class="badge bg-light text-dark p-2 d-flex align-items-center">
-                                        <img src="https://ui-avatars.com/api/?name={{ assignment.employee.name }}&background=10AC84&color=fff" 
-                                             width="20" height="20" class="rounded-circle me-2">
-                                        {{ assignment.employee.email }}
-                                    </div>
-                                {% endif %}
-                            {% endfor %}
-                        </div>
-                    </div>
+                {% if order.address %}
+                <p class="card-text">
+                    <i class="fas fa-map-marker-alt me-2 text-muted"></i> 
+                    {{ order.address.city or '' }} - {{ order.address.full_address or 'لا يوجد عنوان' }}
+                </p>
                 {% else %}
-                    <p class="card-text text-muted mt-3">
-                        <i class="fas fa-exclamation-circle me-2"></i> لم يتم إسناد الطلب لأي مندوب بعد
-                    </p>
+                <p class="card-text"><i class="fas fa-map-marker-alt me-2 text-muted"></i> {{ order.customer_address or 'غير متوفر' }}</p>
+                {% endif %}
+                
+                <p class="card-text">
+                    <i class="fas fa-money-bill me-2 text-muted"></i> 
+                    {{ order.total_amount }} {{ order.currency or 'ر.س' }}
+                </p>
+
+                {% if order.assignments %}
+                <div class="mt-3">
+                    <h6 class="text-muted mb-2">
+                        <i class="fas fa-user-tie me-1"></i>
+                        مسند إلى:
+                    </h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for assignment in order.assignments %}
+                            {% if assignment.employee %}
+                                <div class="badge bg-light text-dark p-2 d-flex align-items-center">
+                                    <img src="https://ui-avatars.com/api/?name={{ assignment.employee.name }}&background=10AC84&color=fff" 
+                                         width="20" height="20" class="rounded-circle me-2">
+                                    {{ assignment.employee.email }}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% else %}
+                <p class="card-text text-muted mt-3">
+                    <i class="fas fa-exclamation-circle me-2"></i> لم يتم إسناد الطلب لأي مندوب بعد
+                </p>
                 {% endif %}
             </div>
             <div class="card-footer d-flex justify-content-between align-items-center">
-                <span class="fw-bold text-primary">{{ order.total_amount }} ر.س</span>
-                <div>
-                    <button class="btn btn-primary btn-sm">تغيير الحالة</button>
-                    <a href="{{ url_for('orders.order_details', order_id=order.id) }}" 
-                       class="btn btn-sm btn-info mb-1" title="عرض التفاصيل">
-                        <i class="fas fa-eye"></i> عرض
-                    </a>
-                    <button class="btn btn-sm btn-warning mb-1 assign-btn" 
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-warning assign-btn" 
                             data-order-id="{{ order.id }}" 
                             data-bs-toggle="modal" 
-                            data-bs-target="#assignOrderModal">
-                        <i class="fas fa-user-plus"></i> 
-                        {% if order.assigned_to %}تعديل{% else %}إسناد{% endif %}
+                            data-bs-target="#assignOrderModal"
+                            title="إسناد الطلب">
+                        <i class="fas fa-user-plus"></i> {% if order.assignments %}تعديل{% else %}إسناد{% endif %}
+                    </button>
+                    <a href="{{ url_for('orders.order_details', order_id=order.id) }}" 
+                       class="btn btn-sm btn-outline-info" 
+                       title="تفاصيل الطلب"
+                       target="_blank">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                    <button class="btn btn-sm btn-outline-success delivery-action-btn" 
+                            data-order-id="{{ order.id }}"
+                            data-action="deliver"
+                            title="تسليم الطلب">
+                        <i class="fas fa-check"></i>
                     </button>
                 </div>
+                
+                {% if order.status_notes %}
+                <span class="badge bg-warning" title="ملاحظات الطلب">
+                    <i class="fas fa-sticky-note"></i> {{ order.status_notes|length }}
+                </span>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -74,29 +97,45 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // إعادة تهيئة إدارة الاختيار بعد تحميل المحتوى
-    if (typeof initOrderSelection === 'function') {
-        initOrderSelection();
-    }
+// إعادة تهيئة الأحداث بعد تحميل المحتوى عبر AJAX
+if (typeof initOrderSelection === 'function') {
+    initOrderSelection();
+}
+if (typeof initAssignButtons === 'function') {
+    initAssignButtons();
+}
 
-    // التعامل مع أزرار الإسناد
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.assign-btn')) {
-            const button = e.target.closest('.assign-btn');
-            const orderId = button.getAttribute('data-order-id');
-            
-            fetch('/delivery/assign_order_modal/' + orderId)
-                .then(response => response.text())
-                .then(html => {
-                    document.getElementById('assignModalContent').innerHTML = html;
+// التعامل مع أزرار تسليم الطلب
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.delivery-action-btn')) {
+        const button = e.target.closest('.delivery-action-btn');
+        const orderId = button.getAttribute('data-order-id');
+        const action = button.getAttribute('data-action');
+        
+        if (action === 'deliver') {
+            if (confirm('هل تريد تأكيد تسليم هذا الطلب؟')) {
+                fetch('/delivery/mark_delivered/' + orderId, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('فشل في تأكيد التسليم: ' + data.message);
+                    }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    document.getElementById('assignModalContent').innerHTML = 
-                        '<div class="alert alert-danger">حدث خطأ أثناء تحميل المحتوى</div>';
+                    alert('حدث خطأ أثناء تأكيد التسليم');
                 });
+            }
         }
-    });
+    }
 });
 </script>

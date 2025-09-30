@@ -128,7 +128,13 @@
         <!-- قسم طلبات التوصيل -->
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="fas fa-shopping-bag me-2"></i> طلبات التوصيل النشطة</h5>
+                <div class="d-flex align-items-center">
+                    <h5 class="mb-0 me-3"><i class="fas fa-shopping-bag me-2"></i> طلبات التوصيل النشطة</h5>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="selectAllCheckbox">
+                        <label class="form-check-label small" for="selectAllCheckbox">تحديد الكل</label>
+                    </div>
+                </div>
                 <div>
                     <button id="assignMultipleBtn" class="btn btn-warning btn-sm me-2" style="display: none;" data-bs-toggle="modal" data-bs-target="#assignMultipleModal">
                         <i class="fas fa-user-plus me-1"></i> إسناد المحدد
@@ -157,92 +163,29 @@
                 </ul>
                 <!-- حاوية الطلبات التي سيتم تحديثها عبر AJAX -->
                 <div id="orders-container">
-                    <div class="row">
-                        {% for order in filtered_orders %}
-                        <div class="col-md-6 col-lg-4 mb-3">
-                            <div class="card h-100">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <div class="form-check">
-                                        <input class="form-check-input order-checkbox" type="checkbox" data-order-id="{{ order.id }}">
-                                        <strong>#{{ order.id}}</strong>
-                                    </div>
-                                    <div>
-                                        {% if order.status %}
-                                        <span class="badge me-2 bg-secondary">
-                                            {{ order.status.name }}
-                                        </span>
-                                        {% endif %}
-                                        <small class="text-muted"><i class="fas fa-clock me-1"></i> {{ order.created_at|time_ago }}</small>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <p class="card-text"><i class="fas fa-user me-2 text-muted"></i> {{ order.customer_name or 'غير معروف' }}</p>
-                                    <p class="card-text"><i class="fas fa-phone me-2 text-muted"></i> {{ order.customer_phone or 'غير متوفر' }}</p>
-                                    <p class="card-text"><i class="fas fa-map-marker-alt me-2 text-muted"></i> {{ order.customer_address or 'غير متوفر' }}</p>
-                                    
-                                    <!-- إظهار جميع الموظفين المسندين للطلب -->
-                                    {% if order.assignments %}
-                                        <div class="mt-3">
-                                            <h6 class="text-muted mb-2">
-                                                <i class="fas fa-user-tie me-1"></i>
-                                                مسند إلى:
-                                            </h6>
-                                            <div class="d-flex flex-wrap gap-2">
-                                                {% for assignment in order.assignments %}
-                                                    {% if assignment.employee %}
-                                                        <div class="badge bg-light text-dark p-2 d-flex align-items-center">
-                                                            <img src="https://ui-avatars.com/api/?name={{ assignment.employee.name }}&background=10AC84&color=fff" 
-                                                                 width="20" height="20" class="rounded-circle me-2">
-                                                            {{ assignment.employee.email }}
-                                                        </div>
-                                                    {% endif %}
-                                                {% endfor %}
-                                            </div>
-                                        </div>
-                                    {% else %}
-                                        <p class="card-text text-muted mt-3">
-                                            <i class="fas fa-exclamation-circle me-2"></i> لم يتم إسناد الطلب لأي مندوب بعد
-                                        </p>
-                                    {% endif %}
-                                </div>
-                                <div class="card-footer d-flex justify-content-between align-items-center">
-                                    <span class="fw-bold text-primary">{{ order.total_amount }} ر.س</span>
-                                    <div>
-                                        <button class="btn btn-primary btn-sm">تغيير الحالة</button>
-                                        <a href="{{ url_for('orders.order_details', order_id=order.id) }}" 
-                                           class="btn btn-sm btn-info mb-1" title="عرض التفاصيل">
-                                            <i class="fas fa-eye"></i> عرض
-                                        </a>
-                                        <button class="btn btn-sm btn-warning mb-1 assign-btn" 
-                                                data-order-id="{{ order.id }}" 
-                                                data-bs-toggle="modal" 
-                                                data-bs-target="#assignOrderModal">
-                                            <i class="fas fa-user-plus"></i> 
-                                            {% if order.assigned_to %}تعديل{% else %}إسناد{% endif %}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        {% else %}
-                        <div class="col-12 text-center py-5">
-                            <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
-                            <p class="text-muted">لا توجد طلبات في هذه الحالة</p>
-                        </div>
-                        {% endfor %}
-                    </div>
+                    {% include 'orders_partial.html' %}
                 </div>
             </div>
         </div>
 
-        <!-- قسم الخريطة (نفس المحتوى الأصلي) -->
+        <!-- قسم الخريطة -->
         <div class="card">
-            <!-- ... المحتوى الأصلي للخريطة ... -->
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-map me-2"></i> خريطة التوصيل</h5>
+            </div>
+            <div class="card-body">
+                <div id="delivery-map" style="height: 400px; background-color: #f8f9fa; display: flex; align-items: center; justify-content: center;">
+                    <div class="text-center text-muted">
+                        <i class="fas fa-map-marked-alt fa-3x mb-3"></i>
+                        <p>خريطة التوصيل ستظهر هنا</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- المودال مرة واحدة فقط -->
+<!-- مودال إسناد طلب واحد -->
 <div class="modal fade" id="assignOrderModal" tabindex="-1" aria-labelledby="assignOrderModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -283,143 +226,17 @@
 
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // كود الرسوم المتحركة فقط
-        window.addEventListener('scroll', () => {
-            const cards = document.querySelectorAll('.card');
-            cards.forEach(card => {
-                const cardPosition = card.getBoundingClientRect().top;
-                const screenPosition = window.innerHeight / 1.3;
-                if(cardPosition < screenPosition) {
-                    card.style.opacity = 1;
-                    card.style.transform = 'translateY(0)';
-                }
-            });
-        });
-
-        // تهيئة أولية للبطاقات
-        document.querySelectorAll('.card').forEach(card => {
-            card.style.opacity = 0;
-            card.style.transform = 'translateY(20px)';
-            card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-        });
-
-        // تشغيل تأثير الظهور بعد تحميل الصفحة
-        setTimeout(() => {
-            document.querySelectorAll('.card').forEach((card, index) => {
-                setTimeout(() => {
-                    card.style.opacity = 1;
-                    card.style.transform = 'translateY(0)';
-                }, index * 100);
-            });
-        }, 500);
-
-        const ordersTabs = document.getElementById('orders-tabs');
-        if (ordersTabs) {
-            ordersTabs.addEventListener('click', function(e) {
-                e.preventDefault();
-                const target = e.target.closest('a');
-                if (!target) return;
-                
-                // إزالة النشاط من جميع التبويبات
-                document.querySelectorAll('#orders-tabs a').forEach(tab => {
-                    tab.classList.remove('active');
-                });
-                
-                // إضافة النشاط للتبويب المختار
-                target.classList.add('active');
-                
-                // الحصول على معرف الحالة المحددة
-                const statusId = target.getAttribute('data-status-id');
-                
-                // إرسال طلب AJAX لجلب الطلبات المصفاة
-  // إرسال طلب AJAX لجلب الطلبات المصفاة
-fetch(`/dashboard/filter_orders?status_id=${statusId}`)
-    .then(response => response.text())
-    .then(html => {
-        document.getElementById('orders-container').innerHTML = html;
-        // إعادة تهيئة أحداث الاختيار بعد تحميل المحتوى الجديد
-        initOrderSelection();
-    })
-    .catch(error => {
-        console.error('Error:', error);
-    });            });
-        }
-
-        // كود المودال
-        $('#assignOrderModal').on('show.bs.modal', function (event) {
-            var button = $(event.relatedTarget);
-            var orderId = button.data('order-id');
-            var modal = $(this);
-            
-            modal.find('.modal-body').load('/delivery/assign_order_modal/' + orderId);
-        });
-        
-        $('#assignOrderModal').on('hidden.bs.modal', function () {
-            $(this).find('.modal-body').html(
-                '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">جاري التحميل...</span></div></div>'
-            );
-        });
-
-        // إدارة إسناد متعدد الطلبات
-        function initOrderSelection() {
-            const assignMultipleBtn = document.getElementById('assignMultipleBtn');
-            const checkboxes = document.querySelectorAll('.order-checkbox');
-            
-            // إظهار/إخفاء زر الإسناد المتعدد بناءً على عدد الطلبات المحددة
-            function updateAssignButton() {
-                const selectedCount = document.querySelectorAll('.order-checkbox:checked').length;
-                if (selectedCount > 0) {
-                    assignMultipleBtn.style.display = 'block';
-                    assignMultipleBtn.innerHTML = `<i class="fas fa-user-plus me-1"></i> إسناد المحدد (${selectedCount})`;
-                } else {
-                    assignMultipleBtn.style.display = 'none';
-                }
-            }
-            
-            // إضافة مستمعي الأحداث لخانات الاختيار
-            checkboxes.forEach(checkbox => {
-                checkbox.addEventListener('change', updateAssignButton);
-            });
-            
-            // تحديث حالة الزر عند التحميل الأولي
-            updateAssignButton();
-        }
-        // زر تحديد/إلغاء تحديد الكل
-function initSelectAll() {
-    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
-    if (!selectAllCheckbox) {
-        // إنشاء زر تحديد الكل إذا لم يكن موجوداً
-        const cardHeader = document.querySelector('.card-header h5.mb-0').closest('.card-header');
-        const existingButton = cardHeader.querySelector('#selectAllCheckbox');
-        
-        if (!existingButton) {
-            const selectAllDiv = document.createElement('div');
-            selectAllDiv.className = 'form-check form-check-inline';
-            selectAllDiv.innerHTML = `
-                <input class="form-check-input" type="checkbox" id="selectAllCheckbox">
-                <label class="form-check-label small" for="selectAllCheckbox">تحديد الكل</label>
-            `;
-            
-            // إدراج زر تحديد الكل بجانب العنوان
-            cardHeader.querySelector('h5').after(selectAllDiv);
-            
-            // إضافة مستمع الحدث لتحديد الكل
-            document.getElementById('selectAllCheckbox').addEventListener('change', function() {
-                const checkboxes = document.querySelectorAll('.order-checkbox');
-                checkboxes.forEach(checkbox => {
-                    checkbox.checked = this.checked;
-                });
-                updateAssignButton();
-            });
-        }
-    }
+// دالة للحصول على CSRF token
+function getCSRFToken() {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]');
+    return csrfToken ? csrfToken.getAttribute('content') : '';
 }
 
-// تحديث دالة initOrderSelection لتشمل تحديد الكل
+// إدارة اختيار الطلبات
 function initOrderSelection() {
     const assignMultipleBtn = document.getElementById('assignMultipleBtn');
     const checkboxes = document.querySelectorAll('.order-checkbox');
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
     
     // إظهار/إخفاء زر الإسناد المتعدد بناءً على عدد الطلبات المحددة
     function updateAssignButton() {
@@ -432,7 +249,6 @@ function initOrderSelection() {
         }
         
         // تحديث حالة زر تحديد الكل
-        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
         if (selectAllCheckbox) {
             const totalCheckboxes = document.querySelectorAll('.order-checkbox').length;
             selectAllCheckbox.checked = selectedCount > 0 && selectedCount === totalCheckboxes;
@@ -445,46 +261,193 @@ function initOrderSelection() {
         checkbox.addEventListener('change', updateAssignButton);
     });
     
-    // تهيئة زر تحديد الكل
-    initSelectAll();
+    // حدث تحديد/إلغاء تحديد الكل
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('.order-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateAssignButton();
+        });
+    }
     
     // تحديث حالة الزر عند التحميل الأولي
     updateAssignButton();
 }
-        
-        // تهيئة إدارة الاختيار عند تحميل الصفحة
-        initOrderSelection();
-        
-        // معالجة النقر على زر إسناد المحدد
-        // Add this function to get CSRF token
-function getCSRFToken() {
-    return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+// التعامل مع أزرار الإسناد
+function initAssignButtons() {
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.assign-btn')) {
+            const button = e.target.closest('.assign-btn');
+            const orderId = button.getAttribute('data-order-id');
+            
+            fetch('/delivery/assign_order_modal/' + orderId)
+                .then(response => response.text())
+                .then(html => {
+                    document.getElementById('assignModalContent').innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('assignModalContent').innerHTML = 
+                        '<div class="alert alert-danger">حدث خطأ أثناء تحميل المحتوى</div>';
+                });
+        }
+    });
 }
 
-// Update your fetch request for bulk assignment
-document.getElementById('assignMultipleBtn').addEventListener('click', function() {
-    const selectedOrders = Array.from(document.querySelectorAll('.order-checkbox:checked'))
-        .map(checkbox => checkbox.getAttribute('data-order-id'));
+// التعامل مع تبويبات التصفية
+function initOrderTabs() {
+    const ordersTabs = document.getElementById('orders-tabs');
+    if (ordersTabs) {
+        ordersTabs.addEventListener('click', function(e) {
+            e.preventDefault();
+            const target = e.target.closest('a');
+            if (!target) return;
+            
+            // إزالة النشاط من جميع التبويبات
+            document.querySelectorAll('#orders-tabs a').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // إضافة النشاط للتبويب المختار
+            target.classList.add('active');
+            
+            // الحصول على معرف الحالة المحددة
+            const statusId = target.getAttribute('data-status-id');
+            
+            // إظهار مؤشر التحميل
+            const ordersContainer = document.getElementById('orders-container');
+            ordersContainer.innerHTML = `
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">جاري التحميل...</span>
+                    </div>
+                    <p class="text-muted mt-2">جاري تحميل الطلبات...</p>
+                </div>
+            `;
+            
+            // إرسال طلب AJAX لجلب الطلبات المصفاة
+            fetch(`/dashboard/filter_orders?status_id=${statusId}`)
+                .then(response => response.text())
+                .then(html => {
+                    ordersContainer.innerHTML = html;
+                    // إعادة تهيئة الأحداث بعد تحميل المحتوى الجديد
+                    initOrderSelection();
+                    initAssignButtons();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    ordersContainer.innerHTML = `
+                        <div class="alert alert-danger text-center">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            حدث خطأ أثناء تحميل الطلبات
+                        </div>
+                    `;
+                });
+        });
+    }
+}
+
+// معالجة الإسناد المتعدد
+function initBulkAssignment() {
+    const assignMultipleBtn = document.getElementById('assignMultipleBtn');
+    if (assignMultipleBtn) {
+        assignMultipleBtn.addEventListener('click', function() {
+            const selectedOrders = Array.from(document.querySelectorAll('.order-checkbox:checked'))
+                .map(checkbox => checkbox.getAttribute('data-order-id'));
+            
+            if (selectedOrders.length === 0) {
+                alert('يرجى تحديد طلبات للإسناد');
+                return;
+            }
+            
+            // تحميل محتوى المودال الخاص بالإسناد المتعدد
+            fetch('/delivery/assign_multiple_orders_modal', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ order_ids: selectedOrders })
+            })
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('assignMultipleModalContent').innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('assignMultipleModalContent').innerHTML = 
+                    '<div class="alert alert-danger">حدث خطأ أثناء تحميل المحتوى</div>';
+            });
+        });
+    }
+}
+
+// تأثيرات الرسوم المتحركة
+function initAnimations() {
+    window.addEventListener('scroll', () => {
+        const cards = document.querySelectorAll('.card');
+        cards.forEach(card => {
+            const cardPosition = card.getBoundingClientRect().top;
+            const screenPosition = window.innerHeight / 1.3;
+            if(cardPosition < screenPosition) {
+                card.style.opacity = 1;
+                card.style.transform = 'translateY(0)';
+            }
+        });
+    });
+
+    // تهيئة أولية للبطاقات
+    document.querySelectorAll('.card').forEach(card => {
+        card.style.opacity = 0;
+        card.style.transform = 'translateY(20px)';
+        card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+    });
+
+    // تشغيل تأثير الظهور بعد تحميل الصفحة
+    setTimeout(() => {
+        document.querySelectorAll('.card').forEach((card, index) => {
+            setTimeout(() => {
+                card.style.opacity = 1;
+                card.style.transform = 'translateY(0)';
+            }, index * 100);
+        });
+    }, 500);
+}
+
+// إعادة تعيين المودال عند الإغلاق
+function initModalReset() {
+    const assignOrderModal = document.getElementById('assignOrderModal');
+    if (assignOrderModal) {
+        assignOrderModal.addEventListener('hidden.bs.modal', function () {
+            document.getElementById('assignModalContent').innerHTML = 
+                '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">جاري التحميل...</span></div></div>';
+        });
+    }
     
-    // تحميل محتوى المودال الخاص بالإسناد المتعدد
-    fetch('/delivery/assign_multiple_orders_modal', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCSRFToken()  // Add CSRF token header
-        },
-        body: JSON.stringify({ order_ids: selectedOrders })
-    })
-    .then(response => response.text())
-    .then(html => {
-        document.getElementById('assignMultipleModalContent').innerHTML = html;
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        document.getElementById('assignMultipleModalContent').innerHTML = 
-            '<div class="alert alert-danger">حدث خطأ أثناء تحميل المحتوى</div>';
-    });
+    const assignMultipleModal = document.getElementById('assignMultipleModal');
+    if (assignMultipleModal) {
+        assignMultipleModal.addEventListener('hidden.bs.modal', function () {
+            document.getElementById('assignMultipleModalContent').innerHTML = 
+                '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">جاري التحميل...</span></div></div>';
+        });
+    }
+}
+
+// التهيئة الرئيسية عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', function() {
+    initAnimations();
+    initOrderSelection();
+    initAssignButtons();
+    initOrderTabs();
+    initBulkAssignment();
+    initModalReset();
+    
+    // جعل الدوال متاحة عالمياً لاستدعائها من الملفات الجزئية
+    window.initOrderSelection = initOrderSelection;
+    window.initAssignButtons = initAssignButtons;
 });
-    });
 </script>
 {% endblock %}
