@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تقرير الطلبات - نسخة مبسطة</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 0.5cm;
+        }
+        
+        body {
+            font-family: 'DejaVu Sans', Arial, sans-serif;
+            font-size: 10px;
+            line-height: 1.2;
+            margin: 0;
+            padding: 10px;
+            color: #000;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+        }
+        
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .summary-item {
+            padding: 8px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        
+        .summary-number {
+            font-size: 16px;
+            font-weight: bold;
+            display: block;
+        }
+        
+        .orders-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        
+        .order-card {
+            border: 1px solid #ccc;
+            padding: 6px;
+            font-size: 9px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+        
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .order-ref {
+            font-weight: bold;
+            font-size: 11px;
+        }
+        
+        .order-quantity {
+            background: #333;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 9px;
+        }
+        
+        .product-name {
+            font-weight: bold;
+            margin-bottom: 3px;
+            font-size: 10px;
+        }
+        
+        .customer-info {
+            color: #666;
+            margin-bottom: 3px;
+        }
+        
+        .options {
+            margin-top: 3px;
+        }
+        
+        .option-item {
+            background: #f0f0f0;
+            padding: 1px 3px;
+            margin: 1px;
+            border-radius: 2px;
+            display: inline-block;
+            font-size: 8px;
+        }
+        
+        .notes {
+            background: #fffacd;
+            padding: 3px;
+            margin-top: 3px;
+            border-radius: 2px;
+            font-size: 8px;
+        }
+        
+        .barcode {
+            text-align: center;
+            margin-top: 4px;
+            padding-top: 4px;
+            border-top: 1px solid #eee;
+        }
+        
+        .barcode img {
+            max-width: 100%;
+            height: 25px;
+            object-fit: contain;
+        }
+        
+        .warning {
+            background: #ffeb3b;
+            padding: 8px;
+            margin: 10px 0;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        @media print {
+            body {
+                font-size: 9px;
+            }
+            
+            .orders-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            
+            .order-card {
+                border: 1px solid #999;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>تقرير الطلبات المبسط</h1>
+        <p>تاريخ التقرير: {{ current_time }}</p>
+        {% if print_data.summary.originalRequestCount > print_data.summary.totalOrders %}
+        <div class="warning">
+            ⚠️ تم معالجة {{ print_data.summary.totalOrders }} من أصل {{ print_data.summary.originalRequestCount }} طلب
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="summary">
+        <div class="summary-item">
+            <span class="summary-number">{{ print_data.summary.totalProducts }}</span>
+            <span>المنتجات</span>
+        </div>
+        <div class="summary-item">
+            <span class="summary-number">{{ print_data.summary.totalOrders }}</span>
+            <span>الطلبات</span>
+        </div>
+        <div class="summary-item">
+            <span class="summary-number">{{ print_data.summary.totalQuantity }}</span>
+            <span>الكميات</span>
+        </div>
+        <div class="summary-item">
+            <span class="summary-number">{{ print_data.summary.processingTime }}s</span>
+            <span>وقت المعالجة</span>
+        </div>
+    </div>
+    
+    <div class="orders-grid">
+        {% for product in print_data.products %}
+            {% for order in product.orders %}
+            <div class="order-card">
+                <div class="order-header">
+                    <span class="order-ref">#{{ order.reference_id }}</span>
+                    <span class="order-quantity">{{ order.quantity }}</span>
+                </div>
+                
+                <div class="product-name">{{ product.name|truncate(30) }}</div>
+                
+                <div class="customer-info">
+                    {{ order.customer_name|truncate(20) }}
+                </div>
+                
+                {% if order.options and order.options|length > 0 %}
+                <div class="options">
+                    {% for option in order.options[:2] %}
+                    <span class="option-item">{{ option.name }}:{{ option.value|truncate(10) }}</span>
+                    {% endfor %}
+                    {% if order.options|length > 2 %}
+                    <span class="option-item">+{{ order.options|length - 2 }}</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                {% if order.notes %}
+                <div class="notes">{{ order.notes|truncate(30) }}</div>
+                {% endif %}
+                
+                {% if order.barcode %}
+                <div class="barcode">
+                    <img src="{{ order.barcode }}" alt="Barcode">
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% endfor %}
+    </div>
+    
+    <div style="margin-top: 20px; text-align: center; color: #666; font-size: 8px;">
+        تم الإنشاء في {{ current_time }} | إجمالي {{ print_data.summary.totalItems }} عنصر
+    </div>
+</body>
+</html>

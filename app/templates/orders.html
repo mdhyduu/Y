@@ -965,6 +965,7 @@ function collectQuickListPrintData() {
     // دالة محسنة فتح نافذة الطباعة
 // دالة فتح نافذة الطباعة للقائمة السريعة
 // دالة فتح نافذة الطباعة باستخدام المعالجة على الخادم
+// دالة محسنة للتعامل مع الأعداد الكبيرة
 function openQuickListPrint() {
     try {
         const selectedOrders = getSelectedOrdersForSalla();
@@ -974,24 +975,96 @@ function openQuickListPrint() {
             return;
         }
         
-        console.log('🔄 استخدام المعالجة على الخادم للطلبات:', selectedOrders);
-        
-        // استخدام route الخادم الجديد
-        const printUrl = `{{ url_for('orders.server_quick_list_print') }}?order_ids=${selectedOrders.join(',')}`;
-        const printWindow = window.open(printUrl, '_blank', 'width=1400,height=900,scrollbars=yes,resizable=yes');
-        
-        if (!printWindow) {
-            throw new Error('تم منع النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة لهذا الموقع.');
+        // التحذير إذا كان العدد كبيراً
+        if (selectedOrders.length > 200) {
+            Swal.fire({
+                title: 'عدد كبير من الطلبات',
+                html: `لقد حددت <span class="fw-bold text-warning">${selectedOrders.length}</span> طلب.<br>
+                      <small class="text-muted">لأسباب أدائية، سيتم معالجة أول 200 طلب فقط.</small>`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'متابعة مع 200 طلب',
+                cancelButtonText: 'إلغاء',
+                customClass: {
+                    confirmButton: 'btn btn-warning',
+                    cancelButton: 'btn btn-outline-secondary ms-2'
+                },
+                buttonsStyling: false
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    proceedWithPrint(selectedOrders);
+                }
+            });
+        } else {
+            proceedWithPrint(selectedOrders);
         }
-        
-        showSweetAlert('success', 'جاري المعالجة على الخادم', 
-            `يتم معالجة ${selectedOrders.length} طلب على الخادم...`);
         
     } catch (error) {
         console.error('❌ خطأ في فتح نافذة الطباعة:', error);
         showSweetAlert('error', 'خطأ', `فشل في فتح نافذة الطباعة: ${error.message}`);
     }
 }
+
+function proceedWithPrint(selectedOrders) {
+    // تقليل العدد إذا كان كبيراً
+    const ordersToPrint = selectedOrders.slice(0, 200);
+    
+    console.log('🔄 استخدام المعالجة على الخادم للطلبات:', ordersToPrint.length);
+    
+    // استخدام route الخادم الجديد
+    const printUrl = `{{ url_for('orders.server_quick_list_print') }}?order_ids=${ordersToPrint.join(',')}`;
+    const printWindow = window.open(printUrl, '_blank', 'width=1400,height=900,scrollbars=yes,resizable=yes');
+    
+    if (!printWindow) {
+        showSweetAlert('error', 'خطأ', 'تم منع النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة لهذا الموقع.');
+        return;
+    }
+    
+    showSweetAlert('info', 'جاري المعالجة على الخادم', 
+        `يتم معالجة ${ordersToPrint.length} طلب على الخادم...<br><small>قد يستغرق ذلك بضع دقائق</small>`);
+}
+
+// تحديث دالة تحميل PDF للتعامل مع الأعداد الكبيرة
+$(document).on('click', '#download-html-btn', function() {
+    const selectedOrders = getSelectedOrdersForSalla();
+    
+    if (selectedOrders.length === 0) {
+        showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للتحميل');
+        return;
+    }
+    
+    // التحذير إذا كان العدد كبيراً
+    const ordersToProcess = selectedOrders.slice(0, 200);
+    const warningText = selectedOrders.length > 200 ? 
+        `<br><small class="text-warning">سيتم معالجة أول 200 طلب فقط من ${selectedOrders.length}</small>` : '';
+    
+    Swal.fire({
+        title: 'تحميل الطلبات',
+        html: `سيتم فتح <span class="fw-bold text-primary">${ordersToProcess.length}</span> طلب في صفحة معاينة${warningText}`,
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'موافق، فتح المعاينة',
+        cancelButtonText: 'إلغاء',
+        customClass: {
+            confirmButton: 'btn btn-primary',
+            cancelButton: 'btn btn-outline-secondary ms-2'
+        },
+        buttonsStyling: false
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const downloadBtn = $('#download-html-btn');
+            const originalText = downloadBtn.html();
+            downloadBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
+            
+            const previewUrl = `{{ url_for('orders.download_orders_html') }}?order_ids=${ordersToProcess.join(',')}`;
+            window.open(previewUrl, '_blank');
+            
+            setTimeout(() => {
+                downloadBtn.prop('disabled', false).html(originalText);
+            }, 2000);
+        }
+    });
+});
     // 2. تحديد الطلبات (الكل أو فردي)
     $(document).on('change', '#select-all, #select-all-header', function() {
         const isChecked = this.checked;
