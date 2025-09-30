@@ -156,22 +156,20 @@ def _get_filtered_orders(store_id, status_id=None, for_delivery=False):
             OrderAddress.address_type == 'receiver'
         )
     
+    # ✅ التعديل: استخدام التصفية في مستوى قاعدة البيانات بدلاً من الذاكرة
+    if status_id:
+        query = query.filter(SallaOrder.status_id == status_id)
+    
     # تحميل العلاقات المطلوبة بما في ذلك الحالة الأصلية
-    all_orders = query.options(
+    filtered_orders = query.options(
         db.joinedload(SallaOrder.status),  # الحالة الأصلية
         db.joinedload(SallaOrder.status_notes),
         db.joinedload(SallaOrder.assignments).joinedload(OrderAssignment.employee),
         db.joinedload(SallaOrder.address)
     ).all()
     
-    # تصفية الطلبات بناءً على الحالة المحددة
-    if status_id:
-        filtered_orders = [order for order in all_orders 
-                         if order.status and order.status.id == status_id]
-    else:
-        filtered_orders = all_orders
-    
-    return filtered_orders, all_orders
+    # ✅ التعديل: إرجاع نفس القائمة مرتين للحفاظ على التوافق مع الدوال الأخرى
+    return filtered_orders, filtered_orders
 
 def _get_delivery_status_stats(store_id, employee_id=None):
     """إحصائيات الحالات الأصلية لفريق التوصيل"""
@@ -180,13 +178,13 @@ def _get_delivery_status_stats(store_id, employee_id=None):
     
     status_stats = []
     for status in order_statuses:
-        # بناء الاستعلام الأساسي
+        # بناء الاستعلام الأساسي بنفس شروط _get_filtered_orders
         query = SallaOrder.query.filter_by(
             store_id=store_id,
             status_id=status.id
         ).join(OrderAddress).filter(
-            OrderAddress.city == 'الرياض',
-            OrderAddress.address_type == 'receiver'
+            OrderAddress.city == 'الرياض',  # ✅ نفس الشرط
+            OrderAddress.address_type == 'receiver'  # ✅ نفس الشرط
         )
         
         # إذا كان موظف محدد، نضيف التصفية بالطلبات المسندة له
@@ -200,12 +198,11 @@ def _get_delivery_status_stats(store_id, employee_id=None):
         status_stats.append({
             'id': status.id,
             'name': status.name,
-            'color': '#6c757d',  # لون افتراضي للحالات الأصلية
+            'color': '#6c757d',
             'count': count
         })
     
     return status_stats
-
 @dashboard_bp.route('/')
 @login_required
 def index():
