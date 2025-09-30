@@ -285,28 +285,84 @@
         }
 
  window.addEventListener('load', function() {
-            try {
-                const savedData = localStorage.getItem('quickListPrintData');
+    console.log('🔄 بدء تحميل بيانات الطباعة...');
+    
+    function loadPrintData() {
+        try {
+            // المحاولة الأولى: الحصول على آخر مفتاح بيانات
+            const lastKey = localStorage.getItem('lastPrintDataKey');
+            console.log('🔑 مفتاح البيانات الأخير:', lastKey);
+            
+            if (lastKey) {
+                const savedData = localStorage.getItem(lastKey);
                 if (savedData) {
+                    console.log('✅ تم العثور على بيانات مطبوعة حديثة');
                     const data = JSON.parse(savedData);
-                    initReport(data);
-                    localStorage.removeItem('quickListPrintData');
                     
-                    setTimeout(() => {
-                        window.print(); // يمكن تفعيل الطباعة التلقائية بإزالة التعليق
-                    }, 1500);
-                } else {
-                    // محاولة تحميل البيانات من النافذة الأم كخيار بديل
-                    if (window.opener && window.opener.quickListPrintData) {
-                       initReport(window.opener.quickListPrintData);
+                    // تنظيف التخزين بعد الاستخدام
+                    localStorage.removeItem(lastKey);
+                    localStorage.removeItem('lastPrintDataKey');
+                    
+                    return data;
+                }
+            }
+            
+            // المحاولة الثانية: البحث عن أي بيانات طباعة
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('quickListPrintData_')) {
+                    console.log('🔍 العثور على بيانات بديلة:', key);
+                    const savedData = localStorage.getItem(key);
+                    if (savedData) {
+                        const data = JSON.parse(savedData);
+                        
+                        // تنظيف التخزين بعد الاستخدام
+                        localStorage.removeItem(key);
+                        
+                        return data;
                     }
                 }
-            } catch (error) {
-                console.error('Error loading print data:', error);
-                document.getElementById('orders-grid-container').innerHTML = 
-                    `<div class="no-data"><h3>خطأ في تحميل البيانات</h3><p>الرجاء المحاولة مرة أخرى.</p></div>`;
             }
+            
+            console.warn('❌ لم يتم العثور على أي بيانات للطباعة');
+            return null;
+            
+        } catch (error) {
+            console.error('💥 خطأ في تحميل البيانات:', error);
+            return null;
+        }
+    }
+    
+    const printData = loadPrintData();
+    
+    if (printData) {
+        console.log('📊 بيانات الطباعة المحملة:', {
+            products: printData.products ? printData.products.length : 0,
+            orders: printData.summary ? printData.summary.totalOrders : 0
         });
+        
+        initReport(printData);
+        
+        // طباعة تلقائية بعد تحميل البيانات
+        setTimeout(() => {
+            console.log('🖨️ بدء الطباعة التلقائية...');
+            window.print();
+        }, 1000);
+    } else {
+        console.error('❌ فشل في تحميل بيانات الطباعة');
+        document.getElementById('orders-grid-container').innerHTML = 
+            `<div class="no-data">
+                <h3>❌ خطأ في تحميل البيانات</h3>
+                <p>لم يتم العثور على بيانات للطباعة. الرجاء:</p>
+                <ul>
+                    <li>التأكد من تحديد الطلبات المراد طباعتها</li>
+                    <li>المحاولة مرة أخرى</li>
+                    <li>التحقق من إعدادات المتصفح</li>
+                </ul>
+                <button onclick="window.close()" class="btn-secondary">إغلاق النافذة</button>
+            </div>`;
+    }
+});
     </script>
 </body>
 </html>
