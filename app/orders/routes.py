@@ -102,43 +102,42 @@ def index():
         is_reviewer = employee.role in ['reviewer', 'manager']
         is_delivery_personnel = employee.role in ['delivery_manager', 'delivery']
     
+    # orders/routes.py - Fixed section
+
+    # orders/routes.py - Fixed section
+
     try:
         # ✅ استخدام SallaOrder مع join صحيح لـ OrderAddress
         orders_query = SallaOrder.query.filter_by(store_id=user.store_id).options(
             selectinload(SallaOrder.status),
             selectinload(SallaOrder.assignments).selectinload(OrderAssignment.employee)
         )
+        
         if is_delivery_personnel:
             print(f"🚚 تطبيق فلتر الرياض لموظف التوصيل: {employee.email}")
             
-            # استخدام subquery للعناوين في الرياض
-            riyadh_subquery = db.session.query(OrderAddress.order_id).filter(
-                OrderAddress.city.ilike('%الرياض%'),
+            # استخدام join للعناوين في الرياض
+            orders_query = orders_query.join(OrderAddress).filter(
+                OrderAddress.city == 'الرياض',
                 OrderAddress.address_type == 'receiver'
-            ).subquery()
+            )
             
-            if employee.role == 'delivery_manager':
-                # مدير التوصيل: جميع طلبات المتجر في الرياض
-                orders_query = orders_query.filter(
-                    SallaOrder.id.in_(riyadh_subquery)
-                )
-                print("✅ مدير التوصيل: عرض جميع طلبات الرياض في المتجر")
-            else:
-                # موظف توصيل عادي: الطلبات المسندة له في الرياض
-                orders_query = orders_query.filter(
-                    SallaOrder.id.in_(riyadh_subquery)
-                ).join(OrderAssignment).filter(
-                    OrderAssignment.employee_id == employee.id
-                )
-                print("✅ موظف توصيل عادي: عرض الطلبات المسندة له في الرياض")
-    
-    # التحقق النهائي
+            # التحقق النهائي
             final_count = orders_query.count()
             print(f"🎯 العدد النهائي للطلبات: {final_count}") 
         
         # ✅ الباقي بدون تغيير
+        # إصلاح: استخدام exists() بدلاً من join مباشر لتجنب تضارب الـ JOINs
         if not is_reviewer and employee:
-            orders_query = orders_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee.id)
+            # استخدام subquery لتجنب تضارب الـ JOINs
+            from sqlalchemy import exists
+            assignment_exists = exists().where(
+                and_(
+                    OrderAssignment.order_id == SallaOrder.id,
+                    OrderAssignment.employee_id == employee.id
+                )
+            )
+            orders_query = orders_query.filter(assignment_exists)
         
         # تطبيق الفلاتر الأخرى...
         if status_filter in ['late', 'missing', 'not_shipped', 'refunded']:
@@ -153,6 +152,8 @@ def index():
         
         if employee_filter:
             orders_query = orders_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
+    
+    # ... rest of the filters remain the same
         
         if custom_status_filter:
             custom_status_id = int(custom_status_filter)
