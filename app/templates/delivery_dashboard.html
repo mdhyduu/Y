@@ -333,17 +333,17 @@
                 const statusId = target.getAttribute('data-status-id');
                 
                 // إرسال طلب AJAX لجلب الطلبات المصفاة
-                fetch(`/dashboard/filter_orders?status_id=${statusId}`)
-                    .then(response => response.text())
-                    .then(html => {
-                        document.getElementById('orders-container').innerHTML = html;
-                        // إعادة تهيئة أحداث الاختيار بعد تحميل المحتوى الجديد
-                        initOrderSelection();
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                    });
-            });
+  // إرسال طلب AJAX لجلب الطلبات المصفاة
+fetch(`/dashboard/filter_orders?status_id=${statusId}`)
+    .then(response => response.text())
+    .then(html => {
+        document.getElementById('orders-container').innerHTML = html;
+        // إعادة تهيئة أحداث الاختيار بعد تحميل المحتوى الجديد
+        initOrderSelection();
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });            });
         }
 
         // كود المودال
@@ -385,6 +385,72 @@
             // تحديث حالة الزر عند التحميل الأولي
             updateAssignButton();
         }
+        // زر تحديد/إلغاء تحديد الكل
+function initSelectAll() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    if (!selectAllCheckbox) {
+        // إنشاء زر تحديد الكل إذا لم يكن موجوداً
+        const cardHeader = document.querySelector('.card-header h5.mb-0').closest('.card-header');
+        const existingButton = cardHeader.querySelector('#selectAllCheckbox');
+        
+        if (!existingButton) {
+            const selectAllDiv = document.createElement('div');
+            selectAllDiv.className = 'form-check form-check-inline';
+            selectAllDiv.innerHTML = `
+                <input class="form-check-input" type="checkbox" id="selectAllCheckbox">
+                <label class="form-check-label small" for="selectAllCheckbox">تحديد الكل</label>
+            `;
+            
+            // إدراج زر تحديد الكل بجانب العنوان
+            cardHeader.querySelector('h5').after(selectAllDiv);
+            
+            // إضافة مستمع الحدث لتحديد الكل
+            document.getElementById('selectAllCheckbox').addEventListener('change', function() {
+                const checkboxes = document.querySelectorAll('.order-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = this.checked;
+                });
+                updateAssignButton();
+            });
+        }
+    }
+}
+
+// تحديث دالة initOrderSelection لتشمل تحديد الكل
+function initOrderSelection() {
+    const assignMultipleBtn = document.getElementById('assignMultipleBtn');
+    const checkboxes = document.querySelectorAll('.order-checkbox');
+    
+    // إظهار/إخفاء زر الإسناد المتعدد بناءً على عدد الطلبات المحددة
+    function updateAssignButton() {
+        const selectedCount = document.querySelectorAll('.order-checkbox:checked').length;
+        if (selectedCount > 0) {
+            assignMultipleBtn.style.display = 'block';
+            assignMultipleBtn.innerHTML = `<i class="fas fa-user-plus me-1"></i> إسناد المحدد (${selectedCount})`;
+        } else {
+            assignMultipleBtn.style.display = 'none';
+        }
+        
+        // تحديث حالة زر تحديد الكل
+        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        if (selectAllCheckbox) {
+            const totalCheckboxes = document.querySelectorAll('.order-checkbox').length;
+            selectAllCheckbox.checked = selectedCount > 0 && selectedCount === totalCheckboxes;
+            selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < totalCheckboxes;
+        }
+    }
+    
+    // إضافة مستمعي الأحداث لخانات الاختيار
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateAssignButton);
+    });
+    
+    // تهيئة زر تحديد الكل
+    initSelectAll();
+    
+    // تحديث حالة الزر عند التحميل الأولي
+    updateAssignButton();
+}
         
         // تهيئة إدارة الاختيار عند تحميل الصفحة
         initOrderSelection();
