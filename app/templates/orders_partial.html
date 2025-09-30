@@ -61,8 +61,6 @@
                 <div class="btn-group">
                     <button class="btn btn-sm btn-outline-warning assign-btn" 
                             data-order-id="{{ order.id }}" 
-                            data-bs-toggle="modal" 
-                            data-bs-target="#assignOrderModal"
                             title="إسناد الطلب">
                         <i class="fas fa-user-plus"></i> {% if order.assignments %}تعديل{% else %}إسناد{% endif %}
                     </button>
@@ -97,45 +95,8 @@
 </div>
 
 <script>
-// إعادة تهيئة الأحداث بعد تحميل المحتوى عبر AJAX
+// فقط إعادة تهيئة اختيار الطلبات بعد تحميل المحتوى
 if (typeof initOrderSelection === 'function') {
     initOrderSelection();
 }
-if (typeof initAssignButtons === 'function') {
-    initAssignButtons();
-}
-
-// التعامل مع أزرار تسليم الطلب
-document.addEventListener('click', function(e) {
-    if (e.target.closest('.delivery-action-btn')) {
-        const button = e.target.closest('.delivery-action-btn');
-        const orderId = button.getAttribute('data-order-id');
-        const action = button.getAttribute('data-action');
-        
-        if (action === 'deliver') {
-            if (confirm('هل تريد تأكيد تسليم هذا الطلب؟')) {
-                fetch('/delivery/mark_delivered/' + orderId, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('فشل في تأكيد التسليم: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('حدث خطأ أثناء تأكيد التسليم');
-                });
-            }
-        }
-    }
-});
 </script>
