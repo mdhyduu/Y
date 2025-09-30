@@ -109,14 +109,32 @@ def index():
             selectinload(SallaOrder.assignments).selectinload(OrderAssignment.employee)
         )
         if is_delivery_personnel:
-            orders_query = orders_query.join(
-                OrderAddress,
-                SallaOrder.id == OrderAddress.order_id
-            ).filter(
-                OrderAddress.city == 'الرياض',
+            print(f"🚚 تطبيق فلتر الرياض لموظف التوصيل: {employee.email}")
+            
+            # استخدام subquery للعناوين في الرياض
+            riyadh_subquery = db.session.query(OrderAddress.order_id).filter(
+                OrderAddress.city.ilike('%الرياض%'),
                 OrderAddress.address_type == 'receiver'
-            )
-            print(f"✅ تطبيق فلتر الرياض لموظف التوصيل: {employee.email}")
+            ).subquery()
+            
+            if employee.role == 'delivery_manager':
+                # مدير التوصيل: جميع طلبات المتجر في الرياض
+                orders_query = orders_query.filter(
+                    SallaOrder.id.in_(riyadh_subquery)
+                )
+                print("✅ مدير التوصيل: عرض جميع طلبات الرياض في المتجر")
+            else:
+                # موظف توصيل عادي: الطلبات المسندة له في الرياض
+                orders_query = orders_query.filter(
+                    SallaOrder.id.in_(riyadh_subquery)
+                ).join(OrderAssignment).filter(
+                    OrderAssignment.employee_id == employee.id
+                )
+                print("✅ موظف توصيل عادي: عرض الطلبات المسندة له في الرياض")
+    
+    # التحقق النهائي
+            final_count = orders_query.count()
+            print(f"🎯 العدد النهائي للطلبات: {final_count}") 
         
         # ✅ الباقي بدون تغيير
         if not is_reviewer and employee:
