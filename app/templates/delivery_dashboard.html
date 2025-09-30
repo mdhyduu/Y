@@ -228,7 +228,6 @@
 <script>
 // دالة للحصول على CSRF token
 // دالة للحصول على CSRF token
-// دالة للحصول على CSRF token
 function getCSRFToken() {
     const csrfToken = document.querySelector('meta[name="csrf-token"]');
     return csrfToken ? csrfToken.getAttribute('content') : '';
@@ -240,6 +239,7 @@ function initOrderSelection() {
     const checkboxes = document.querySelectorAll('.order-checkbox');
     const selectAllCheckbox = document.getElementById('selectAllCheckbox');
     
+    // إظهار/إخفاء زر الإسناد المتعدد بناءً على عدد الطلبات المحددة
     function updateAssignButton() {
         const selectedCount = document.querySelectorAll('.order-checkbox:checked').length;
         if (selectedCount > 0) {
@@ -249,6 +249,7 @@ function initOrderSelection() {
             assignMultipleBtn.style.display = 'none';
         }
         
+        // تحديث حالة زر تحديد الكل
         if (selectAllCheckbox) {
             const totalCheckboxes = document.querySelectorAll('.order-checkbox').length;
             selectAllCheckbox.checked = selectedCount > 0 && selectedCount === totalCheckboxes;
@@ -256,10 +257,12 @@ function initOrderSelection() {
         }
     }
     
+    // إضافة مستمعي الأحداث لخانات الاختيار
     checkboxes.forEach(checkbox => {
         checkbox.addEventListener('change', updateAssignButton);
     });
     
+    // حدث تحديد/إلغاء تحديد الكل
     if (selectAllCheckbox) {
         selectAllCheckbox.addEventListener('change', function() {
             const checkboxes = document.querySelectorAll('.order-checkbox');
@@ -270,26 +273,24 @@ function initOrderSelection() {
         });
     }
     
+    // تحديث حالة الزر عند التحميل الأولي
     updateAssignButton();
 }
 
-// EVENT DELEGATION للتعامل مع جميع الأزرار الديناميكية
-function initGlobalEventDelegation() {
-    // التعامل مع أزرار الإسناد الفردي
+// التعامل مع أزرار الإسناد باستخدام event delegation
+function initAssignButtons() {
+    // استخدام event delegation للتعامل مع الأزرار التي يتم تحميلها ديناميكياً
     document.addEventListener('click', function(e) {
-        const assignBtn = e.target.closest('.assign-btn');
-        if (assignBtn) {
-            e.preventDefault();
-            const orderId = assignBtn.getAttribute('data-order-id');
-            console.log('إسناد طلب:', orderId);
+        // التعامل مع أزرار الإسناد
+        if (e.target.closest('.assign-btn')) {
+            const button = e.target.closest('.assign-btn');
+            const orderId = button.getAttribute('data-order-id');
             
-            fetch(`/delivery/assign_order_modal/${orderId}`)
-                .then(response => {
-                    if (!response.ok) throw new Error('Network error');
-                    return response.text();
-                })
+            fetch('/delivery/assign_order_modal/' + orderId)
+                .then(response => response.text())
                 .then(html => {
                     document.getElementById('assignModalContent').innerHTML = html;
+                    // فتح المودال بعد تحميل المحتوى
                     const modal = new bootstrap.Modal(document.getElementById('assignOrderModal'));
                     modal.show();
                 })
@@ -297,50 +298,39 @@ function initGlobalEventDelegation() {
                     console.error('Error:', error);
                     document.getElementById('assignModalContent').innerHTML = 
                         '<div class="alert alert-danger">حدث خطأ أثناء تحميل المحتوى</div>';
-                    const modal = new bootstrap.Modal(document.getElementById('assignOrderModal'));
-                    modal.show();
                 });
         }
         
         // التعامل مع أزرار التسليم
-        const deliverBtn = e.target.closest('.delivery-action-btn');
-        if (deliverBtn && deliverBtn.getAttribute('data-action') === 'deliver') {
-            e.preventDefault();
-            const orderId = deliverBtn.getAttribute('data-order-id');
-            console.log('تسليم طلب:', orderId);
+        if (e.target.closest('.delivery-action-btn')) {
+            const button = e.target.closest('.delivery-action-btn');
+            const orderId = button.getAttribute('data-order-id');
+            const action = button.getAttribute('data-action');
             
-            if (confirm('هل تريد تأكيد تسليم هذا الطلب؟')) {
-                fetch(`/delivery/mark_delivered/${orderId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRFToken': getCSRFToken()
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showToast('success', 'تم تسليم الطلب بنجاح');
-                        setTimeout(() => location.reload(), 1000);
-                    } else {
-                        showToast('error', 'فشل في تأكيد التسليم: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showToast('error', 'حدث خطأ أثناء تأكيد التسليم');
-                });
+            if (action === 'deliver') {
+                if (confirm('هل تريد تأكيد تسليم هذا الطلب؟')) {
+                    fetch('/delivery/mark_delivered/' + orderId, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRFToken': getCSRFToken()
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            location.reload();
+                        } else {
+                            alert('فشل في تأكيد التسليم: ' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('حدث خطأ أثناء تأكيد التسليم');
+                    });
+                }
             }
-        }
-        
-        // التعامل مع أزرار العرض (التفاصيل)
-        const viewBtn = e.target.closest('.view-order-btn');
-        if (viewBtn) {
-            e.preventDefault();
-            const orderId = viewBtn.getAttribute('data-order-id');
-            const url = `/orders/${orderId}`;
-            window.open(url, '_blank');
         }
     });
 }
@@ -349,18 +339,24 @@ function initGlobalEventDelegation() {
 function initOrderTabs() {
     const ordersTabs = document.getElementById('orders-tabs');
     if (ordersTabs) {
+        // استخدام event delegation للتبويبات
         ordersTabs.addEventListener('click', function(e) {
             e.preventDefault();
             const target = e.target.closest('a');
             if (!target) return;
             
+            // إزالة النشاط من جميع التبويبات
             document.querySelectorAll('#orders-tabs a').forEach(tab => {
                 tab.classList.remove('active');
             });
             
+            // إضافة النشاط للتبويب المختار
             target.classList.add('active');
+            
+            // الحصول على معرف الحالة المحددة
             const statusId = target.getAttribute('data-status-id');
             
+            // إظهار مؤشر التحميل
             const ordersContainer = document.getElementById('orders-container');
             ordersContainer.innerHTML = `
                 <div class="text-center py-5">
@@ -371,12 +367,13 @@ function initOrderTabs() {
                 </div>
             `;
             
+            // إرسال طلب AJAX لجلب الطلبات المصفاة
             fetch(`/dashboard/filter_orders?status_id=${statusId}`)
                 .then(response => response.text())
                 .then(html => {
                     ordersContainer.innerHTML = html;
-                    // إعادة تهيئة اختيار الطلبات فقط
-                    initOrderSelection();
+                    // لا حاجة لاستدعاء initOrderSelection() و initAssignButtons() هنا
+                    // لأننا نستخدم event delegation
                 })
                 .catch(error => {
                     console.error('Error:', error);
@@ -400,10 +397,11 @@ function initBulkAssignment() {
                 .map(checkbox => checkbox.getAttribute('data-order-id'));
             
             if (selectedOrders.length === 0) {
-                showToast('warning', 'يرجى تحديد طلبات للإسناد');
+                alert('يرجى تحديد طلبات للإسناد');
                 return;
             }
             
+            // تحميل محتوى المودال الخاص بالإسناد المتعدد
             fetch('/delivery/assign_multiple_orders_modal', {
                 method: 'POST',
                 headers: {
@@ -415,6 +413,7 @@ function initBulkAssignment() {
             .then(response => response.text())
             .then(html => {
                 document.getElementById('assignMultipleModalContent').innerHTML = html;
+                // فتح المودال بعد تحميل المحتوى
                 const modal = new bootstrap.Modal(document.getElementById('assignMultipleModal'));
                 modal.show();
             })
@@ -422,58 +421,33 @@ function initBulkAssignment() {
                 console.error('Error:', error);
                 document.getElementById('assignMultipleModalContent').innerHTML = 
                     '<div class="alert alert-danger">حدث خطأ أثناء تحميل المحتوى</div>';
-                const modal = new bootstrap.Modal(document.getElementById('assignMultipleModal'));
-                modal.show();
             });
         });
     }
 }
 
-// دالة لعرض الإشعارات
-function showToast(type, message) {
-    // إنشاء toast ديناميكي إذا لم يكن موجوداً
-    let toastContainer = document.getElementById('toastContainer');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.id = 'toastContainer';
-        toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
-        document.body.appendChild(toastContainer);
-    }
-    
-    const toastId = 'toast-' + Date.now();
-    const bgColor = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : 'bg-warning';
-    const icon = type === 'success' ? 'fa-check' : type === 'error' ? 'fa-exclamation-triangle' : 'fa-info';
-    
-    const toastHTML = `
-        <div id="${toastId}" class="toast align-items-center text-white ${bgColor} border-0" role="alert">
-            <div class="d-flex">
-                <div class="toast-body">
-                    <i class="fas ${icon} me-2"></i>${message}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            </div>
-        </div>
-    `;
-    
-    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-    const toastElement = document.getElementById(toastId);
-    const toast = new bootstrap.Toast(toastElement);
-    toast.show();
-    
-    // إزالة الـ toast من DOM بعد الاختفاء
-    toastElement.addEventListener('hidden.bs.toast', function () {
-        toastElement.remove();
-    });
-}
-
 // تأثيرات الرسوم المتحركة
 function initAnimations() {
+    window.addEventListener('scroll', () => {
+        const cards = document.querySelectorAll('.card');
+        cards.forEach(card => {
+            const cardPosition = card.getBoundingClientRect().top;
+            const screenPosition = window.innerHeight / 1.3;
+            if(cardPosition < screenPosition) {
+                card.style.opacity = 1;
+                card.style.transform = 'translateY(0)';
+            }
+        });
+    });
+
+    // تهيئة أولية للبطاقات
     document.querySelectorAll('.card').forEach(card => {
         card.style.opacity = 0;
         card.style.transform = 'translateY(20px)';
         card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
     });
 
+    // تشغيل تأثير الظهور بعد تحميل الصفحة
     setTimeout(() => {
         document.querySelectorAll('.card').forEach((card, index) => {
             setTimeout(() => {
@@ -507,14 +481,13 @@ function initModalReset() {
 document.addEventListener('DOMContentLoaded', function() {
     initAnimations();
     initOrderSelection();
-    initGlobalEventDelegation(); // هذا هو الأهم!
+    initAssignButtons(); // هذا هو الأهم - event delegation
     initOrderTabs();
     initBulkAssignment();
     initModalReset();
     
-    // جعل الدوال متاحة عالمياً
+    // جعل الدوال متاحة عالمياً لاستدعائها من الملفات الجزئية
     window.initOrderSelection = initOrderSelection;
-    window.showToast = showToast;
 });
 </script>
 {% endblock %}
