@@ -285,42 +285,73 @@
         }
 
  window.addEventListener('load', function() {
-    console.log('🔄 بدء تحميل بيانات الطباعة...');
+    console.log('🔄 بدء تحميل بيانات الطباعة المحسنة...');
     
-    function loadPrintData() {
+    function loadEnhancedPrintData() {
         try {
-            // المحاولة الأولى: الحصول على آخر مفتاح بيانات
-            const lastKey = localStorage.getItem('lastPrintDataKey');
-            console.log('🔑 مفتاح البيانات الأخير:', lastKey);
+            // البحث في معلمات URL أولاً
+            const urlParams = new URLSearchParams(window.location.search);
+            const timestamp = urlParams.get('t');
             
-            if (lastKey) {
-                const savedData = localStorage.getItem(lastKey);
-                if (savedData) {
-                    console.log('✅ تم العثور على بيانات مطبوعة حديثة');
-                    const data = JSON.parse(savedData);
-                    
-                    // تنظيف التخزين بعد الاستخدام
-                    localStorage.removeItem(lastKey);
-                    localStorage.removeItem('lastPrintDataKey');
-                    
-                    return data;
+            let storageKey = localStorage.getItem('lastPrintDataKey');
+            
+            // إذا كان هناك timestamp في URL، نبحث عن المفتاح المناسب
+            if (timestamp) {
+                const timedKey = `quickListPrintData_${timestamp}`;
+                if (localStorage.getItem(timedKey)) {
+                    storageKey = timedKey;
+                    console.log('🔍 وجد مفتاح مخصص من URL:', storageKey);
                 }
             }
             
-            // المحاولة الثانية: البحث عن أي بيانات طباعة
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith('quickListPrintData_')) {
-                    console.log('🔍 العثور على بيانات بديلة:', key);
-                    const savedData = localStorage.getItem(key);
-                    if (savedData) {
-                        const data = JSON.parse(savedData);
-                        
-                        // تنظيف التخزين بعد الاستخدام
-                        localStorage.removeItem(key);
-                        
-                        return data;
+            if (!storageKey) {
+                // البحث عن أحدث مفتاح
+                let latestKey = null;
+                let latestTime = 0;
+                
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('quickListPrintData_')) {
+                        try {
+                            const dataStr = localStorage.getItem(key);
+                            if (dataStr) {
+                                const data = JSON.parse(dataStr);
+                                if (data._verified && data._source === 'enhanced_collector') {
+                                    const dataTime = new Date(data.timestamp).getTime();
+                                    if (dataTime > latestTime) {
+                                        latestTime = dataTime;
+                                        latestKey = key;
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('⚠️ تخطي بيانات غير صالحة:', key);
+                        }
                     }
+                }
+                
+                if (latestKey) {
+                    storageKey = latestKey;
+                    console.log('✅ استخدام أحدث بيانات محسنة:', storageKey);
+                }
+            }
+            
+            if (storageKey) {
+                const savedData = localStorage.getItem(storageKey);
+                if (savedData) {
+                    const data = JSON.parse(savedData);
+                    
+                    // تنظيف التخزين بعد الاستخدام
+                    localStorage.removeItem(storageKey);
+                    localStorage.removeItem('lastPrintDataKey');
+                    
+                    console.log('📊 بيانات الطباعة المحملة:', {
+                        products: data.products ? data.products.length : 0,
+                        orders: data.summary ? data.summary.totalOrders : 0,
+                        verified: data._verified
+                    });
+                    
+                    return data;
                 }
             }
             
@@ -333,14 +364,10 @@
         }
     }
     
-    const printData = loadPrintData();
+    const printData = loadEnhancedPrintData();
     
-    if (printData) {
-        console.log('📊 بيانات الطباعة المحملة:', {
-            products: printData.products ? printData.products.length : 0,
-            orders: printData.summary ? printData.summary.totalOrders : 0
-        });
-        
+    if (printData && printData.products && printData.products.length > 0) {
+        console.log('🎉 نجاح تحميل البيانات للطباعة');
         initReport(printData);
         
         // طباعة تلقائية بعد تحميل البيانات
@@ -354,12 +381,16 @@
             `<div class="no-data">
                 <h3>❌ خطأ في تحميل البيانات</h3>
                 <p>لم يتم العثور على بيانات للطباعة. الرجاء:</p>
-                <ul>
-                    <li>التأكد من تحديد الطلبات المراد طباعتها</li>
-                    <li>المحاولة مرة أخرى</li>
-                    <li>التحقق من إعدادات المتصفح</li>
-                </ul>
-                <button onclick="window.close()" class="btn-secondary">إغلاق النافذة</button>
+                <ol>
+                    <li>التأكد من تحديد الطلبات المراد طباعتها في القائمة السريعة</li>
+                    <li>الضغط على زر "طباعة القائمة السريعة" مرة أخرى</li>
+                    <li>التحقق من إعدادات المتصفح والسماح بالنوافذ المنبثقة</li>
+                    <li>المحاولة مرة أخرى بعد تأكيد التحديد</li>
+                </ol>
+                <div class="mt-3">
+                    <button onclick="window.close()" class="btn-secondary">إغلاق النافذة</button>
+                    <button onclick="location.reload()" class="btn-primary" style="margin-right: 10px;">إعادة المحاولة</button>
+                </div>
             </div>`;
     }
 });
