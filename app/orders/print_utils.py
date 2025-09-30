@@ -26,7 +26,7 @@ import json
 logger = logging.getLogger('salla_app')
 
 def get_orders_from_local_database(order_ids, store_id):
-    """جلب الطلبات من قاعدة البيانات المحلية باستخدام full_order_data"""
+    """جلب الطلبات من قاعدة البيانات المحلية باستخدام full_order_data - محسن"""
     try:
         logger.info(f"🔍 جلب {len(order_ids)} طلب من قاعدة البيانات المحلية")
         
@@ -47,6 +47,7 @@ def get_orders_from_local_database(order_ids, store_id):
         logger.info(f"✅ تم العثور على {len(salla_orders)} طلب في قاعدة البيانات")
         
         processed_orders = []
+        orders_without_items = 0
         
         for order in salla_orders:
             try:
@@ -62,23 +63,25 @@ def get_orders_from_local_database(order_ids, store_id):
                 
                 if not items_data:
                     logger.warning(f"⚠️ الطلب {order.id} لا يحتوي على عناصر في full_order_data")
+                    orders_without_items += 1
                     # يمكن محاولة جلب العناصر من API كحل بديل
                     continue
                 
                 # معالجة بيانات الطلب باستخدام البيانات المحلية
                 processed_order = process_order_from_local_data(order, order_data, items_data)
                 
-                if processed_order:
+                if processed_order and processed_order.get('order_items'):
                     processed_orders.append(processed_order)
-                    logger.info(f"✅ تم معالجة الطلب {order.id} من البيانات المحلية")
+                    logger.info(f"✅ تم معالجة الطلب {order.id} مع {len(processed_order['order_items'])} عنصر")
                 else:
-                    logger.warning(f"❌ فشل في معالجة الطلب {order.id}")
+                    logger.warning(f"❌ الطلب {order.id} لا يحتوي على عناصر صالحة بعد المعالجة")
+                    orders_without_items += 1
                     
             except Exception as e:
                 logger.error(f"❌ خطأ في معالجة الطلب {order.id}: {str(e)}")
                 continue
         
-        logger.info(f"🎉 تم معالجة {len(processed_orders)} طلب بنجاح من البيانات المحلية")
+        logger.info(f"🎉 تم معالجة {len(processed_orders)} طلب بنجاح من البيانات المحلية، {orders_without_items} طلب بدون عناصر")
         return processed_orders
         
     except Exception as e:
@@ -86,7 +89,7 @@ def get_orders_from_local_database(order_ids, store_id):
         return []
 
 def process_order_from_local_data(order, order_data, items_data):
-    """معالجة بيانات الطلب من البيانات المحلية"""
+    """معالجة بيانات الطلب من البيانات المحلية - محسن"""
     try:
         # استخراج البيانات الأساسية
         customer = order_data.get('customer', {})
@@ -94,20 +97,43 @@ def process_order_from_local_data(order, order_data, items_data):
         if not customer_name:
             customer_name = order_data.get('customer_name', 'عميل غير معروف')
         
-        # معالجة العناصر
+        # معالجة العناصر مع تحسينات
         processed_items = []
+        valid_items_count = 0
+        
         for index, item in enumerate(items_data):
             try:
+                # التحقق من صحة العنصر الأساسي
+                if not item or not isinstance(item, dict):
+                    logger.warning(f"⚠️ عنصر غير صالح في الفهرس {index} للطلب {order.id}")
+                    continue
+                
                 item_id = item.get('id') or f"temp_{index}"
+                item_name = item.get('name', '').strip()
+                item_sku = item.get('sku', '').strip()
+                item_quantity = item.get('quantity', 0)
+                
+                # تخطي العناصر بدون اسم أو SKU أو كمية
+                if not item_name and not item_sku:
+                    logger.warning(f"⚠️ عنصر بدون اسم أو SKU في الطلب {order.id}")
+                    continue
+                    
+                if not item_quantity or item_quantity <= 0:
+                    logger.warning(f"⚠️ عنصر بكمية غير صالحة في الطلب {order.id}: {item_quantity}")
+                    continue
                 
                 # استخراج الصورة الرئيسية
                 main_image = get_main_image_from_local(item)
                 notes = item.get('notes', '') or item.get('note', '') or ''
+                
                 # معالجة الخيارات
                 options = []
                 item_options = item.get('options', [])
                 if isinstance(item_options, list):
                     for option in item_options:
+                        if not option or not isinstance(option, dict):
+                            continue
+                            
                         raw_value = option.get('value', '')
                         display_value = 'غير محدد'
                         
@@ -116,7 +142,7 @@ def process_order_from_local_data(order, order_data, items_data):
                         elif isinstance(raw_value, list):
                             values_list = [str(opt.get('name') or opt.get('value') or str(opt)) 
                                          for opt in raw_value if isinstance(opt, (dict, str))]
-                            display_value = ', '.join(values_list)
+                            display_value = ', '.join(values_list) if values_list else 'غير محدد'
                         else:
                             display_value = str(raw_value) if raw_value else 'غير محدد'
                         
@@ -129,9 +155,9 @@ def process_order_from_local_data(order, order_data, items_data):
                 # إنشاء بيانات العنصر
                 item_data = {
                     'id': item_id,
-                    'name': item.get('name', ''),
-                    'sku': item.get('sku', ''),
-                    'quantity': item.get('quantity', 0),
+                    'name': item_name or 'منتج بدون اسم',
+                    'sku': item_sku or f"unknown_{item_id}",
+                    'quantity': item_quantity,
                     'currency': item.get('currency', 'SAR'),
                     'price': {
                         'amount': item.get('amounts', {}).get('price_without_tax', {}).get('amount', 0),
@@ -143,12 +169,18 @@ def process_order_from_local_data(order, order_data, items_data):
                 }
                 
                 processed_items.append(item_data)
+                valid_items_count += 1
                 
             except Exception as item_error:
-                logger.error(f"❌ خطأ في معالجة العنصر {index}: {str(item_error)}")
+                logger.error(f"❌ خطأ في معالجة العنصر {index} في الطلب {order.id}: {str(item_error)}")
                 continue
         
-        # الحصول على الباركود من قاعدة البيانات - التصحيح هنا
+        # إذا لم يكن هناك عناصر صالحة، نعيد None
+        if valid_items_count == 0:
+            logger.warning(f"⚠️ الطلب {order.id} لا يحتوي على عناصر صالحة بعد المعالجة")
+            return None
+        
+        # الحصول على الباركود من قاعدة البيانات
         barcode_data = order.barcode_data if order else None
         
         # معالجة الباركود بشكل آمن
@@ -158,19 +190,19 @@ def process_order_from_local_data(order, order_data, items_data):
                     barcode_data = f"data:image/png;base64,{barcode_data}"
                 elif not barcode_data.startswith('data:image'):
                     # إذا كان الباركود ليس بصيغة صحيحة، نستخدم رقم الطلب لإنشاء باركود جديد
-                    logger.warning(f"⚠️ تنسيق الباركود غير صحيح للطلب {order.id if order else 'unknown'}")
-                    barcode_data = generate_barcode(order.id if order else 'unknown')
+                    logger.warning(f"⚠️ تنسيق الباركود غير صحيح للطلب {order.id}")
+                    barcode_data = generate_barcode(str(order.id))
             else:
                 # إذا لم يكن الباركود نصاً، نستخدم رقم الطلب لإنشاء باركود جديد
-                barcode_data = generate_barcode(order.id if order else 'unknown')
+                barcode_data = generate_barcode(str(order.id))
         else:
             # إذا لم يكن هناك باركود، ننشئ واحداً
-            barcode_data = generate_barcode(order.id if order else 'unknown')
+            barcode_data = generate_barcode(str(order.id))
         
         # إنشاء كائن الطلب النهائي
         processed_order = {
-            'id': order.id if order else 'unknown',
-            'reference_id': order_data.get('reference_id', order.id if order else 'unknown'),
+            'id': str(order.id),
+            'reference_id': order_data.get('reference_id', str(order.id)),
             'order_items': processed_items,
             'barcode': barcode_data,
             'customer': {
@@ -183,10 +215,11 @@ def process_order_from_local_data(order, order_data, items_data):
             'status': order_data.get('status', {})
         }
         
+        logger.info(f"✅ تم معالجة الطلب {order.id} مع {valid_items_count} عنصر صالح")
         return processed_order
         
     except Exception as e:
-        logger.error(f"❌ خطأ في معالجة البيانات المحلية: {str(e)}")
+        logger.error(f"❌ خطأ في معالجة البيانات المحلية للطلب {order.id if order else 'unknown'}: {str(e)}")
         return None
 
 def get_main_image_from_local(item):
@@ -378,6 +411,7 @@ def get_quick_list_data():
         products_by_sku = {}
         success_count = 0
         error_count = 0
+        orders_with_items = 0
         
         if not orders:
             return jsonify({
@@ -393,9 +427,33 @@ def get_quick_list_data():
         # تجميع جميع المنتجات من جميع الطلبات حسب SKU
         for order in orders:
             try:
-                for item in order.get('order_items', []):
-                    sku = item.get('sku', '')
-                    item_name = item.get('name', '')
+                order_items = order.get('order_items', [])
+                
+                # تخطي الطلبات التي لا تحتوي على عناصر
+                if not order_items:
+                    logger.warning(f"⚠️ الطلب {order.get('id', '')} لا يحتوي على عناصر")
+                    error_count += 1
+                    continue
+                
+                # عد الطلبات التي تحتوي على عناصر
+                orders_with_items += 1
+                
+                for item in order_items:
+                    # التحقق من صحة بيانات العنصر
+                    if not item or not isinstance(item, dict):
+                        continue
+                        
+                    sku = item.get('sku', '').strip()
+                    item_name = item.get('name', '').strip()
+                    quantity = item.get('quantity', 0)
+                    
+                    # تخطي العناصر بدون اسم أو SKU
+                    if not sku and not item_name:
+                        continue
+                        
+                    # تخطي العناصر بكمية صفر أو غير صالحة
+                    if not quantity or quantity <= 0:
+                        continue
                     
                     # استخدام الاسم إذا لم يكن هناك SKU
                     if not sku:
@@ -420,16 +478,16 @@ def get_quick_list_data():
                         'order_id': order.get('id', ''),
                         'reference_id': order.get('reference_id', order.get('id', '')),
                         'customer_name': order.get('customer', {}).get('name', ''),
+                        'customer_mobile': order.get('customer', {}).get('mobile', ''),  # إضافة الجوال
                         'created_at': order.get('created_at', ''),
-                        'quantity': item.get('quantity', 0),
+                        'quantity': quantity,
                         'options': item.get('options', []),
                         'barcode': order.get('barcode', ''),
                         'notes': item.get('notes', '')
-                        
                     }
                     
                     products_by_sku[sku]['order_appearances'].append(order_appearance)
-                    products_by_sku[sku]['total_quantity'] += item.get('quantity', 0)
+                    products_by_sku[sku]['total_quantity'] += quantity
                 
                 success_count += 1
                 
@@ -457,7 +515,7 @@ def get_quick_list_data():
         # ترتيب المنتجات حسب الكمية الإجمالية (من الأكبر إلى الأصغر)
         products_result.sort(key=lambda x: x['total_quantity'], reverse=True)
         
-        logger.info(f"✅ تم تجميع {len(products_result)} منتج من {success_count} طلب بنجاح، وفشل {error_count} طلب")
+        logger.info(f"✅ تم تجميع {len(products_result)} منتج من {orders_with_items} طلب يحتوي على عناصر، إجمالي {success_count} طلب ناجح و {error_count} طلب فاشل")
         
         return jsonify({
             'success': True,
@@ -466,6 +524,7 @@ def get_quick_list_data():
                 'total_orders': len(order_ids),
                 'successful_orders': success_count,
                 'failed_orders': error_count,
+                'orders_with_items': orders_with_items,
                 'total_products': len(products_result),
                 'total_items': sum(product['total_quantity'] for product in products_result)
             }
