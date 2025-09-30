@@ -1,5 +1,5 @@
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, make_response
 from .models import (
     User, 
     Employee, 
@@ -173,44 +173,36 @@ def _get_filtered_orders(store_id, status_id=None, for_delivery=False):
 
 def _get_delivery_status_stats(store_id, employee_id=None):
     """إحصائيات الحالات الأصلية لفريق التوصيل"""
-    try:
-        # الحصول على جميع الحالات الأصلية للمتجر
-        order_statuses = OrderStatus.query.filter_by(store_id=store_id).all()
+    # الحصول على جميع الحالات الأصلية للمتجر
+    order_statuses = OrderStatus.query.filter_by(store_id=store_id).all()
+    
+    status_stats = []
+    for status in order_statuses:
+        # بناء الاستعلام الأساسي بنفس شروط _get_filtered_orders
+        query = SallaOrder.query.filter_by(
+            store_id=store_id,
+            status_id=status.id
+        ).join(OrderAddress).filter(
+            OrderAddress.city == 'الرياض',  # ✅ نفس الشرط
+            OrderAddress.address_type == 'receiver'  # ✅ نفس الشرط
+        )
         
-        status_stats = []
-        for status in order_statuses:
-            # ✅ استخدام نفس شروط _get_filtered_orders بالضبط
-            query = SallaOrder.query.filter_by(
-                store_id=store_id,
-                status_id=status.id  # ✅ هنا status.id هو String بالفعل
-            ).join(OrderAddress).filter(
-                OrderAddress.city == 'الرياض',
-                OrderAddress.address_type == 'receiver'
+        # إذا كان موظف محدد، نضيف التصفية بالطلبات المسندة له
+        if employee_id:
+            query = query.join(OrderAssignment).filter(
+                OrderAssignment.employee_id == employee_id
             )
-            
-            # ✅ نفس شرط الموظف
-            if employee_id:
-                query = query.join(OrderAssignment).filter(
-                    OrderAssignment.employee_id == employee_id
-                )
-            
-            count = query.count()
-            
-            status_stats.append({
-                'id': status.id,  # ✅ هذا String
-                'name': status.name,
-                'color': '#6c757d',
-                'count': count
-            })
         
-        # ✅ تسجيل تشخيصي
-        current_app.logger.info(f"إحصائيات الحالات للمتجر {store_id}: {[(s['name'], s['count']) for s in status_stats]}")
+        count = query.count()
         
-        return status_stats
-        
-    except Exception as e:
-        current_app.logger.error(f"خطأ في _get_delivery_status_stats: {str(e)}")
-        return []
+        status_stats.append({
+            'id': status.id,
+            'name': status.name,
+            'color': '#6c757d',
+            'count': count
+        })
+    
+    return status_stats
 @dashboard_bp.route('/')
 @login_required
 def index():
