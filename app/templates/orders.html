@@ -2089,12 +2089,19 @@ function generatePrintHTML(printData) {
     });
 
     // 10. أحداث القائمة السريعة
-    $(document).on('change', '#selectAllQuickList', function() {
-        const isChecked = this.checked;
-        $('#quickListContent input.quick-list-order').prop('checked', isChecked);
-        updateQuickListSelectionCount();
-    });
+    // 10. أحداث القائمة السريعة - الإصدار المصحح
+$(document).on('change', '#selectAllQuickList', function() {
+    const isChecked = this.checked;
     
+    // تحديث جميع صناديق الاختيار
+    $('#quickListContent input.quick-list-order').prop('checked', isChecked);
+    $('#quickListContent input.product-checkbox').prop('checked', isChecked);
+    $('#quickListContent input.product-checkbox').prop('indeterminate', false);
+    
+    // تحديث جميع العدادات
+    updateQuickListSelectionCount();
+    updateProductSelectionCounts();
+});
     $(document).on('change', '#quickListContent input.quick-list-order', function() {
         updateQuickListSelectionCount();
     });
