@@ -14,7 +14,7 @@ from app.utils import (
     get_postgres_engine,
     generate_barcode
 )
-from app.models import SallaOrder, CustomOrder  # إضافة الاستيراد
+from app.models import SallaOrder, CustomOrder, OrderAddress # إضافة الاستيراد
 from app.config import Config
 import logging
 import traceback
@@ -703,48 +703,45 @@ def download_addresses_pdf():
         return redirect(url_for('orders.index'))
 
 def get_order_with_address(order_id, store_id):
-    """جلب بيانات الطلب مع العنوان من قاعدة البيانات"""
+    """جلب بيانات الطلب مع العنوان من نموذج OrderAddress الرسمي"""
     try:
-        # جلب الطلب من قاعدة البيانات
-        order = SallaOrder.query.filter(
-            SallaOrder.id == order_id,
-            SallaOrder.store_id == store_id,
-            SallaOrder.full_order_data.isnot(None)
-        ).first()
+        # جلب عنوان الطلب من نموذج OrderAddress مباشرة
+        order_address = OrderAddress.query.filter_by(order_id=order_id).first()
         
-        if not order or not order.full_order_data:
+        if not order_address:
+            logger.warning(f"⚠️ لم يتم العثور على عنوان للطلب {order_id}")
             return None
-        
-        order_data = order.full_order_data
-        
-        # استخراج معلومات العنوان
-        shipping_address = order_data.get('shipping_address', {})
-        customer = order_data.get('customer', {})
-        
-        # معالجة بيانات العنوان
+
+        # استخدام البيانات مباشرة من نموذج OrderAddress
         address_info = {
-            'name': f"{shipping_address.get('first_name', '')} {shipping_address.get('last_name', '')}".strip(),
-            'address': shipping_address.get('address', ''),
-            'city': shipping_address.get('city', {}).get('name', '') if isinstance(shipping_address.get('city'), dict) else shipping_address.get('city', ''),
-            'state': shipping_address.get('state', {}).get('name', '') if isinstance(shipping_address.get('state'), dict) else shipping_address.get('state', ''),
-            'country': shipping_address.get('country', {}).get('name', '') if isinstance(shipping_address.get('country'), dict) else shipping_address.get('country', ''),
-            'postal_code': shipping_address.get('postal_code', ''),
-            'mobile': shipping_address.get('mobile', '') or customer.get('mobile', ''),
-            'additional_info': shipping_address.get('additional_info', '')
+            'name': order_address.name,
+            'address': order_address.full_address,  # العنوان الكامل من الحقل المخصص
+            'city': order_address.city,
+            'state': order_address.country,  # لاحظ: في النموذج الحالي لا يوجد حقل state منفصل
+            'country': order_address.country,
+            'postal_code': '',  # يمكن إضافته إذا كان موجوداً في النموذج
+            'mobile': order_address.phone,
+            'additional_info': ''
         }
-        
+
+        # جلب بيانات الطلب الأساسية من SallaOrder
+        order = SallaOrder.query.filter_by(id=order_id, store_id=store_id).first()
+        if not order:
+            logger.warning(f"⚠️ لم يتم العثور على الطلب {order_id} في SallaOrder")
+            return None
+
         # الحصول على الباركود
-        barcode_data = order.barcode_data if order else None
+        barcode_data = order.barcode_data
         if not barcode_data or not isinstance(barcode_data, str) or not barcode_data.startswith('data:image'):
             barcode_data = generate_barcode(str(order_id))
-        
+
         return {
             'id': str(order.id),
-            'reference_id': order_data.get('reference_id', str(order.id)),
+            'reference_id': order.full_order_data.get('reference_id', str(order.id)) if order.full_order_data else str(order.id),
             'barcode': barcode_data,
             'address': address_info,
-            'customer_name': f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip(),
-            'created_at': format_date(order_data.get('created_at', order.created_at if order else None))
+            'customer_name': order_address.name,
+            'created_at': format_date(order.created_at)
         }
         
     except Exception as e:

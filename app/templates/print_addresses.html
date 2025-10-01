@@ -133,52 +133,39 @@
     </style>
 </head>
 <body>
-    <div class="page-container">
-        {% for order in orders %}
-        <div class="address-card">
-            <div class="order-header">
-                <div class="order-id">الطلب #{{ order.reference_id }}</div>
-                <div class="customer-name">{{ order.customer_name or order.address.name }}</div>
-            </div>
-            
-            <div class="address-details">
-                <div class="address-line">
-                    <span class="address-label">الاسم:</span>
-                    {{ order.address.name }}
-                </div>
-                
-                {% if order.address.mobile %}
-                <div class="address-line">
-                    <span class="address-label">الجوال:</span>
-                    {{ order.address.mobile }}
-                </div>
-                {% endif %}
-                
-                <div class="address-line">
-                    <span class="address-label">العنوان:</span>
-                    {{ order.address.address }}
-                </div>
-                
-                {% if order.address.city %}
-                <div class="address-line">
-                    <span class="address-label">المدينة:</span>
-                    {{ order.address.city }}
-                </div>
-                {% endif %}
-                
-                {% if order.address.state %}
-                <div class="address-line">
-                    <span class="address-label">المنطقة:</span>
-                    {{ order.address.state }}
-                </div>
-                {% endif %}
-                
-                {% if order.address.country %}
-                <div class="address-line">
-                    <span class="address-label">الدولة:</span>
-                    {{ order.address.country }}
-                </div>
-                {% endif %}
+<div class="address-details">
+    <div class="address-line">
+        <span class="address-label">الاسم:</span>
+        {{ order.address.name }}
+    </div>
+    
+    {% if order.address.mobile %}
+    <div class="address-line">
+        <span class="address-label">الجوال:</span>
+        {{ order.address.mobile }}
+    </div>
+    {% endif %}
+    
+    <!-- عرض العنوان الكامل من حقل full_address -->
+    <div class="address-line full-address-section">
+        <span class="address-label">العنوان:</span>
+        <div class="full-address-text">{{ order.address.address }}</div>
+    </div>
+    
+    {% if order.address.city %}
+    <div class="address-line">
+        <span class="address-label">المدينة:</span>
+        {{ order.address.city }}
+    </div>
+    {% endif %}
+    
+    {% if order.address.country %}
+    <div class="address-line">
+        <span class="address-label">الدولة:</span>
+        {{ order.address.country }}
+    </div>
+    {% endif %}
+</div>
                 
                 {% if order.address.postal_code %}
                 <div class="address-line">
