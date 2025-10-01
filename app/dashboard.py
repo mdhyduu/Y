@@ -69,10 +69,12 @@ def clear_cookies_and_redirect():
 
 def _aggregate_default_statuses_for_store(store_id):
     """تجمع الحالات الأصلية لكل الطلبات في المتجر"""
+    # الحصول على جميع الحالات الأصلية للمتجر
     order_statuses = OrderStatus.query.filter_by(store_id=store_id).all()
     
     status_stats_dict = {}
     for status in order_statuses:
+        # حساب عدد الطلبات لكل حالة
         count = SallaOrder.query.filter_by(
             store_id=store_id,
             status_id=status.id
@@ -82,22 +84,23 @@ def _aggregate_default_statuses_for_store(store_id):
             'id': status.id,
             'name': status.name,
             'slug': status.slug,  # ✅ إضافة الـ slug
-            'color': '#6c757d',
+            'color': '#6c757d',  # لون افتراضي للحالات الأصلية
             'count': count
         }
 
     return list(status_stats_dict.values())
-
 def _get_employee_status_stats(employee_id):
     """إحصاءات الحالات الأصلية لموظف محدد"""
     employee = Employee.query.get(employee_id)
     if not employee:
         return [], []
 
+    # الحصول على جميع الحالات الأصلية للمتجر
     order_statuses = OrderStatus.query.filter_by(store_id=employee.store_id).all()
 
     default_status_stats = []
     for status in order_statuses:
+        # حساب عدد الطلبات المسندة للموظف في كل حالة
         count = SallaOrder.query.join(OrderAssignment).filter(
             OrderAssignment.employee_id == employee_id,
             SallaOrder.status_id == status.id
@@ -107,19 +110,23 @@ def _get_employee_status_stats(employee_id):
             'id': status.id,
             'name': status.name,
             'slug': status.slug,  # ✅ إضافة الـ slug
-            'color': '#6c757d',
+            'color': '#6c757d',  # لون افتراضي
             'count': count
         })
 
+    # في هذا السياق، لا نستخدم الحالات المخصصة، لذا نرجع قائمة فارغة للثانية
     custom_status_stats_selected = []
-    return default_status_stats, custom_status_stats_selected
 
+    return default_status_stats, custom_status_stats_selected
+    
 def _get_delivery_status_stats(store_id, employee_id=None):
     """إحصائيات الحالات الأصلية لفريق التوصيل"""
+    # الحصول على جميع الحالات الأصلية للمتجر
     order_statuses = OrderStatus.query.filter_by(store_id=store_id).all()
     
     status_stats = []
     for status in order_statuses:
+        # بناء الاستعلام الأساسي
         query = SallaOrder.query.filter_by(
             store_id=store_id,
             status_id=status.id
@@ -128,6 +135,7 @@ def _get_delivery_status_stats(store_id, employee_id=None):
             OrderAddress.address_type == 'receiver'
         )
         
+        # إذا كان موظف محدد، نضيف التصفية بالطلبات المسندة له
         if employee_id:
             query = query.join(OrderAssignment).filter(
                 OrderAssignment.employee_id == employee_id
@@ -139,7 +147,7 @@ def _get_delivery_status_stats(store_id, employee_id=None):
             'id': status.id,
             'name': status.name,
             'slug': status.slug,  # ✅ إضافة الـ slug
-            'color': '#6c757d',
+            'color': '#6c757d',  # لون افتراضي للحالات الأصلية
             'count': count
         })
     
