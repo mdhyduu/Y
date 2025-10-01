@@ -5,16 +5,8 @@
     <div class="card shadow-lg border-0">
         <div class="card-body p-md-5 text-center">
 
-            <div id="initial-view">
-                <i class="fas fa-qrcode fa-4x text-primary mb-3"></i>
-                <h3 class="card-title mb-3">مسح باركود/QR كود</h3>
-                <p class="text-muted mb-4">اضغط على الزر لبدء تشغيل الكاميرا ومسح كود الطلب.</p>
-                <button id="startButton" class="btn btn-primary btn-lg px-5 shadow">
-                    <i class="fas fa-camera me-2"></i>ابدأ المسح
-                </button>
-            </div>
-
-            <div id="scanner-view" style="display: none;">
+            <!-- إزالة الواجهة الأولية وإظهار الماسح مباشرة -->
+            <div id="scanner-view">
                 <div id="reader-container" class="mx-auto mb-3">
                     <div id="reader"></div>
                     <div class="scanner-overlay">
@@ -23,10 +15,10 @@
                 </div>
                 <div id="scan-status" class="alert alert-info mt-3">
                     <i class="fas fa-spinner fa-spin me-2"></i>
-                    <span>جاري تهيئة الكاميرا...</span>
+                    <span>جاري تشغيل الكاميرا...</span>
                 </div>
                 <button id="stopButton" class="btn btn-outline-danger mt-3">
-                    <i class="fas fa-times me-2"></i>إلغاء
+                    <i class="fas fa-times me-2"></i>إلغاء المسح
                 </button>
             </div>
 
@@ -57,9 +49,8 @@
         width: 100%;
         height: 100%;
         background: linear-gradient(to bottom, rgba(0, 0, 0, 0.2), transparent, rgba(0, 0, 0, 0.2));
-        pointer-events: none; /* للسماح بالتفاعل مع الفيديو خلفه */
+        pointer-events: none;
     }
-    /* إطار التوجيه (المنظار) */
     .scanner-overlay::before {
         content: '';
         position: absolute;
@@ -72,7 +63,6 @@
         border-radius: 10px;
         box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.3);
     }
-    /* خط المسح المتحرك */
     .scanner-line {
         position: absolute;
         top: 20%;
@@ -95,9 +85,7 @@
 class ModernBarcodeScanner {
     constructor() {
         this.elements = {
-            initialView: document.getElementById('initial-view'),
             scannerView: document.getElementById('scanner-view'),
-            startButton: document.getElementById('startButton'),
             stopButton: document.getElementById('stopButton'),
             readerDiv: document.getElementById('reader'),
             statusDiv: document.getElementById('scan-status'),
@@ -108,10 +96,11 @@ class ModernBarcodeScanner {
         this.isScanning = false;
         
         this.bindEvents();
+        // بدء المسح تلقائياً عند إنشاء الكائن
+        this.start();
     }
 
     bindEvents() {
-        this.elements.startButton.addEventListener('click', () => this.start());
         this.elements.stopButton.addEventListener('click', () => this.stop());
     }
 
@@ -131,18 +120,16 @@ class ModernBarcodeScanner {
     }
 
     async start() {
-        this.elements.initialView.style.display = 'none';
-        this.elements.scannerView.style.display = 'block';
         this.updateStatus('جاري طلب صلاحيات الكاميرا...', 'info', true);
 
         try {
             await this.scanner.start(
-                { facingMode: "environment" }, // طلب الكاميرا الخلفية
+                { facingMode: "environment" },
                 {
                     fps: 10,
                     qrbox: (viewfinderWidth, viewfinderHeight) => {
                         const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                        const qrboxSize = Math.floor(minEdge * 0.7); // حجم مربع المسح
+                        const qrboxSize = Math.floor(minEdge * 0.7);
                         return { width: qrboxSize, height: qrboxSize };
                     }
                 },
@@ -165,21 +152,18 @@ class ModernBarcodeScanner {
                 console.error("Error stopping the scanner:", err);
             }
         }
-        this.elements.initialView.style.display = 'block';
-        this.elements.scannerView.style.display = 'none';
+        // العودة للصفحة السابقة
+        window.history.back();
     }
 
     onScanSuccess(code) {
         if (!this.isScanning) return;
         
-        // إيقاف المسح فوراً لمنع القراءات المتعددة
         this.isScanning = false; 
         
         this.updateStatus(`تم العثور على الكود: <strong>${code}</strong>. جاري التوجيه...`, 'success', true);
         
-        // إيقاف الكاميرا بعد فترة وجيزة
         setTimeout(() => this.scanner.stop(), 500);
-
         this.processScannedCode(code);
     }
 
@@ -193,35 +177,39 @@ class ModernBarcodeScanner {
             }
         }
         this.updateStatus(message, 'danger', false);
-        // إعادة الواجهة للوضع الأولي بعد عرض الخطأ
-        setTimeout(() => this.stop(), 3000);
+        // إعادة المحاولة بعد 3 ثواني
+        setTimeout(() => {
+            this.updateStatus('جاري إعادة المحاولة...', 'info', true);
+            this.start();
+        }, 3000);
     }
 
     processScannedCode(code) {
-        // انتظر ثانيتين ليرى المستخدم رسالة النجاح قبل إعادة التوجيه
         setTimeout(() => {
             const cleanCode = code.split('.')[0];
             let orderId = '';
 
-            // التعامل مع باركود الطلب فقط
             if (cleanCode.startsWith('order_')) {
                 orderId = cleanCode.replace('order_', '');
             } else if (/^\d+$/.test(cleanCode)) {
-                // يفترض أن الأرقام الصافية هي رقم طلب
                 orderId = cleanCode;
             }
 
             if (orderId) {
-                // توجيه إلى صفحة تفاصيل الطلب
                 window.location.href = `/${orderId}`;
             } else {
                 this.updateStatus('باركود الطلب غير معروف أو بصيغة غير صحيحة.', 'warning', false);
-                setTimeout(() => this.stop(), 3000); // العودة للواجهة الرئيسية بعد 3 ثوان
+                // إعادة تشغيل الماسح بعد 3 ثواني
+                setTimeout(() => {
+                    this.isScanning = true;
+                    this.start();
+                }, 3000);
             }
         }, 2000);
     }
 }
 
+// بدء المسح تلقائياً عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', () => {
     new ModernBarcodeScanner();
 });
