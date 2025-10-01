@@ -132,7 +132,7 @@
             <div class="stats-grid-compact">
                 {% if selected_employee %}
                     {% for item in default_status_stats %}
-                    <a href="{{ url_for('orders.index') }}?status={{ item.slug }}" class="text-decoration-none">
+                  <a href="{{ url_for('orders.index') }}?status={{ item.slug }}&employee={{ selected_employee.id }}"  class="text-decoration-none">
                         <div class="stat-card-compact" style="--status-color: {{ item.color }};">
                             <div class="stat-content">
                                 <span class="stat-count">{{ item.count }}</span>
@@ -179,7 +179,7 @@
                     <div class="d-flex flex-wrap gap-2">
                         {% if selected_employee %}
                             {% for item in default_status_stats %}
-                            <a href="{{ url_for('orders.index') }}?status={{ item.slug }}" class="text-decoration-none">
+                         <a href="{{ url_for('orders.index') }}?status={{ item.slug }}&employee={{ selected_employee.id }}" class="text-decoration-none">
                                 <div class="position-relative">
                                     <span class="badge position-absolute top-0 start-100 translate-middle rounded-pill bg-danger">
                                         {{ item.count }}
