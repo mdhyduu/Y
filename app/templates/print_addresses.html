@@ -123,12 +123,32 @@
             }
         }
 
-        /* للجوال */
+.full-address-section {
+    margin: 10px 0;
+}
+
+.full-address-text {
+    display: block;
+    margin-top: 5px;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #f9f9f9;
+    font-size: 14px;
+    line-height: 1.4;
+    min-height: 40px;
+}
+
+  /* للجوال */
         @media (max-width: 768px) {
             .page-container {
                 grid-template-columns: 1fr;
                 grid-template-rows: auto;
             }
+                .full-address-text {
+        border: 1px solid #000;
+        background: white;
+    }
         }
     </style>
 </head>
