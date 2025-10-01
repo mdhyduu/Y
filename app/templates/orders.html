@@ -959,14 +959,14 @@ $(document).ready(function () {
      * إنشاء HTML ديناميكي للطباعة
      */
     function generatePrintHTML(printData) {
-    const timestamp = new Date().toLocaleDateString('ar-SA', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        weekday: 'long'
-    });
-    
-    return `<!DOCTYPE html>
+        const timestamp = new Date().toLocaleDateString('ar-SA', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'long'
+        });
+        
+        return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -985,40 +985,6 @@ $(document).ready(function () {
             padding: 15px;
             color: #2c3e50;
             background: #f4f7f9;
-        }
-
-        /* ⭐⭐ إضافة تنسيقات للتحكم اليدوي ⭐⭐ */
-        .print-controls {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            border: 2px solid #e9ecef;
-            text-align: center;
-        }
-
-        .print-controls button {
-            margin: 0 5px;
-            padding: 8px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        .btn-print {
-            background: #28a745;
-            color: white;
-        }
-
-        .btn-close {
-            background: #dc3545;
-            color: white;
-        }
-
-        .btn-save {
-            background: #17a2b8;
-            color: white;
         }
 
         .print-header {
@@ -1173,20 +1139,15 @@ $(document).ready(function () {
             grid-column: 1 / -1;
         }
 
-        /* ⭐⭐ إخفاء عناصر التحكم أثناء الطباعة ⭐⭐ */
         @media print {
-            .print-controls {
-                display: none !important;
-            }
-            
-            .print-header, .summary-grid {
-                display: none;
-            }
-
             body {
                 margin: 0;
                 padding: 0;
                 background: white;
+            }
+            
+            .print-header, .summary-grid {
+                display: none;
             }
 
             .orders-container {
@@ -1209,23 +1170,6 @@ $(document).ready(function () {
     </style>
 </head>
 <body>
-    <!-- ⭐⭐ إضافة أزرار التحكم اليدوي ⭐⭐ -->
-    <div class="print-controls">
-        <h3 style="margin: 0 0 15px 0; color: #495057;">تحكم في الطباعة</h3>
-        <button class="btn-print" onclick="window.print()">
-            🖨️ طباعة
-        </button>
-        <button class="btn-save" onclick="saveAsPDF()">
-            💾 حفظ كـ PDF
-        </button>
-        <button class="btn-close" onclick="window.close()">
-            ❌ إغلاق النافذة
-        </button>
-        <div style="margin-top: 10px; font-size: 14px; color: #6c757d;">
-            💡 نصيحة: استخدم زر "حفظ كـ PDF" لحفظ الملف على جهازك
-        </div>
-    </div>
-
     <div class="print-header">
         <h1>تقرير القائمة السريعة</h1>
         <p>تاريخ التقرير: ${timestamp}</p>
@@ -1255,43 +1199,36 @@ $(document).ready(function () {
     </div>
 
     <script>
-        // ⭐⭐ دالة لحفظ الملف كـ PDF ⭐⭐
-        function saveAsPDF() {
-            window.print();
-        }
-
-        // ⭐⭐ طباعة تلقائية عند التحميل (اختياري) ⭐⭐
+        // طباعة تلقائية عند التحميل
         window.addEventListener('load', function() {
-            // يمكنك تعطيل هذا السطر إذا كنت تريد التحكم يدوياً
-            // setTimeout(() => { window.print(); }, 1000);
+            setTimeout(() => {
+                window.print();
+                // إغلاق النافذة تلقائياً بعد الطباعة
+                setTimeout(() => {
+                    if (!window.closed) {
+                        window.close();
+                    }
+                }, 3000);
+            }, 1000);
         });
 
-        // ⭐⭐ دالة إنشاء محتوى الطلبات ⭐⭐
         function generateOrdersHTML(products) {
             if (!products || products.length === 0) {
                 return '<div class="no-data"><h3>لا توجد بيانات للعرض</h3></div>';
             }
 
             let html = '';
-            
             products.forEach(product => {
-                if (!product.orders || product.orders.length === 0) return;
-                
                 product.orders.forEach(order => {
-                    const referenceId = order.reference_id || 'غير محدد';
-                    const quantity = order.quantity || 1;
-                    const productName = product.name || 'منتج غير محدد';
-                    const thumbnail = product.thumbnail || '/static/images/no-image.png';
-                    
                     html += \`
                         <div class="order-card">
                             <div class="order-header">
-                                <img src="\${thumbnail}" alt="\${productName}" 
+                                <img src="\${product.thumbnail}" alt="\${product.name}" 
                                      class="product-image"
-                                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzAiIGhlaWdodD0iNzAiIHZpZXdCb3g9IjAgMCA3MCA3MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjcwIiBoZWlnaHQ9IjcwIiBmaWxsPSIjRTVFNUU1Ii8+CjxwYXRoIGQ9Ik00NSAyNUgyNUMyMy44OTU0IDI1IDIzIDI1Ljg5NTQgMjMgMjdWNDNDMjMgNDQuMTA0NiAyMy44OTU0IDQ1IDI1IDQ1SDQ1QzQ2LjE0NjQgNDUgNDcgNDQuMTA0NiA0NyA0M1YyN0M0NyAyNS44OTU0IDQ2LjE0NjQgMjUgNDUgMjVaTTI1IDI4SDM1VjM1SDI1VjI4Wk0zNyAyOEg0NVYzNUgzN1YyOFpNMjUgMzdIMzVWNDJIMjVWMzdaTTM3IDM3SDQ1VjQySDM3VjM3WiIgZmlsbD0iIzk5OTk5OSIvPgo8L3N2Zz4K'">
+                                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzAiIGhlaWdodD0iNzAiIHZpZXdCb3g9IjAgMCA3MCA3MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjcwIiBoZWlnaHQ9IjcwIiBmaWxsPSIjRTVFNUU1Ii8+CjxwYXRoIGQ9Ik00NSAyNUgyNUMyMy44OTU0IDI1IDIzIDI1Ljg5NTQgMjMgMjdWNDNDMjMgNDQuMTA0NiAyMy44OTU0IDQ1IDI1IDQ1SDQ1QzQ2LjEwNDYgNDUgNDcgNDQuMTA0NiA0NyA0M1YyN0M0NyAyNS44OTU0IDQ2LjEwNDYgMjUgNDUgMjVaTTI1IDI4SDM1VjM1SDI1VjI4Wk0zNyAyOEg0NVYzNUgzN1YyOFpNMjUgMzdIMzVWNDJIMjVWMzdaTTM3IDM3SDQ1VjQySDM3VjM3WiIgZmlsbD0iIzk5OTk5OSIvPgo8L3N2Zz4K'">
                                 <div class="order-info">
-                                    <span class="order-ref">#\${referenceId}</span>
-                                    <span class="order-quantity">\${quantity}×</span>
+                                    <span class="order-ref">#\${order.reference_id}</span>
+                                    <span class="order-quantity">\${order.quantity}×</span>
                                 </div>
                             </div>
                             
@@ -1300,7 +1237,7 @@ $(document).ready(function () {
                                     <div class="options-section">
                                         <div class="options-title">الخيارات:</div>
                                         \${order.options.map(opt => 
-                                            \`<span class="option-item">\${opt.name || ''}: <strong>\${opt.value || ''}</strong></span>\`
+                                            \`<span class="option-item">\${opt.name}: <strong>\${opt.value}</strong></span>\`
                                         ).join('')}
                                     </div>
                                 \` : ''}
@@ -1313,10 +1250,9 @@ $(document).ready(function () {
                                 \` : ''}
                             </div>
                             
-                            \${order.barcode && order.barcode !== \`باركود_\${referenceId}\` ? \`
+                            \${order.barcode && order.barcode !== \`باركود_\${order.reference_id}\` ? \`
                                 <div class="barcode-section">
-                                    <img src="\${order.barcode}" alt="باركود" class="barcode-image"
-                                         onerror="this.style.display='none'">
+                                    <img src="\${order.barcode}" alt="باركود" class="barcode-image">
                                 </div>
                             \` : ''}
                         </div>
@@ -1324,12 +1260,12 @@ $(document).ready(function () {
                 });
             });
             
-            return html || '<div class="no-data"><h3>لا توجد بيانات صالحة للعرض</h3></div>';
+            return html;
         }
     <\/script>
 </body>
 </html>`;
-}
+    }
 /**
  * Generates HTML for orders in the print view
  */
@@ -1448,65 +1384,52 @@ function generatePrintHTML(printData) {
 }
     // ⭐ الدالة المصححة هنا ⭐
     function openQuickListPrint() {
-    try {
-        console.log('🖨️ بدء عملية الطباعة...');
-        
-        if (!validatePrintData()) {
+        try {
+            const printData = collectQuickListPrintData();
+            
+            console.log('🖨️ تحضير الطباعة الفورية:', printData);
+            
+            if (printData.products.length === 0) {
+                showSweetAlert('warning', 'لا توجد بيانات', 'لم يتم تحديد أي طلبات للطباعة');
+                return false;
+            }
+            
+            // إنشاء HTML كامل مع البيانات
+            const htmlContent = generatePrintHTML(printData);
+            
+            // إنشاء Blob من المحتوى
+            const blob = new Blob([htmlContent], { type: 'text/html; charset=utf-8' });
+            const blobUrl = URL.createObjectURL(blob);
+            
+            // فتح النافذة مع Blob URL
+            const printWindow = window.open(blobUrl, '_blank', 
+                'width=1200,height=800,scrollbars=yes,resizable=yes');
+            
+            if (!printWindow) {
+                URL.revokeObjectURL(blobUrl);
+                throw new Error('تم منع النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة لهذا الموقع.');
+            }
+            
+            // تنظيف Blob URL بعد فتح النافذة
+            printWindow.addEventListener('load', function() {
+                setTimeout(() => {
+                    URL.revokeObjectURL(blobUrl);
+                    console.log('🧹 تم تنظيف Blob URL');
+                }, 1000);
+            });
+            
+            showSweetAlert('success', 'تم فتح نافذة الطباعة', 
+                `يتم الآن تحميل ${printData.summary.totalOrders} طلب للطباعة الفورية`);
+            
+            return true;
+            
+        } catch (error) {
+            console.error('❌ خطأ في الطباعة:', error);
+            showSweetAlert('error', 'خطأ في الطباعة', 
+                error.message || 'حدث خطأ أثناء فتح نافذة الطباعة. يرجى المحاولة مرة أخرى.');
             return false;
         }
-
-        const printData = collectQuickListPrintData();
-        
-        console.log('📋 بيانات الطباعة المجمعة:', printData);
-        
-        if (!printData.products || printData.products.length === 0) {
-            showSweetAlert('warning', 'لا توجد بيانات', 'لم يتم العثور على أي طلبات صالحة للطباعة');
-            return false;
-        }
-
-        // إنشاء HTML كامل مع البيانات
-        const htmlContent = generatePrintHTML(printData);
-        
-        if (!htmlContent || htmlContent.includes('لا توجد بيانات')) {
-            showSweetAlert('warning', 'بيانات غير كافية', 'البيانات المجمعة غير كافية للطباعة');
-            return false;
-        }
-
-        // إنشاء Blob من المحتوى
-        const blob = new Blob([htmlContent], { 
-            type: 'text/html; charset=utf-8' 
-        });
-        const blobUrl = URL.createObjectURL(blob);
-        
-        // ⭐⭐ فتح النافذة بدون إغلاق تلقائي ⭐⭐
-        const printWindow = window.open(blobUrl, '_blank', 
-            'width=1200,height=900,scrollbars=yes,resizable=yes,toolbar=yes,location=no');
-        
-        if (!printWindow) {
-            URL.revokeObjectURL(blobUrl);
-            throw new Error('تم منع النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة لهذا الموقع.');
-        }
-        
-        // ⭐⭐ تنظيف Blob URL بعد دقائق بدلاً من ثواني ⭐⭐
-        setTimeout(() => {
-            URL.revokeObjectURL(blobUrl);
-            console.log('🧹 تم تنظيف Blob URL بعد مهلة طويلة');
-        }, 300000); // 5 دقائق
-        
-        console.log('✅ تم فتح نافذة الطباعة بنجاح');
-        showSweetAlert('success', 'تم فتح نافذة الطباعة', 
-            `يمكنك الآن الطباعة أو الحفظ كـ PDF من النافذة المنبثقة\n\n` +
-            `💡 استخدم زر "حفظ كـ PDF" في النافذة الجديدة`);
-        
-        return true;
-        
-    } catch (error) {
-        console.error('❌ خطأ في الطباعة:', error);
-        showSweetAlert('error', 'خطأ في الطباعة', 
-            error.message || 'حدث خطأ غير متوقع أثناء فتح نافذة الطباعة. يرجى المحاولة مرة أخرى.');
-        return false;
     }
-}
 
     /**
      * التحقق من البيانات قبل الطباعة
@@ -2352,4 +2275,4 @@ function generatePrintHTML(printData) {
 
 </script>
 {% endblock %}
-{% endblock %}
+{% endblock %} 
