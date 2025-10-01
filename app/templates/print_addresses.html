@@ -139,7 +139,8 @@
     min-height: 40px;
 }
 
-  /* للجوال */
+
+        /* للجوال */
         @media (max-width: 768px) {
             .page-container {
                 grid-template-columns: 1fr;
@@ -153,6 +154,14 @@
     </style>
 </head>
 <body>
+    <div class="page-container">
+        {% for order in orders %}
+        <div class="address-card">
+            <div class="order-header">
+                <div class="order-id">الطلب #{{ order.reference_id }}</div>
+                <div class="customer-name">{{ order.customer_name or order.address.name }}</div>
+            </div>
+            
 <div class="address-details">
     <div class="address-line">
         <span class="address-label">الاسم:</span>
