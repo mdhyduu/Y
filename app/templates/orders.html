@@ -114,6 +114,7 @@
         <!-- إضافة أزرار الإجراءات السريعة -->
     <!-- إضافة أزرار الإجراءات السريعة -->
 <!-- في قسم أزرار الإجراءات السريعة - أضف هذا الزر -->
+<!-- في قسم أزرار الإجراءات السريعة -->
 <div class="d-flex p-3" class="card-body" id="quick-actions">
     {% if is_reviewer and employees %}
     <button type="button" class="btn btn-success rounded-pill px-3 me-2" id="assign-orders-btn" disabled>
@@ -122,10 +123,15 @@
     </button>
     {% endif %}
     
-    <!-- ⭐⭐ زر تحديث حالة سلة الجديد ⭐⭐ -->
     <button type="button" class="btn btn-warning rounded-pill px-3 me-2" id="update-salla-status-btn" disabled>
         <i class="fas fa-sync-alt me-1"></i> 
         <span id="selected-orders-count-salla">0</span> تحديث في سلة
+    </button>
+    
+    <!-- ⭐⭐ زر طباعة العناوين الجديد ⭐⭐ -->
+    <button type="button" class="btn btn-dark rounded-pill px-3 me-2" id="print-addresses-btn" disabled>
+        <i class="fas fa-map-marker-alt me-1"></i> 
+        <span id="selected-orders-count-address">0</span> طباعة عناوين
     </button>
     
     <button type="button" class="btn btn-primary rounded-pill px-3 me-2" id="download-html-btn" disabled>
@@ -644,21 +650,95 @@ $(document).ready(function () {
         });
     }
     
-    function updateAssignButtonState() {
-        const checkedCount = $('.order-checkbox:checked').length;
-        $('#selected-orders-count').text(checkedCount);
-        $('#selected-orders-count-2').text(checkedCount);
-        $('#selected-orders-count-html').text(checkedCount);
-        $('#selected-orders-count-salla').text(checkedCount);
-        
-        const buttons = $('#assign-orders-btn, #change-status-btn, #download-html-btn, #quickListViewBtn, #update-salla-status-btn');
-        buttons.prop('disabled', checkedCount === 0);
-        
-        if (checkedCount > 0) {
-            buttons.addClass('pulse-effect');
-            setTimeout(() => buttons.removeClass('pulse-effect'), 1000);
-        }
+    // تحديث دالة updateAssignButtonState
+function updateAssignButtonState() {
+    const checkedCount = $('.order-checkbox:checked').length;
+    $('#selected-orders-count').text(checkedCount);
+    $('#selected-orders-count-2').text(checkedCount);
+    $('#selected-orders-count-html').text(checkedCount);
+    $('#selected-orders-count-salla').text(checkedCount);
+    $('#selected-orders-count-address').text(checkedCount); // ⭐ إضافة العداد الجديد
+    
+    const buttons = $('#assign-orders-btn, #change-status-btn, #download-html-btn, #quickListViewBtn, #update-salla-status-btn, #print-addresses-btn');
+    buttons.prop('disabled', checkedCount === 0);
+    
+    if (checkedCount > 0) {
+        buttons.addClass('pulse-effect');
+        setTimeout(() => buttons.removeClass('pulse-effect'), 1000);
     }
+}
+
+// إضافة حدث الزر الجديد
+$(document).on('click', '#print-addresses-btn', function() {
+    const selectedOrders = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
+    
+    if (selectedOrders.length === 0) {
+        showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات لطباعة العناوين');
+        return;
+    }
+    
+    Swal.fire({
+        title: 'طباعة عناوين الطلبات',
+        html: `سيتم طباعة عناوين <span class="fw-bold text-primary">${selectedOrders.length}</span> طلب مع الباركود`,
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'موافق، طباعة العناوين',
+        cancelButtonText: 'إلغاء',
+        customClass: {
+            confirmButton: 'btn btn-dark',
+            cancelButton: 'btn btn-outline-secondary ms-2'
+        },
+        buttonsStyling: false
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const printBtn = $('#print-addresses-btn');
+            const originalText = printBtn.html();
+            printBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
+            
+            // فتح نافذة جديدة لمعاينة العناوين
+            const previewUrl = `{{ url_for('orders.preview_addresses_html') }}?order_ids=${selectedOrders.join(',')}`;
+            const previewWindow = window.open(previewUrl, '_blank');
+            
+            setTimeout(() => {
+                printBtn.prop('disabled', false).html(originalText);
+            }, 2000);
+        }
+    });
+});
+
+// إضافة خيار تحميل PDF للعناوين في القائمة السريعة
+$(document).on('click', '#quickListDownloadAddressesBtn', function() {
+    const selectedOrders = [];
+    
+    $('#quickListContent input.quick-list-order:checked').each(function() {
+        const orderId = $(this).data('order-id');
+        if (!selectedOrders.includes(orderId)) {
+            selectedOrders.push(orderId);
+        }
+    });
+
+    if (selectedOrders.length === 0) {
+        showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات لتحميل العناوين');
+        return;
+    }
+
+    const downloadBtn = $('#quickListDownloadAddressesBtn');
+    const originalText = downloadBtn.html();
+    downloadBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
+
+    const downloadLink = document.createElement('a');
+    downloadLink.href = `{{ url_for('orders.download_addresses_pdf') }}?order_ids=${selectedOrders.join(',')}`;
+    downloadLink.style.display = 'none';
+    downloadLink.target = '_blank';
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+
+    setTimeout(() => {
+        downloadBtn.prop('disabled', false).html(originalText);
+        showSweetAlert('success', 'تم البدء في التحميل', 'سيبدأ تحميل ملف عناوين PDF قريباً');
+    }, 1000);
+});
 
     function buildQueryParams() {
         const params = new URLSearchParams();

@@ -617,3 +617,182 @@ def download_pdf():
         return redirect(url_for('orders.index'))
 
 # باقي الدوال تبقى كما هي...
+@orders_bp.route('/download_addresses_pdf')
+def download_addresses_pdf():
+    """تحميل عناوين الطلبات كملف PDF مع الباركود"""
+    logger.info("بدء تحميل عناوين الطلبات كملف PDF")
+    
+    try:
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            flash('الرجاء تسجيل الدخول أولاً', 'error')
+            return redirect(url_for('user_auth.login'))
+        
+        order_ids = request.args.get('order_ids', '').split(',')
+        
+        # تصفية القائمة من القيم الفارغة
+        order_ids = [order_id.strip() for order_id in order_ids if order_id.strip()]
+        
+        if not order_ids:
+            flash('لم يتم تحديد أي طلبات للتحميل', 'error')
+            return redirect(url_for('orders.index'))
+        
+        logger.info(f"🔄 معالجة {len(order_ids)} طلب لعناوين PDF")
+        
+        # استخدام البيانات المحلية
+        orders = get_orders_from_local_database(order_ids, user.store_id)
+        
+        if not orders:
+            logger.warning("⚠️ لم يتم العثور على طلبات في البيانات المحلية، جاري استخدام API كبديل")
+            # العودة إلى الطريقة القديمة كبديل
+            access_token = user.salla_access_token
+            if not access_token:
+                flash('يجب ربط المتجر مع سلة أولاً', 'error')
+                return redirect(url_for('auth.link_store'))
+            
+            max_workers = max(1, min(current_app.config.get('MAX_WORKERS', 10), len(order_ids)))
+            orders = process_orders_concurrently(order_ids, access_token, max_workers)
+        
+        if not orders:
+            flash('لم يتم العثور على أي طلبات للتحميل', 'error')
+            return redirect(url_for('orders.index'))
+        
+        # إضافة معلومات العنوان لكل طلب
+        orders_with_addresses = []
+        for order in orders:
+            try:
+                # جلب بيانات الطلب الكاملة للحصول على العنوان
+                order_with_address = get_order_with_address(order['id'], user.store_id)
+                if order_with_address:
+                    orders_with_addresses.append(order_with_address)
+            except Exception as e:
+                logger.error(f"❌ خطأ في جلب عنوان الطلب {order.get('id', '')}: {str(e)}")
+                continue
+        
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # إنشاء HTML للعناوين
+        html = render_template('print_addresses.html', 
+                             orders=orders_with_addresses, 
+                             current_time=current_time)
+        
+        # إنشاء PDF
+        pdf = HTML(
+            string=html,
+            base_url=request.host_url
+        ).write_pdf(
+            optimize_size=(),
+            jpeg_quality=80
+        )
+        
+        filename = f"addresses_{current_time.replace(':', '-').replace(' ', '_')}.pdf"
+        
+        response = make_response(pdf)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        response.headers['Content-Length'] = len(pdf)
+        
+        logger.info(f"✅ تم إنشاء عناوين PDF بنجاح: {filename} بحجم {len(pdf)} بايت")
+        return response
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في إنشاء عناوين PDF: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash('حدث خطأ أثناء إنشاء ملف العناوين', 'error')
+        return redirect(url_for('orders.index'))
+
+def get_order_with_address(order_id, store_id):
+    """جلب بيانات الطلب مع العنوان من قاعدة البيانات"""
+    try:
+        # جلب الطلب من قاعدة البيانات
+        order = SallaOrder.query.filter(
+            SallaOrder.id == order_id,
+            SallaOrder.store_id == store_id,
+            SallaOrder.full_order_data.isnot(None)
+        ).first()
+        
+        if not order or not order.full_order_data:
+            return None
+        
+        order_data = order.full_order_data
+        
+        # استخراج معلومات العنوان
+        shipping_address = order_data.get('shipping_address', {})
+        customer = order_data.get('customer', {})
+        
+        # معالجة بيانات العنوان
+        address_info = {
+            'name': f"{shipping_address.get('first_name', '')} {shipping_address.get('last_name', '')}".strip(),
+            'address': shipping_address.get('address', ''),
+            'city': shipping_address.get('city', {}).get('name', '') if isinstance(shipping_address.get('city'), dict) else shipping_address.get('city', ''),
+            'state': shipping_address.get('state', {}).get('name', '') if isinstance(shipping_address.get('state'), dict) else shipping_address.get('state', ''),
+            'country': shipping_address.get('country', {}).get('name', '') if isinstance(shipping_address.get('country'), dict) else shipping_address.get('country', ''),
+            'postal_code': shipping_address.get('postal_code', ''),
+            'mobile': shipping_address.get('mobile', '') or customer.get('mobile', ''),
+            'additional_info': shipping_address.get('additional_info', '')
+        }
+        
+        # الحصول على الباركود
+        barcode_data = order.barcode_data if order else None
+        if not barcode_data or not isinstance(barcode_data, str) or not barcode_data.startswith('data:image'):
+            barcode_data = generate_barcode(str(order_id))
+        
+        return {
+            'id': str(order.id),
+            'reference_id': order_data.get('reference_id', str(order.id)),
+            'barcode': barcode_data,
+            'address': address_info,
+            'customer_name': f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip(),
+            'created_at': format_date(order_data.get('created_at', order.created_at if order else None))
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في جلب عنوان الطلب {order_id}: {str(e)}")
+        return None
+
+@orders_bp.route('/preview_addresses_html')
+def preview_addresses_html():
+    """معاينة عناوين الطلبات بتنسيق HTML"""
+    logger.info("بدء معاينة عناوين الطلبات بتنسيق HTML")
+    
+    try:
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            flash('الرجاء تسجيل الدخول أولاً', 'error')
+            return redirect(url_for('user_auth.login'))
+        
+        order_ids = request.args.get('order_ids', '').split(',')
+        
+        # تصفية القائمة من القيم الفارغة
+        order_ids = [order_id.strip() for order_id in order_ids if order_id.strip()]
+        
+        if not order_ids:
+            flash('لم يتم تحديد أي طلبات للمعاينة', 'error')
+            return redirect(url_for('orders.index'))
+        
+        logger.info(f"🔄 معالجة {len(order_ids)} طلب لعناوين HTML")
+        
+        # استخدام البيانات المحلية
+        orders_with_addresses = []
+        for order_id in order_ids:
+            order_with_address = get_order_with_address(order_id, user.store_id)
+            if order_with_address:
+                orders_with_addresses.append(order_with_address)
+        
+        if not orders_with_addresses:
+            flash('لم يتم العثور على أي طلبات للمعاينة', 'error')
+            return redirect(url_for('orders.index'))
+        
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        return render_template('print_addresses.html', 
+                             orders=orders_with_addresses, 
+                             current_time=current_time)
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في إنشاء معاينة العناوين: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash('حدث خطأ أثناء إنشاء المعاينة', 'error')
+        return redirect(url_for('orders.index'))
