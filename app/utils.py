@@ -168,7 +168,7 @@ def generate_barcode(data, dpi=300):
         
         writer.set_options({
             'write_text': True,
-            'module_width': 0.2,    # جعل الشرائط أرفع (مثل الصورة)
+            'module_width': 0.5,    # جعل الشرائط أرفع (مثل الصورة)
             'module_height': 6.0,   # زيادة ارتفاع الباركود
             'quiet_zone': 2.0,      # تقليل المسافة البيضاء حول الباركود
             'font_size': 8,         # تقليل حجم الخط
@@ -195,7 +195,7 @@ def generate_barcode_with_code39(data, dpi=300):
         writer = ImageWriter()
         writer.set_options({
             'write_text': True,
-            'module_width': 0.4,
+            'module_width': 0.5,
             'module_height': 20,
             'quiet_zone': 6,
             'font_size': 10,
@@ -225,7 +225,7 @@ def generate_barcode_alternative(data, dpi=300):
         writer = AltImageWriter()
         writer.set_options({
             'write_text': True,
-            'module_width': 0.4,
+            'module_width': 0.5,
             'module_height': 20,
             'quiet_zone': 6,
             'font_size': 10,
