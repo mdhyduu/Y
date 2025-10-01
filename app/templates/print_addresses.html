@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بوالص الشحن للطلبات</title>
+    <title>بوالص الشحن للطلبات (باركود كبير)</title>
     <style>
         /* التنسيق للطباعة */
         @page {
-            /* سنستخدم A4 ونقسمه إلى 4 بوالص */
             size: A4;
             margin: 0.5cm;
         }
@@ -24,7 +23,7 @@
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             grid-template-rows: repeat(2, 1fr);
-            gap: 10px; /* تقليل الفراغ */
+            gap: 10px; 
             padding: 10px;
             height: calc(100vh - 20px);
             box-sizing: border-box;
@@ -33,15 +32,14 @@
         /* بطاقة البوليصة - التركيز على المعلومات الأساسية */
         .shipping-label-card {
             background: white;
-            border: 2px solid #000; /* حدود سميكة */
+            border: 2px solid #000;
             border-radius: 4px;
-            padding: 8px; /* تقليل الهوامش الداخلية */
+            padding: 8px; 
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             page-break-inside: avoid;
             overflow: hidden;
-            position: relative;
         }
 
         /* رأس البوليصة - إبراز رقم الطلب */
@@ -55,14 +53,14 @@
         }
 
         .order-id {
-            font-size: 18px;
+            font-size: 20px;
             font-weight: 900;
-            color: #d9534f; /* لون مميز لرقم الطلب */
+            color: #d9534f;
         }
 
         .reference-text {
-            font-size: 11px;
-            font-weight: normal;
+            font-size: 12px;
+            font-weight: bold;
             color: #333;
             background: #f1f1f1;
             padding: 3px 6px;
@@ -72,14 +70,13 @@
         /* أقسام العنوان - تقليل المسافات */
         .address-details-container {
             flex-grow: 1;
-            margin-bottom: 10px;
         }
 
         .section-title {
-            font-size: 10px;
+            font-size: 11px;
             font-weight: bold;
             color: #fff;
-            background: #007bff; /* خلفية زرقاء لقسم المستلم */
+            background: #007bff; 
             padding: 3px 5px;
             display: block;
             margin-bottom: 5px;
@@ -105,7 +102,7 @@
         .full-address-text {
             display: block;
             padding: 8px;
-            border: 1px solid #000; /* حدود واضحة للعنوان */
+            border: 1px solid #000;
             border-radius: 4px;
             background: #f9f9f9;
             font-size: 14px;
@@ -122,54 +119,55 @@
             margin-top: 8px;
             font-size: 12px;
             font-weight: bold;
+            margin-bottom: 10px; /* إضافة مسافة قبل الباركود */
         }
         
-        /* الباركود والقسم السفلي */
-        .barcode-footer-section {
-            border-top: 2px solid #000;
-            padding-top: 8px;
+        /* الباركود والقسم السفلي - تعديل أساسي هنا */
+        .barcode-section {
+            padding-top: 5px;
             text-align: center;
+            /* جعل الباركود جزء من حدود البطاقة */
+            margin: 0 -8px -8px -8px; 
+            background: #fff; /* خلفية بيضاء لضمان وضوح الباركود */
+            border-top: 1px solid #000;
         }
 
         .barcode-image {
-            max-width: 95%;
-            height: 60px; /* زيادة ارتفاع الباركود لسهولة المسح */
+            max-width: 100%; /* استخدام أقصى عرض ممكن */
+            height: 90px; /* زيادة كبيرة في ارتفاع الباركود */
             object-fit: contain;
             margin-bottom: 5px;
+            padding: 5px 0;
         }
 
         .barcode-number {
             font-family: 'Courier New', monospace;
-            font-size: 14px;
+            font-size: 16px; /* زيادة حجم رقم الباركود */
             font-weight: bold;
             display: block;
+            padding-bottom: 5px;
         }
 
         /* وسائل الإعلام للطباعة النهائية */
         @media print {
-            body {
-                background: white;
-            }
-
-            .page-container {
-                padding: 0;
-                gap: 0;
-                height: auto;
-            }
+            body { background: white; }
+            .page-container { padding: 0; gap: 0; height: auto; }
 
             .shipping-label-card {
                 border: 1px solid #000;
                 box-shadow: none;
                 margin: 0;
-                /* تحديد ارتفاع وعرض ربع A4 تقريبًا */
                 height: 14.85cm; 
                 width: 10.5cm;
                 padding: 5px;
                 box-sizing: border-box;
             }
-            .print-info {
-                display: none;
+            .barcode-section {
+                /* إزالة الهوامش السالبة عند الطباعة النهائية */
+                margin: 0; 
+                border-top: 1px solid #000;
             }
+            .print-info { display: none; }
         }
     </style>
 </head>
@@ -200,22 +198,22 @@
                     
                     <div class="extra-info-line">
                         {% if order.address.city %}
-                            <span>المدينة: {{ order.address.city }}</span>
+                            <span>المدينة: **{{ order.address.city }}**</span>
                         {% endif %}
                         
                         {% if order.address.country %}
-                            <span>الدولة: {{ order.address.country }}</span>
+                            <span>الدولة: **{{ order.address.country }}**</span>
                         {% endif %}
                         
                         {% if order.address.postal_code %}
-                            <span>الرمز البريدي: {{ order.address.postal_code }}</span>
+                            <span>الرمز البريدي: **{{ order.address.postal_code }}**</span>
                         {% endif %}
                     </div>
 
                 </div>
             </div>
             
-            <div class="barcode-footer-section">
+            <div class="barcode-section">
                 {% if order.barcode %}
                 <img src="{{ order.barcode }}" alt="باركود الطلب {{ order.reference_id }}" class="barcode-image">
                 <div class="barcode-number">
