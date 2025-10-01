@@ -703,93 +703,143 @@ def download_addresses_pdf():
         return redirect(url_for('orders.index'))
 
 def get_order_with_address(order_id, store_id):
-    """جلب بيانات الطلب مع العنوان من نموذج OrderAddress الرسمي"""
+    """جلب بيانات الطلب مع العنوان من قاعدة البيانات - مصحح"""
     try:
-        # جلب عنوان الطلب من نموذج OrderAddress مباشرة
-        order_address = OrderAddress.query.filter_by(order_id=order_id).first()
+        logger.info(f"🔍 جلب عنوان الطلب {order_id} للمتجر {store_id}")
         
-        if not order_address:
-            logger.warning(f"⚠️ لم يتم العثور على عنوان للطلب {order_id}")
-            return None
-
-        # استخدام البيانات مباشرة من نموذج OrderAddress
-        address_info = {
-            'name': order_address.name,
-            'address': order_address.full_address,  # العنوان الكامل من الحقل المخصص
-            'city': order_address.city,
-            'state': order_address.country,  # لاحظ: في النموذج الحالي لا يوجد حقل state منفصل
-            'country': order_address.country,
-            'postal_code': '',  # يمكن إضافته إذا كان موجوداً في النموذج
-            'mobile': order_address.phone,
-            'additional_info': ''
-        }
-
-        # جلب بيانات الطلب الأساسية من SallaOrder
-        order = SallaOrder.query.filter_by(id=order_id, store_id=store_id).first()
+        # جلب الطلب من قاعدة البيانات
+        order = SallaOrder.query.filter(
+            SallaOrder.id == order_id,
+            SallaOrder.store_id == store_id
+        ).first()
+        
         if not order:
-            logger.warning(f"⚠️ لم يتم العثور على الطلب {order_id} في SallaOrder")
+            logger.warning(f"⚠️ الطلب {order_id} غير موجود في قاعدة البيانات")
             return None
-
+        
+        if not order.full_order_data:
+            logger.warning(f"⚠️ الطلب {order_id} لا يحتوي على full_order_data")
+            return None
+        
+        order_data = order.full_order_data
+        logger.info(f"✅ تم جلب بيانات الطلب {order_id}")
+        
+        # استخراج معلومات العنوان
+        shipping_address = order_data.get('shipping_address', {})
+        customer = order_data.get('customer', {})
+        
+        # إذا لم يكن هناك عنوان شحن، نستخدم بيانات العميل
+        if not shipping_address:
+            shipping_address = customer
+            logger.info(f"ℹ️ استخدام بيانات العميل كعنوان للطلب {order_id}")
+        
+        # معالجة بيانات العنوان بشكل آمن
+        address_name = f"{shipping_address.get('first_name', '')} {shipping_address.get('last_name', '')}".strip()
+        if not address_name:
+            address_name = customer.get('name', '') or f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip()
+        
+        # استخراج المدينة والمنطقة
+        city = ''
+        if isinstance(shipping_address.get('city'), dict):
+            city = shipping_address['city'].get('name', '')
+        else:
+            city = shipping_address.get('city', '')
+        
+        state = ''
+        if isinstance(shipping_address.get('state'), dict):
+            state = shipping_address['state'].get('name', '')
+        else:
+            state = shipping_address.get('state', '')
+        
+        country = ''
+        if isinstance(shipping_address.get('country'), dict):
+            country = shipping_address['country'].get('name', '')
+        else:
+            country = shipping_address.get('country', 'السعودية')  # قيمة افتراضية
+        
+        address_info = {
+            'name': address_name or 'عميل غير معروف',
+            'address': shipping_address.get('address', '') or shipping_address.get('street', '') or 'عنوان غير محدد',
+            'city': city,
+            'state': state,
+            'country': country,
+            'mobile': shipping_address.get('mobile', '') or customer.get('mobile', '')
+        }
+        
+        logger.info(f"📍 عنوان الطلب {order_id}: {address_info['name']} - {address_info['city']}")
+        
         # الحصول على الباركود
         barcode_data = order.barcode_data
         if not barcode_data or not isinstance(barcode_data, str) or not barcode_data.startswith('data:image'):
             barcode_data = generate_barcode(str(order_id))
-
+            logger.info(f"📊 تم إنشاء باركود جديد للطلب {order_id}")
+        
+        # إرجاع البيانات الأساسية فقط
         return {
             'id': str(order.id),
-            'reference_id': order.full_order_data.get('reference_id', str(order.id)) if order.full_order_data else str(order.id),
+            'reference_id': order_data.get('reference_id', str(order.id)),
             'barcode': barcode_data,
             'address': address_info,
-            'customer_name': order_address.name,
-            'created_at': format_date(order.created_at)
+            # استخدام القيم الثابتة كما في الصورة
+            'cod_amount': '0',
+            'dv_amount': '0.1',
+            'weight': '3',
+            'pieces': '1',
+            'ship_date': datetime.now().strftime('%d/%m/%Y'),
+            'master_number': '2914 9190 1938',
+            'destination_code': 'HOF',
+            'origin_code': 'EDDL'
         }
         
     except Exception as e:
         logger.error(f"❌ خطأ في جلب عنوان الطلب {order_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return None
 
-@orders_bp.route('/preview_addresses_html')
-def preview_addresses_html():
-    """معاينة عناوين الطلبات بتنسيق HTML"""
-    logger.info("بدء معاينة عناوين الطلبات بتنسيق HTML")
+@orders_bp.route('/preview_addresses_direct')
+def preview_addresses_direct():
+    """معاينة مباشرة للعناوين - للمساعدة في تصحيح الأخطاء"""
+    logger.info("بدء معاينة مباشرة للعناوين")
     
     try:
         user, employee = get_user_from_cookies()
         
         if not user:
-            flash('الرجاء تسجيل الدخول أولاً', 'error')
-            return redirect(url_for('user_auth.login'))
+            return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول'}), 401
         
         order_ids = request.args.get('order_ids', '').split(',')
-        
-        # تصفية القائمة من القيم الفارغة
         order_ids = [order_id.strip() for order_id in order_ids if order_id.strip()]
         
         if not order_ids:
-            flash('لم يتم تحديد أي طلبات للمعاينة', 'error')
-            return redirect(url_for('orders.index'))
+            return jsonify({'success': False, 'error': 'لم يتم تحديد أي طلبات'}), 400
         
-        logger.info(f"🔄 معالجة {len(order_ids)} طلب لعناوين HTML")
+        logger.info(f"🔍 معاينة مباشرة لـ {len(order_ids)} طلب")
         
-        # استخدام البيانات المحلية
-        orders_with_addresses = []
-        for order_id in order_ids:
-            order_with_address = get_order_with_address(order_id, user.store_id)
-            if order_with_address:
-                orders_with_addresses.append(order_with_address)
+        # اختبار جلب البيانات
+        test_results = []
+        for order_id in order_ids[:3]:  # اختبار أول 3 طلبات فقط
+            order_data = get_order_with_address(order_id, user.store_id)
+            if order_data:
+                test_results.append({
+                    'order_id': order_id,
+                    'success': True,
+                    'address': order_data['address'],
+                    'reference_id': order_data['reference_id']
+                })
+            else:
+                test_results.append({
+                    'order_id': order_id,
+                    'success': False,
+                    'error': 'فشل في جلب البيانات'
+                })
         
-        if not orders_with_addresses:
-            flash('لم يتم العثور على أي طلبات للمعاينة', 'error')
-            return redirect(url_for('orders.index'))
-        
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
-        return render_template('print_addresses.html', 
-                             orders=orders_with_addresses, 
-                             current_time=current_time)
+        return jsonify({
+            'success': True,
+            'test_results': test_results,
+            'total_orders': len(order_ids),
+            'tested_orders': len(test_results)
+        })
         
     except Exception as e:
-        logger.error(f"❌ خطأ في إنشاء معاينة العناوين: {str(e)}")
-        logger.error(traceback.format_exc())
-        flash('حدث خطأ أثناء إنشاء المعاينة', 'error')
-        return redirect(url_for('orders.index'))
+        logger.error(f"❌ خطأ في المعاينة المباشرة: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
