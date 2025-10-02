@@ -109,8 +109,8 @@ def process_order_from_local_data(order, order_data, items_data):
                     continue
                 
                 item_id = item.get('id') or f"temp_{index}"
-                item_sku = item.get('name', '').strip()
-                item_name = item.get('sku', '').strip()
+                item_name = item.get('name', '').strip()
+                item_sku = item.get('sku', '').strip()
                 item_quantity = item.get('quantity', 0)
                 
                 # تخطي العناصر بدون اسم أو SKU أو كمية
