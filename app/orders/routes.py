@@ -446,7 +446,11 @@ def order_details(order_id):
         })
 
         db_data = fetch_additional_order_data(user.store_id, str(order_id))
-
+        # ⭐⭐ الخطوة 8: استخراج معلومات الشحن والبطاقة ⭐⭐
+        shipping_info = extract_shipping_info(order_data)
+        processed_order['shipping'] = shipping_info
+        
+        print(f"📦 معلومات الشحن المستخرجة: {shipping_info}")
         return render_template('order_details.html', 
             order=processed_order,
             order_address=order_address,
@@ -463,7 +467,54 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
-
+def extract_shipping_info(order_data):
+    """استخراج معلومات الشحن والبطاقة من بيانات الطلب"""
+    try:
+        shipping_data = order_data.get('shipping', {})
+        shipments_data = order_data.get('shipments', [])
+        
+        shipping_info = {
+            'has_shipping': bool(shipping_data),
+            'company': shipping_data.get('company', ''),
+            'logo': shipping_data.get('logo', ''),
+            'status': shipping_data.get('status', ''),
+            'tracking_number': None,
+            'tracking_link': None,
+            'shipping_label': None,
+            'shipment_details': []
+        }
+        
+        # استخراج بيانات الشحن الرئيسية
+        if shipping_data:
+            shipment = shipping_data.get('shipment', {})
+            shipping_info.update({
+                'tracking_number': shipment.get('tracking_number'),
+                'tracking_link': shipment.get('tracking_link'),
+                'shipping_label': shipment.get('label', [])
+            })
+        
+        # استخراج بيانات الشحنات المتعددة
+        if shipments_data:
+            for shipment in shipments_data:
+                shipment_info = {
+                    'id': shipment.get('id'),
+                    'courier_name': shipment.get('courier_name', ''),
+                    'courier_logo': shipment.get('courier_logo', ''),
+                    'tracking_number': shipment.get('tracking_number'),
+                    'tracking_link': shipment.get('tracking_link'),
+                    'status': shipment.get('status', ''),
+                    'label': shipment.get('label'),
+                    'shipping_number': shipment.get('shipping_number'),
+                    'total_weight': shipment.get('total_weight', {}),
+                    'packages': shipment.get('packages', [])
+                }
+                shipping_info['shipment_details'].append(shipment_info)
+        
+        return shipping_info
+        
+    except Exception as e:
+        logger.error(f"Error extracting shipping info: {str(e)}")
+        return {}
 # 🔥 تعريف الدوال المساعدة المطلوبة
 def ensure_valid_access_token(user):
     """التأكد من وجود توكن وصول صالح مع معالجة الأخطاء المحسنة"""

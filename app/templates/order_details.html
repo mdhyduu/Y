@@ -367,7 +367,146 @@
     </div>
   </div>
 </div>
+<!-- قسم معلومات الشحن -->
+{% if order.shipping and order.shipping.has_shipping %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-shipping-fast me-2"></i>
+            معلومات الشحن والتتبع
+        </h5>
+    </div>
+    <div class="card-body">
+        <!-- معلومات شركة الشحن -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <strong>شركة الشحن:</strong>
+                {% if order.shipping.logo %}
+                <img src="{{ order.shipping.logo }}" alt="{{ order.shipping.company }}" height="30" class="ms-2">
+                {% endif %}
+                <span class="ms-2">{{ order.shipping.company }}</span>
+            </div>
+            <div class="col-md-6">
+                <strong>حالة الشحنة:</strong>
+                <span class="badge bg-info ms-2">{{ order.shipping.status }}</span>
+            </div>
+        </div>
 
+        <!-- معلومات التتبع -->
+        {% if order.shipping.tracking_number or order.shipping.tracking_link %}
+        <div class="row mb-3">
+            {% if order.shipping.tracking_number %}
+            <div class="col-md-6">
+                <strong>رقم التتبع:</strong>
+                <code class="ms-2">{{ order.shipping.tracking_number }}</code>
+            </div>
+            {% endif %}
+            
+            {% if order.shipping.tracking_link %}
+            <div class="col-md-6">
+                <strong>رابط التتبع:</strong>
+                <a href="{{ order.shipping.tracking_link }}" target="_blank" class="btn btn-sm btn-outline-primary ms-2">
+                    <i class="fas fa-external-link-alt me-1"></i>
+                    تتبع الشحنة
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- بطاقة الشحن -->
+        {% if order.shipping.shipping_label %}
+        <div class="row mb-3">
+            <div class="col-12">
+                <strong>بطاقة الشحن:</strong>
+                <div class="mt-2">
+                    {% if order.shipping.shipping_label is string %}
+                    <a href="{{ order.shipping.shipping_label }}" target="_blank" class="btn btn-success btn-sm">
+                        <i class="fas fa-download me-1"></i>
+                        تحميل بطاقة الشحن
+                    </a>
+                    {% elif order.shipping.shipping_label is iterable %}
+                        {% for label in order.shipping.shipping_label %}
+                        <a href="{{ label }}" target="_blank" class="btn btn-success btn-sm me-2">
+                            <i class="fas fa-download me-1"></i>
+                            بطاقة الشحن {{ loop.index }}
+                        </a>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- الشحنات المتعددة -->
+        {% if order.shipping.shipment_details %}
+        <div class="shipments-section">
+            <h6 class="border-bottom pb-2">تفاصيل الشحنات</h6>
+            {% for shipment in order.shipping.shipment_details %}
+            <div class="shipment-item border rounded p-3 mb-3">
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>شركة الشحن:</strong>
+                        {% if shipment.courier_logo %}
+                        <img src="{{ shipment.courier_logo }}" alt="{{ shipment.courier_name }}" height="25" class="ms-2">
+                        {% endif %}
+                        <span class="ms-2">{{ shipment.courier_name }}</span>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>الحالة:</strong>
+                        <span class="badge 
+                            {% if shipment.status == 'delivered' %}bg-success
+                            {% elif shipment.status == 'shipped' %}bg-primary
+                            {% elif shipment.status == 'pending' %}bg-warning
+                            {% else %}bg-secondary{% endif %} ms-2">
+                            {{ shipment.status }}
+                        </span>
+                    </div>
+                    <div class="col-md-4">
+                        {% if shipment.tracking_link %}
+                        <a href="{{ shipment.tracking_link }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-map-marker-alt me-1"></i>
+                            تتبع الشحنة
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                {% if shipment.tracking_number %}
+                <div class="row mt-2">
+                    <div class="col-12">
+                        <strong>رقم الشحنة:</strong>
+                        <code class="ms-2">{{ shipment.tracking_number }}</code>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- الطرود -->
+                {% if shipment.packages %}
+                <div class="packages-section mt-3">
+                    <strong>الطرود:</strong>
+                    {% for package in shipment.packages %}
+                    <div class="package-item border-start border-3 border-primary ps-3 mt-2">
+                        <div><strong>{{ package.name }}</strong> ({{ package.quantity }} ×)</div>
+                        {% if package.weight %}
+                        <small class="text-muted">الوزن: {{ package.weight.value }} {{ package.weight.units }}</small>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="fas fa-info-circle me-2"></i>
+    لا توجد معلومات شحن متاحة لهذا الطلب
+</div>
+{% endif %}
 
 <style>
   /* أنماط عامة للجدول */
