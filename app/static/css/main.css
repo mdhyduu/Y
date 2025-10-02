@@ -487,10 +487,10 @@
     color: #854d0e !important; 
     border-color: #fef08a !important;
 }
-.payment-cash { 
-    background-color: #f3e8ff !important; 
-    color: #7c3aed !important; 
-    border-color: #e9d5ff !important;
+.payment-cod { 
+    background-color: #ffedd5 !important; 
+    color: #c2410c !important; 
+    border-color: #fed7aa !important;
 }
 .payment-bank { 
     background-color: #ffedd5 !important; 
@@ -530,10 +530,10 @@ body.dark-mode .payment-visa {
     color: #fde047 !important; 
     border-color: #eab308 !important;
 }
-body.dark-mode .payment-cash { 
-    background-color: #581c87 !important; 
-    color: #d8b4fe !important; 
-    border-color: #a855f7 !important;
+body.dark-mode .payment-cod { 
+background-color: #7c2d12 !important; 
+    color: #fdba74 !important; 
+    border-color: #f97316 !important;
 }
 body.dark-mode .payment-bank { 
     background-color: #7c2d12 !important; 
