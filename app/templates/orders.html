@@ -1039,14 +1039,14 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
      * إنشاء HTML ديناميكي للطباعة
      */
     function generatePrintHTML(printData) {
-        const timestamp = new Date().toLocaleDateString('ar-SA', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            weekday: 'long'
-        });
-        
-        return `<!DOCTYPE html>
+    const timestamp = new Date().toLocaleDateString('ar-SA', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long'
+    });
+    
+    return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -1056,15 +1056,20 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
         @page {
             size: A4;
             margin: 0.8cm;
+            marks: crop cross;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: "Segoe UI", "DejaVu Sans", Arial, sans-serif;
             line-height: 1.4;
             margin: 0;
             padding: 15px;
             color: #2c3e50;
             background: #f4f7f9;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
         }
 
         .print-header {
@@ -1080,6 +1085,7 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
         .print-header h1 {
             margin: 0;
             font-size: 24px;
+            font-weight: 600;
         }
 
         .summary-grid {
@@ -1102,12 +1108,14 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
             margin: 0;
             font-size: 24px;
             color: #667eea;
+            font-weight: 700;
         }
 
         .summary-card p {
             margin: 5px 0 0 0;
             color: #666;
             font-size: 14px;
+            font-weight: 500;
         }
 
         .orders-container {
@@ -1124,6 +1132,7 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
             page-break-inside: avoid;
             break-inside: avoid;
             box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+            position: relative;
         }
 
         .order-header {
@@ -1141,17 +1150,39 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
             border-radius: 6px;
             object-fit: cover;
             border: 1px solid #ddd;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .order-info {
             flex: 1;
         }
 
-        .order-ref {
+        /* رابط رقم الطلب - محسن للنسخ */
+        .order-ref-link {
             font-size: 18px;
             font-weight: bold;
             color: #2c3e50;
             display: block;
+            letter-spacing: 0.5px;
+            text-decoration: none;
+            cursor: pointer;
+            padding: 4px 0;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        /* تحسين التحديد للرابط */
+        .order-ref-link::selection {
+            background: #b3d7ff;
+            color: #000;
+        }
+
+        .order-ref-link::-moz-selection {
+            background: #b3d7ff;
+            color: #000;
         }
 
         .order-quantity {
@@ -1162,6 +1193,7 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
             font-size: 14px;
             display: inline-block;
             margin-top: 5px;
+            font-weight: 600;
         }
 
         .options-section, .notes-section {
@@ -1194,6 +1226,7 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
             margin-bottom: 3px;
             border-radius: 4px;
             font-size: 13px;
+            border: 1px solid #e0e0e0;
         }
 
         .barcode-section {
@@ -1208,6 +1241,8 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
             max-width: 180px;
             height: 60px;
             object-fit: contain;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .no-data {
@@ -1219,33 +1254,155 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
             grid-column: 1 / -1;
         }
 
+        /* تأثيرات تفاعلية للرابط */
+        @media (hover: hover) {
+            .order-ref-link:hover {
+                background: #f0f8ff;
+                color: #0066cc;
+                text-decoration: underline;
+            }
+        }
+
+        /* نسخة الطباعة المحسنة */
         @media print {
             body {
-                margin: 0;
-                padding: 0;
-                background: white;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                color: #000000 !important;
+                font-family: "Arial", "Helvetica", sans-serif !important;
+                font-size: 12pt !important;
+                line-height: 1.3 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                text-rendering: optimizeLegibility !important;
+                color-adjust: exact !important;
+            }
+
+            /* تحسين الروابط في الطباعة */
+            .order-ref-link {
+                color: #000000 !important;
+                text-decoration: none !important;
+                font-weight: bold !important;
+                background: transparent !important;
+                -webkit-user-select: text !important;
+                user-select: text !important;
+                cursor: text !important;
+            }
+
+            /* إضافة محتوى للرابط في الطباعة */
+            .order-ref-link::after {
+
+                font-size: 10pt;
+                color: #666;
+                font-weight: normal;
+            }
+
+            .print-header {
+                display: block !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+                box-shadow: none !important;
+                border: 2px solid #000000 !important;
+                padding: 15px !important;
+                margin-bottom: 15px !important;
+                page-break-after: avoid;
             }
             
-            .print-header, .summary-grid {
-                display: none;
+            .summary-grid {
+                display: grid !important;
+                background: white !important;
+                margin-bottom: 15px !important;
+                page-break-after: avoid;
             }
-
+            
+            .summary-card {
+                background: #ffffff !important;
+                border: 1px solid #000000 !important;
+                box-shadow: none !important;
+                color: #000000 !important;
+            }
+            
+            .summary-card h3, .summary-card p {
+                color: #000000 !important;
+                font-weight: bold !important;
+            }
+            
             .orders-container {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 8px;
-                padding: 0;
+                display: grid !important;
+                grid-template-columns: repeat(3, 1fr) !important;
+                gap: 8px !important;
             }
-
+            
             .order-card {
-                border: 1px solid #999;
-                box-shadow: none;
-                padding: 8px;
+                border: 1px solid #000000 !important;
+                box-shadow: none !important;
+                background: #ffffff !important;
+                padding: 8px !important;
+                color: #000000 !important;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            
+            .product-image {
+                display: block !important;
+                width: 60px !important;
+                height: 60px !important;
+                border: 1px solid #000000 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                max-width: 100% !important;
+            }
+            
+            .order-quantity {
+                background: #ffffff !important;
+                color: #000000 !important;
+                border: 1px solid #000000 !important;
+            }
+            
+            .options-section, .notes-section {
+                background: #ffffff !important;
+                border: 1px solid #000000 !important;
+                color: #000000 !important;
+            }
+            
+            .option-item {
+                background: #ffffff !important;
+                border: 1px solid #cccccc !important;
+            }
+            
+            .barcode-section {
+                display: block !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            .barcode-image {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                filter: contrast(1.8) brightness(0.8) !important;
+                image-rendering: -webkit-optimize-contrast !important;
+                image-rendering: crisp-edges !important;
             }
 
-            .options-section, .notes-section {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
+            /* منع انقطاع العناصر */
+            h1, h2, h3, h4, h5, h6 {
+                page-break-after: avoid;
             }
+            
+            table, figure, .order-card {
+                page-break-inside: avoid;
+            }
+        }
+        
+        /* تحسين إخفاء الصور التالفة */
+        .product-image[style*="display: none"] {
+            display: none !important;
         }
     </style>
 </head>
@@ -1281,73 +1438,86 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
     <script>
         // طباعة تلقائية عند التحميل
         window.addEventListener('load', function() {
+            // تحسين جودة الصور قبل الطباعة
+            const images = document.querySelectorAll('img');
+            images.forEach(img => {
+                img.loading = 'eager';
+                img.fetchPriority = 'high';
+            });
+
             setTimeout(() => {
                 window.print();
-                // إغلاق النافذة تلقائياً بعد الطباعة
-
-            }, 1000);
+            }, 1500);
         });
-
-        function generateOrdersHTML(products) {
-            if (!products || products.length === 0) {
-                return '<div class="no-data"><h3>لا توجد بيانات للعرض</h3></div>';
-            }
-
-            let html = '';
-            products.forEach(product => {
-                product.orders.forEach(order => {
-                    html += \`
-                        <div class="order-card">
-                            <div class="order-header">
-                                <img src="\${product.thumbnail}" alt="\${product.name}" 
-                                     class="product-image"
-                                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzAiIGhlaWdodD0iNzAiIHZpZXdCb3g9IjAgMCA3MCA3MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjcwIiBoZWlnaHQ9IjcwIiBmaWxsPSIjRTVFNUU1Ii8+CjxwYXRoIGQ9Ik00NSAyNUgyNUMyMy44OTU0IDI1IDIzIDI1Ljg5NTQgMjMgMjdWNDNDMjMgNDQuMTA0NiAyMy44OTU0IDQ1IDI1IDQ1SDQ1QzQ2LjEwNDYgNDUgNDcgNDQuMTA0NiA0NyA0M1YyN0M0NyAyNS44OTU0IDQ2LjEwNDYgMjUgNDUgMjVaTTI1IDI4SDM1VjM1SDI1VjI4Wk0zNyAyOEg0NVYzNUgzN1YyOFpNMjUgMzdIMzVWNDJIMjVWMzdaTTM3IDM3SDQ1VjQySDM3VjM3WiIgZmlsbD0iIzk5OTk5OSIvPgo8L3N2Zz4K'">
-                                <div class="order-info">
-                                    <span class="order-ref">#\${order.reference_id}</span>
-                                    <span class="order-quantity">\${order.quantity}×</span>
-                                </div>
-                            </div>
-                            
-                            <div>
-                                \${order.options && order.options.length > 0 ? \`
-                                    <div class="options-section">
-                                        <div class="options-title">الخيارات:</div>
-                                        \${order.options.map(opt => 
-                                            \`<span class="option-item">\${opt.name}: <strong>\${opt.value}</strong></span>\`
-                                        ).join('')}
-                                    </div>
-                                \` : ''}
-                                
-                                \${order.notes ? \`
-                                    <div class="notes-section">
-                                        <div class="notes-title">ملاحظات:</div>
-                                        <div>\${order.notes}</div>
-                                    </div>
-                                \` : ''}
-                            </div>
-                            
-                            \${order.barcode && order.barcode !== \`باركود_\${order.reference_id}\` ? \`
-                                <div class="barcode-section">
-                                    <img src="\${order.barcode}" alt="باركود" class="barcode-image">
-                                </div>
-                            \` : ''}
-                        </div>
-                    \`;
+        
+        // معالجة الصور التالفة وتحسين النصوص
+        document.addEventListener('DOMContentLoaded', function() {
+            const images = document.querySelectorAll('.product-image, .barcode-image');
+            images.forEach(img => {
+                img.addEventListener('error', function() {
+                    this.style.display = 'none';
+                });
+                
+                img.addEventListener('load', function() {
+                    this.style.imageRendering = 'auto';
                 });
             });
+
+            // تحسين قابلية نسخ الروابط
+            const links = document.querySelectorAll('.order-ref-link');
+            links.forEach(link => {
+                // إضافة وظيفة نسخ عند النقر
+                link.addEventListener('click', function(e) {
+                    if (!window.getSelection().toString()) {
+                        e.preventDefault();
+                        const orderNumber = this.getAttribute('href').replace('#', '');
+                        navigator.clipboard.writeText(orderNumber).then(() => {
+                            // تأكيد النسخ (يمكن إضافته إذا لزم الأمر)
+                            console.log('تم نسخ رقم الطلب: ' + orderNumber);
+                        });
+                    }
+                });
+
+                // جعل الرابط قابل للتحديد بسهولة
+                link.style.webkitUserSelect = 'text';
+                link.style.mozUserSelect = 'text';
+                link.style.msUserSelect = 'text';
+                link.style.userSelect = 'text';
+            });
+
+            // جعل كل النصوص قابلة للتحديد
+            const textElements = document.querySelectorAll('.options-title, .notes-title, .option-item, .notes-content');
+            textElements.forEach(el => {
+                el.style.webkitUserSelect = 'text';
+                el.style.mozUserSelect = 'text';
+                el.style.msUserSelect = 'text';
+                el.style.userSelect = 'text';
+            });
+        });
+
+        // منع السلوك الافتراضي لقائمة السياق على الروابط
+        document.addEventListener('contextmenu', function(e) {
+            if (e.target.classList.contains('order-ref-link')) {
+                e.stopPropagation();
+                return;
+            }
             
-            return html;
-        }
+            const selection = window.getSelection();
+            if (selection.toString().length > 0) {
+                e.stopPropagation();
+            }
+        });
     <\/script>
 </body>
 </html>`;
-    }
+}
+
 /**
  * Generates HTML for orders in the print view
  */
 function generateOrdersHTML(products) {
     if (!products || products.length === 0) {
-        return '<div class="no-data"><h3>لا توجد بيانات للعرض</h3></div>';
+        return '<div class="no-data"><h3>لا توجد بيانات للعرض</h3><p>يمكنك إضافة طلبات جديدة لتظهر في هذا التقرير.</p></div>';
     }
 
     let html = '';
@@ -1356,36 +1526,35 @@ function generateOrdersHTML(products) {
             html += `
                 <div class="order-card">
                     <div class="order-header">
-                        <img src="${product.thumbnail}" alt="${product.name}" 
+                        <img src="${product.thumbnail}" alt="صورة المنتج: ${product.name}" 
                              class="product-image"
-                             onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzAiIGhlaWdodD0iNzAiIHZpZXdCb3g9IjAgMCA3MCA3MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjcwIiBoZWlnaHQ9IjcwIiBmaWxsPSIjRTVFNUU1Ii8+CjxwYXRoIGQ9Ik00NSAyNUgyNUMyMy44OTU0IDI1IDIzIDI1Ljg5NTQgMjMgMjdWNDNDMjMgNDQuMTA0NiAyMy44OTU0IDQ1IDI1IDQ1SDQ1QzQ2LjEwNDYgNDUgNDcgNDQuMTA0NiA0NyA0M1YyN0M0NyAyNS44OTU0IDQ2LjEwNDYgMjUgNDUgMjVaTTI1IDI4SDM1VjM1SDI1VjI4Wk0zNyAyOEg0NVYzNUgzN1YyOFpNMjUgMzdIMzVWNDJIMjVWMzdaTTM3IDM3SDQ1VjQySDM3VjM3WiIgZmlsbD0iIzk5OTk5OSIvPgo8L3N2Zz4K'">
+                             onerror="this.style.display='none'">
                         <div class="order-info">
-                            <span class="order-ref">#${order.reference_id}</span>
-                            <span class="order-quantity">${order.quantity}×</span>
+                            <a href="#${order.reference_id}" class="order-ref-link" title="انقر لنسخ رقم الطلب">#${order.reference_id}</a>
+                            <span class="order-quantity">${order.quantity} الكمية</span>
                         </div>
                     </div>
                     
-                    <div>
-                        ${order.options && order.options.length > 0 ? `
-                            <div class="options-section">
-                                <div class="options-title">الخيارات:</div>
-                                ${order.options.map(opt => 
-                                    `<span class="option-item">${opt.name}: <strong>${opt.value}</strong></span>`
-                                ).join('')}
-                            </div>
-                        ` : ''}
-                        
-                        ${order.notes ? `
-                            <div class="notes-section">
-                                <div class="notes-title">ملاحظات:</div>
-                                <div>${order.notes}</div>
-                            </div>
-                        ` : ''}
-                    </div>
+                    ${order.options && order.options.length > 0 ? `
+                        <div class="options-section">
+                            <div class="options-title">الخيارات:</div>
+                            ${order.options.map(opt => 
+                                `<span class="option-item">${opt.name}: ${opt.value}</span>`
+                            ).join('')}
+                        </div>
+                    ` : ''}
+                    
+                    ${order.notes ? `
+                        <div class="notes-section">
+                            <div class="notes-title">ملاحظات:</div>
+                            <div class="notes-content">${order.notes}</div>
+                        </div>
+                    ` : ''}
                     
                     ${order.barcode && order.barcode !== `باركود_${order.reference_id}` ? `
                         <div class="barcode-section">
-                            <img src="${order.barcode}" alt="باركود" class="barcode-image">
+                            <img src="${order.barcode}" alt="باركود الطلب ${order.reference_id}" class="barcode-image"
+                                 onerror="this.style.display='none'">
                         </div>
                     ` : ''}
                 </div>
@@ -1394,67 +1563,6 @@ function generateOrdersHTML(products) {
     });
     
     return html;
-}
-
-/**
- * Creates the full HTML document for the print popup window.
- */
-function generatePrintHTML(printData) {
-    const timestamp = new Date().toLocaleDateString('ar-SA', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        weekday: 'long'
-    });
-    
-    return `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تقرير القائمة السريعة - ${timestamp}</title>
-    <style>
-        @page{size:A4;margin:.8cm}body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;line-height:1.4;margin:0;padding:15px;color:#2c3e50;background:#f4f7f9}.print-header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:20px;border-radius:10px;margin-bottom:20px;text-align:center;box-shadow:0 4px 6px rgba(0,0,0,.1)}.print-header h1{margin:0;font-size:24px}.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px;margin-bottom:20px}.summary-card{background:#fff;padding:15px;border-radius:8px;text-align:center;border:1px solid #e0e0e0;box-shadow:0 2px 4px rgba(0,0,0,.05)}.summary-card h3{margin:0;font-size:24px;color:#667eea}.summary-card p{margin:5px 0 0;color:#666;font-size:14px}.orders-container{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.order-card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:12px;page-break-inside:avoid;break-inside:avoid;box-shadow:0 2px 5px rgba(0,0,0,.08)}.order-header{display:flex;align-items:center;gap:12px;border-bottom:1px solid #eee;padding-bottom:8px;margin-bottom:8px}.product-image{width:70px;height:70px;border-radius:6px;object-fit:cover;border:1px solid #ddd}.order-info{flex:1}.order-ref{font-size:18px;font-weight:700;color:#2c3e50;display:block}.order-quantity{background:#2c3e50;color:#fff;padding:4px 12px;border-radius:15px;font-size:14px;display:inline-block;margin-top:5px}.options-section,.notes-section{padding:8px;border-radius:6px;margin-top:8px;font-size:13px}.options-section{background:#e9f5ff;border:1px solid #b3d7ff}.notes-section{background:#fffbe6;border:1px solid #ffeccd}.options-title,.notes-title{font-weight:700;margin-bottom:5px;font-size:14px}.option-item{display:block;background:#fff;padding:3px 8px;margin-bottom:3px;border-radius:4px;font-size:13px}.barcode-section{text-align:center;margin-top:10px;padding-top:8px;border-top:1px solid #eee}.barcode-image{width:100%;max-width:180px;height:60px;object-fit:contain}.no-data{text-align:center;padding:50px;color:#6c757d;background:#fff;border-radius:8px;grid-column:1/-1}@media print{body{margin:0;padding:0;background:#fff}.print-header,.summary-grid{display:none}.orders-container{grid-template-columns:repeat(3,1fr);gap:8px;padding:0}.order-card{border:1px solid #999;box-shadow:none;padding:8px}.options-section,.notes-section{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-    </style>
-</head>
-<body>
-    <div class="print-header">
-        <h1>تقرير القائمة السريعة</h1>
-        <p>تاريخ التقرير: ${timestamp}</p>
-    </div>
-    <div class="summary-grid">
-        <div class="summary-card">
-            <h3>${printData.summary.totalProducts}</h3>
-            <p>عدد المنتجات</p>
-        </div>
-        <div class="summary-card">
-            <h3>${printData.summary.totalOrders}</h3>
-            <p>عدد الطلبات</p>
-        </div>
-        <div class="summary-card">
-            <h3>${printData.summary.totalQuantity}</h3>
-            <p>إجمالي الكميات</p>
-        </div>
-        <div class="summary-card">
-            <h3>${printData.summary.totalItems}</h3>
-            <p>إجمالي العناصر</p>
-        </div>
-    </div>
-
-    <div class="orders-container">
-        ${generateOrdersHTML(printData.products)}
-    </div>
-
-    <script>
-        window.addEventListener('load', function() {
-            setTimeout(() => {
-                window.print();
-
-            }, 8000);
-        });
-    <\/script>
-</body>
-</html>`;
 }
     // ⭐ الدالة المصححة هنا ⭐
     function openQuickListPrint() {
