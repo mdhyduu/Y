@@ -477,36 +477,36 @@ def extract_shipping_info(order_data):
             'has_shipping': bool(shipping_data),
             'company': shipping_data.get('company', ''),
             'logo': shipping_data.get('logo', ''),
-            'status': shipping_data.get('status', ''),
+            'status': shipping_data.get('status', ''),  # الحالة الأساسية
             'tracking_number': None,
             'tracking_link': None,
-            'has_tracking': False,  # 🔥 إضافة هذا الحقل
+            'has_tracking': False,
             'shipping_label': None,
             'has_shipping_label': False,
             'shipment_details': []
         }
         
+        # 🔥 إذا مافي حالة في shipping، نجرب من shipment
+        if not shipping_info['status'] and 'shipment' in shipping_data:
+            shipping_info['status'] = shipping_data['shipment'].get('status', '')
+
         # 🔥 معالجة رابط التتبع الرئيسي
         if shipping_data:
             shipment = shipping_data.get('shipment', {})
             tracking_link = shipment.get('tracking_link')
             tracking_number = shipment.get('tracking_number')
             
-            # 🔥 التحقق من رابط التتبع
             if tracking_link and tracking_link not in ["", "0", "null", "None"]:
                 if tracking_link.startswith(('http://', 'https://')):
                     shipping_info['tracking_link'] = tracking_link
                     shipping_info['has_tracking'] = True
                 else:
-                    # إذا كان مجرد رقم، ننشئ رابط تتبع افتراضي
                     shipping_info['tracking_link'] = f"https://track.salla.sa/track/{tracking_link}"
                     shipping_info['has_tracking'] = True
             
-            # 🔥 معالجة رقم التتبع
             if tracking_number and tracking_number not in ["", "0", "null", "None"]:
                 shipping_info['tracking_number'] = tracking_number
                 if not shipping_info['tracking_link']:
-                    # إنشاء رابط تتبع إذا كان الرقم متوفراً ولكن الرابط غير متوفر
                     shipping_info['tracking_link'] = f"https://track.salla.sa/track/{tracking_number}"
                     shipping_info['has_tracking'] = True
         
@@ -517,7 +517,6 @@ def extract_shipping_info(order_data):
                 shipment_tracking_number = shipment.get('tracking_number')
                 shipment_label = shipment.get('label')
                 
-                # 🔥 معالجة رابط التتبع للشحنة
                 shipment_has_tracking = False
                 final_tracking_link = None
                 
@@ -529,7 +528,6 @@ def extract_shipping_info(order_data):
                         final_tracking_link = f"https://track.salla.sa/track/{shipment_tracking_link}"
                         shipment_has_tracking = True
                 
-                # إذا لم يكن هناك رابط، ولكن هناك رقم تتبع، ننشئ رابط
                 if not final_tracking_link and shipment_tracking_number:
                     final_tracking_link = f"https://track.salla.sa/track/{shipment_tracking_number}"
                     shipment_has_tracking = True
@@ -540,8 +538,8 @@ def extract_shipping_info(order_data):
                     'courier_logo': shipment.get('courier_logo', ''),
                     'tracking_number': shipment_tracking_number,
                     'tracking_link': final_tracking_link,
-                    'has_tracking': shipment_has_tracking,  # 🔥 إضافة هذا
-                    'status': shipment.get('status', ''),
+                    'has_tracking': shipment_has_tracking,
+                    'status': shipment.get('status', ''),  # 🟢 الحالة هنا
                     'label': shipment_label,
                     'has_label': bool(shipment_label and shipment_label not in ["", "0", "null"]),
                     'shipping_number': shipment.get('shipping_number'),
@@ -550,7 +548,10 @@ def extract_shipping_info(order_data):
                 }
                 shipping_info['shipment_details'].append(shipment_info)
                 
-                # 🔥 إذا كان هناك تتبع في الشحنات، نحديث الرئيسي
+                # 🔥 تحديث الحالة الرئيسية من أول شحنة إذا كانت فاضية
+                if not shipping_info['status'] and shipment_info['status']:
+                    shipping_info['status'] = shipment_info['status']
+                
                 if shipment_has_tracking and not shipping_info['has_tracking']:
                     shipping_info['tracking_link'] = final_tracking_link
                     shipping_info['tracking_number'] = shipment_tracking_number
