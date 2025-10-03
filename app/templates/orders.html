@@ -1038,7 +1038,7 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
     /**
      * إنشاء HTML ديناميكي للطباعة
      */
-    function generatePrintHTML(printData) {
+function generatePrintHTML(printData) {
     const timestamp = new Date().toLocaleDateString('ar-SA', {
         year: 'numeric',
         month: 'long',
@@ -1137,11 +1137,12 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
 
         .order-header {
             display: flex;
-            align-items: center;
+            align-items: stretch;
             gap: 12px;
             border-bottom: 1px solid #eee;
             padding-bottom: 8px;
             margin-bottom: 8px;
+            min-height: 70px;
         }
 
         .product-image {
@@ -1152,10 +1153,35 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
             border: 1px solid #ddd;
             -webkit-user-select: none;
             user-select: none;
+            flex-shrink: 0;
+        }
+
+        .barcode-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+            padding: 5px;
+            min-height: 70px;
+        }
+
+        .barcode-image {
+            width: 100%;
+            height: 100%;
+            max-height: 65px;
+            object-fit: contain;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         .order-info {
-            flex: 1;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
 
         /* رابط رقم الطلب - محسن للنسخ */
@@ -1194,6 +1220,7 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
             display: inline-block;
             margin-top: 5px;
             font-weight: 600;
+            align-self: flex-start;
         }
 
         .options-section, .notes-section {
@@ -1227,22 +1254,6 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
             border-radius: 4px;
             font-size: 13px;
             border: 1px solid #e0e0e0;
-        }
-
-        .barcode-section {
-            text-align: center;
-            margin-top: 10px;
-            padding-top: 8px;
-            border-top: 1px solid #eee;
-        }
-
-        .barcode-image {
-            width: 100%;
-            max-width: 180px;
-            height: 60px;
-            object-fit: contain;
-            -webkit-user-select: none;
-            user-select: none;
         }
 
         .no-data {
@@ -1293,14 +1304,6 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
                 -webkit-user-select: text !important;
                 user-select: text !important;
                 cursor: text !important;
-            }
-
-            /* إضافة محتوى للرابط في الطباعة */
-            .order-ref-link::after {
-
-                font-size: 10pt;
-                color: #666;
-                font-weight: normal;
             }
 
             .print-header {
@@ -1359,6 +1362,22 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
                 print-color-adjust: exact !important;
                 max-width: 100% !important;
             }
+
+            .barcode-container {
+                background: #ffffff !important;
+                border: 1px solid #000000 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            .barcode-image {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                filter: contrast(1.8) brightness(0.8) !important;
+                background: transparent !important;
+                image-rendering: -webkit-optimize-contrast !important;
+                image-rendering: crisp-edges !important;
+            }
             
             .order-quantity {
                 background: #ffffff !important;
@@ -1375,23 +1394,6 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
             .option-item {
                 background: #ffffff !important;
                 border: 1px solid #cccccc !important;
-            }
-            
-            .barcode-section {
-                display: block !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                background: transparent !important;
-                background:white !important; 
-            }
-            
-            .barcode-image {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                filter: contrast(1.8) brightness(0.8) !important;
-                background: transparent !important;
-                image-rendering: -webkit-optimize-contrast !important;
-                image-rendering: crisp-edges !important;
             }
 
             /* منع انقطاع العناصر */
@@ -1451,7 +1453,7 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
 
             setTimeout(() => {
                 window.print();
-            }, 5000);
+            }, 500);
         });
         
         // معالجة الصور التالفة وتحسين النصوص
@@ -1460,6 +1462,10 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
             images.forEach(img => {
                 img.addEventListener('error', function() {
                     this.style.display = 'none';
+                    // إذا كانت صورة الباركود تالفة، نخفي الحاوية كاملة
+                    if (this.classList.contains('barcode-image')) {
+                        this.closest('.barcode-container').style.display = 'none';
+                    }
                 });
                 
                 img.addEventListener('load', function() {
@@ -1533,6 +1539,12 @@ function generateOrdersHTML(products) {
                         <img src="${product.thumbnail}" alt="صورة المنتج: ${product.name}" 
                              class="product-image"
                              onerror="this.style.display='none'">
+                        ${order.barcode && order.barcode !== `باركود_${order.reference_id}` ? `
+                            <div class="barcode-container">
+                                <img src="${order.barcode}" alt="باركود الطلب ${order.reference_id}" class="barcode-image"
+                                     onerror="this.style.display='none'">
+                            </div>
+                        ` : '<div class="barcode-container" style="background: transparent; border: none;"></div>'}
                         <div class="order-info">
                             <a href="#${order.reference_id}" class="order-ref-link" title="انقر لنسخ رقم الطلب">#${order.reference_id}</a>
                             <span class="order-quantity">${order.quantity} الكمية</span>
@@ -1552,13 +1564,6 @@ function generateOrdersHTML(products) {
                         <div class="notes-section">
                             <div class="notes-title">ملاحظات:</div>
                             <div class="notes-content">${order.notes}</div>
-                        </div>
-                    ` : ''}
-                    
-                    ${order.barcode && order.barcode !== `باركود_${order.reference_id}` ? `
-                        <div class="barcode-section">
-                            <img src="${order.barcode}" alt="باركود الطلب ${order.reference_id}" class="barcode-image"
-                                 onerror="this.style.display='none'">
                         </div>
                     ` : ''}
                 </div>
