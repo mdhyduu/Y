@@ -468,73 +468,101 @@ def order_details(order_id):
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
 def extract_shipping_info(order_data):
-    """استخراج معلومات الشحن من بيانات الطلب اعتمادًا على الشحنات (shipments)"""
+    """استخراج معلومات الشحن والبطاقة من بيانات الطلب"""
     try:
+        shipping_data = order_data.get('shipping', {})
         shipments_data = order_data.get('shipments', [])
         
         shipping_info = {
-            'has_shipping': bool(shipments_data),
-            'status': '',
+            'has_shipping': bool(shipping_data),
+            'company': shipping_data.get('company', ''),
+            'logo': shipping_data.get('logo', ''),
+            'status': shipping_data.get('status', ''),  # الحالة الأساسية
             'tracking_number': None,
             'tracking_link': None,
             'has_tracking': False,
+            'shipping_label': None,
+            'has_shipping_label': False,
             'shipment_details': []
         }
         
-        for shipment in shipments_data:
-            shipment_tracking_link = shipment.get('tracking_link')
-            shipment_tracking_number = shipment.get('tracking_number')
-            shipment_label = shipment.get('label')
+        # 🔥 إذا مافي حالة في shipping، نجرب من shipment
+        if not shipping_info['status'] and 'shipment' in shipping_data:
+            shipping_info['status'] = shipping_data['shipment'].get('status', '')
+
+        # 🔥 معالجة رابط التتبع الرئيسي
+        if shipping_data:
+            shipment = shipping_data.get('shipment', {})
+            tracking_link = shipment.get('tracking_link')
+            tracking_number = shipment.get('tracking_number')
             
-            shipment_has_tracking = False
-            final_tracking_link = None
-            
-            # معالجة رابط التتبع
-            if shipment_tracking_link and shipment_tracking_link not in ["", "0", "null", "None"]:
-                if shipment_tracking_link.startswith(('http://', 'https://')):
-                    final_tracking_link = shipment_tracking_link
+            if tracking_link and tracking_link not in ["", "0", "null", "None"]:
+                if tracking_link.startswith(('http://', 'https://')):
+                    shipping_info['tracking_link'] = tracking_link
+                    shipping_info['has_tracking'] = True
                 else:
-                    final_tracking_link = f"https://track.salla.sa/track/{shipment_tracking_link}"
-                shipment_has_tracking = True
+                    shipping_info['tracking_link'] = f"https://track.salla.sa/track/{tracking_link}"
+                    shipping_info['has_tracking'] = True
             
-            # إذا الرابط غير موجود لكن رقم التتبع موجود
-            if not final_tracking_link and shipment_tracking_number:
-                final_tracking_link = f"https://track.salla.sa/track/{shipment_tracking_number}"
-                shipment_has_tracking = True
-            
-            shipment_info = {
-                'id': shipment.get('id'),
-                'courier_name': shipment.get('courier_name', ''),
-                'courier_logo': shipment.get('courier_logo', ''),
-                'tracking_number': shipment_tracking_number,
-                'tracking_link': final_tracking_link,
-                'has_tracking': shipment_has_tracking,
-                'status': shipment.get('status', ''),
-                'label': shipment_label,
-                'has_label': bool(shipment_label and shipment_label not in ["", "0", "null"]),
-                'shipping_number': shipment.get('shipping_number'),
-                'total_weight': shipment.get('total_weight', {}),
-                'packages': shipment.get('packages', [])
-            }
-            
-            shipping_info['shipment_details'].append(shipment_info)
-            
-            # تحديث الحالة الرئيسية من أول شحنة
-            if not shipping_info['status'] and shipment_info['status']:
-                shipping_info['status'] = shipment_info['status']
-            
-            # تحديث التتبع الرئيسي من أول شحنة تحتوي على تتبع
-            if shipment_has_tracking and not shipping_info['has_tracking']:
-                shipping_info['tracking_link'] = final_tracking_link
-                shipping_info['tracking_number'] = shipment_tracking_number
-                shipping_info['has_tracking'] = True
+            if tracking_number and tracking_number not in ["", "0", "null", "None"]:
+                shipping_info['tracking_number'] = tracking_number
+                if not shipping_info['tracking_link']:
+                    shipping_info['tracking_link'] = f"https://track.salla.sa/track/{tracking_number}"
+                    shipping_info['has_tracking'] = True
+        
+        # 🔥 معالجة الشحنات المتعددة
+        if shipments_data:
+            for shipment in shipments_data:
+                shipment_tracking_link = shipment.get('tracking_link')
+                shipment_tracking_number = shipment.get('tracking_number')
+                shipment_label = shipment.get('label')
+                
+                shipment_has_tracking = False
+                final_tracking_link = None
+                
+                if shipment_tracking_link and shipment_tracking_link not in ["", "0", "null", "None"]:
+                    if shipment_tracking_link.startswith(('http://', 'https://')):
+                        final_tracking_link = shipment_tracking_link
+                        shipment_has_tracking = True
+                    else:
+                        final_tracking_link = f"https://track.salla.sa/track/{shipment_tracking_link}"
+                        shipment_has_tracking = True
+                
+                if not final_tracking_link and shipment_tracking_number:
+                    final_tracking_link = f"https://track.salla.sa/track/{shipment_tracking_number}"
+                    shipment_has_tracking = True
+                
+                shipment_info = {
+                    'id': shipment.get('id'),
+                    'courier_name': shipment.get('courier_name', ''),
+                    'courier_logo': shipment.get('courier_logo', ''),
+                    'tracking_number': shipment_tracking_number,
+                    'tracking_link': final_tracking_link,
+                    'has_tracking': shipment_has_tracking,
+                    'status': shipment.get('status', ''),  # 🟢 الحالة هنا
+                    'label': shipment_label,
+                    'has_label': bool(shipment_label and shipment_label not in ["", "0", "null"]),
+                    'shipping_number': shipment.get('shipping_number'),
+                    'total_weight': shipment.get('total_weight', {}),
+                    'packages': shipment.get('packages', [])
+                }
+                shipping_info['shipment_details'].append(shipment_info)
+                
+                # 🔥 تحديث الحالة الرئيسية من أول شحنة إذا كانت فاضية
+                if not shipping_info['status'] and shipment_info['status']:
+                    shipping_info['status'] = shipment_info['status']
+                
+                if shipment_has_tracking and not shipping_info['has_tracking']:
+                    shipping_info['tracking_link'] = final_tracking_link
+                    shipping_info['tracking_number'] = shipment_tracking_number
+                    shipping_info['has_tracking'] = True
         
         return shipping_info
-    
+        
     except Exception as e:
         logger.error(f"Error extracting shipping info: {str(e)}")
         return {}
-# 🔥 تعريف  الدوال المساعدة المطلوبة
+# 🔥 تعريف الدوال المساعدة المطلوبة
 def ensure_valid_access_token(user):
     """التأكد من وجود توكن وصول صالح مع معالجة الأخطاء المحسنة"""
     try:
