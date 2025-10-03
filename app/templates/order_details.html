@@ -377,74 +377,15 @@
         </h5>
     </div>
     <div class="card-body">
-        <!-- معلومات شركة الشحن -->
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <strong>شركة الشحن:</strong>
-                {% if order.shipping.logo %}
-                <img src="{{ order.shipping.logo }}" alt="{{ order.shipping.company }}" height="30" class="ms-2">
-                {% endif %}
-                <span class="ms-2">{{ order.shipping.company }}</span>
-            </div>
-            <div class="col-md-6">
-                <strong>حالة الشحنة:</strong>
-                <span class="badge bg-info ms-2">{{ order.shipping.status }}</span>
-            </div>
-        </div>
-
-        <!-- معلومات التتبع -->
-        {% if order.shipping.tracking_number or order.shipping.tracking_link %}
-        <div class="row mb-3">
-            {% if order.shipping.tracking_number %}
-            <div class="col-md-6">
-                <strong>رقم التتبع:</strong>
-                <code class="ms-2">{{ order.shipping.tracking_number }}</code>
-            </div>
-            {% endif %}
-            
-            {% if order.shipping.tracking_link %}
-            <div class="col-md-6">
-                <strong>رابط التتبع:</strong>
-                <a href="{{ order.shipping.tracking_link }}" target="_blank" class="btn btn-sm btn-outline-primary ms-2">
-                    <i class="fas fa-external-link-alt me-1"></i>
-                    تتبع الشحنة
-                </a>
-            </div>
-            {% endif %}
-        </div>
-        {% endif %}
-
-        <!-- بطاقة الشحن -->
-        {% if order.shipping.shipping_label %}
-        <div class="row mb-3">
-            <div class="col-12">
-                <strong>بطاقة الشحن:</strong>
-                <div class="mt-2">
-                    {% if order.shipping.shipping_label is string %}
-                    <a href="{{ order.shipping.shipping_label }}" target="_blank" class="btn btn-success btn-sm">
-                        <i class="fas fa-download me-1"></i>
-                        تحميل بطاقة الشحن
-                    </a>
-                    {% elif order.shipping.shipping_label is iterable %}
-                        {% for label in order.shipping.shipping_label %}
-                        <a href="{{ label }}" target="_blank" class="btn btn-success btn-sm me-2">
-                            <i class="fas fa-download me-1"></i>
-                            بطاقة الشحن {{ loop.index }}
-                        </a>
-                        {% endfor %}
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
+        
         <!-- الشحنات المتعددة -->
         {% if order.shipping.shipment_details %}
         <div class="shipments-section">
-            <h6 class="border-bottom pb-2">تفاصيل الشحنات</h6>
             {% for shipment in order.shipping.shipment_details %}
             <div class="shipment-item border rounded p-3 mb-3">
-                <div class="row">
+
+                <!-- بيانات الشحنة -->
+                <div class="row mb-2">
                     <div class="col-md-4">
                         <strong>شركة الشحن:</strong>
                         {% if shipment.courier_logo %}
@@ -453,7 +394,7 @@
                         <span class="ms-2">{{ shipment.courier_name }}</span>
                     </div>
                     <div class="col-md-4">
-                        <strong>الحالة:</strong>
+                        <strong>حالة الشحنة:</strong>
                         <span class="badge 
                             {% if shipment.status == 'delivered' %}bg-success
                             {% elif shipment.status == 'shipped' %}bg-primary
@@ -471,9 +412,10 @@
                         {% endif %}
                     </div>
                 </div>
-                
+
+                <!-- رقم التتبع -->
                 {% if shipment.tracking_number %}
-                <div class="row mt-2">
+                <div class="row mb-2">
                     <div class="col-12">
                         <strong>رقم الشحنة:</strong>
                         <code class="ms-2">{{ shipment.tracking_number }}</code>
@@ -481,39 +423,36 @@
                 </div>
                 {% endif %}
 
-                <!-- الطرود -->
-       <!-- رابط التتبع -->
-{% if order.shipping.has_tracking %}
-<div class="row mb-3">
-    <div class="col-12">
-        <strong>رابط التتبع:</strong>
-        <div class="mt-2">
-            <a href="{{ order.shipping.tracking_link }}" target="_blank" class="btn btn-primary btn-sm">
-                <i class="fas fa-external-link-alt me-1"></i>
-                تتبع الشحنة
-            </a>
-            {% if order.shipping.tracking_number %}
-            <small class="ms-3">
-                <strong>رقم التتبع:</strong>
-                <code class="ms-2">{{ order.shipping.tracking_number }}</code>
-            </small>
-            {% endif %}
-        </div>
-    </div>
-</div>
-{% else %}
-<div class="row mb-3">
-    <div class="col-12">
-        <strong>رابط التتبع:</strong>
-        <span class="text-warning ms-2">غير متاح حالياً</span>
-        <small class="d-block text-muted">
-            سيتم تفعيل رابط التتبع عند بدء عملية الشحن الفعلية
-        </small>
-    </div>
-</div>
-{% endif %}
+                <!-- بطاقة الشحن -->
+                {% if shipment.label %}
+                <div class="row mb-2">
+                    <div class="col-12">
+                        <strong>بطاقة الشحن:</strong>
+                        <div class="mt-2">
+                            {% if shipment.label is string %}
+                            <a href="{{ shipment.label }}" target="_blank" class="btn btn-success btn-sm">
+                                <i class="fas fa-download me-1"></i>
+                                تحميل بطاقة الشحن
+                            </a>
+                            {% elif shipment.label is iterable %}
+                                {% for label in shipment.label %}
+                                <a href="{{ label }}" target="_blank" class="btn btn-success btn-sm me-2">
+                                    <i class="fas fa-download me-1"></i>
+                                    بطاقة الشحن {{ loop.index }}
+                                </a>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
             {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            لا توجد شحنات متاحة لهذا الطلب
         </div>
         {% endif %}
     </div>
@@ -524,7 +463,6 @@
     لا توجد معلومات شحن متاحة لهذا الطلب
 </div>
 {% endif %}
-
 <style>
   /* أنماط عامة للجدول */
   .table {
