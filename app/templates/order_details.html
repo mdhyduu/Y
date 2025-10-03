@@ -368,7 +368,7 @@
   </div>
 </div>
 <!-- قسم معلومات الشحن -->
-{% if order.shipping and order.shipping.has_shipping %}
+{{% if order.shipping and order.shipping.has_shipping %}
 <div class="card mb-4">
     <div class="card-header">
         <h5 class="card-title mb-0">
@@ -377,8 +377,7 @@
         </h5>
     </div>
     <div class="card-body">
-        
-        <!-- الشحنات المتعددة -->
+
         {% if order.shipping.shipment_details %}
         <div class="shipments-section">
             {% for shipment in order.shipping.shipment_details %}
