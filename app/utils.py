@@ -141,15 +141,21 @@ def clean_data(data: str) -> str:
     return re.sub(r'[^A-Za-z0-9\s\-]', '', str(data)).strip()
 
 def save_with_dpi(buffer, dpi=300):
-    """تحويل الباركود إلى صورة PNG مع ضبط DPI"""
+    """تحويل الباركود إلى صورة PNG مع ضبط DRI وإزالة المسافات الزائدة"""
     buffer.seek(0)
     image = Image.open(buffer)
+    
+    # قص المساحات البيضاء الزائدة حول الباركود
+    bbox = image.getbbox()
+    if bbox:
+        image = image.crop(bbox)
+    
     out_buffer = BytesIO()
     image.save(out_buffer, format="PNG", dpi=(dpi, dpi))
     return base64.b64encode(out_buffer.getvalue()).decode('utf-8')
 
 def generate_barcode(data, dpi=300):
-    """إنشاء باركود باستخدام code128 مع دقة عالية"""
+    """إنشاء باركود باستخدام code128 مع دقة عالية وإخفاء النص"""
     try:
         data_str = str(data).strip()
         if not data_str:
@@ -167,13 +173,15 @@ def generate_barcode(data, dpi=300):
         writer = ImageWriter()
         
         writer.set_options({
-            'write_text': True,
-            'module_width': 0.5,    # جعل الشرائط أرفع (مثل الصورة)
-            'module_height': 6.0,   # زيادة ارتفاع الباركود
-            'quiet_zone': 2.0,      # تقليل المسافة البيضاء حول الباركود
-            'font_size': 8,         # تقليل حجم الخط
-            'text_distance': 1.0    # تقليل المسافة بين النص والباركود
+            'write_text': False,  # إخفاء النص تحت الباركود
+            'module_width': 0.3,    # جعل الشرائط أرفع لتحسين المظهر
+            'module_height': 25.0,  # زيادة ارتفاع الباركود لملء الحاوية
+            'quiet_zone': 1.0,      # تقليل المسافة البيضاء حول الباركود
+            'background': 'white',  # خلفية بيضاء
+            'foreground': 'black',  # لون الباركود أسود
+            'dpi': dpi,            # دقة عالية
         })
+        
         barcode_instance = code_class(cleaned_data, writer=writer)
         buffer = BytesIO()
         barcode_instance.write(buffer)
@@ -188,18 +196,19 @@ def generate_barcode(data, dpi=300):
 
 
 def generate_barcode_with_code39(data, dpi=300):
-    """إنشاء باركود باستخدام code39 كبديل"""
+    """إنشاء باركود باستخدام code39 كبديل مع إخفاء النص"""
     try:
         cleaned_data = clean_data(data)
         code_class = barcode.get_barcode_class('code39')
         writer = ImageWriter()
         writer.set_options({
-            'write_text': True,
-            'module_width': 0.5,
-            'module_height': 20,
-            'quiet_zone': 6,
-            'font_size': 10,
-            'text_distance': 2
+            'write_text': False,    # إخفاء النص تحت الباركود
+            'module_width': 0.3,
+            'module_height': 25.0,
+            'quiet_zone': 1.0,
+            'background': 'white',
+            'foreground': 'black',
+            'dpi': dpi,
         })
 
         barcode_instance = code_class(cleaned_data, writer=writer, add_checksum=False)
@@ -216,7 +225,7 @@ def generate_barcode_with_code39(data, dpi=300):
 
 
 def generate_barcode_alternative(data, dpi=300):
-    """طريقة بديلة باستخدام Code128 مع دقة عالية"""
+    """طريقة بديلة باستخدام Code128 مع دقة عالية وإخفاء النص"""
     try:
         from barcode import Code128
         from barcode.writer import ImageWriter as AltImageWriter
@@ -224,12 +233,13 @@ def generate_barcode_alternative(data, dpi=300):
         cleaned_data = clean_data(data)
         writer = AltImageWriter()
         writer.set_options({
-            'write_text': True,
-            'module_width': 0.5,
-            'module_height': 20,
-            'quiet_zone': 6,
-            'font_size': 10,
-            'text_distance': 2
+            'write_text': False,    # إخفاء النص تحت الباركود
+            'module_width': 0.3,
+            'module_height': 25.0,
+            'quiet_zone': 1.0,
+            'background': 'white',
+            'foreground': 'black',
+            'dpi': dpi,
         })
 
         code128 = Code128(cleaned_data, writer=writer)
