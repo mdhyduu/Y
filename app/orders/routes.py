@@ -533,7 +533,8 @@ def extract_shipping_info(order_data):
     
     except Exception as e:
         logger.error(f"Error extracting shipping info: {str(e)}")
-        return {}الدوال المساعدة المطلوبة
+        return {}
+# 🔥 تعريف  الدوال المساعدة المطلوبة
 def ensure_valid_access_token(user):
     """التأكد من وجود توكن وصول صالح مع معالجة الأخطاء المحسنة"""
     try:
