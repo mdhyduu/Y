@@ -187,15 +187,17 @@ def index():
         processed_orders = []
         
         for order in orders:
-            raw_data = json.loads(order.raw_data) if order.raw_data else {}
-            reference_id = raw_data.get('reference_id', order.id)
+            # استخدام full_order_data فقط
+            order_data = order.full_order_data or {}
+            reference_id = order_data.get('reference_id', order.id)
             status_name = order.status.name if order.status else 'غير محدد'
             status_slug = order.status.slug if order.status else 'unknown'
             
             last_note = OrderStatusNote.query.filter_by(order_id=order.id).order_by(OrderStatusNote.created_at.desc()).first()
             last_emp_status = OrderEmployeeStatus.query.filter_by(order_id=order.id).order_by(OrderEmployeeStatus.created_at.desc()).first()
             
-            payment_method = order.payment_method or raw_data.get('payment_method', '')
+            # استخدام payment_method من full_order_data
+            payment_method = order_data.get('payment_method', '')
             payment_method_name = get_payment_method_name(payment_method)
             
             order_address = OrderAddress.query.filter_by(order_id=order.id).first()
@@ -218,7 +220,8 @@ def index():
                 'status_notes': [last_note] if last_note else [],
                 'payment_method': payment_method,
                 'payment_method_name': payment_method_name,
-                'city': order_city
+                'city': order_city,
+                'order_data': order_data
             }
                 
             processed_orders.append(processed_order)
@@ -382,7 +385,8 @@ def order_details(order_id):
                 'discount': order_data.get('amounts', {}).get('discount', {'amount': 0, 'currency': 'SAR'}),
                 'total': order_data.get('amounts', {}).get('total', {'amount': 0, 'currency': 'SAR'})
             },
-            'items': processed_items
+            'items': processed_items,
+            'full_order_data': order_data
         })
 
         db_data = fetch_additional_order_data(user.store_id, str(order_id))
@@ -596,6 +600,7 @@ def create_order_from_api_data(user, order_data, items_data=None):
             if items_data:
                 order_data['items'] = items_data
         
+        # استخدام full_order_data فقط بدون raw_data
         new_order = SallaOrder(
             id=order_id,
             store_id=user.store_id,
@@ -604,8 +609,7 @@ def create_order_from_api_data(user, order_data, items_data=None):
             total_amount=total_amount,
             currency=currency,
             payment_method=order_data.get('payment_method', ''),
-            raw_data=json.dumps(order_data, ensure_ascii=False),
-            full_order_data=order_data
+            full_order_data=order_data  # البيانات الكاملة فقط
         )
         
         db.session.add(new_order)
