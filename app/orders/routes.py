@@ -102,32 +102,18 @@ def index():
         is_reviewer = employee.role in ['reviewer', 'manager']
         is_delivery_personnel = employee.role in ['delivery_manager', 'delivery']
     
-    # orders/routes.py - Fixed section
-
-    # orders/routes.py - Fixed section
-
     try:
-        # ✅ استخدام SallaOrder مع join صحيح لـ OrderAddress
         orders_query = SallaOrder.query.filter_by(store_id=user.store_id).options(
             selectinload(SallaOrder.status),
             selectinload(SallaOrder.assignments).selectinload(OrderAssignment.employee)
         )
         
         if is_delivery_personnel:
-            print(f"🚚 تطبيق فلتر الرياض لموظف التوصيل: {employee.email}")
-            
-            # استخدام join للعناوين في الرياض
             orders_query = orders_query.join(OrderAddress).filter(
                 OrderAddress.city == 'الرياض',
                 OrderAddress.address_type == 'receiver'
             )
-            
-            # التحقق النهائي
-            final_count = orders_query.count()
-            print(f"🎯 العدد النهائي للطلبات: {final_count}") 
         
-        # ✅ الباقي بدون تغيير
-        # إصلاح: استخدام exists() بدلاً من join مباشر لتجنب تضارب الـ JOINs
         if not is_reviewer and employee and not (employee.role in ['delivery_manager']):
             from sqlalchemy import exists
             assignment_exists = exists().where(
@@ -138,7 +124,6 @@ def index():
             )
             orders_query = orders_query.filter(assignment_exists)
         
-        # تطبيق الفلاتر الأخرى...
         if status_filter in ['late', 'missing', 'not_shipped', 'refunded']:
             orders_query = orders_query.join(
                 OrderStatusNote, 
@@ -151,8 +136,6 @@ def index():
         
         if employee_filter:
             orders_query = orders_query.join(OrderAssignment).filter(OrderAssignment.employee_id == employee_filter)
-    
-    # ... rest of the filters remain the same
         
         if custom_status_filter:
             custom_status_id = int(custom_status_filter)
@@ -197,17 +180,10 @@ def index():
         elif employee:
             custom_statuses = EmployeeCustomStatus.query.filter_by(employee_id=employee.id).all()
         
-        # ✅ الحصول على العدد قبل التصفح للتحقق
-        total_orders_before_pagination = orders_query.count()
-        print(f"📊 عدد الطلبات قبل التصفح: {total_orders_before_pagination}")
-        
         orders_query = orders_query.order_by(nullslast(db.desc(SallaOrder.created_at)))
         pagination_obj = orders_query.paginate(page=page, per_page=per_page, error_out=False)
         orders = pagination_obj.items
         
-        print(f"📦 عدد الطلبات بعد التصفح: {len(orders)}")
-        
-        # ✅ معالجة الطلبات مع إصلاح استعلام المدينة
         processed_orders = []
         
         for order in orders:
@@ -222,7 +198,6 @@ def index():
             payment_method = order.payment_method or raw_data.get('payment_method', '')
             payment_method_name = get_payment_method_name(payment_method)
             
-            # ✅ إصلاح: استعلام منفصل للحصول على المدينة
             order_address = OrderAddress.query.filter_by(order_id=order.id).first()
             order_city = order_address.city if order_address else 'غير محدد'
             
@@ -274,8 +249,6 @@ def index():
             'search': search_query
         }
         
-        print(f"🎯 جاهز للعرض: {len(processed_orders)} طلب")
-        
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return render_template('orders_partial.html', 
                                 orders=processed_orders, 
@@ -302,16 +275,12 @@ def index():
         error_msg = f'حدث خطأ غير متوقع: {str(e)}'
         flash(error_msg, 'error')
         logger.exception(error_msg)
-        import traceback
-        print(f"❌ خطأ كامل: {traceback.format_exc()}")
         return redirect(url_for('orders.index'))
-import copy
 
 @orders_bp.route('/<int:order_id>')
 def order_details(order_id):
     user, current_employee = get_user_from_cookies()
     
-    # إصلاح المشكلة: إعادة تحميل employee مع العلاقات
     if current_employee:
         current_employee = db.session.query(Employee).options(
             selectinload(Employee.custom_statuses)
@@ -331,85 +300,57 @@ def order_details(order_id):
         elif current_employee and current_employee.role in ['reviewer', 'manager']:
             is_reviewer = True
 
-        # ⭐⭐ الخطوة 1: محاولة جلب الطلب من قاعدة البيانات أولاً ⭐⭐
         order = SallaOrder.query.filter_by(id=str(order_id), store_id=user.store_id).first()
         
         order_data = None
         items_data = []
         
         if order and order.full_order_data:
-            print("✅ استخدام البيانات المحلية المخزنة")
             order_data = order.full_order_data
             items_data = order_data.get('items', [])
             
-            # 🔥 إذا لم تكن العناصر متوفرة محلياً، نضيفها ونحدث التخزين
             if not items_data:
-                print("⚠️ العناصر غير متوفرة محلياً، جاري جلبها من API وتحديث التخزين...")
                 items_data = fetch_order_items_from_api(user, order_id)
                 if items_data:
-                    # تحديث البيانات المحلية بإضافة العناصر
                     order_data['items'] = items_data
-                    order.full_order_data = order_data  # تحديث الحقل
+                    order.full_order_data = order_data
                     db.session.commit()
-                    print(f"✅ تم تحديث البيانات المحلية بإضافة {len(items_data)} عنصر")
-                else:
-                    print("❌ فشل في جلب العناصر من API")
         else:
-            print("⚠️ الطلب غير موجود محلياً أو لا يحتوي على بيانات كاملة، جاري جلب البيانات من API...")
-            # ⭐⭐ الخطوة 2: جلب البيانات من API كاحتياطي ⭐⭐
             order_data, items_data = fetch_order_data_from_api(user, order_id)
             
             if order_data:
-                # ⭐⭐ حفظ البيانات محلياً للاستخدام المستقبلي ⭐⭐
                 if order:
-                    # تحديث الطلب الموجود
-                    order.full_order_data = order_data  # ✅ تحتوي على العناصر
-                    print("✅ تم تحديث البيانات المحلية للطلب الموجود")
+                    order.full_order_data = order_data
                 else:
-                    # إنشاء طلب جديد في قاعدة البيانات
-                    new_order = create_order_from_api_data(user, order_data, items_data)  # ✅ نمرر العناصر
+                    new_order = create_order_from_api_data(user, order_data, items_data)
                     if new_order:
                         order = new_order
-                        print("✅ تم إنشاء طلب جديد في قاعدة البيانات مع العناصر")
                 
                 db.session.commit()
 
-        # ⭐⭐ الخطوة 3: إذا فشل كل شيء، عرض رسالة خطأ ⭐⭐
         if not order_data:
             flash('الطلب غير موجود أو لا يمكن الوصول إليه', 'error')
             return redirect(url_for('orders.index'))
 
-        # ⭐⭐ الخطوة 4: معالجة البيانات (سواء كانت محلية أو من API) ⭐⭐
         processed_order = process_order_data(order_id, items_data)
         
-        # جلب العنوان من قاعدة البيانات
         order_address = OrderAddress.query.filter_by(order_id=str(order_id)).first()
-        print(f"🔍 العنوان من DB: {order_address}")
         
         if order_address:
-            print("✅ استخدام العنوان المحفوظ في قاعدة البيانات")
-            # فك تشفير البيانات الحساسة
             decrypted_name = decrypt_data(order_address.name) if order_address.name else ''
             decrypted_phone = decrypt_data(order_address.phone) if order_address.phone else ''
-        else:
-            print("❌ لا يوجد عنوان محفوظ")
 
-        # ⭐⭐ الخطوة 5: تحديث بيانات processed_order من order_data ⭐⭐
-
-        notes = order_data.get('notes', '')  # ملاحظات الطلب
-        payment_method = order_data.get('payment_method', {})  # طريقة الدفع
+        notes = order_data.get('notes', '')
+        payment_method = order_data.get('payment_method', {})
         
-        # إذا كانت payment_method كائن، استخرج الاسم
         if isinstance(payment_method, dict):
             payment_method_name = payment_method.get('name', 'غير محدد')
         else:
             payment_method_name = str(payment_method) if payment_method else 'غير محدد'
 
-        # ⭐⭐ الخطوة 6: معالجة العناصر مع الملاحظات ⭐⭐
         processed_items = []
         for item in items_data:
-            # ✅ استخراج ملاحظات المنتج من الحقل notes في كل عنصر
-            product_notes = item.get('notes', '')  # هذا هو الحقل الجديد الذي نريده
+            product_notes = item.get('notes', '')
             
             processed_item = {
                 'id': item.get('id'),
@@ -417,7 +358,7 @@ def order_details(order_id):
                 'quantity': item.get('quantity', 1),
                 'price': item.get('amounts', {}).get('total', {}).get('amount', 0),
                 'currency': item.get('amounts', {}).get('total', {}).get('currency', 'SAR'),
-                'notes': product_notes,  # ✅ إضافة ملاحظات المنتج هنا
+                'notes': product_notes,
                 'product_type': item.get('product_type', ''),
                 'product_thumbnail': item.get('product_thumbnail', ''),
                 'options': item.get('options', []),
@@ -425,12 +366,11 @@ def order_details(order_id):
             }
             processed_items.append(processed_item)
 
-        # ⭐⭐ الخطوة 7: تحديث processed_order بالبيانات الكاملة ⭐⭐
         processed_order.update({
             'id': order_id,
             'reference_id': order_data.get('reference_id') or order_data.get('id') or 'غير متوفر',
-            'notes': notes,  # ✅ إضافة ملاحظات الطلب العامة
-            'payment_method': payment_method_name,  # ✅ إضافة طريقة الدفع
+            'notes': notes,
+            'payment_method': payment_method_name,
             'status': {
                 'name': order_data.get('status', {}).get('name', 'غير معروف'),
                 'slug': order_data.get('status', {}).get('slug', 'unknown')
@@ -442,15 +382,13 @@ def order_details(order_id):
                 'discount': order_data.get('amounts', {}).get('discount', {'amount': 0, 'currency': 'SAR'}),
                 'total': order_data.get('amounts', {}).get('total', {'amount': 0, 'currency': 'SAR'})
             },
-            'items': processed_items  # ✅ إضافة العناصر المعالجة مع الملاحظات
+            'items': processed_items
         })
 
         db_data = fetch_additional_order_data(user.store_id, str(order_id))
-        # ⭐⭐ الخطوة 8: استخراج معلومات الشحن والبطاقة ⭐⭐
         shipping_info = extract_shipping_info(order_data)
         processed_order['shipping'] = shipping_info
         
-        print(f"📦 معلومات الشحن المستخرجة: {shipping_info}")
         return render_template('order_details.html', 
             order=processed_order,
             order_address=order_address,
@@ -467,6 +405,7 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
+
 def extract_shipping_info(order_data):
     """استخراج معلومات الشحن من بيانات الطلب اعتمادًا على الشحنات (shipments)"""
     try:
@@ -489,7 +428,6 @@ def extract_shipping_info(order_data):
             shipment_has_tracking = False
             final_tracking_link = None
             
-            # معالجة رابط التتبع
             if shipment_tracking_link and shipment_tracking_link not in ["", "0", "null", "None"]:
                 if shipment_tracking_link.startswith(('http://', 'https://')):
                     final_tracking_link = shipment_tracking_link
@@ -497,7 +435,6 @@ def extract_shipping_info(order_data):
                     final_tracking_link = f"https://track.salla.sa/track/{shipment_tracking_link}"
                 shipment_has_tracking = True
             
-            # إذا الرابط غير موجود لكن رقم التتبع موجود
             if not final_tracking_link and shipment_tracking_number:
                 final_tracking_link = f"https://track.salla.sa/track/{shipment_tracking_number}"
                 shipment_has_tracking = True
@@ -519,11 +456,9 @@ def extract_shipping_info(order_data):
             
             shipping_info['shipment_details'].append(shipment_info)
             
-            # تحديث الحالة الرئيسية من أول شحنة
             if not shipping_info['status'] and shipment_info['status']:
                 shipping_info['status'] = shipment_info['status']
             
-            # تحديث التتبع الرئيسي من أول شحنة تحتوي على تتبع
             if shipment_has_tracking and not shipping_info['has_tracking']:
                 shipping_info['tracking_link'] = final_tracking_link
                 shipping_info['tracking_number'] = shipment_tracking_number
@@ -534,50 +469,40 @@ def extract_shipping_info(order_data):
     except Exception as e:
         logger.error(f"Error extracting shipping info: {str(e)}")
         return {}
-# 🔥 تعريف  الدوال المساعدة المطلوبة
+
 def ensure_valid_access_token(user):
     """التأكد من وجود توكن وصول صالح مع معالجة الأخطاء المحسنة"""
     try:
         if not user:
-            logger.error("❌ لا يوجد مستخدم للمصادقة")
+            logger.error("لا يوجد مستخدم للمصادقة")
             return None
             
-        # التحقق من صلاحية التوكنات باستخدام الدالة من النموذج
         if user.tokens_are_valid:
-            logger.debug("✅ التوكنات صالحة")
             return user.salla_access_token
         
-        logger.warning("🔄 التوكنات منتهية، جاري التجديد...")
-        
-        # استخدام الدالة من token_utils مع معالجة أفضل للأخطاء
         from app.token_utils import refresh_salla_token
         success = refresh_salla_token(user)
         
         if success and user.tokens_are_valid:
-            logger.info("✅ تم تجديد التوكن بنجاح")
-            # إعادة تحميل المستخدم من الجلسة للحصول على أحدث البيانات
             db.session.refresh(user)
             return user.salla_access_token
         else:
-            logger.error("❌ فشل في تجديد التوكن")
-            # محاولة استخدام التوكن الحالي كحل أخير
             if user.salla_access_token:
-                logger.warning("⚠️ استخدام التوكن الحالي رغم انتهاء صلاحيته")
                 return user.salla_access_token
             return None
             
     except Exception as e:
-        logger.error(f"❌ خطأ في التأكد من صلاحية التوكن: {str(e)}")
-        # محاولة استخدام التوكن الحالي كحل أخير
+        logger.error(f"خطأ في التأكد من صلاحية التوكن: {str(e)}")
         if user and user.salla_access_token:
             return user.salla_access_token
         return None
+
 def fetch_order_data_from_api(user, order_id):
     """جلب بيانات الطلب من API مع تضمين العناصر في البيانات الرئيسية"""
     try:
         access_token = ensure_valid_access_token(user)
         if not access_token:
-            logger.error("❌ لا يمكن الحصول على توكن وصول صالح")
+            logger.error("لا يمكن الحصول على توكن وصول صالح")
             return None, []
             
         headers = {
@@ -586,7 +511,6 @@ def fetch_order_data_from_api(user, order_id):
             'Accept': 'application/json'
         }
         
-        # جلب بيانات الطلب الأساسية
         order_response = requests.get(
             f"{Config.SALLA_ORDERS_API}/{order_id}",
             headers=headers,
@@ -594,33 +518,27 @@ def fetch_order_data_from_api(user, order_id):
         )
         
         if order_response.status_code != 200:
-            logger.error(f"❌ خطأ في جلب بيانات الطلب من API: {order_response.status_code}")
+            logger.error(f"خطأ في جلب بيانات الطلب من API: {order_response.status_code}")
             return None, []
         
         order_data = order_response.json().get('data', {})
-        logger.info(f"✅ تم جلب بيانات الطلب {order_id} من API")
         
-        # جلب عناصر الطلب
         items_data = fetch_order_items_from_api(user, order_id)
         
-        # دمج العناصر مع البيانات الرئيسية للتخزين
         if items_data:
             order_data['items'] = items_data
-            logger.info(f"✅ تم دمج {len(items_data)} عنصر مع بيانات الطلب")
-        else:
-            logger.warning("⚠️ لم يتم العثور على عناصر للطلب")
         
         return order_data, items_data
         
     except Exception as e:
-        logger.error(f"❌ خطأ في جلب بيانات الطلب من API: {str(e)}")
+        logger.error(f"خطأ في جلب بيانات الطلب من API: {str(e)}")
         return None, []
+
 def fetch_order_items_from_api(user, order_id):
     """جلب عناصر الطلب من API مع معالجة الأخطاء المحسنة"""
     try:
         access_token = ensure_valid_access_token(user)
         if not access_token:
-            print("❌ لا يوجد access token")
             return []
             
         headers = {
@@ -638,13 +556,12 @@ def fetch_order_items_from_api(user, order_id):
         
         if response.status_code == 200:
             items = response.json().get('data', [])
-            print(f"✅ تم جلب {len(items)} عنصر من API للطلب {order_id}")
             return items
         else:
-            print(f"❌ خطأ في جلب العناصر من API: {response.status_code} - {response.text}")
+            logger.error(f"خطأ في جلب العناصر من API: {response.status_code} - {response.text}")
             return []
     except Exception as e:
-        print(f"❌ خطأ في جلب العناصر من API: {str(e)}")
+        logger.error(f"خطأ في جلب العناصر من API: {str(e)}")
         return []
 
 def create_order_from_api_data(user, order_data, items_data=None):
@@ -654,13 +571,11 @@ def create_order_from_api_data(user, order_data, items_data=None):
         if not order_id:
             return None
             
-        # استخراج البيانات الأساسية
         customer = order_data.get('customer', {})
         customer_name = f"{customer.get('first_name', '')} {customer.get('last_name', '')}".strip()
         if not customer_name:
             customer_name = order_data.get('customer_name', 'عميل غير معروف')
             
-        # معالجة التاريخ
         created_at = None
         date_info = order_data.get('date', {})
         if date_info and 'date' in date_info:
@@ -670,21 +585,17 @@ def create_order_from_api_data(user, order_data, items_data=None):
             except Exception:
                 created_at = datetime.utcnow()
         
-        # المبلغ والعملة
         total_info = order_data.get('total') or order_data.get('amounts', {}).get('total', {})
         total_amount = float(total_info.get('amount', 0))
         currency = total_info.get('currency', 'SAR')
         
-        # 🔥 دمج العناصر مع البيانات الرئيسية إذا كانت متوفرة
         if items_data:
             order_data['items'] = items_data
         else:
-            # إذا لم تكن العناصر متوفرة، نجلبها من API
             items_data = fetch_order_items_from_api(user, order_id)
             if items_data:
                 order_data['items'] = items_data
         
-        # إنشاء الطلب الجديد
         new_order = SallaOrder(
             id=order_id,
             store_id=user.store_id,
@@ -694,12 +605,11 @@ def create_order_from_api_data(user, order_data, items_data=None):
             currency=currency,
             payment_method=order_data.get('payment_method', ''),
             raw_data=json.dumps(order_data, ensure_ascii=False),
-            full_order_data=order_data  # ✅ تحتوي على العناصر الآن
+            full_order_data=order_data
         )
         
         db.session.add(new_order)
         
-        # إضافة العنوان إذا كان متوفراً
         address_info = extract_order_address(order_data)
         if address_info:
             address_info['name'] = encrypt_data(address_info.get('name', ''))
@@ -714,7 +624,7 @@ def create_order_from_api_data(user, order_data, items_data=None):
         return new_order
         
     except Exception as e:
-        print(f"❌ خطأ في إنشاء الطلب من بيانات API: {str(e)}")
+        logger.error(f"خطأ في إنشاء الطلب من بيانات API: {str(e)}")
         return None
 
 def fetch_additional_order_data(store_id, order_id_str):
@@ -766,33 +676,13 @@ def fetch_additional_order_data(store_id, order_id_str):
             'product_statuses': product_statuses
         }
     except Exception as e:
-        print(f"❌ خطأ في جلب البيانات الإضافية: {str(e)}")
+        logger.error(f"خطأ في جلب البيانات الإضافية: {str(e)}")
         return {
             'custom_note_statuses': [],
             'status_notes': [],
             'employee_statuses': [],
             'product_statuses': {}
         }
-
-
-def verify_order_storage(order_id):
-    """دالة مساعدة للتحقق من تخزين البيانات بشكل صحيح"""
-    try:
-        order = SallaOrder.query.get(str(order_id))
-        if order and order.full_order_data:
-            items_count = len(order.full_order_data.get('items', []))
-            has_items = items_count > 0
-            print(f"🔍 تحقق التخزين للطلب {order_id}:")
-            print(f"   - يوجد بيانات كاملة: ✅")
-            print(f"   - عدد العناصر: {items_count}")
-            print(f"   - يحتوي على عناصر: {'✅' if has_items else '❌'}")
-            return has_items
-        else:
-            print(f"🔍 تحقق التخزين للطلب {order_id}: ❌ لا يوجد بيانات")
-            return False
-    except Exception as e:
-        print(f"❌ خطأ في التحقق من التخزين: {str(e)}")
-        return False
 import hmac
 import hashlib
 
