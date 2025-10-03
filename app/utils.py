@@ -140,22 +140,8 @@ def clean_data(data: str) -> str:
     """تنظيف البيانات من الرموز الغير مرغوبة"""
     return re.sub(r'[^A-Za-z0-9\s\-]', '', str(data)).strip()
 
-def save_with_dpi(buffer, dpi=300):
-    """تحويل الباركود إلى صورة PNG مع ضبط DRI وإزالة المسافات الزائدة"""
-    buffer.seek(0)
-    image = Image.open(buffer)
-    
-    # قص المساحات البيضاء الزائدة حول الباركود
-    bbox = image.getbbox()
-    if bbox:
-        image = image.crop(bbox)
-    
-    out_buffer = BytesIO()
-    image.save(out_buffer, format="PNG", dpi=(dpi, dpi))
-    return base64.b64encode(out_buffer.getvalue()).decode('utf-8')
-
 def generate_barcode(data, dpi=300):
-    """إنشاء باركود باستخدام code128 مع دقة عالية وإخفاء النص"""
+    """إنشاء باركود باستخدام code128 مع إزالة النص تماماً"""
     try:
         data_str = str(data).strip()
         if not data_str:
@@ -172,21 +158,25 @@ def generate_barcode(data, dpi=300):
         code_class = barcode.get_barcode_class('code128')
         writer = ImageWriter()
         
+        # إعدادات لإزالة النص تماماً وتحسين المظهر
         writer.set_options({
-            'write_text': False,  # إخفاء النص تحت الباركود
-            'module_width': 0.3,    # جعل الشرائط أرفع لتحسين المظهر
-            'module_height': 25.0,  # زيادة ارتفاع الباركود لملء الحاوية
-            'quiet_zone': 1.0,      # تقليل المسافة البيضاء حول الباركود
-            'background': 'white',  # خلفية بيضاء
-            'foreground': 'black',  # لون الباركود أسود
-            'dpi': dpi,            # دقة عالية
+            'write_text': False,      # إخفاء النص تحت الباركود
+            'text': '',               # نص فارغ
+            'module_width': 0.2,      # جعل الشرائط أرفع
+            'module_height': 40.0,    # زيادة الارتفاع بشكل كبير
+            'quiet_zone': 0.5,        # تقليل المسافة البيضاء للحد الأدنى
+            'background': 'white',    # خلفية بيضاء
+            'foreground': 'black',    # لون أسود للباركود
+            'dpi': dpi,              # دقة عالية
+            'font_size': 0,          # حجم خط صفر لإزالة النص
+            'text_distance': 0,      # مسافة صفر للنص
         })
         
         barcode_instance = code_class(cleaned_data, writer=writer)
         buffer = BytesIO()
         barcode_instance.write(buffer)
 
-        barcode_base64 = save_with_dpi(buffer, dpi)
+        barcode_base64 = save_with_dpi_optimized(buffer, dpi)
         logger.info(f"Barcode generated successfully for order: {cleaned_data}")
         return f"data:image/png;base64,{barcode_base64}"
 
@@ -196,26 +186,29 @@ def generate_barcode(data, dpi=300):
 
 
 def generate_barcode_with_code39(data, dpi=300):
-    """إنشاء باركود باستخدام code39 كبديل مع إخفاء النص"""
+    """إنشاء باركود باستخدام code39 كبديل مع إزالة النص تماماً"""
     try:
         cleaned_data = clean_data(data)
         code_class = barcode.get_barcode_class('code39')
         writer = ImageWriter()
         writer.set_options({
-            'write_text': False,    # إخفاء النص تحت الباركود
-            'module_width': 0.3,
-            'module_height': 25.0,
-            'quiet_zone': 1.0,
+            'write_text': False,      # إخفاء النص
+            'text': '',               # نص فارغ
+            'module_width': 0.2,
+            'module_height': 40.0,
+            'quiet_zone': 0.5,
             'background': 'white',
             'foreground': 'black',
             'dpi': dpi,
+            'font_size': 0,
+            'text_distance': 0,
         })
 
         barcode_instance = code_class(cleaned_data, writer=writer, add_checksum=False)
         buffer = BytesIO()
         barcode_instance.write(buffer)
 
-        barcode_base64 = save_with_dpi(buffer, dpi)
+        barcode_base64 = save_with_dpi_optimized(buffer, dpi)
         logger.info(f"Barcode generated with code39 for order: {cleaned_data}")
         return f"data:image/png;base64,{barcode_base64}"
 
@@ -225,7 +218,7 @@ def generate_barcode_with_code39(data, dpi=300):
 
 
 def generate_barcode_alternative(data, dpi=300):
-    """طريقة بديلة باستخدام Code128 مع دقة عالية وإخفاء النص"""
+    """طريقة بديلة باستخدام Code128 مع إزالة النص تماماً"""
     try:
         from barcode import Code128
         from barcode.writer import ImageWriter as AltImageWriter
@@ -233,26 +226,75 @@ def generate_barcode_alternative(data, dpi=300):
         cleaned_data = clean_data(data)
         writer = AltImageWriter()
         writer.set_options({
-            'write_text': False,    # إخفاء النص تحت الباركود
-            'module_width': 0.3,
-            'module_height': 25.0,
-            'quiet_zone': 1.0,
+            'write_text': False,      # إخفاء النص
+            'text': '',               # نص فارغ
+            'module_width': 0.2,
+            'module_height': 40.0,
+            'quiet_zone': 0.5,
             'background': 'white',
             'foreground': 'black',
             'dpi': dpi,
+            'font_size': 0,
+            'text_distance': 0,
         })
 
         code128 = Code128(cleaned_data, writer=writer)
         buffer = BytesIO()
         code128.write(buffer)
 
-        barcode_base64 = save_with_dpi(buffer, dpi)
+        barcode_base64 = save_with_dpi_optimized(buffer, dpi)
         logger.info(f"Barcode generated with alternative method for order: {cleaned_data}")
         return f"data:image/png;base64,{barcode_base64}"
 
     except Exception as e:
         logger.error(f"All barcode generation methods failed: {str(e)}")
         return None
+
+
+def save_with_dpi_optimized(buffer, dpi=300):
+    """تحويل الباركود إلى صورة PNG مع إزالة المسافات البيضاء الزائدة"""
+    try:
+        buffer.seek(0)
+        image = Image.open(buffer)
+        
+        # تحويل إلى RGB إذا كان صورة شفافة
+        if image.mode in ('RGBA', 'LA'):
+            background = Image.new('RGB', image.size, 'white')
+            background.paste(image, mask=image.split()[-1])
+            image = background
+        
+        # قص المساحات البيضاء الزائدة بدقة
+        bbox = image.getbbox()
+        if bbox:
+            # إضافة مسافة صغيرة جداً للحفاظ على الباركود
+            padding = 2
+            bbox = (
+                max(0, bbox[0] - padding),
+                max(0, bbox[1] - padding),
+                min(image.size[0], bbox[2] + padding),
+                min(image.size[1], bbox[3] + padding)
+            )
+            image = image.crop(bbox)
+        
+        # تحسين جودة الصورة
+        out_buffer = BytesIO()
+        image.save(out_buffer, format="PNG", dpi=(dpi, dpi), optimize=True)
+        
+        return base64.b64encode(out_buffer.getvalue()).decode('utf-8')
+        
+    except Exception as e:
+        logger.error(f"Error in save_with_dpi_optimized: {str(e)}")
+        # Fallback إلى الطريقة الأصلية
+        return save_with_dpi_fallback(buffer, dpi)
+
+
+def save_with_dpi_fallback(buffer, dpi=300):
+    """طريقة احتياطية لحفظ الصورة"""
+    buffer.seek(0)
+    image = Image.open(buffer)
+    out_buffer = BytesIO()
+    image.save(out_buffer, format="PNG", dpi=(dpi, dpi))
+    return base64.b64encode(out_buffer.getvalue()).decode('utf-8')
 def get_cached_barcode_data(order_id):
     """الحصول على بيانات الباركود من التخزين المؤقت"""
     try:
