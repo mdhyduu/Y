@@ -1301,6 +1301,17 @@ function generatePrintHTML(printData) {
                 print-color-adjust: exact !important;
             }
 
+  a[href] {
+    color: inherit !important;
+    text-decoration: none !important;
+    display: inline !important;
+    visibility: visible !important;
+  }
+
+  a[href]::after {
+    content: none !important;
+  }
+
             * {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
