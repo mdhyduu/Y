@@ -87,9 +87,8 @@ def get_orders_from_local_database(order_ids, store_id):
     except Exception as e:
         logger.error(f"❌ خطأ في جلب الطلبات من قاعدة البيانات: {str(e)}")
         return []
-
 def process_order_from_local_data(order, order_data, items_data):
-    """معالجة بيانات الطلب من البيانات المحلية - محسن"""
+    """معالجة بيانات الطلب من البيانات المحلية - محسن مع جمع الصور المرفوعة"""
     try:
         # استخراج البيانات الأساسية
         customer = order_data.get('customer', {})
@@ -126,12 +125,82 @@ def process_order_from_local_data(order, order_data, items_data):
                 main_image = get_main_image_from_local(item)
                 notes = item.get('notes', '') or item.get('note', '') or ''
                 
-                # معالجة الخيارات
-                options = []
+                # ⭐⭐ جمع الصور المرفوعة من العميل لهذا المنتج ⭐⭐
+                uploaded_images = []
+                
+                # الحالة 1: الصور في items[].files
+                item_files = item.get('files', [])
+                if isinstance(item_files, list):
+                    for file_data in item_files:
+                        if isinstance(file_data, dict):
+                            file_url = file_data.get('url')
+                            file_name = file_data.get('name', 'صورة مرفوعة')
+                            file_type = file_data.get('type', '')
+                            
+                            # إذا كان الملف صورة
+                            if file_url and (file_type == 'image' or 
+                                           file_url.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp'))):
+                                uploaded_images.append({
+                                    'url': file_url,
+                                    'name': file_name,
+                                    'type': 'file',
+                                    'original_name': file_data.get('original_name', '')
+                                })
+                
+                # الحالة 2: الصور في items[].images
+                item_images = item.get('images', [])
+                if isinstance(item_images, list):
+                    for image_data in item_images:
+                        if isinstance(image_data, dict):
+                            image_url = image_data.get('url') or image_data.get('original') or image_data.get('thumbnail')
+                            image_name = image_data.get('name', 'صورة المنتج')
+                            
+                            if image_url:
+                                uploaded_images.append({
+                                    'url': image_url,
+                                    'name': image_name,
+                                    'type': 'image',
+                                    'original_name': image_data.get('original_name', '')
+                                })
+                
+                # الحالة 3: الصور في options (إذا كانت من نوع file)
                 item_options = item.get('options', [])
                 if isinstance(item_options, list):
                     for option in item_options:
+                        if option.get('type') == 'file':
+                            option_value = option.get('value')
+                            option_name = option.get('name', 'خيار مرفوع')
+                            
+                            if isinstance(option_value, list):
+                                # إذا كانت القيمة قائمة من الملفات
+                                for file_item in option_value:
+                                    if isinstance(file_item, dict):
+                                        file_url = file_item.get('url')
+                                        if file_url:
+                                            uploaded_images.append({
+                                                'url': file_url,
+                                                'name': f"{option_name} - {file_item.get('name', 'ملف')}",
+                                                'type': 'option_file',
+                                                'option_name': option_name
+                                            })
+                            elif isinstance(option_value, str) and option_value.startswith('http'):
+                                # إذا كانت القيمة رابط مباشر
+                                uploaded_images.append({
+                                    'url': option_value,
+                                    'name': option_name,
+                                    'type': 'option_file',
+                                    'option_name': option_name
+                                })
+                
+                # معالجة الخيارات
+                options = []
+                if isinstance(item_options, list):
+                    for option in item_options:
                         if not option or not isinstance(option, dict):
+                            continue
+                            
+                        # تخطي خيارات الملفات لأننا جمعناها بشكل منفصل
+                        if option.get('type') == 'file':
                             continue
                             
                         raw_value = option.get('value', '')
@@ -165,11 +234,15 @@ def process_order_from_local_data(order, order_data, items_data):
                     },
                     'main_image': main_image,
                     'options': options,
-                    'notes': notes
+                    'notes': notes,
+                    # ⭐⭐ إضافة الصور المرفوعة إلى بيانات العنصر ⭐⭐
+                    'uploaded_images': uploaded_images
                 }
                 
                 processed_items.append(item_data)
                 valid_items_count += 1
+                
+                logger.info(f"✅ تم معالجة العنصر {item_name} مع {len(uploaded_images)} صورة مرفوعة")
                 
             except Exception as item_error:
                 logger.error(f"❌ خطأ في معالجة العنصر {index} في الطلب {order.id}: {str(item_error)}")
@@ -199,6 +272,9 @@ def process_order_from_local_data(order, order_data, items_data):
             # إذا لم يكن هناك باركود، ننشئ واحداً
             barcode_data = generate_barcode(str(order.id))
         
+        # حساب إجمالي الصور المرفوعة
+        total_uploaded_images = sum(len(item.get('uploaded_images', [])) for item in processed_items)
+        
         # إنشاء كائن الطلب النهائي
         processed_order = {
             'id': str(order.id),
@@ -208,19 +284,28 @@ def process_order_from_local_data(order, order_data, items_data):
             'customer': {
                 'name': customer_name,
                 'email': customer.get('email', ''),
-                'mobile': customer.get('mobile', '')
+                'mobile': customer.get('mobile', ''),
+                'avatar': customer.get('avatar', '')  # صورة الملف الشخصي للعميل
             },
             'created_at': format_date(order_data.get('created_at', order.created_at if order else None)),
             'amounts': order_data.get('amounts', {}),
-            'status': order_data.get('status', {})
+            'status': order_data.get('status', {}),
+            # ⭐⭐ إضافة إحصائية الصور المرفوعة ⭐⭐
+            'stats': {
+                'total_items': valid_items_count,
+                'total_uploaded_images': total_uploaded_images
+            }
         }
         
-        logger.info(f"✅ تم معالجة الطلب {order.id} مع {valid_items_count} عنصر صالح")
+        logger.info(f"✅ تم معالجة الطلب {order.id} مع {valid_items_count} عنصر صالح و {total_uploaded_images} صورة مرفوعة")
         return processed_order
         
     except Exception as e:
         logger.error(f"❌ خطأ في معالجة البيانات المحلية للطلب {order.id if order else 'unknown'}: {str(e)}")
         return None
+
+
+
 
 def get_main_image_from_local(item):
     """استخراج الصورة الرئيسية من البيانات المحلية"""
