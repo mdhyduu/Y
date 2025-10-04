@@ -56,25 +56,37 @@
                 {% for item in order.order_items %}
                 <tr class="border-bottom">
                   <!-- صورة المنتج -->
-                  <td style="width: 120px; min-width: 120px;">
-                    <div class="d-flex justify-content-center">
-                      {% if item.main_image %}
-                      <img src="{{ item.main_image | safe }}" alt="{{ item.name | safe }}"
-                           class="img-fluid rounded product-image"
-                           style="width: 160px; height: 160px; object-fit: cover;"
-                           loading="lazy">
-                      {% else %}
-                      <div class="bg-light d-flex align-items-center justify-content-center rounded product-image-placeholder" 
-                           style="width: 80px; height: 80px;">
-                        <i class="fas fa-image fa-lg text-muted"></i>
-                      </div>
-                      {% endif %}
-                    </div>
-                    <div class="text-center mt-1 small text-muted">
-                      الكمية: {{ item.quantity }}
-                    </div>
-                  </td>
-  
+       <td style="width: 120px; min-width: 120px;">
+  <div class="d-flex justify-content-center flex-column align-items-center">
+    {% if item.main_image %}
+      <img src="{{ item.main_image | safe }}" alt="{{ item.name | safe }}"
+           class="img-fluid rounded product-image mb-2"
+           style="width: 160px; height: 160px; object-fit: cover;"
+           loading="lazy">
+    {% else %}
+      <div class="bg-light d-flex align-items-center justify-content-center rounded product-image-placeholder mb-2" 
+           style="width: 80px; height: 80px;">
+        <i class="fas fa-image fa-lg text-muted"></i>
+      </div>
+    {% endif %}
+
+    <!-- 👇 هنا نضيف صور العميل إن وجدت -->
+    {% if item.uploaded_images %}
+      <div class="uploaded-images text-center">
+        <h6 class="small text-muted mb-1">صور العميل:</h6>
+        {% for img in item.uploaded_images %}
+          <img src="{{ img.url }}" alt="{{ img.name }}" 
+               class="img-thumbnail rounded mb-1" 
+               style="width: 80px; height: 80px; object-fit: cover;">
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="text-center mt-1 small text-muted">
+      الكمية: {{ item.quantity }}
+    </div>
+  </div>
+</td>
                   <!-- خيارات المنتج -->
                   <td style="min-width: 150px;">
                     {% if item.options %}

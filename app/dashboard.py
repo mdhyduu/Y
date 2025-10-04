@@ -243,7 +243,7 @@ def index():
                 SallaOrder.store_id == user.store_id,
                 OrderStatusNote.id == None
             ).count()
-
+# في قسم إحصائيات المدير (admin)، قم بتحديث الـ stats لتشمل:
             stats = {
                 'total_orders': len(all_orders),
                 'new_orders': new_orders_count,
@@ -261,6 +261,15 @@ def index():
                 ).count(),
                 'not_shipped_orders': db.session.query(OrderStatusNote).join(SallaOrder).filter(
                     OrderStatusNote.status_flag == 'not_shipped',
+                    SallaOrder.store_id == user.store_id
+                ).count(),
+                # ✅ إضافة الحالتين الجديدتين
+                'not_shipped_count': db.session.query(OrderStatusNote).join(SallaOrder).filter(
+                    OrderStatusNote.status_flag == 'not_shipped',
+                    SallaOrder.store_id == user.store_id
+                ).count(),
+                'refunded_count': db.session.query(OrderStatusNote).join(SallaOrder).filter(
+                    OrderStatusNote.status_flag == 'refunded',
                     SallaOrder.store_id == user.store_id
                 ).count()
             }
