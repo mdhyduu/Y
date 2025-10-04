@@ -70,18 +70,22 @@
       </div>
     {% endif %}
 
-    <!-- 👇 هنا نضيف صور العميل إن وجدت -->
-    {% if item.uploaded_images %}
-      <div class="uploaded-images text-center">
-        <h6 class="small text-muted mb-1">صور العميل:</h6>
-        {% for img in item.uploaded_images %}
-          <img src="{{ img.url }}" alt="{{ img.name }}" 
-               class="img-thumbnail rounded mb-1" 
-               style="width: 80px; height: 80px; object-fit: cover;">
-        {% endfor %}
-      </div>
-    {% endif %}
-
+<!-- بـهذا الكود المعدل -->
+{% if item.uploaded_images %}
+  <div class="uploaded-images text-center mt-2">
+    <h6 class="small text-muted mb-1">صور العميل:</h6>
+    <div class="d-flex flex-wrap justify-content-center gap-1">
+      {% for img in item.uploaded_images %}
+        {% if img.url %}
+          <img src="{{ img.url }}" alt="{{ img.name | default('صورة العميل') }}" 
+               class="img-thumbnail rounded" 
+               style="width: 60px; height: 60px; object-fit: cover;"
+               onerror="this.style.display='none'">
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
     <div class="text-center mt-1 small text-muted">
       الكمية: {{ item.quantity }}
     </div>
@@ -1024,5 +1028,21 @@ Swal.fire({
   timer: 3000
 });
 {% endif %}
+// معالجة أخطاء تحميل الصور
+document.addEventListener('DOMContentLoaded', function() {
+  const images = document.querySelectorAll('.uploaded-images img');
+  images.forEach(img => {
+    img.addEventListener('error', function() {
+      this.style.display = 'none';
+      // إنشاء عنصر بديل عند فشل تحميل الصورة
+      const placeholder = document.createElement('div');
+      placeholder.className = 'bg-light d-flex align-items-center justify-content-center rounded';
+      placeholder.style.width = '60px';
+      placeholder.style.height = '60px';
+      placeholder.innerHTML = '<i class="fas fa-image text-muted"></i>';
+      this.parentNode.insertBefore(placeholder, this);
+    });
+  });
+});
 </script>
 {% endblock %}
