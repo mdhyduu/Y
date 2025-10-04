@@ -56,50 +56,36 @@
                 {% for item in order.order_items %}
                 <tr class="border-bottom">
                   <!-- صورة المنتج -->
-<!-- صور المنتج والعميل -->
-<td style="width: 120px; min-width: 120px;">
+       <td style="width: 120px; min-width: 120px;">
   <div class="d-flex justify-content-center flex-column align-items-center">
-    
-    <!-- الصورة الرئيسية للمنتج -->
-    {% if item.product_thumbnail %}
-      <img src="{{ item.product_thumbnail }}" alt="{{ item.name }}"
+    {% if item.main_image %}
+      <img src="{{ item.main_image | safe }}" alt="{{ item.name | safe }}"
            class="img-fluid rounded product-image mb-2"
            style="width: 160px; height: 160px; object-fit: cover;"
-           loading="lazy"
-           onerror="handleImageError(this)">
+           loading="lazy">
     {% else %}
       <div class="bg-light d-flex align-items-center justify-content-center rounded product-image-placeholder mb-2" 
-           style="width: 160px; height: 160px;">
+           style="width: 80px; height: 80px;">
         <i class="fas fa-image fa-lg text-muted"></i>
       </div>
     {% endif %}
 
-    <!-- صور العميل المرفوعة -->
-    {% if item.uploaded_images and item.uploaded_images|length > 0 %}
-      <div class="uploaded-images text-center mt-2">
-        <h6 class="small text-muted mb-1">صور العميل:</h6>
-        <div class="d-flex flex-wrap justify-content-center gap-1">
-          {% for img in item.uploaded_images %}
-            {% if img is string %}
-              <!-- إذا كانت الصورة كرابط نصي -->
-              <img src="{{ img }}" 
-                   alt="صورة العميل" 
-                   class="img-thumbnail rounded" 
-                   style="width: 60px; height: 60px; object-fit: cover;"
-                   onerror="handleUploadedImageError(this)">
-            {% elif img.url %}
-              <!-- إذا كانت الصورة ككائن -->
-              <img src="{{ img.url }}" 
-                   alt="{{ img.name | default('صورة العميل') }}" 
-                   class="img-thumbnail rounded" 
-                   style="width: 60px; height: 60px; object-fit: cover;"
-                   onerror="handleUploadedImageError(this)">
-            {% endif %}
-          {% endfor %}
-        </div>
-      </div>
-    {% endif %}
-
+<!-- بـهذا الكود المعدل -->
+{% if item.uploaded_images %}
+  <div class="uploaded-images text-center mt-2">
+    <h6 class="small text-muted mb-1">صور العميل:</h6>
+    <div class="d-flex flex-wrap justify-content-center gap-1">
+      {% for img in item.uploaded_images %}
+        {% if img.url %}
+          <img src="{{ img.url }}" alt="{{ img.name | default('صورة العميل') }}" 
+               class="img-thumbnail rounded" 
+               style="width: 60px; height: 60px; object-fit: cover;"
+               onerror="this.style.display='none'">
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
     <div class="text-center mt-1 small text-muted">
       الكمية: {{ item.quantity }}
     </div>
