@@ -1333,19 +1333,10 @@ function generatePrintHTML(printData) {
     .link-option .option-link {
         color: #000000 !important;
         text-decoration: underline !important;
-        pointer-events: none !important; /* تعطيل النقر في الطباعة */
+
     }
     
-    /* إظهار الرابط الكامل كنص صغير عند الطباعة إذا أردت */
-    .link-option .option-link:after {
-        content: " (" attr(href) ")";
-        font-size: 8pt !important;
-        color: #666 !important;
-        text-decoration: none !important;
-        word-break: break-all !important;
-    }
-    
-    /* إذا أردت إخفاء الرابط الكامل في الطباعة واحتفاظ فقط بالمختصر، احذف الكود أعلاه */
+  
             * {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
