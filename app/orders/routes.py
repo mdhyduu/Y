@@ -355,9 +355,6 @@ def order_details(order_id):
         for item in items_data:
             product_notes = item.get('notes', '')
             
-            # استخراج صور العميل
-            uploaded_images = extract_uploaded_images(item)
-            
             processed_item = {
                 'id': item.get('id'),
                 'name': item.get('name', ''),
@@ -368,8 +365,7 @@ def order_details(order_id):
                 'product_type': item.get('product_type', ''),
                 'product_thumbnail': item.get('product_thumbnail', ''),
                 'options': item.get('options', []),
-                'sku': item.get('sku', ''),
-                'uploaded_images': uploaded_images  # إضافة صور العميل
+                'sku': item.get('sku', '')
             }
             processed_items.append(processed_item)
 
@@ -413,6 +409,7 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
+
 def extract_shipping_info(order_data):
     """استخراج معلومات الشحن من بيانات الطلب اعتمادًا على الشحنات (shipments)"""
     try:
@@ -476,50 +473,6 @@ def extract_shipping_info(order_data):
     except Exception as e:
         logger.error(f"Error extracting shipping info: {str(e)}")
         return {}
-def extract_uploaded_images(item_data):
-    """استخراج صور العميل المرفوعة من بيانات العنصر"""
-    uploaded_images = []
-    
-    try:
-        # البحث في أماكن مختلفة قد تحتوي على صور العميل
-        possible_image_fields = [
-            'uploaded_images',
-            'customer_images', 
-            'custom_images',
-            'images',
-            'attachments'
-        ]
-        
-        for field in possible_image_fields:
-            if field in item_data and item_data[field]:
-                images_data = item_data[field]
-                
-                if isinstance(images_data, list):
-                    for img in images_data:
-                        if isinstance(img, dict):
-                            if img.get('url'):
-                                uploaded_images.append({
-                                    'url': img['url'],
-                                    'name': img.get('name', 'صورة العميل')
-                                })
-                            elif img.get('original'):
-                                uploaded_images.append({
-                                    'url': img['original'],
-                                    'name': img.get('name', 'صورة العميل')
-                                })
-                        elif isinstance(img, str) and img.startswith(('http://', 'https://')):
-                            uploaded_images.append(img)
-                
-                elif isinstance(images_data, str) and images_data.startswith(('http://', 'https://')):
-                    uploaded_images.append(images_data)
-        
-        return uploaded_images
-        
-    except Exception as e:
-        logger.error(f"خطأ في استخراج صور العميل: {str(e)}")
-        return []
-
-# داخل حللة processed_items
 
 def ensure_valid_access_token(user):
     """التأكد من وجود توكن وصول صالح مع معالجة الأخطاء المحسنة"""
