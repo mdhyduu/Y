@@ -2115,23 +2115,47 @@ function generateOrdersHTML(products) {
         let html = '';
         
         if (data.products && data.products.length > 0) {
-            
-            // ⭐⭐ إضافة الترتيب حسب الاسم هنا ⭐⭐
-// ⭐⭐ بديل أكثر تطوراً للترتيب حسب التشابه في الأسماء ⭐⭐
-data.products.sort((a, b) => {
-    // تنظيف الأسماء من المسافات الزائدة وتحويلها لحروف صغيرة للمقارنة
-    const cleanNameA = a.name.trim().toLowerCase().replace(/\s+/g, ' ');
-    const cleanNameB = b.name.trim().toLowerCase().replace(/\s+/g, ' ');
-    
-    // إذا كانت الأسماء متطابقة بعد التنظيف
-    if (cleanNameA === cleanNameB) {
-        return a.sku.localeCompare(b.sku); // ترتيب إضافي حسب SKU
-    }
-    
-    // مقارنة عادية
-    return a.name.localeCompare(b.name, 'ar');
-});
-            
+            // ⭐⭐ ترتيب متقدم حسب الكلمات المفتاحية ⭐⭐
+            const keywordGroups = [
+                ['سلسال', 'اسوارة', 'حلق', 'اقراط', 'خواتم'],
+                ['ساعة', 'قلم', 'تيشرت', 'هودي', 'لوحة', 'شتوي'],
+                ['بوك', 'بروش'] // يمكنك إضافة المزيد من المجموعات حسب حاجتك
+            ];
+
+            data.products.sort((a, b) => {
+                // دالة مساعدة للعثور على مجموعة الكلمة المفتاحية
+                function findKeywordGroup(name) {
+                    const cleanName = name.toLowerCase().trim();
+                    for (let i = 0; i < keywordGroups.length; i++) {
+                        for (const keyword of keywordGroups[i]) {
+                            if (cleanName.includes(keyword.toLowerCase())) {
+                                return i;
+                            }
+                        }
+                    }
+                    return keywordGroups.length; // المنتجات التي لا تنتمي لأي مجموعة
+                }
+
+                const groupA = findKeywordGroup(a.name);
+                const groupB = findKeywordGroup(b.name);
+
+                // إذا كانا في نفس المجموعة، نرتب أبجدياً داخل المجموعة
+                if (groupA === groupB) {
+                    // إذا كانت الأسماء متشابهة، نرتب حسب SKU
+                    const cleanNameA = a.name.trim().toLowerCase().replace(/\s+/g, ' ');
+                    const cleanNameB = b.name.trim().toLowerCase().replace(/\s+/g, ' ');
+                    
+                    if (cleanNameA === cleanNameB) {
+                        return a.sku.localeCompare(b.sku);
+                    }
+                    
+                    return a.name.localeCompare(b.name, 'ar');
+                }
+
+                // نرتب حسب المجموعة أولاً
+                return groupA - groupB;
+            });
+
             data.products.forEach(product => {
                 html += `
     <div class="card mb-4 product-card" data-product-sku="${product.sku}">
@@ -2171,6 +2195,7 @@ data.products.sort((a, b) => {
                 </button>
             </div>
         </div>
+        <!-- ... باقي كود المنتج ... -->
     
         <div class="card-body orders-container" id="orders-${product.sku}" style="display: none;">
             <h6 class="border-bottom pb-2 mb-3">تفاصيل الطلبات:</h6>
