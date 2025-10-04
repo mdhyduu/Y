@@ -2109,13 +2109,31 @@ function generateOrdersHTML(products) {
             },
             data: JSON.stringify({ order_ids: selectedOrders })
         })
-        .done(function(data) {
-            if (data.success) {
-                let html = '';
-                
-                if (data.products && data.products.length > 0) {
-                    data.products.forEach(product => {
-                        html += `
+// في قسم نجاح استدعاء AJAX للقائمة السريعة - ابحث عن هذا الجزء:
+.done(function(data) {
+    if (data.success) {
+        let html = '';
+        
+        if (data.products && data.products.length > 0) {
+            
+            // ⭐⭐ إضافة الترتيب حسب الاسم هنا ⭐⭐
+// ⭐⭐ بديل أكثر تطوراً للترتيب حسب التشابه في الأسماء ⭐⭐
+data.products.sort((a, b) => {
+    // تنظيف الأسماء من المسافات الزائدة وتحويلها لحروف صغيرة للمقارنة
+    const cleanNameA = a.name.trim().toLowerCase().replace(/\s+/g, ' ');
+    const cleanNameB = b.name.trim().toLowerCase().replace(/\s+/g, ' ');
+    
+    // إذا كانت الأسماء متطابقة بعد التنظيف
+    if (cleanNameA === cleanNameB) {
+        return a.sku.localeCompare(b.sku); // ترتيب إضافي حسب SKU
+    }
+    
+    // مقارنة عادية
+    return a.name.localeCompare(b.name, 'ar');
+});
+            
+            data.products.forEach(product => {
+                html += `
     <div class="card mb-4 product-card" data-product-sku="${product.sku}">
         <div class="card-header bg-light d-flex justify-content-between align-items-center">
             <div class="d-flex align-items-center">
@@ -2153,6 +2171,7 @@ function generateOrdersHTML(products) {
                 </button>
             </div>
         </div>
+    
         <div class="card-body orders-container" id="orders-${product.sku}" style="display: none;">
             <h6 class="border-bottom pb-2 mb-3">تفاصيل الطلبات:</h6>
                         `;
