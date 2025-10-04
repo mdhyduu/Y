@@ -283,12 +283,12 @@ def index():
 @orders_bp.route('/<int:order_id>')
 def order_details(order_id):
     user, current_employee = get_user_from_cookies()
-
+    
     if current_employee:
         current_employee = db.session.query(Employee).options(
             selectinload(Employee.custom_statuses)
         ).get(current_employee.id)
-
+    
     if not user:
         flash("الرجاء تسجيل الدخول أولاً", "error")
         response = make_response(redirect(url_for('user_auth.login')))
@@ -304,14 +304,14 @@ def order_details(order_id):
             is_reviewer = True
 
         order = SallaOrder.query.filter_by(id=str(order_id), store_id=user.store_id).first()
-
+        
         order_data = None
         items_data = []
-
+        
         if order and order.full_order_data:
             order_data = order.full_order_data
             items_data = order_data.get('items', [])
-
+            
             if not items_data:
                 items_data = fetch_order_items_from_api(user, order_id)
                 if items_data:
@@ -320,7 +320,7 @@ def order_details(order_id):
                     db.session.commit()
         else:
             order_data, items_data = fetch_order_data_from_api(user, order_id)
-
+            
             if order_data:
                 if order:
                     order.full_order_data = order_data
@@ -328,7 +328,7 @@ def order_details(order_id):
                     new_order = create_order_from_api_data(user, order_data, items_data)
                     if new_order:
                         order = new_order
-
+                
                 db.session.commit()
 
         if not order_data:
@@ -336,16 +336,16 @@ def order_details(order_id):
             return redirect(url_for('orders.index'))
 
         processed_order = process_order_data(order_id, items_data)
-
+        
         order_address = OrderAddress.query.filter_by(order_id=str(order_id)).first()
-
+        
         if order_address:
             decrypted_name = decrypt_data(order_address.name) if order_address.name else ''
             decrypted_phone = decrypt_data(order_address.phone) if order_address.phone else ''
 
         notes = order_data.get('notes', '')
         payment_method = order_data.get('payment_method', {})
-
+        
         if isinstance(payment_method, dict):
             payment_method_name = payment_method.get('name', 'غير محدد')
         else:
@@ -354,29 +354,7 @@ def order_details(order_id):
         processed_items = []
         for item in items_data:
             product_notes = item.get('notes', '')
-
-            # 📦 استخراج الصور التي رفعها العميل
-            uploaded_images = []
-
-            # 1️⃣ لو فيه ملفات مرفوعة مباشرة
-            if item.get('files'):
-                for f in item['files']:
-                    if f.get('url'):
-                        uploaded_images.append({
-                            'name': f.get('name', 'صورة العميل'),
-                            'url': f['url']
-                        })
-
-            # 2️⃣ لو الصور مرفوعة كخيارات (option من نوع file)
-            for opt in item.get('options', []):
-                if opt.get('type') == 'file' and opt.get('value'):
-                    for v in opt['value']:
-                        if v.get('url'):
-                            uploaded_images.append({
-                                'name': v.get('name', 'صورة مرفقة'),
-                                'url': v['url']
-                            })
-
+            
             processed_item = {
                 'id': item.get('id'),
                 'name': item.get('name', ''),
@@ -384,12 +362,11 @@ def order_details(order_id):
                 'price': item.get('amounts', {}).get('total', {}).get('amount', 0),
                 'currency': item.get('amounts', {}).get('total', {}).get('currency', 'SAR'),
                 'notes': product_notes,
-                'sku': item.get('sku', ''),
+                'product_type': item.get('product_type', ''),
+                'product_thumbnail': item.get('product_thumbnail', ''),
                 'options': item.get('options', []),
-                'main_image': item.get('product', {}).get('thumbnail', ''),
-                'uploaded_images': uploaded_images  # ✅ إضافة الصور المرفوعة
+                'sku': item.get('sku', '')
             }
-
             processed_items.append(processed_item)
 
         processed_order.update({
@@ -415,9 +392,8 @@ def order_details(order_id):
         db_data = fetch_additional_order_data(user.store_id, str(order_id))
         shipping_info = extract_shipping_info(order_data)
         processed_order['shipping'] = shipping_info
-
-        return render_template(
-            'order_details.html',
+        
+        return render_template('order_details.html', 
             order=processed_order,
             order_address=order_address,
             status_notes=db_data['status_notes'],
