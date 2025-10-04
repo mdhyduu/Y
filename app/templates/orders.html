@@ -1329,22 +1329,23 @@ function generatePrintHTML(printData) {
             }
 
 
+
     .link-option .option-link {
         color: #000000 !important;
         text-decoration: underline !important;
-        pointer-events: none !important;
-        cursor: default !important;
+        pointer-events: none !important; /* تعطيل النقر في الطباعة */
     }
     
-    /* إخفاء title في الطباعة */
-    .link-option[title] {
+    /* إظهار الرابط الكامل كنص صغير عند الطباعة إذا أردت */
+    .link-option .option-link:after {
+        content: " (" attr(href) ")";
+        font-size: 8pt !important;
+        color: #666 !important;
         text-decoration: none !important;
+        word-break: break-all !important;
     }
     
-    .link-option[title]:after {
-        content: none !important;
-    }
-
+    /* إذا أردت إخفاء الرابط الكامل في الطباعة واحتفاظ فقط بالمختصر، احذف الكود أعلاه */
             * {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
@@ -1616,19 +1617,18 @@ function generateOrdersHTML(products) {
                             </div>
                         ` : '<div class="barcode-container" style="background: transparent; border: none;"></div>'}
                     </div>
-                    
-              ${order.options && order.options.length > 0 ? `
+      ${order.options && order.options.length > 0 ? `
     <div class="options-section">
         <div class="options-title">الخيارات:</div>
         ${order.options.map(opt => {
             if (opt.is_link && opt.href) {
-                // عرض أول 6 أحرف فقط مع "..." للروابط
+                // عرض الروابط مختصرة (أول 6 أحرف) مع "..." في الطباعة
                 let displayValue = opt.value;
                 if (displayValue.length > 6) {
                     displayValue = displayValue.substring(0, 6) + '...';
                 }
-                return `<span class="option-item link-option" title="${opt.value}">
-                    ${opt.name}: <a href="${opt.href}" target="_blank" class="option-link">${displayValue}</a>
+                return `<span class="option-item link-option">
+                    ${opt.name}: <a href="${opt.href}" target="_blank" class="option-link" title="${opt.value}">${displayValue}</a>
                 </span>`;
             } else {
                 return `<span class="option-item">${opt.name}: ${opt.value}</span>`;
