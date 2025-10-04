@@ -413,7 +413,69 @@ def order_details(order_id):
         flash(error_msg, "error")
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
-
+def extract_shipping_info(order_data):
+    """استخراج معلومات الشحن من بيانات الطلب اعتمادًا على الشحنات (shipments)"""
+    try:
+        shipments_data = order_data.get('shipments', [])
+        
+        shipping_info = {
+            'has_shipping': bool(shipments_data),
+            'status': '',
+            'tracking_number': None,
+            'tracking_link': None,
+            'has_tracking': False,
+            'shipment_details': []
+        }
+        
+        for shipment in shipments_data:
+            shipment_tracking_link = shipment.get('tracking_link')
+            shipment_tracking_number = shipment.get('tracking_number')
+            shipment_label = shipment.get('label')
+            
+            shipment_has_tracking = False
+            final_tracking_link = None
+            
+            if shipment_tracking_link and shipment_tracking_link not in ["", "0", "null", "None"]:
+                if shipment_tracking_link.startswith(('http://', 'https://')):
+                    final_tracking_link = shipment_tracking_link
+                else:
+                    final_tracking_link = f"https://track.salla.sa/track/{shipment_tracking_link}"
+                shipment_has_tracking = True
+            
+            if not final_tracking_link and shipment_tracking_number:
+                final_tracking_link = f"https://track.salla.sa/track/{shipment_tracking_number}"
+                shipment_has_tracking = True
+            
+            shipment_info = {
+                'id': shipment.get('id'),
+                'courier_name': shipment.get('courier_name', ''),
+                'courier_logo': shipment.get('courier_logo', ''),
+                'tracking_number': shipment_tracking_number,
+                'tracking_link': final_tracking_link,
+                'has_tracking': shipment_has_tracking,
+                'status': shipment.get('status', ''),
+                'label': shipment_label,
+                'has_label': bool(shipment_label and shipment_label not in ["", "0", "null"]),
+                'shipping_number': shipment.get('shipping_number'),
+                'total_weight': shipment.get('total_weight', {}),
+                'packages': shipment.get('packages', [])
+            }
+            
+            shipping_info['shipment_details'].append(shipment_info)
+            
+            if not shipping_info['status'] and shipment_info['status']:
+                shipping_info['status'] = shipment_info['status']
+            
+            if shipment_has_tracking and not shipping_info['has_tracking']:
+                shipping_info['tracking_link'] = final_tracking_link
+                shipping_info['tracking_number'] = shipment_tracking_number
+                shipping_info['has_tracking'] = True
+        
+        return shipping_info
+    
+    except Exception as e:
+        logger.error(f"Error extracting shipping info: {str(e)}")
+        return {}
 def extract_uploaded_images(item_data):
     """استخراج صور العميل المرفوعة من بيانات العنصر"""
     uploaded_images = []
