@@ -982,19 +982,46 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
                 });
 
                 // الخيارات
-                $appearance.find('.badge.bg-light').each(function() {
-                    const optionText = $(this).text().trim();
-                    if (optionText.includes(':')) {
-                        const parts = optionText.split(':');
-                        if (parts.length === 2) {
-                            orderData.options.push({
-                                name: parts[0].trim(),
-                                value: parts[1].trim()
-                            });
-                        }
-                    }
-                });
-
+                // الخيارات - الكود المصحح
+$appearance.find('.options-section .badge').each(function() {
+    const $badge = $(this);
+    
+    // استخدام html() بدلاً من text() للحفاظ على التنسيق والروابط
+    const optionHtml = $badge.html().trim();
+    
+    // إذا كان الخيار يحتوي على رابط، نتعامل معه بشكل مختلف
+    if ($badge.find('a').length > 0) {
+        // استخراج النص من الرابط إذا وجد
+        const linkText = $badge.find('a').text().trim();
+        const linkHref = $badge.find('a').attr('href') || '';
+        
+        orderData.options.push({
+            name: 'رابط',
+            value: linkText,
+            href: linkHref,
+            is_link: true
+        });
+    } else if (optionHtml.includes(':')) {
+        // معالجة الخيارات العادية
+        const parts = optionHtml.split(':');
+        if (parts.length >= 2) {
+            const name = parts[0].trim();
+            const value = parts.slice(1).join(':').trim();
+            orderData.options.push({
+                name: name,
+                value: value,
+                is_link: false
+            });
+        }
+    } else {
+        // إذا لم يكن هناك نقطتين، نعتبره قيمة واحدة
+        orderData.options.push({
+            name: 'خيار',
+            value: optionHtml,
+            is_link: false
+        });
+    }
+});
                 // الملاحظات
                 const $notes = $appearance.find('.notes-section .notes-text');
                 if ($notes.length) {
