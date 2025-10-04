@@ -100,13 +100,22 @@ def create_app():
         if request.path.startswith('/webhook/'):
             return response
     
+        # ⭐⭐ CSP معدل خصيصاً لسلة ومصادرها ⭐⭐
         csp = (
             "default-src 'self' https: data:; "
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob: data:; "
             "style-src 'self' 'unsafe-inline' https:; "
-            "img-src 'self' data: blob: https:; "
+            # ⭐⭐ السماح لجميع نطاقات سلة و CDN الخاصة بها ⭐⭐
+            "img-src 'self' data: blob: https: "
+            "https://cdn.salla.sa "  # ⭐ CDN الرئيسي للصور
+            "https://salla.sa "      # ⭐ النطاق الرئيسي
+            "https://s.salla.sa "    # ⭐ النطاق الإداري
+            "https://*.salla.sa "    # ⭐ جميع النطاقات الفرعية
+            "https://*.cdn.salla.sa;" # ⭐ جميع نطاقات CDN الفرعية
             "font-src 'self' https: data:; "
-            "connect-src 'self' https: wss:; "
+            "connect-src 'self' https: wss: "
+            "https://api.salla.dev "  # ⭐ واجهة برمجة التطبيقات
+            "https://api.salla.sa;"   # ⭐ واجهة برمجة التطبيقات
             "frame-ancestors 'none'; "
             "form-action 'self'; "
             "base-uri 'self'; "
@@ -122,7 +131,6 @@ def create_app():
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=(self)'
     
-    
         if request.path.startswith(('/auth/', '/logout')):
             # لا تخزن أبداً صفحات المصادقة الحساسة
             response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
@@ -131,7 +139,7 @@ def create_app():
         else:
             # اسمح للمتصفح الخاص بالمستخدم فقط بتخزين الصفحة
             response.headers['Cache-Control'] = 'private, max-age=3600'
-
+    
         return response
     @app.template_filter('time_ago')
     def time_ago_filter(dt):
