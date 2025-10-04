@@ -1329,23 +1329,21 @@ function generatePrintHTML(printData) {
             }
 
 
-  a[href] {
-    color: #000 !important;
-    text-decoration: none !important;
-    border: none !important;
-    display: inline !important;
-  }
-
-  a[href]:after {
-    content: attr(href);
-    font-size: 10pt;
-    color: #444;
-    margin-right: 4px;
-  }
-
-  /* لو ما تبغى يظهر الرابط النصي بعد العنصر */
-  /* احذف الجزء a[href]:after بالكامل */
-
+    .link-option .option-link {
+        color: #000000 !important;
+        text-decoration: underline !important;
+        pointer-events: none !important;
+        cursor: default !important;
+    }
+    
+    /* إخفاء title في الطباعة */
+    .link-option[title] {
+        text-decoration: none !important;
+    }
+    
+    .link-option[title]:after {
+        content: none !important;
+    }
 
             * {
                 -webkit-print-color-adjust: exact !important;
@@ -1619,15 +1617,25 @@ function generateOrdersHTML(products) {
                         ` : '<div class="barcode-container" style="background: transparent; border: none;"></div>'}
                     </div>
                     
-                    ${order.options && order.options.length > 0 ? `
-                        <div class="options-section">
-                            <div class="options-title">الخيارات:</div>
-                            ${order.options.map(opt => 
-                                `<span class="option-item">${opt.name}: ${opt.value}</span>`
-                            ).join('')}
-                        </div>
-                    ` : ''}
-                    
+              ${order.options && order.options.length > 0 ? `
+    <div class="options-section">
+        <div class="options-title">الخيارات:</div>
+        ${order.options.map(opt => {
+            if (opt.is_link && opt.href) {
+                // عرض أول 6 أحرف فقط مع "..." للروابط
+                let displayValue = opt.value;
+                if (displayValue.length > 6) {
+                    displayValue = displayValue.substring(0, 6) + '...';
+                }
+                return `<span class="option-item link-option" title="${opt.value}">
+                    ${opt.name}: <a href="${opt.href}" target="_blank" class="option-link">${displayValue}</a>
+                </span>`;
+            } else {
+                return `<span class="option-item">${opt.name}: ${opt.value}</span>`;
+            }
+        }).join('')}
+    </div>
+` : ''}                   
                     ${order.notes ? `
                         <div class="notes-section">
                             <div class="notes-title">ملاحظات:</div>
