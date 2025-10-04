@@ -1301,16 +1301,24 @@ function generatePrintHTML(printData) {
                 print-color-adjust: exact !important;
             }
 
+
   a[href] {
-    color: inherit !important;
+    color: #000 !important;
     text-decoration: none !important;
+    border: none !important;
     display: inline !important;
-    visibility: visible !important;
   }
 
-  a[href]::after {
-    content: none !important;
+  a[href]:after {
+    content: attr(href);
+    font-size: 10pt;
+    color: #444;
+    margin-right: 4px;
   }
+
+  /* لو ما تبغى يظهر الرابط النصي بعد العنصر */
+  /* احذف الجزء a[href]:after بالكامل */
+
 
             * {
                 -webkit-print-color-adjust: exact !important;
