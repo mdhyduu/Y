@@ -297,7 +297,7 @@ def create_app():
         db.session.remove()   # يغلق الجلسة ويرجع الاتصال للـ pool
 
     def scheduled_late_orders_check():
-    """دالة مجدولة مع سياق التطبيق"""
+        """دالة مجدولة مع سياق التطبيق"""
         with app.app_context():
             try:
                 # في app/__init__.py
@@ -307,7 +307,7 @@ def create_app():
                 check_and_update_late_orders()
             except Exception as e:
                 app.logger.error(f"خطأ في المهمة المجدولة: {str(e)}")
-
+    
     def init_scheduler():
         """تهيئة المهمات المجدولة"""
         scheduler = BackgroundScheduler()
@@ -316,7 +316,7 @@ def create_app():
         scheduler.add_job(
             func=scheduled_late_orders_check,
             trigger='interval',
-            hours=1,  # تغيير من minutes=1 إلى hours=24
+            hours=24,  # تغيير من minutes=1 إلى hours=24
             id='check_late_orders',
             name='فحص الطلبات المتأخرة كل 24 ساعة',
             replace_existing=True
@@ -327,8 +327,6 @@ def create_app():
     
     # بدء المخطط
     init_scheduler()
-    # إضافة هيدرز الأمان لكل الردود
- 
     return app
     
     
