@@ -772,6 +772,10 @@ def handle_order_creation(data, webhook_version='2'):
             print("❌ لا يوجد معرف طلب")
             return False
 
+        # --- استخراج reference_id من البيانات ---
+        reference_id = order_data.get('reference_id')
+        print(f"🔗 reference_id المستخرج: {reference_id}")
+        
         # --- التحقق إذا الطلب موجود مسبقاً ---
         existing_order = SallaOrder.query.get(order_id)
         if existing_order:
@@ -780,8 +784,14 @@ def handle_order_creation(data, webhook_version='2'):
             # تحديث full_order_data إذا كان ناقص
             if not existing_order.full_order_data:
                 existing_order.full_order_data = order_data
-                db.session.commit()
                 print("✅ تم تحديث الطلب ببيانات كاملة (full_order_data)")
+
+            # تحديث reference_id إذا لم يكن موجوداً
+            if not existing_order.reference_id and reference_id:
+                existing_order.reference_id = str(reference_id)
+                print(f"✅ تم تحديث reference_id للطلب: {reference_id}")
+            
+            db.session.commit()
 
             # التحقق من وجود العنوان
             existing_address = OrderAddress.query.filter_by(order_id=order_id).first()
@@ -852,7 +862,7 @@ def handle_order_creation(data, webhook_version='2'):
             if default_status:
                 status_id = default_status.id
 
-        # --- إنشاء الطلب الجديد ---
+        # --- إنشاء الطلب الجديد مع reference_id ---
         new_order = SallaOrder(
             id=order_id,
             store_id=store_id,
@@ -863,7 +873,8 @@ def handle_order_creation(data, webhook_version='2'):
             payment_method=order_data.get('payment_method', ''),
             raw_data=json.dumps(order_data, ensure_ascii=False),
             full_order_data=order_data,   # ✅ تخزين البيانات الكاملة
-            status_id=status_id
+            status_id=status_id,
+            reference_id=str(reference_id) if reference_id else None  # ✅ حفظ reference_id
         )
         db.session.add(new_order)
         db.session.flush()
@@ -877,7 +888,7 @@ def handle_order_creation(data, webhook_version='2'):
             db.session.add(new_address)
 
         db.session.commit()
-        print("🎉 تم حفظ الطلب مع full_order_data والعنوان بنجاح")
+        print(f"🎉 تم حفظ الطلب مع reference_id: {reference_id} والعنوان بنجاح")
         return True
 
     except Exception as e:
@@ -886,7 +897,6 @@ def handle_order_creation(data, webhook_version='2'):
         print(error_msg)
         logger.error(error_msg, exc_info=True)
         return False
-        
         
 def update_order_items_from_webhook(order, order_data):
     """
