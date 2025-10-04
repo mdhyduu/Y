@@ -298,15 +298,15 @@ def create_app():
 
     def scheduled_late_orders_check():
     """دالة مجدولة مع سياق التطبيق"""
-    with app.app_context():
-        try:
-            # في app/__init__.py
-            from .scheduler_tasks import check_and_update_late_orders
-            
-            # ثم استخدمها كما في الكود السابق
-            check_and_update_late_orders()
-        except Exception as e:
-            app.logger.error(f"خطأ في المهمة المجدولة: {str(e)}")
+        with app.app_context():
+            try:
+                # في app/__init__.py
+                from .scheduler_tasks import check_and_update_late_orders
+                
+                # ثم استخدمها كما في الكود السابق
+                check_and_update_late_orders()
+            except Exception as e:
+                app.logger.error(f"خطأ في المهمة المجدولة: {str(e)}")
 
     def init_scheduler():
         """تهيئة المهمات المجدولة"""
