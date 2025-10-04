@@ -1558,7 +1558,7 @@ function generatePrintHTML(printData) {
 
             setTimeout(() => {
                 window.print();
-            }, 500);
+            }, 5000);
         });
         
         // معالجة الصور التالفة وتحسين النصوص
@@ -1672,7 +1672,7 @@ function generateOrdersHTML(products) {
                         </div>
                     ` : ''}
                     
-                    <!-- ⭐⭐ قسم صور العميل المضاف ⭐⭐ -->
+                    <!-- ⭐⭐ قسم صور العميل - يعرض جميع الصور بدون شرط ⭐⭐ -->
                     ${order.customer_images && order.customer_images.length > 0 ? `
                         <div class="customer-images-section">
                             <div class="customer-images-title">صور العميل (${order.customer_images.length}):</div>
@@ -1687,7 +1687,13 @@ function generateOrdersHTML(products) {
                                 `).join('')}
                             </div>
                         </div>
-                    ` : ''}
+                    ` : `
+                        <!-- ⭐⭐ إذا لم توجد صور، نعرض رسالة ⭐⭐ -->
+                        <div class="customer-images-section">
+                            <div class="customer-images-title">صور العميل:</div>
+                            <div class="text-muted small">لا توجد صور مرفوعة من العميل</div>
+                        </div>
+                    `}
                 </div>
             `;
         });
