@@ -2155,7 +2155,9 @@ function generateOrdersHTML(products) {
                      class="img-thumbnail me-3" 
                      style="width: 60px; height: 60px; object-fit: cover;"
                      onerror="this.src='/static/images/no-image.png'">
+                     
                 <div>
+                
                     <h6 class="mb-1 fw-bold">${product.name}</h6>
                     <small class="text-muted">SKU: ${product.sku}</small>
                     <div class="mt-1">
@@ -2248,6 +2250,22 @@ function generateOrdersHTML(products) {
                             <span class="notes-text small">${appearance.notes}</span>
                         </div>
                         ` : ''}
+                        // في جزء إنشاء HTML للقائمة السريعة، أضف قسم صور العميل
+${appearance.uploaded_images && appearance.uploaded_images.length > 0 ? `
+<div class="customer-uploaded-images mt-2">
+    <strong class="small d-block mb-1 text-info">
+        <i class="fas fa-camera me-1"></i>صور العميل (${appearance.uploaded_images.length}):
+    </strong>
+    <div class="d-flex flex-wrap gap-1">
+        ${appearance.uploaded_images.map((img, index) => `
+            <img src="${img.url}" alt="${img.name || 'صورة العميل ' + (index + 1)}" 
+                 class="img-thumbnail" 
+                 style="width: 40px; height: 40px; object-fit: cover;"
+                 onerror="this.style.display='none'">
+        `).join('')}
+    </div>
+</div>
+` : ''}
                     </div>
                 </div>
             </div>
