@@ -2297,6 +2297,11 @@ ${appearance.uploaded_images && appearance.uploaded_images.length > 0 ? `
                 $('#quickListContent').html(html);
                 updateQuickListSelectionCount();
                 updateProductSelectionCounts();
+                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+            
                 
                 showSweetAlert('success', 'تم التحميل بنجاح', 
                     `تم تحميل ${data.products?.length || 0} منتج من ${data.stats?.successful_orders || 0} طلب`);
