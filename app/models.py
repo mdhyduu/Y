@@ -405,6 +405,7 @@ class SallaOrder(db.Model):
         Index('ix_salla_orders_sync', 'last_synced'),
         Index('ix_salla_orders_total', 'total_amount'),
         Index('ix_salla_orders_store_status_date', 'store_id', 'status_id', 'created_at'),
+        Index('ix_salla_orders_reference_id', 'reference_id'),  # إضافة فهرس للحقل الجديد
     )
     
     id = db.Column(db.String(50), primary_key=True)
@@ -415,6 +416,9 @@ class SallaOrder(db.Model):
     currency = db.Column(db.String(10), default='SAR')
     payment_method = db.Column(db.String(100))
     last_synced = db.Column(db.DateTime, nullable=True)
+    # إضافة الحقل الجديد
+    reference_id = db.Column(db.String(50), nullable=True, index=True)
+    
     # العمود الأساسي للربط
     status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'), nullable=True)
     full_order_data = db.Column(JSONB, nullable=True)
