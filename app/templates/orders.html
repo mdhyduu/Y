@@ -723,7 +723,21 @@ $(document).on('click', '#quickListDownloadAddressesBtn', function() {
         showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات لتحميل العناوين');
         return;
     }
-
+/**
+ * تنظيف النص من tags HTML للطباعة
+ */
+function cleanTextForPrint(text) {
+    if (!text) return '';
+    
+    // إزالة جميع tags HTML والاحتفاظ بالنص فقط
+    return text.replace(/<[^>]*>/g, '')
+               .replace(/&nbsp;/g, ' ')
+               .replace(/&amp;/g, '&')
+               .replace(/&lt;/g, '<')
+               .replace(/&gt;/g, '>')
+               .replace(/&quot;/g, '"')
+               .trim();
+}
     const downloadBtn = $('#quickListDownloadAddressesBtn');
     const originalText = downloadBtn.html();
     downloadBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
@@ -955,7 +969,21 @@ function collectQuickListPrintData() {
                 if (text.includes('التاريخ:')) orderData.created_at = cleanTextForPrint(text.replace('التاريخ:', '').trim());
                 if (text.includes('الكمية:')) orderData.quantity = parseInt(text.replace('الكمية:', '').trim()) || 1;
             });
-
+/**
+ * تنظيف النص من tags HTML للطباعة
+ */
+function cleanTextForPrint(text) {
+    if (!text) return '';
+    
+    // إزالة جميع tags HTML والاحتفاظ بالنص فقط
+    return text.replace(/<[^>]*>/g, '')
+               .replace(/&nbsp;/g, ' ')
+               .replace(/&amp;/g, '&')
+               .replace(/&lt;/g, '<')
+               .replace(/&gt;/g, '>')
+               .replace(/&quot;/g, '"')
+               .trim();
+}
             // ✅ جمع الخيارات مع تنظيف الروابط
             $appearance.find('.badge.bg-light').each(function() {
                 const optionText = cleanTextForPrint($(this).text().trim());
