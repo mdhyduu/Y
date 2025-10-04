@@ -316,7 +316,7 @@ def create_app():
         scheduler.add_job(
             func=scheduled_late_orders_check,
             trigger='interval',
-            hours=24,  # تغيير من minutes=1 إلى hours=24
+            hours=1,  # تغيير من minutes=1 إلى hours=24
             id='check_late_orders',
             name='فحص الطلبات المتأخرة كل 24 ساعة',
             replace_existing=True
