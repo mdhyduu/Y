@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 
 {% block title %}رفع بوليصة الشحن{% endblock %}
@@ -25,7 +24,7 @@
                                 <div class="card-header bg-info text-white">
                                     <h5 class="mb-0">
                                         <i class="fas fa-file-pdf me-2"></i>
-                                        استخراج الطلبات من ملف PDF
+                                        استخراج الطلبات من ملف PDF أو صورة
                                     </h5>
                                 </div>
                                 <div class="card-body">
@@ -34,10 +33,10 @@
                                             <i class="fas fa-cloud-upload-alt"></i>
                                         </div>
                                         <label for="pdfFile" class="file-label">
-                                            <i class="fas fa-file-pdf"></i> اختر ملف PDF
+                                            <i class="fas fa-file-pdf"></i> اختر ملف PDF أو صورة
                                         </label>
-                                        <input type="file" id="pdfFile" accept=".pdf" />
-                                        <p>أو اسحب ملف PDF وأسقطه هنا</p>
+                                        <input type="file" id="pdfFile" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp" />
+                                        <p>أو اسحب ملف PDF أو صورة وأسقطه هنا</p>
                                     </div>
 
                                     <div class="progress mb-3" id="progress" style="display: none;">
@@ -49,12 +48,12 @@
                                     <!-- معاينة الصفحات - مخفية بشكل افتراضي -->
                                     <div class="mb-3">
                                         <button class="btn btn-sm btn-outline-secondary" id="togglePreviewBtn" style="display: none;">
-                                            <i class="fas fa-eye me-1"></i>معاينة الصفحات المستخرجة
+                                            <i class="fas fa-eye me-1"></i>معاينة الصور المستخرجة
                                         </button>
                                     </div>
                                     
                                     <div id="pagesPreview" class="mb-3" style="display: none;">
-                                        <h6 class="mb-2">معاينة الصفحات المستخرجة:</h6>
+                                        <h6 class="mb-2">معاينة الصور المستخرجة:</h6>
                                         <div id="pagesContainer" class="row">
                                             <!-- سيتم تعبئة معاينة الصفحات هنا -->
                                         </div>
@@ -188,7 +187,6 @@
 </div>
 
 <style>
-/* نفس الستايل السابق */
 .card {
     border: 1px solid rgba(0,0,0,0.125);
     border-radius: 0.5rem;
@@ -363,16 +361,31 @@
     margin-top: 10px;
     background-color: #fffbf0;
 }
+
+.image-processing-options {
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 15px;
+    margin-top: 15px;
+    background-color: #f8f9fa;
+}
+
+.image-processing-options h6 {
+    margin-bottom: 10px;
+    color: #495057;
+}
 </style>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 <script>
 // متغيرات عامة
 let selectedOrder = null;
 let extractedOrders = [];
 let selectedOrdersFromPDF = [];
+let isImageProcessingEnabled = true;
 
 // تهيئة الصفحة
 document.addEventListener('DOMContentLoaded', function() {
@@ -553,7 +566,7 @@ function selectOrder(order) {
     showSuccess('تم اختيار الطلب بنجاح');
 }
 
-// إعداد تحميل PDF
+// إعداد تحميل PDF والصور
 function setupPDFUpload() {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
     
@@ -570,6 +583,30 @@ function setupPDFUpload() {
     const pagesPreview = document.getElementById('pagesPreview');
     const pagesContainer = document.getElementById('pagesContainer');
     const togglePreviewBtn = document.getElementById('togglePreviewBtn');
+    
+    // إضافة خيارات معالجة الصور
+    const imageProcessingHTML = `
+        <div class="image-processing-options">
+            <h6><i class="fas fa-cogs me-2"></i>خيارات معالجة الصور</h6>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="imageProcessingToggle" checked>
+                <label class="form-check-label" for="imageProcessingToggle">
+                    تفعيل معالجة الصور لتحسين استخراج النص
+                </label>
+            </div>
+            <div class="form-text">
+                تفعيل هذه الخاصية يحسن استخراج النص من الصور باستخدام تقنيات معالجة الصور المتقدمة
+            </div>
+        </div>
+    `;
+    
+    dropArea.insertAdjacentHTML('afterend', imageProcessingHTML);
+    
+    // إعداد التبديل
+    const imageProcessingToggle = document.getElementById('imageProcessingToggle');
+    imageProcessingToggle.addEventListener('change', function() {
+        isImageProcessingEnabled = this.checked;
+    });
     
     // إعداد السحب والإفلات
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -598,19 +635,21 @@ function setupPDFUpload() {
     function handleDrop(e) {
         const dt = e.dataTransfer;
         const files = dt.files;
-        if (files.length && files[0].type === 'application/pdf') {
+        if (files.length && (files[0].type === 'application/pdf' || files[0].type.startsWith('image/'))) {
             pdfFile.files = files;
-            loadPDF(files[0]);
+            loadFile(files[0]);
         } else {
-            status.textContent = 'الرجاء إسقاط ملف PDF صالح';
+            status.textContent = 'الرجاء إسقاط ملف PDF أو صورة صالحة';
         }
     }
     
     pdfFile.addEventListener('change', function(event) {
-        if (event.target.files.length && event.target.files[0].type === 'application/pdf') {
-            loadPDF(event.target.files[0]);
+        if (event.target.files.length && 
+            (event.target.files[0].type === 'application/pdf' || 
+             event.target.files[0].type.startsWith('image/'))) {
+            loadFile(event.target.files[0]);
         } else {
-            status.textContent = 'الرجاء اختيار ملف PDF صالح';
+            status.textContent = 'الرجاء اختيار ملف PDF أو صورة صالحة';
         }
     });
     
@@ -641,11 +680,11 @@ function setupPDFUpload() {
             togglePreviewBtn.innerHTML = '<i class="fas fa-eye-slash me-1"></i>إخفاء المعاينة';
         } else {
             pagesPreview.style.display = 'none';
-            togglePreviewBtn.innerHTML = '<i class="fas fa-eye me-1"></i>معاينة الصفحات المستخرجة';
+            togglePreviewBtn.innerHTML = '<i class="fas fa-eye me-1"></i>معاينة الصور المستخرجة';
         }
     });
     
-    function loadPDF(file) {
+    function loadFile(file) {
         status.textContent = 'جاري تحميل الملف...';
         progress.style.display = 'block';
         progressBar.style.width = '0%';
@@ -664,6 +703,14 @@ function setupPDFUpload() {
         document.getElementById('orderDetails').style.display = 'none';
         document.getElementById('uploadBtn').disabled = true;
         
+        if (file.type === 'application/pdf') {
+            loadPDF(file);
+        } else if (file.type.startsWith('image/')) {
+            loadImage(file);
+        }
+    }
+    
+    function loadPDF(file) {
         const fileReader = new FileReader();
         
         fileReader.onload = function() {
@@ -678,6 +725,43 @@ function setupPDFUpload() {
         };
         
         fileReader.readAsArrayBuffer(file);
+    }
+    
+    function loadImage(file) {
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            const imageUrl = e.target.result;
+            const img = new Image();
+            
+            img.onload = function() {
+                // إنشاء كائن يشبه بيانات PDF للتوافق مع الكود الحالي
+                const mockPDF = {
+                    numPages: 1
+                };
+                
+                status.textContent = 'تم تحميل الصورة، جاري استخراج النص...';
+                
+                // استخراج الطلب من الصورة مباشرة
+                extractOrderAndImageFromImage(img, 1).then(orderData => {
+                    progress.style.display = 'none';
+                    
+                    if (orderData && orderData.orderNumber) {
+                        extractedOrders = [orderData];
+                        displayExtractedOrders();
+                        displayPagesPreview([orderData]);
+                        togglePreviewBtn.style.display = 'inline-block';
+                        status.textContent = `تم استخراج طلب من الصورة`;
+                    } else {
+                        status.textContent = 'لم يتم العثور على أرقام طلبات في الصورة';
+                    }
+                });
+            };
+            
+            img.src = imageUrl;
+        };
+        
+        reader.readAsDataURL(file);
     }
     
     function extractOrdersAndImagesFromPDF(pdf) {
@@ -708,173 +792,202 @@ function setupPDFUpload() {
         });
     }
     
-// requires: pdfjs loaded, optional: Tesseract.js loaded for OCR fallback
-async function extractOrderAndImageFromPage(pdf, pageNumber) {
-    const page = await pdf.getPage(pageNumber);
-
-    // زوّد الـ scale شوية لتحسين جودة الـ OCR لو احتجناه
-    const viewport = page.getViewport({ scale: 2.0 });
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = Math.round(viewport.width);
-    canvas.height = Math.round(viewport.height);
-
-    const renderContext = { canvasContext: ctx, viewport };
-    await page.render(renderContext).promise;
-
-    // ===== 1) استخراج النص من PDF مع الحفاظ على الترتيب =====
-    const textContent = await page.getTextContent();
-    const items = textContent.items || [];
-
-    // نجمع أجزاء النص مع إحداثياتهم
-    const rows = [];
-    items.forEach(item => {
-        const str = item.str || '';
-        // transform عادةً بصيغة [a,b,c,d, x, y] -> x = transform[4], y = transform[5]
-        const tx = item.transform || [];
-        const x = tx[4] ?? 0;
-        const y = tx[5] ?? 0;
-
-        // نبحث عن صف موجود بقرب y (tolerance)
-        const tol = 3;
-        let row = rows.find(r => Math.abs(r.y - y) <= tol);
-        if (!row) {
-            row = { y, parts: [] };
-            rows.push(row);
+    // دالة محسنة لاستخراج النص من الصور
+    async function extractOrderAndImageFromImage(img, pageNumber) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        // معالجة الصورة لتحسين استخراج النص
+        if (isImageProcessingEnabled) {
+            await enhanceImageForOCR(canvas, ctx);
         }
-        row.parts.push({ x, str });
-    });
-
-    // نرتب الصفوف من أعلى لأسفل (حسب y) ونرتب كل صف حسب x ثم نجمع النص
-    rows.sort((a, b) => b.y - a.y);
-    const reconstructedLines = rows.map(r =>
-        r.parts.sort((p, q) => p.x - q.x).map(p => p.str).join(' ')
-    );
-    let text = reconstructedLines.join('\n').replace(/\s+/g, ' ').trim();
-
-    console.log('🔎 reconstructed text:', text);
-
-    // ===== 2) أنماط مبسطة وفعالة لاستخراج رقم الطلب =====
-    const patterns = [
-        // النمط المباشر: PCs: 1 يليه رقم في نفس السطر أو السطر التالي
-        /PCs?:\s*1\s*[\r\n]+\s*(\d{6,9})/i,
-        /PCs?:\s*1[^\d]{0,9}(\d{6,9})/i,
         
-        // أنماط بديلة للسياقات المختلفة
-        /Order[^\d]{0,9}(\d{6,9})/i,
-        /Riydah[^\d]{0,50}(\d{6,9})/i,
-        /طلب[^\d]{0,50}(\d{6,9})/i,
+        // استخراج النص باستخدام Tesseract.js
+        let extractedText = '';
+        try {
+            const worker = await Tesseract.createWorker('ara+eng');
+            const { data: { text } } = await worker.recognize(canvas);
+            await worker.terminate();
+            extractedText = text || '';
+        } catch (error) {
+            console.error('Tesseract error:', error);
+        }
         
-        // البحث عن أي مجموعة أرقام مناسبة
-        /\b(\d{6,15})\b/g
-    ];
-
-    function normalizeDigits(s) {
-        if (!s) return s;
-        return s.replace(/\D/g, '');
+        // استخراج رقم الطلب من النص
+        const orderNumber = extractOrderNumberFromText(extractedText);
+        
+        // حفظ الصورة
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        const imageUrl = URL.createObjectURL(blob);
+        
+        const orderData = {
+            pageNumber,
+            orderNumber: orderNumber || `image_${pageNumber}`,
+            imageUrl,
+            imageBlob: blob,
+            extractedText: extractedText.substring(0, 200) + '...'
+        };
+        
+        return orderData;
     }
+    
+    // دالة محسنة لاستخراج النص من صفحة PDF
+    async function extractOrderAndImageFromPage(pdf, pageNumber) {
+        const page = await pdf.getPage(pageNumber);
 
-    let orderNumber = null;
+        const viewport = page.getViewport({ scale: 2.5 }); // تحسين جودة الصورة
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = Math.round(viewport.width);
+        canvas.height = Math.round(viewport.height);
 
-    // نجرب الأنماط على النص المُعاد بناؤه
-    for (const pat of patterns) {
-        const matches = text.match(pat);
-        if (matches) {
-            const extracted = matches[1] || matches[0];
-            orderNumber = normalizeDigits(extracted);
+        const renderContext = { canvasContext: ctx, viewport };
+        await page.render(renderContext).promise;
+
+        // ===== 1) استخراج النص من PDF =====
+        const textContent = await page.getTextContent();
+        const items = textContent.items || [];
+
+        const rows = [];
+        items.forEach(item => {
+            const str = item.str || '';
+            const tx = item.transform || [];
+            const x = tx[4] ?? 0;
+            const y = tx[5] ?? 0;
+
+            const tol = 4; // زيادة التحمل للتفاوت
+            let row = rows.find(r => Math.abs(r.y - y) <= tol);
+            if (!row) {
+                row = { y, parts: [] };
+                rows.push(row);
+            }
+            row.parts.push({ x, str });
+        });
+
+        rows.sort((a, b) => b.y - a.y);
+        const reconstructedLines = rows.map(r =>
+            r.parts.sort((p, q) => p.x - q.x).map(p => p.str).join(' ')
+        );
+        let text = reconstructedLines.join('\n').replace(/\s+/g, ' ').trim();
+
+        // ===== 2) استخراج رقم الطلب من النص =====
+        let orderNumber = extractOrderNumberFromText(text);
+
+        // ===== 3) استخدام OCR إذا لم يتم العثور على رقم الطلب =====
+        if (!orderNumber && isImageProcessingEnabled) {
+            // معالجة الصورة لتحسين استخراج النص
+            await enhanceImageForOCR(canvas, ctx);
             
-            // تحقق من أن الرقم ضمن النطاق المطلوب
-            if (orderNumber && orderNumber.length >= 6 && orderNumber.length <= 15) {
-                console.log(`✅ تم استخراج رقم الطلب: ${orderNumber} بالنمط: ${pat}`);
-                break;
-            } else {
-                orderNumber = null; // إعادة الضبط إذا لم يكن الرقم مناسباً
-            }
-        }
-    }
-
-    // ===== 3) استخدام OCR كحل احتياطي إذا لم نجد الرقم =====
-    if (!orderNumber) {
-        console.log('🤖 محاولة OCR عبر Tesseract (fallback) ...');
-        if (window.Tesseract && Tesseract.createWorker) {
             try {
-                const worker = Tesseract.createWorker({
-                    logger: m => console.log('Tesseract:', m)
-                });
-                await worker.load();
-                await worker.loadLanguage('eng+ara'); // إضافة العربية
-                await worker.initialize('eng+ara');
-
-                const { data: { text: ocrTextRaw } } = await worker.recognize(canvas);
+                const worker = await Tesseract.createWorker('ara+eng');
+                const { data: { text: ocrText } } = await worker.recognize(canvas);
                 await worker.terminate();
-
-                const ocrText = (ocrTextRaw || '').replace(/\s+/g, ' ').trim();
-                console.log('📄 OCR text:', ocrText);
-
-                // دمج النصين والمحاولة مرة أخرى
-                const combined = (text + '\n' + ocrText).replace(/\s+/g, ' ');
-                for (const pat of patterns) {
-                    const m = combined.match(pat);
-                    if (m) {
-                        const extracted = m[1] || m[0];
-                        orderNumber = normalizeDigits(extracted);
-                        if (orderNumber && orderNumber.length >= 6 && orderNumber.length <= 15) {
-                            console.log(`✅ تم استخراج رقم الطلب عبر OCR: ${orderNumber}`);
-                            break;
-                        }
-                    }
-                }
-            } catch (err) {
-                console.warn('❌ خطأ في OCR:', err);
+                
+                // دمج النص المستخرج من PDF مع نص OCR
+                const combinedText = text + ' ' + ocrText;
+                orderNumber = extractOrderNumberFromText(combinedText);
+            } catch (error) {
+                console.error('Tesseract error:', error);
             }
-        } else {
-            console.warn('⚠️ Tesseract.js غير متوفر');
         }
-    }
 
-    // ===== 4) حل احتياطي نهائي =====
-    if (!orderNumber) {
-        // البحث عن أي رقم في النص كحل أخير
-        const fallbackMatch = text.match(/(\d{6,9})/);
-        if (fallbackMatch) {
-            orderNumber = normalizeDigits(fallbackMatch[1]);
-            console.log(`⚠️ استخدام الحل الاحتياطي: ${orderNumber}`);
+        // ===== 4) حل احتياطي نهائي =====
+        if (!orderNumber) {
+            const fallbackMatch = text.match(/(\d{6,15})/);
+            if (fallbackMatch) {
+                orderNumber = normalizeDigits(fallbackMatch[1]);
+                console.log(`⚠️ استخدام الحل الاحتياطي: ${orderNumber}`);
+            }
         }
+
+        if (!orderNumber) orderNumber = `page_${pageNumber}`;
+
+        // ===== 5) حفظ الصورة =====
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        const imageUrl = URL.createObjectURL(blob);
+
+        const orderData = {
+            pageNumber,
+            orderNumber,
+            imageUrl,
+            imageBlob: blob,
+            extractedText: text.substring(0, 200) + '...'
+        };
+
+        if (typeof extractedOrders !== 'undefined' && orderNumber && !extractedOrders.some(o => o.orderNumber === orderNumber)) {
+            extractedOrders.push(orderData);
+        }
+
+        if (typeof progressBar !== 'undefined' && pdf.numPages) {
+            const progressPercent = Math.round((pageNumber / pdf.numPages) * 100);
+            progressBar.style.width = `${progressPercent}%`;
+            progressBar.textContent = `${progressPercent}%`;
+        }
+
+        return orderData;
     }
+    
+    // دالة محسنة لاستخراج رقم الطلب من النص
+    function extractOrderNumberFromText(text) {
+        // تطبيع النص
+        const normalizedText = text.replace(/\s+/g, ' ').trim();
+        
+        // أنماط متنوعة لاستخراج أرقام الطلبات
+        const patterns = [
+            // نمط من المثال: 211444630
+            /\b(2\d{5,8})\b/,
+            // نمط آخر: رقم طلب بعد كلمات محددة
+            /(?:طلب|رقم|Order|ID)[\s:]*(\d{6,15})/i,
+            // نمط للتعرف على الأرقام في سياق معين
+            /(?:COD|SAR)[\s:]*\d*[\s\S]{0,100}?(\d{6,15})/i,
+            // نمط للتعرف على أرقام في جداول
+            /PCs?:\s*1\s*[\r\n]*\s*(\d{6,15})/i,
+            // نمط عام لأرقام طويلة
+            /\b\d{6,15}\b/
+        ];
+        
+        function normalizeDigits(s) {
+            return s ? s.replace(/\D/g, '') : s;
+        }
 
-    if (!orderNumber) {
-        console.warn('❌ لم يُعثر على رقم طلب، سنستخدم قيمة افتراضية.');
-        orderNumber = `page_${pageNumber}`;
-    } else {
-        console.log('🎉 تم استخراج رقم الطلب بنجاح:', orderNumber);
+        let orderNumber = null;
+        for (const pat of patterns) {
+            const matches = normalizedText.match(pat);
+            if (matches) {
+                const extracted = matches[1] || matches[0];
+                const normalized = normalizeDigits(extracted);
+                if (normalized && normalized.length >= 6 && normalized.length <= 15) {
+                    orderNumber = normalized;
+                    console.log(`✅ رقم الطلب تم استخراجه: ${orderNumber}`);
+                    break;
+                }
+            }
+        }
+        
+        return orderNumber;
     }
-
-    // ===== 5) تحويل الـ canvas لصورة =====
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-    const imageUrl = URL.createObjectURL(blob);
-
-    const orderData = {
-        pageNumber,
-        orderNumber,
-        imageUrl,
-        imageBlob: blob,
-        extractedText: text.substring(0, 200) + '...' // حفظ جزء من النص للعرض
-    };
-
-    // إضافة الطلب للمصفوفة إذا لم يكن موجوداً
-    if (typeof extractedOrders !== 'undefined' && orderNumber && !extractedOrders.some(o => o.orderNumber === orderNumber)) {
-        extractedOrders.push(orderData);
+    
+    // دالة لتحسين الصورة لاستخراج النص
+    async function enhanceImageForOCR(canvas, ctx) {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        
+        // تحسين التباين
+        for (let i = 0; i < data.length; i += 4) {
+            // زيادة التباين
+            const factor = 1.5;
+            data[i] = Math.min(255, Math.max(0, (data[i] - 128) * factor + 128)); // الأحمر
+            data[i + 1] = Math.min(255, Math.max(0, (data[i + 1] - 128) * factor + 128)); // الأخضر
+            data[i + 2] = Math.min(255, Math.max(0, (data[i + 2] - 128) * factor + 128)); // الأزرق
+        }
+        
+        ctx.putImageData(imageData, 0, 0);
+        return canvas;
     }
-
-    // تحديث شريط التقدم
-    if (typeof progressBar !== 'undefined' && pdf.numPages) {
-        const progressPercent = Math.round((pageNumber / pdf.numPages) * 100);
-        progressBar.style.width = `${progressPercent}%`;
-        progressBar.textContent = `${progressPercent}%`;
-    }
-
-    return orderData;
-}
+    
     function displayPagesPreview(pagesData) {
         pagesContainer.innerHTML = '';
         
@@ -1326,6 +1439,11 @@ function resetForm() {
             URL.revokeObjectURL(order.imageUrl);
         }
     });
+}
+
+// دالة مساعدة لتطبيع الأرقام
+function normalizeDigits(s) {
+    return s ? s.replace(/\D/g, '') : s;
 }
 </script>
 {% endblock %}
