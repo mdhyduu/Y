@@ -14,9 +14,25 @@
       <a href="{{ url_for('orders.index') }}" class="btn btn-outline-secondary btn-sm">
         <i class="fas fa-arrow-left ms-1"></i> العودة للطلبات
       </a>
+      
     </div>
   </div>
-
+<!-- في قسم رأس الصفحة - بعد زر العودة -->
+<div class="d-flex gap-2 flex-wrap">
+    <a href="{{ url_for('orders.index') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left ms-1"></i> العودة للطلبات
+    </a>
+    
+    <!-- زر طباعة الطلب كـ PDF -->
+    <button onclick="printOrderAsPDF('{{ order.id }}')" class="btn btn-primary btn-sm">
+        <i class="fas fa-file-pdf me-1"></i> طباعة الطلب
+    </button>
+    
+    <!-- زر طباعة العنوان -->
+    <button onclick="printOrderAddress('{{ order.id }}')" class="btn btn-success btn-sm">
+        <i class="fas fa-truck me-1"></i> طباعة العنوان
+    </button>
+</div>
   <div class="row g-0 mx-0">
     <!-- القسم الرئيسي - تفاصيل الطلب -->
     <div class="col-12 p-3">
@@ -1044,5 +1060,68 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
+
+// دالة لطباعة الطلب كـ PDF
+function printOrderAsPDF(orderId) {
+    if (!orderId) {
+        Swal.fire({
+            title: 'خطأ!',
+            text: 'معرف الطلب غير صالح',
+            icon: 'error',
+            confirmButtonText: 'حسناً'
+        });
+        return;
+    }
+    
+    // إظهار تحميل
+    Swal.fire({
+        title: 'جاري التحميل...',
+        text: 'يتم تجهيز الطلب للطباعة',
+        icon: 'info',
+        showConfirmButton: false,
+        allowOutsideClick: false
+    });
+    
+    // فتح نافذة جديدة لتحميل PDF
+    const pdfUrl = `{{ url_for('orders.download_single_order_pdf') }}?order_id=${orderId}`;
+    window.open(pdfUrl, '_blank');
+    
+    // إغلاق تحميل SweetAlert بعد ثانيتين
+    setTimeout(() => {
+        Swal.close();
+    }, 2000);
+}
+
+// دالة لطباعة العنوان
+function printOrderAddress(orderId) {
+    if (!orderId) {
+        Swal.fire({
+            title: 'خطأ!',
+            text: 'معرف الطلب غير صالح',
+            icon: 'error',
+            confirmButtonText: 'حسناً'
+        });
+        return;
+    }
+    
+    // إظهار تحميل
+    Swal.fire({
+        title: 'جاري التحميل...',
+        text: 'يتم تجهيز العنوان للطباعة',
+        icon: 'info',
+        showConfirmButton: false,
+        allowOutsideClick: false
+    });
+    
+    // فتح نافذة جديدة لتحميل PDF العنوان
+    const pdfUrl = `{{ url_for('orders.download_single_address_pdf') }}?order_id=${orderId}`;
+    window.open(pdfUrl, '_blank');
+    
+    // إغلاق تحميل SweetAlert بعد ثانيتين
+    setTimeout(() => {
+        Swal.close();
+    }, 2000);
+}
 </script>
+
 {% endblock %}

@@ -7,6 +7,8 @@ from flask import (render_template, request, flash, redirect, url_for, jsonify,
                    make_response, current_app)
 import requests
 from sqlalchemy import nullslast, or_, and_, func
+from weasyprint import HTML
+import traceback
 from sqlalchemy.orm import selectinload
 from . import orders_bp
 from app.models import (db, SallaOrder, CustomOrder, OrderStatus,User, Employee, 
@@ -1212,4 +1214,136 @@ def get_payment_method_name(payment_method):
         return payment_method.get('name', 'غير محدد')
     
     return payment_methods.get(payment_method, payment_method or 'غير محدد')
+@orders_bp.route('/download_single_order_pdf')
+def download_single_order_pdf():
+    """تحميل طلب فردي كملف PDF"""
+    logger.info("بدء تحميل طلب فردي كملف PDF")
     
+    try:
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            flash('الرجاء تسجيل الدخول أولاً', 'error')
+            return redirect(url_for('user_auth.login'))
+        
+        order_id = request.args.get('order_id', '').strip()
+        
+        if not order_id:
+            flash('لم يتم تحديد أي طلب للتحميل', 'error')
+            return redirect(url_for('orders.index'))
+        
+        logger.info(f"🔄 معالجة طلب فردي {order_id} لتحويل PDF")
+        
+        # استخدام البيانات المحلية
+        orders = get_orders_from_local_database([order_id], user.store_id)
+        
+        if not orders:
+            logger.warning("⚠️ لم يتم العثور على الطلب في البيانات المحلية، جاري استخدام API كبديل")
+            # العودة إلى الطريقة القديمة كبديل
+            access_token = user.salla_access_token
+            if not access_token:
+                flash('يجب ربط المتجر مع سلة أولاً', 'error')
+                return redirect(url_for('auth.link_store'))
+            
+            orders = process_orders_concurrently([order_id], access_token, 1)
+        
+        if not orders:
+            flash('لم يتم العثور على الطلب للتحميل', 'error')
+            return redirect(url_for('orders.order_details', order_id=order_id))
+        
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # تحسين أداء إنشاء PDF
+        optimized_orders = optimize_pdf_generation(orders)
+        
+        # إنشاء HTML مع تحسينات الأداء
+        html = render_template('print_orders.html', 
+                             orders=optimized_orders, 
+                             current_time=current_time)
+        
+        # تحسين إعدادات WeasyPrint للأداء
+        pdf = HTML(
+            string=html,
+            base_url=request.host_url
+        ).write_pdf(
+            optimize_size=(),
+            jpeg_quality=80
+        )
+        
+        filename = f"order_{order_id}_{current_time.replace(':', '-').replace(' ', '_')}.pdf"
+        
+        response = make_response(pdf)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        response.headers['Content-Length'] = len(pdf)
+        
+        logger.info(f"✅ تم إنشاء PDF فردي بنجاح: {filename} بحجم {len(pdf)} بايت")
+        return response
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في إنشاء PDF فردي: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash('حدث خطأ أثناء إنشاء PDF', 'error')
+        return redirect(url_for('orders.order_details', order_id=order_id))
+
+@orders_bp.route('/download_single_address_pdf')
+def download_single_address_pdf():
+    """تحميل عنوان طلب فردي كملف PDF"""
+    logger.info("بدء تحميل عنوان طلب فردي كملف PDF")
+    
+    try:
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            flash('الرجاء تسجيل الدخول أولاً', 'error')
+            return redirect(url_for('user_auth.login'))
+        
+        order_id = request.args.get('order_id', '').strip()
+        
+        if not order_id:
+            flash('لم يتم تحديد أي طلب للتحميل', 'error')
+            return redirect(url_for('orders.index'))
+        
+        logger.info(f"🔄 معالجة عنوان طلب فردي {order_id}")
+        
+        # استخدام البيانات المحلية
+        orders_with_addresses = []
+        order_with_address = get_order_with_address(order_id, user.store_id)
+        if order_with_address:
+            orders_with_addresses.append(order_with_address)
+        
+        if not orders_with_addresses:
+            flash('لم يتم العثور على عنوان للطلب', 'error')
+            return redirect(url_for('orders.order_details', order_id=order_id))
+        
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # إنشاء HTML للعناوين
+        html = render_template('print_addresses.html', 
+                             orders=orders_with_addresses, 
+                             current_time=current_time)
+        
+        # إنشاء PDF
+        pdf = HTML(
+            string=html,
+            base_url=request.host_url
+        ).write_pdf(
+            optimize_size=(),
+            jpeg_quality=80
+        )
+        
+        filename = f"address_{order_id}_{current_time.replace(':', '-').replace(' ', '_')}.pdf"
+        
+        response = make_response(pdf)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        response.headers['Content-Length'] = len(pdf)
+        
+        logger.info(f"✅ تم إنشاء عنوان PDF فردي بنجاح: {filename} بحجم {len(pdf)} بايت")
+        return response
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في إنشاء عنوان PDF فردي: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash('حدث خطأ أثناء إنشاء ملف العنوان', 'error')
+        return redirect(url_for('orders.order_details', order_id=order_id))
