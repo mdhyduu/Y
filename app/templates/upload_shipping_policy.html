@@ -354,6 +354,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
 <script>
 // متغيرات عامة
+// متغيرات عامة
 let selectedOrder = null;
 let extractedOrders = [];
 let selectedOrdersFromPDF = [];
@@ -680,7 +681,7 @@ function setupPDFUpload() {
     
     function extractOrderAndImageFromPage(pdf, pageNumber) {
         return pdf.getPage(pageNumber).then(function(page) {
-            const viewport = page.getViewport({ scale: 1.0 });
+            const viewport = page.getViewport({ scale: 2.0 }); // زيادة الدقة
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.height = viewport.height;
@@ -697,13 +698,34 @@ function setupPDFUpload() {
             ]).then(function([renderResult, textContent]) {
                 let text = textContent.items.map(item => item.str).join(' ');
                 
-                // البحث عن نمط أرقام الطلبات (يمكن تعديل النمط حسب الحاجة)
-                const orderNumberMatch = text.match(/PCs:\s*1\s*(\d{9})/);
-                let orderNumber = orderNumberMatch ? orderNumberMatch[1] : null;
+                // تحسين أنماط البحث عن أرقام الطلبات
+                const orderPatterns = [
+                    /Order[:\s]*([A-Za-z0-9_-]+)/i,
+                    /طلب[:\s]*([A-Za-z0-9_-]+)/i,
+                    /رقم[:\s]*الطلب[:\s]*([A-Za-z0-9_-]+)/i,
+                    /ID[:\s]*([A-Za-z0-9_-]+)/i,
+                    /Reference[:\s]*([A-Za-z0-9_-]+)/i,
+                    /مرجع[:\s]*([A-Za-z0-9_-]+)/i,
+                    /\b\d{4,}\b/, // أي رقم مكون من 4 أرقام أو أكثر
+                    /PCs:\s*1\s*(\d{9})/ // النمط الموجود حالياً
+                ];
+                
+                let orderNumber = null;
+                
+                for (let pattern of orderPatterns) {
+                    const match = text.match(pattern);
+                    if (match) {
+                        orderNumber = match[1] || match[0];
+                        // تنظيف الرقم من المسافات والرموز غير المرغوب فيها
+                        orderNumber = orderNumber.replace(/[^\w-]/g, '').trim();
+                        if (orderNumber.length >= 3) { // التأكد من أن الرقم ذو معنى
+                            break;
+                        }
+                    }
+                }
                 
                 if (!orderNumber) {
-                    const fallbackMatch = text.match(/\b\d{9}\b/);
-                    orderNumber = fallbackMatch ? fallbackMatch[0] : `page_${pageNumber}`;
+                    orderNumber = `page_${pageNumber}`;
                 }
                 
                 // تحويل canvas إلى صورة
@@ -715,10 +737,17 @@ function setupPDFUpload() {
                             pageNumber: pageNumber,
                             orderNumber: orderNumber,
                             imageUrl: imageUrl,
-                            imageBlob: blob
+                            imageBlob: blob,
+                            extractedText: text.substring(0, 200) + '...' // حفظ جزء من النص للمراجعة
                         };
                         
-                        if (orderNumber && !extractedOrders.some(order => order.orderNumber === orderNumber)) {
+                        // التحقق من عدم تكرار الرقم
+                        const existingOrder = extractedOrders.find(order => order.orderNumber === orderNumber);
+                        if (!existingOrder) {
+                            extractedOrders.push(orderData);
+                        } else {
+                            // إذا كان مكرراً، إضافة رقم الصفحة للتمييز
+                            orderData.orderNumber = `${orderNumber}_p${pageNumber}`;
                             extractedOrders.push(orderData);
                         }
                         
@@ -728,7 +757,7 @@ function setupPDFUpload() {
                         progressBar.textContent = `${progressPercent}%`;
                         
                         resolve(orderData);
-                    }, 'image/png');
+                    }, 'image/png', 0.8); // تقليل الجودة لتقليل الحجم
                 });
             });
         });
@@ -772,7 +801,11 @@ function setupPDFUpload() {
                     </div>
                     <div class="order-actions">
                         <small class="text-muted">الصفحة: ${orderData.pageNumber}</small>
+                        <button class="btn btn-sm btn-outline-info ms-2" onclick="verifyOrder('${orderData.orderNumber}')">
+                            <i class="fas fa-search"></i> التحقق
+                        </button>
                     </div>
+                    <small class="text-muted d-block mt-1">${orderData.extractedText}</small>
                 </div>
             `;
             extractedOrdersList.appendChild(orderItem);
@@ -806,60 +839,76 @@ function setupPDFUpload() {
             uploadSelectedBtn.style.display = 'none';
         }
     }
+}
+
+// رفع البواليص للطلبات المحددة
+async function uploadSelectedOrders() {
+    if (selectedOrdersFromPDF.length === 0) {
+        showError('يرجى اختيار طلبات لرفع بواليصها');
+        return;
+    }
     
-    async function uploadSelectedOrders() {
-        if (selectedOrdersFromPDF.length === 0) {
-            showError('يرجى اختيار طلبات لرفع بواليصها');
-            return;
-        }
+    const progress = document.getElementById('uploadProgress');
+    const error = document.getElementById('uploadError');
+    
+    showLoading(true, 'uploadProgress', 'uploadError');
+    
+    let successCount = 0;
+    let errorCount = 0;
+    let results = {
+        successful: [],
+        failed: []
+    };
+    
+    for (let i = 0; i < selectedOrdersFromPDF.length; i++) {
+        const orderNumber = selectedOrdersFromPDF[i];
         
-        const progress = document.getElementById('uploadProgress');
-        const error = document.getElementById('uploadError');
-        
-        showLoading(true, 'uploadProgress', 'uploadError');
-        
-        let successCount = 0;
-        let errorCount = 0;
-        let errors = [];
-        
-        for (let i = 0; i < selectedOrdersFromPDF.length; i++) {
-            const orderNumber = selectedOrdersFromPDF[i];
+        try {
+            // تحديث شريط التقدم
+            const progressPercent = Math.round(((i + 1) / selectedOrdersFromPDF.length) * 100);
+            progress.querySelector('.progress-bar').style.width = `${progressPercent}%`;
+            progress.querySelector('.progress-bar').textContent = `${progressPercent}%`;
             
-            try {
-                // تحديث شريط التقدم
-                const progressPercent = Math.round(((i + 1) / selectedOrdersFromPDF.length) * 100);
-                progress.querySelector('.progress-bar').style.width = `${progressPercent}%`;
+            // العثور على بيانات الطلب
+            const orderData = extractedOrders.find(order => order.orderNumber === orderNumber);
+            if (orderData) {
+                // رفع البوليصة للطلب الحالي
+                const result = await uploadPolicyForOrderNumber(orderNumber, orderData.imageBlob);
                 
-                // العثور على بيانات الطلب
-                const orderData = extractedOrders.find(order => order.orderNumber === orderNumber);
-                if (orderData) {
-                    // رفع البوليصة للطلب الحالي
-                    await uploadPolicyForOrderNumber(orderNumber, orderData.imageBlob);
+                if (result.success) {
                     successCount++;
+                    results.successful.push({
+                        order_number: orderNumber,
+                        order_id: result.order_id
+                    });
                 } else {
-                    throw new Error(`لم يتم العثور على بيانات للطلب ${orderNumber}`);
+                    errorCount++;
+                    results.failed.push({
+                        order_number: orderNumber,
+                        error: result.error
+                    });
                 }
-            } catch (error) {
-                console.error(`Error uploading policy for order ${orderNumber}:`, error);
-                errorCount++;
-                errors.push(`الطلب ${orderNumber}: ${error.message}`);
-            }
-        }
-        
-        showLoading(false, 'uploadProgress', 'uploadError');
-        
-        if (errorCount === 0) {
-            showSuccess(`تم رفع البواليص بنجاح لجميع الطلبات المحددة (${successCount})`);
-            resetForm();
-        } else {
-            const errorMessage = `تم رفع البواليص لـ ${successCount} طلب، وفشل رفع ${errorCount} طلب`;
-            if (errors.length > 0) {
-                showError(errorMessage + '<br>' + errors.join('<br>'));
             } else {
-                showError(errorMessage);
+                errorCount++;
+                results.failed.push({
+                    order_number: orderNumber,
+                    error: 'لم يتم العثور على بيانات الصورة'
+                });
             }
+        } catch (error) {
+            console.error(`Error uploading policy for order ${orderNumber}:`, error);
+            errorCount++;
+            results.failed.push({
+                order_number: orderNumber,
+                error: error.message
+            });
         }
     }
+    
+    showLoading(false, 'uploadProgress', 'uploadError');
+    
+    // عرض النتائج
+    displayUploadResults(results, successCount, errorCount);
 }
 
 // رفع بوليصة لرقم طلب معين
@@ -875,11 +924,97 @@ async function uploadPolicyForOrderNumber(orderNumber, imageBlob) {
     
     const data = await response.json();
     
-    if (!response.ok) {
-        throw new Error(data.error || 'فشل في رفع الملف');
+    return {
+        success: response.ok,
+        ...data
+    };
+}
+
+// عرض نتائج الرفع
+function displayUploadResults(results, successCount, errorCount) {
+    let resultHTML = '';
+    
+    if (successCount > 0) {
+        resultHTML += `
+            <div class="alert alert-success">
+                <h6><i class="fas fa-check-circle"></i> تم رفع البواليص بنجاح للطلبات التالية:</h6>
+                <ul class="mb-0">
+                    ${results.successful.map(order => 
+                        `<li>الطلب ${order.order_number} (رقم: ${order.order_id})</li>`
+                    ).join('')}
+                </ul>
+            </div>
+        `;
     }
     
-    return data;
+    if (errorCount > 0) {
+        resultHTML += `
+            <div class="alert alert-danger">
+                <h6><i class="fas fa-exclamation-triangle"></i> فشل في رفع البواليص للطلبات التالية:</h6>
+                <ul class="mb-0">
+                    ${results.failed.map(order => 
+                        `<li>الطلب ${order.order_number}: ${order.error}</li>`
+                    ).join('')}
+                </ul>
+            </div>
+        `;
+    }
+    
+    // عرض النتائج في نافذة منبثقة
+    Swal.fire({
+        title: 'نتيجة الرفع',
+        html: resultHTML || 'لا توجد نتائج',
+        icon: errorCount === 0 ? 'success' : 'warning',
+        confirmButtonText: 'حسناً',
+        width: '600px'
+    });
+    
+    if (errorCount === 0) {
+        // إذا نجحت جميع العمليات، إعادة تعيين النموذج
+        setTimeout(() => {
+            resetForm();
+        }, 2000);
+    }
+}
+
+// دالة للتحقق من وجود الطلب في قاعدة البيانات
+async function verifyOrder(orderNumber) {
+    try {
+        const response = await fetch(`/api/search-orders?q=${encodeURIComponent(orderNumber)}`);
+        const data = await response.json();
+        
+        if (response.ok && data.orders && data.orders.length > 0) {
+            const order = data.orders[0];
+            Swal.fire({
+                title: 'الطلب موجود',
+                html: `
+                    <div class="text-start">
+                        <p><strong>رقم الطلب:</strong> ${order.id}</p>
+                        <p><strong>المرجع:</strong> ${order.reference_id || 'لا يوجد'}</p>
+                        <p><strong>العميل:</strong> ${order.customer_name}</p>
+                        <p><strong>المبلغ:</strong> ${order.total_amount} ${order.currency}</p>
+                    </div>
+                `,
+                icon: 'success',
+                confirmButtonText: 'حسناً'
+            });
+        } else {
+            Swal.fire({
+                title: 'تحذير',
+                text: `الطلب ${orderNumber} غير موجود في قاعدة البيانات`,
+                icon: 'warning',
+                confirmButtonText: 'حسناً'
+            });
+        }
+    } catch (error) {
+        console.error('Verification error:', error);
+        Swal.fire({
+            title: 'خطأ',
+            text: 'حدث خطأ أثناء التحقق من الطلب',
+            icon: 'error',
+            confirmButtonText: 'حسناً'
+        });
+    }
 }
 
 // رفع البوليصة

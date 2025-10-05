@@ -166,3 +166,155 @@ def search_orders():
     except Exception as e:
         current_app.logger.error(f"خطأ في البحث: {str(e)}")
         return jsonify({'error': 'حدث خطأ أثناء البحث'}), 500
+@orders_bp.route('/orders/shipping-policy-by-number', methods=['POST'])
+def upload_shipping_policy_by_number():
+    """رفع صورة البوليصة باستخدام رقم الطلب"""
+    try:
+        # الحصول على رقم الطلب من النموذج
+        order_number = request.form.get('order_number')
+        if not order_number:
+            return jsonify({'error': 'لم يتم تقديم رقم الطلب'}), 400
+
+        # البحث عن الطلب باستخدام رقم الطلب أو المرجع
+        order = SallaOrder.query.filter(
+            or_(
+                SallaOrder.id == order_number,
+                SallaOrder.reference_id == order_number
+            )
+        ).first()
+
+        if not order:
+            return jsonify({'error': f'لم يتم العثور على طلب بالرقم {order_number}'}), 404
+        
+        # التحقق من وجود ملف في الطلب
+        if 'shipping_policy_image' not in request.files:
+            return jsonify({'error': 'لم يتم تقديم ملف'}), 400
+         
+        file = request.files['shipping_policy_image']
+        
+        # التحقق من اختيار ملف
+        if file.filename == '':
+            return jsonify({'error': 'لم يتم اختيار ملف'}), 400
+        
+        # التحقق من نوع الملف
+        if not allowed_file(file.filename):
+            return jsonify({
+                'error': 'نوع الملف غير مسموح به. الأنواع المسموحة: ' + 
+                        ', '.join(current_app.config['ALLOWED_EXTENSIONS'])
+            }), 400
+        
+        # التحقق من حجم الملف
+        if request.content_length > current_app.config['MAX_FILE_SIZE']:
+            return jsonify({'error': 'حجم الملف كبير جداً'}), 400
+        
+        # رفع الملف إلى DigitalOcean Spaces
+        image_url = do_storage.upload_file(file, 'shipping-policies')
+        
+        if not image_url:
+            return jsonify({'error': 'فشل في رفع الملف'}), 500
+        
+        # حفظ رابط الصورة في قاعدة البيانات
+        order.shipping_policy_image = image_url
+        db.session.commit()
+        
+        return jsonify({
+            'message': f'تم رفع صورة البوليصة بنجاح للطلب {order_number}',
+            'image_url': image_url,
+            'order_id': order.id,
+            'order_number': order_number
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"خطأ في رفع صورة البوليصة للطلب {order_number}: {str(e)}")
+        return jsonify({'error': 'حدث خطأ أثناء رفع الملف'}), 500
+
+@orders_bp.route('/orders/bulk-shipping-policies', methods=['POST'])
+def bulk_upload_shipping_policies():
+    """رفع جماعي للبواليص للطلبات المستخرجة من PDF"""
+    try:
+        orders_data = request.json.get('orders', [])
+        
+        if not orders_data:
+            return jsonify({'error': 'لم يتم تقديم بيانات الطلبات'}), 400
+        
+        results = {
+            'successful': [],
+            'failed': []
+        }
+        
+        for order_data in orders_data:
+            order_number = order_data.get('order_number')
+            image_data = order_data.get('image_data')  # base64 encoded image
+            
+            if not order_number or not image_data:
+                results['failed'].append({
+                    'order_number': order_number,
+                    'error': 'بيانات ناقصة'
+                })
+                continue
+            
+            # البحث عن الطلب في قاعدة البيانات
+            order = SallaOrder.query.filter(
+                or_(
+                    SallaOrder.id == order_number,
+                    SallaOrder.reference_id == order_number
+                )
+            ).first()
+            
+            if not order:
+                results['failed'].append({
+                    'order_number': order_number,
+                    'error': 'الطلب غير موجود في قاعدة البيانات'
+                })
+                continue
+            
+            try:
+                # تحويل base64 إلى ملف
+                import base64
+                from io import BytesIO
+                
+                # إزالة header إذا موجود
+                if ',' in image_data:
+                    image_data = image_data.split(',')[1]
+                
+                image_binary = base64.b64decode(image_data)
+                image_file = BytesIO(image_binary)
+                image_file.filename = f"{order_number}.png"
+                
+                # رفع الملف إلى التخزين
+                image_url = do_storage.upload_file(image_file, 'shipping-policies')
+                
+                if not image_url:
+                    results['failed'].append({
+                        'order_number': order_number,
+                        'error': 'فشل في رفع الملف'
+                    })
+                    continue
+                
+                # حفظ في قاعدة البيانات
+                order.shipping_policy_image = image_url
+                db.session.commit()
+                
+                results['successful'].append({
+                    'order_number': order_number,
+                    'order_id': order.id,
+                    'image_url': image_url
+                })
+                
+            except Exception as e:
+                db.session.rollback()
+                results['failed'].append({
+                    'order_number': order_number,
+                    'error': f'خطأ في المعالجة: {str(e)}'
+                })
+        
+        return jsonify({
+            'message': f'تم معالجة {len(orders_data)} طلب',
+            'results': results
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"خطأ في الرفع الجماعي للبواليص: {str(e)}")
+        return jsonify({'error': 'حدث خطأ أثناء المعالجة'}), 500
