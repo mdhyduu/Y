@@ -1225,7 +1225,7 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
 
-@orders_bp.route('/<order_id>/shipping-policy', methods=['POST'])
+@orders_bp.route('/orders/<order_id>/shipping-policy', methods=['POST'])
 def upload_shipping_policy(order_id):
     """رفع صورة البوليصة لطلب معين"""
     try:
