@@ -1234,7 +1234,7 @@ def upload_shipping_policy(order_id):
         # التحقق من وجود ملف في الطلب
         if 'shipping_policy_image' not in request.files:
             return jsonify({'error': 'لم يتم تقديم ملف'}), 400
-        
+         
         file = request.files['shipping_policy_image']
         
         # التحقق من اختيار ملف
