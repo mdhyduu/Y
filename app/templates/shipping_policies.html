@@ -332,7 +332,51 @@ async function handleFormSubmit(e) {
     
     await uploadPolicy(orderId, file, 'uploadProgress', 'uploadError');
 }
+// عرض تفاصيل الطلب المختار
+document.getElementById('orderSelect').addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    const orderDetails = document.getElementById('orderDetails');
+    
+    if (this.value) {
+        // عرض تفاصيل الطلب
+        document.getElementById('selectedOrderId').textContent = this.value;
+        document.getElementById('selectedCustomer').textContent = selectedOption.getAttribute('data-customer');
+        document.getElementById('selectedAmount').textContent = selectedOption.getAttribute('data-amount') + ' ' + selectedOption.getAttribute('data-currency');
+        document.getElementById('selectedDate').textContent = selectedOption.getAttribute('data-date');
+        orderDetails.style.display = 'block';
+    } else {
+        orderDetails.style.display = 'none';
+    }
+});
 
+// بحث في قائمة الطلبات
+function setupOrderSearch() {
+    const orderSelect = document.getElementById('orderSelect');
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'form-control mb-2';
+    searchInput.placeholder = 'ابحث برقم الطلب أو اسم العميل...';
+    
+    // إضافة حقل البحث فوق القائمة المنسدلة
+    orderSelect.parentNode.insertBefore(searchInput, orderSelect);
+    
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        const options = orderSelect.getElementsByTagName('option');
+        
+        for (let i = 1; i < options.length; i++) { // تخطي الخيار الأول
+            const option = options[i];
+            const text = option.textContent.toLowerCase();
+            option.style.display = text.includes(searchTerm) ? '' : 'none';
+        }
+    });
+}
+
+// تهيئة البحث عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', function() {
+    setupOrderSearch();
+    initializeForm();
+});
 // رفع البوليصة
 async function uploadPolicy(orderId, file, progressId, errorId) {
     const formData = new FormData();
