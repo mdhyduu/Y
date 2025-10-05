@@ -15,55 +15,91 @@
                 </div>
                 <div class="card-body">
                     <!-- قسم رفع البوليصة -->
-                    <div class="row mb-5">
-                        <div class="col-12">
-                            <div class="card border-success">
-                                <div class="card-header bg-success text-white">
-                                    <h5 class="mb-0">
-                                        <i class="fas fa-upload me-2"></i>
-                                        رفع بوليصة شحن جديدة
-                                    </h5>
-                                </div>
-                                <div class="card-body">
-                                    <form id="uploadPolicyForm" enctype="multipart/form-data" class="row g-3">
-                                        <div class="col-md-6">
-                                            <label for="orderSelect" class="form-label">اختر الطلب</label>
-                                            <select class="form-select" id="orderSelect" required>
-                                                <option value="">-- اختر طلب --</option>
-                                                {% for order in recent_orders %}
-                                                    <option value="{{ order.id }}">
-                                                        {{ order.id }} - {{ order.customer_name or 'غير محدد' }} - {{ order.total_amount or 0 }} {{ order.currency or 'SAR' }}
-                                                    </option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        
-                                        <div class="col-md-6">
-                                            <label for="policyFile" class="form-label">صورة البوليصة</label>
-                                            <input class="form-control" type="file" id="policyFile" 
-                                                   name="shipping_policy_image" 
-                                                   accept=".png,.jpg,.jpeg,.gif,.pdf,.webp" required>
-                                            <div class="form-text">
-                                                الأنواع المسموحة: PNG, JPG, JPEG, GIF, PDF, WEBP (بحد أقصى 16MB)
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="col-12">
-                                            <button type="submit" class="btn btn-success" id="uploadBtn">
-                                                <i class="fas fa-upload me-2"></i>رفع البوليصة
-                                            </button>
-                                        </div>
-                                    </form>
-                                    
-                                    <div class="progress mt-3" style="display: none;" id="uploadProgress">
-                                        <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+            <!-- قسم رفع البوليصة -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="card border-success">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-upload me-2"></i>
+                    رفع بوليصة شحن جديدة
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="uploadPolicyForm" enctype="multipart/form-data" class="row g-3">
+                    <div class="col-md-6">
+                        <label for="orderSelect" class="form-label">اختر الطلب</label>
+                        <select class="form-select" id="orderSelect" required>
+                            <option value="">-- اختر طلب من القائمة --</option>
+                            {% for order in all_orders %}
+                                <option value="{{ order.id }}" 
+                                        data-customer="{{ order.customer_name or 'غير محدد' }}"
+                                        data-amount="{{ order.total_amount or 0 }}"
+                                        data-currency="{{ order.currency or 'SAR' }}"
+                                        data-date="{{ order.created_at|format_date if order.created_at else 'غير محدد' }}">
+                                    {{ order.id }} - {{ order.customer_name or 'غير محدد' }} - 
+                                    {{ order.total_amount or 0 }} {{ order.currency or 'SAR' }} - 
+                                    {{ order.created_at|format_date if order.created_at else 'غير محدد' }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        {% if not all_orders %}
+                            <div class="alert alert-warning mt-2">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                لا توجد طلبات في قاعدة البيانات
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label for="policyFile" class="form-label">صورة البوليصة</label>
+                        <input class="form-control" type="file" id="policyFile" 
+                               name="shipping_policy_image" 
+                               accept=".png,.jpg,.jpeg,.gif,.pdf,.webp" required>
+                        <div class="form-text">
+                            الأنواع المسموحة: PNG, JPG, JPEG, GIF, PDF, WEBP (بحد أقصى 16MB)
+                        </div>
+                    </div>
+                    
+                    <!-- عرض تفاصيل الطلب المختار -->
+                    <div class="col-12" id="orderDetails" style="display: none;">
+                        <div class="card border-info">
+                            <div class="card-body py-2">
+                                <h6 class="card-title mb-2">تفاصيل الطلب المختار:</h6>
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <strong>رقم الطلب:</strong> <span id="selectedOrderId"></span>
                                     </div>
-                                    
-                                    <div class="alert alert-danger mt-3" style="display: none;" id="uploadError"></div>
+                                    <div class="col-md-3">
+                                        <strong>العميل:</strong> <span id="selectedCustomer"></span>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>المبلغ:</strong> <span id="selectedAmount"></span>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>التاريخ:</strong> <span id="selectedDate"></span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-success" id="uploadBtn" {% if not all_orders %}disabled{% endif %}>
+                            <i class="fas fa-upload me-2"></i>رفع البوليصة
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="progress mt-3" style="display: none;" id="uploadProgress">
+                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                </div>
+                
+                <div class="alert alert-danger mt-3" style="display: none;" id="uploadError"></div>
+            </div>
+        </div>
+    </div>
+</div>
 
                     <!-- قسم عرض البواليص الحالية -->
                     <div class="row">

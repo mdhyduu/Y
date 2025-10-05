@@ -1323,11 +1323,11 @@ def manage_shipping_policies():
         SallaOrder.shipping_policy_image.isnot(None)
     ).order_by(SallaOrder.created_at.desc()).all()
     
-    # جلب جميع الطلبات مؤخراً لسهولة الرفع
-    recent_orders = SallaOrder.query.order_by(SallaOrder.created_at.desc()).limit(50).all()
+    # جلب جميع الطلبات من قاعدة البيانات (ليس وهمية)
+    all_orders = SallaOrder.query.order_by(SallaOrder.created_at.desc()).all()
     
     return render_template(
         'shipping_policies.html', 
         orders_with_policies=orders_with_policies,
-        recent_orders=recent_orders
-    )
+        all_orders=all_orders  # تغيير الاسم ليعكس أنه جميع الطلبات الحقيقية
+    ) 
