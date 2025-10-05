@@ -112,15 +112,26 @@ def upload_shipping_policy_page():
 @orders_bp.route('/shipping-policies/manage', methods=['GET'])
 def manage_shipping_policies():
     """عرض صفحة إدارة بواليص الشحن"""
-    # جلب جميع الطلبات التي تحتوي على صور بواليص
-    orders_with_policies = SallaOrder.query.filter(
-        SallaOrder.shipping_policy_image.isnot(None)
-    ).order_by(SallaOrder.created_at.desc()).all()
-    
-    return render_template(
-        'manage_shipping_policies.html', 
-        orders_with_policies=orders_with_policies
-    )
+    try:
+        # جلب جميع الطلبات التي تحتوي على صور بواليص
+        orders_with_policies = SallaOrder.query.filter(
+            SallaOrder.shipping_policy_image.isnot(None)
+        ).order_by(SallaOrder.created_at.desc()).all()
+        
+        # حساب الإحصائيات الأساسية
+        total_policies = len(orders_with_policies)
+        
+        return render_template(
+            'manage_shipping_policies.html', 
+            orders_with_policies=orders_with_policies,
+            total_policies=total_policies
+        )
+        
+    except Exception as e:
+        current_app.logger.error(f"خطأ في جلب بيانات إدارة البواليص: {str(e)}")
+        return render_template('manage_shipping_policies.html', 
+                             orders_with_policies=[],
+                             total_policies=0)
 
 @orders_bp.route('/api/search-orders', methods=['GET'])
 def search_orders():

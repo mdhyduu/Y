@@ -13,7 +13,7 @@
                         <i class="fas fa-cogs me-2"></i>
                         إدارة بواليص الشحن
                     </h4>
-                    <a href="/shipping-policies" class="btn btn-light btn-sm">
+                    <a href="{{ url_for('orders.upload_shipping_policy_page') }}" class="btn btn-light btn-sm">
                         <i class="fas fa-upload me-1"></i>
                         رفع بوليصة جديدة
                     </a>
@@ -55,7 +55,7 @@
                                                         <td>{{ order.customer_name or 'غير محدد' }}</td>
                                                         <td>
                                                             {% if order.created_at %}
-                                                                {{ order.created_at|format_date }}
+                                                                {{ order.created_at.strftime('%Y-%m-%d %H:%M') }}
                                                             {% else %}
                                                                 غير محدد
                                                             {% endif %}
@@ -67,7 +67,11 @@
                                                                     <i class="fas fa-check-circle me-1"></i>مرفوعة
                                                                 </span>
                                                                 <br>
-                                                                <small class="text-muted">{{ order.shipping_policy_uploaded_at|format_date if order.shipping_policy_uploaded_at else '' }}</small>
+                                                                <small class="text-muted">
+                                                                    {% if order.updated_at %}
+                                                                        {{ order.updated_at.strftime('%Y-%m-%d %H:%M') }}
+                                                                    {% endif %}
+                                                                </small>
                                                             {% else %}
                                                                 <span class="badge bg-danger">
                                                                     <i class="fas fa-times-circle me-1"></i>غير مرفوعة
@@ -92,12 +96,6 @@
                                                                             title="حذف البوليصة">
                                                                         <i class="fas fa-trash"></i>
                                                                     </button>
-                                                                {% else %}
-                                                                    <button class="btn btn-outline-success" 
-                                                                            onclick="quickUpload('{{ order.id }}')"
-                                                                            title="رفع بوليصة">
-                                                                        <i class="fas fa-upload"></i>
-                                                                    </button>
                                                                 {% endif %}
                                                             </div>
                                                         </td>
@@ -106,41 +104,12 @@
                                                 </tbody>
                                             </table>
                                         </div>
-
-                                        <!-- ترقيم الصفحات -->
-                                        {% if total_pages > 1 %}
-                                        <nav aria-label="Page navigation">
-                                            <ul class="pagination justify-content-center">
-                                                {% if current_page > 1 %}
-                                                <li class="page-item">
-                                                    <a class="page-link" href="?page={{ current_page -1 }}" aria-label="Previous">
-                                                        <span aria-hidden="true">&laquo;</span>
-                                                    </a>
-                                                </li>
-                                                {% endif %}
-                                                
-                                                {% for page in range(1, total_pages + 1) %}
-                                                <li class="page-item {% if page == current_page %}active{% endif %}">
-                                                    <a class="page-link" href="?page={{ page }}">{{ page }}</a>
-                                                </li>
-                                                {% endfor %}
-                                                
-                                                {% if current_page < total_pages %}
-                                                <li class="page-item">
-                                                    <a class="page-link" href="?page={{ current_page +1 }}" aria-label="Next">
-                                                        <span aria-hidden="true">&raquo;</span>
-                                                    </a>
-                                                </li>
-                                                {% endif %}
-                                            </ul>
-                                        </nav>
-                                        {% endif %}
                                     {% else %}
                                         <div class="text-center py-4">
                                             <i class="fas fa-file-invoice fa-3x text-muted mb-3"></i>
                                             <h5 class="text-muted">لا توجد بواليص مرفوعة بعد</h5>
                                             <p class="text-muted">استخدم زر "رفع بوليصة جديدة" لرفع أول بوليصة شحن</p>
-                                            <a href="/shipping-policies" class="btn btn-primary mt-2">
+                                            <a href="{{ url_for('orders.upload_shipping_policy_page') }}" class="btn btn-primary mt-2">
                                                 <i class="fas fa-upload me-2"></i>رفع أول بوليصة
                                             </a>
                                         </div>
@@ -150,10 +119,10 @@
                         </div>
                     </div>
 
-                    <!-- إحصائيات -->
+                    <!-- إحصائيات مبسطة -->
                     {% if orders_with_policies %}
                     <div class="row mt-4">
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <div class="card bg-primary text-white">
                                 <div class="card-body text-center">
                                     <h4 class="mb-0">{{ total_policies }}</h4>
@@ -161,27 +130,19 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <div class="card bg-success text-white">
                                 <div class="card-body text-center">
-                                    <h4 class="mb-0">{{ active_policies }}</h4>
-                                    <p class="mb-0">بواليص نشطة</p>
+                                    <h4 class="mb-0">{{ orders_with_policies|length }}</h4>
+                                    <p class="mb-0">بواليص مرفوعة</p>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <div class="card bg-info text-white">
                                 <div class="card-body text-center">
-                                    <h4 class="mb-0">{{ recent_policies }}</h4>
-                                    <p class="mb-0">مرفوعة هذا الشهر</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="card bg-warning text-white">
-                                <div class="card-body text-center">
-                                    <h4 class="mb-0">{{ orders_without_policies }}</h4>
-                                    <p class="mb-0">طلبات بدون بواليص</p>
+                                    <h4 class="mb-0">{{ orders_with_policies|length }}</h4>
+                                    <p class="mb-0">نشطة</p>
                                 </div>
                             </div>
                         </div>
@@ -211,39 +172,6 @@
                     <i class="fas fa-download me-2"></i>تحميل
                 </a>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal الرفع السريع -->
-<div class="modal fade" id="quickUploadModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">رفع بوليصة للطلب <span id="quickUploadOrderId"></span></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="quickUploadForm" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="quickPolicyFile" class="form-label">صورة البوليصة</label>
-                        <input class="form-control" type="file" id="quickPolicyFile" 
-                               name="shipping_policy_image" 
-                               accept=".png,.jpg,.jpeg,.gif,.pdf,.webp" required>
-                        <div class="form-text">
-                            الأنواع المسموحة: PNG, JPG, JPEG, GIF, PDF, WEBP (بحد أقصى 16MB)
-                        </div>
-                    </div>
-                </form>
-                <div class="progress mt-3" style="display: none;" id="quickUploadProgress">
-                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
-                </div>
-                <div class="alert alert-danger mt-3" style="display: none;" id="quickUploadError"></div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                <button type="button" class="btn btn-primary" onclick="submitQuickUpload()">رفع</button>
             </div>
         </div>
     </div>
@@ -289,8 +217,6 @@
 
 {% block scripts %}
 <script>
-let currentQuickUploadOrderId = null;
-
 // معاينة البوليصة
 function viewPolicy(orderId, imageUrl) {
     document.getElementById('modalOrderId').textContent = orderId;
@@ -376,109 +302,6 @@ async function deletePolicy(orderId) {
             Swal.fire('خطأ!', error.message, 'error');
         }
     }
-}
-
-// الرفع السريع
-function quickUpload(orderId) {
-    currentQuickUploadOrderId = orderId;
-    document.getElementById('quickUploadOrderId').textContent = orderId;
-    document.getElementById('quickUploadForm').reset();
-    document.getElementById('quickUploadError').style.display = 'none';
-    document.getElementById('quickUploadProgress').style.display = 'none';
-    
-    const modal = new bootstrap.Modal(document.getElementById('quickUploadModal'));
-    modal.show();
-}
-
-// تقديم الرفع السريع
-async function submitQuickUpload() {
-    const fileInput = document.getElementById('quickPolicyFile');
-    const file = fileInput.files[0];
-    
-    if (!file) {
-        showQuickError('يرجى اختيار ملف');
-        return;
-    }
-    
-    // التحقق من حجم الملف
-    if (file.size > 16 * 1024 * 1024) {
-        showQuickError('حجم الملف كبير جداً. الحد الأقصى 16MB');
-        return;
-    }
-    
-    await uploadQuickPolicy(currentQuickUploadOrderId, file);
-}
-
-// رفع البوليصة السريع
-async function uploadQuickPolicy(orderId, file) {
-    const formData = new FormData();
-    formData.append('shipping_policy_image', file);
-    
-    showQuickLoading(true);
-    
-    try {
-        const response = await fetch(`/orders/${orderId}/shipping-policy`, {
-            method: 'POST',
-            body: formData
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-            showQuickSuccess('تم رفع البوليصة بنجاح');
-            
-            // إغلاق الـ modal بعد الرفع الناجح
-            const modal = bootstrap.Modal.getInstance(document.getElementById('quickUploadModal'));
-            modal.hide();
-            
-            // إعادة تحميل الصفحة لعرض البوليصة الجديدة
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-        } else {
-            throw new Error(data.error || 'فشل في رفع الملف');
-        }
-    } catch (error) {
-        console.error('Upload error:', error);
-        showQuickError(error.message);
-    } finally {
-        showQuickLoading(false);
-    }
-}
-
-// دوال مساعدة للرفع السريع
-function showQuickLoading(show) {
-    const progress = document.getElementById('quickUploadProgress');
-    const error = document.getElementById('quickUploadError');
-    
-    if (progress) {
-        progress.style.display = show ? 'block' : 'none';
-        if (show) {
-            progress.querySelector('.progress-bar').style.width = '0%';
-        }
-    }
-    
-    if (error) {
-        error.style.display = 'none';
-    }
-}
-
-function showQuickError(message) {
-    const errorElement = document.getElementById('quickUploadError');
-    if (errorElement) {
-        errorElement.textContent = message;
-        errorElement.style.display = 'block';
-    }
-}
-
-function showQuickSuccess(message) {
-    Swal.fire({
-        icon: 'success',
-        title: 'نجح',
-        text: message,
-        timer: 2000,
-        showConfirmButton: false
-    });
 }
 </script>
 {% endblock %}
