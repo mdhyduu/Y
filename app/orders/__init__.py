@@ -15,3 +15,4 @@ from . import status_management
 from . import custom_orders
 from . import utils_routes
 from . import print_utils
+from . import shipping_policies

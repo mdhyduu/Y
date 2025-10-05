@@ -113,7 +113,7 @@ class Config:
     DO_SPACES_KEY = os.environ.get('DO_SPACES_KEY')
     DO_SPACES_SECRET = os.environ.get('DO_SPACES_SECRET')
     DO_SPACES_BUCKET = os.environ.get('DO_SPACES_BUCKET')
-    DO_SPACES_REGION = os.environ.get('DO_SPACES_REGION', 'nyc3')
+    DO_SPACES_REGION = os.environ.get('DO_SPACES_REGION')
     
     # إعدادات رفع الملفات
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'webp'}

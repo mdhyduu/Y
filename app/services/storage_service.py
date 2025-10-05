@@ -14,7 +14,7 @@ class DigitalOceanStorage:
     def init_app(self, app):
         """تهيئة العميل مع التطبيق"""
         self.bucket_name = app.config.get('DO_SPACES_BUCKET')
-        self.region = app.config.get('DO_SPACES_REGION', 'nyc3')
+        self.region = app.config.get('DO_SPACES_REGION')
         
         self.s3_client = boto3.client(
             's3',
