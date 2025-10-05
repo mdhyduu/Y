@@ -405,6 +405,7 @@ class SallaOrder(db.Model):
         Index('ix_salla_orders_sync', 'last_synced'),
         Index('ix_salla_orders_total', 'total_amount'),
         Index('ix_salla_orders_store_status_date', 'store_id', 'status_id', 'created_at'),
+        Index('ix_salla_orders_shipping_policy', 'shipping_policy_image'),
         Index('ix_salla_orders_reference_id', 'reference_id'),  # إضافة فهرس للحقل الجديد
     )
     
@@ -424,7 +425,7 @@ class SallaOrder(db.Model):
     full_order_data = db.Column(JSONB, nullable=True)
     # العلاقة الصحيحة مع OrderStatus
     status = db.relationship('OrderStatus', backref='salla_orders', lazy='selectin')
-
+    shipping_policy_image = db.Column(db.String(500), nullable=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     raw_data = db.Column(db.JSON)
     barcode_data = db.Column(db.Text)  # تخزين الباركود كـ base64

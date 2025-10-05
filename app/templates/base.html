@@ -59,7 +59,11 @@
 
 {% endif %}
 
-
+<!-- في القائمة الجانبية في base.html -->
+<a class="nav-link {% if request.path == url_for('orders.manage_shipping_policies') %}active{% endif %}" 
+   href="{{ url_for('orders.manage_shipping_policies') }}">
+    <i class="fas fa-file-invoice"></i> بواليص الشحن
+</a>
       
       {% if request.cookies.get('is_admin') == 'true' %}
         <a class="nav-link {% if request.path == url_for('employees.list_employees') %}active{% endif %}" href="{{ url_for('employees.list_employees') }}">

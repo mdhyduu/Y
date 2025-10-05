@@ -95,6 +95,12 @@ def create_app():
 
     # فلترات القوالب
     app.jinja_env.filters['format_date'] = format_date
+    
+    # ⭐⭐ تهيئة خدمة التخزين في DigitalOcean Spaces ⭐⭐
+    from .services.storage_service import do_storage
+    do_storage.init_app(app)
+    app.storage_service = do_storage  # إرفاق خدمة التخزين بالتطبيق
+    
     @app.after_request
     def add_security_headers(response):
         if request.path.startswith('/webhook/'):
@@ -111,7 +117,8 @@ def create_app():
             "https://salla.sa "      # ⭐ النطاق الرئيسي
             "https://s.salla.sa "    # ⭐ النطاق الإداري
             "https://*.salla.sa "    # ⭐ جميع النطاقات الفرعية
-            "https://*.cdn.salla.sa;" # ⭐ جميع نطاقات CDN الفرعية
+            "https://*.cdn.salla.sa " # ⭐ جميع نطاقات CDN الفرعية
+            "https://*.digitaloceanspaces.com;" # ⭐⭐ السماح لـ DigitalOcean Spaces ⭐⭐
             "font-src 'self' https: data:; "
             "connect-src 'self' https: wss: "
             "https://api.salla.dev "  # ⭐ واجهة برمجة التطبيقات
@@ -141,6 +148,7 @@ def create_app():
             response.headers['Cache-Control'] = 'private, max-age=3600'
     
         return response
+    
     @app.template_filter('time_ago')
     def time_ago_filter(dt):
         if not dt:
@@ -336,5 +344,3 @@ def create_app():
     # بدء المخطط
     init_scheduler()
     return app
-    
-    

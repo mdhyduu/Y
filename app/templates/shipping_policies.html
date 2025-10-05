@@ -1,0 +1,492 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة بواليص الشحن{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-file-invoice me-2"></i>
+                        إدارة بواليص الشحن
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- قسم رفع البوليصة -->
+                    <div class="row mb-5">
+                        <div class="col-12">
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-upload me-2"></i>
+                                        رفع بوليصة شحن جديدة
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="uploadPolicyForm" enctype="multipart/form-data" class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="orderSelect" class="form-label">اختر الطلب</label>
+                                            <select class="form-select" id="orderSelect" required>
+                                                <option value="">-- اختر طلب --</option>
+                                                {% for order in recent_orders %}
+                                                    <option value="{{ order.id }}">
+                                                        {{ order.id }} - {{ order.customer_name or 'غير محدد' }} - {{ order.total_amount or 0 }} {{ order.currency or 'SAR' }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <label for="policyFile" class="form-label">صورة البوليصة</label>
+                                            <input class="form-control" type="file" id="policyFile" 
+                                                   name="shipping_policy_image" 
+                                                   accept=".png,.jpg,.jpeg,.gif,.pdf,.webp" required>
+                                            <div class="form-text">
+                                                الأنواع المسموحة: PNG, JPG, JPEG, GIF, PDF, WEBP (بحد أقصى 16MB)
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-12">
+                                            <button type="submit" class="btn btn-success" id="uploadBtn">
+                                                <i class="fas fa-upload me-2"></i>رفع البوليصة
+                                            </button>
+                                        </div>
+                                    </form>
+                                    
+                                    <div class="progress mt-3" style="display: none;" id="uploadProgress">
+                                        <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                    </div>
+                                    
+                                    <div class="alert alert-danger mt-3" style="display: none;" id="uploadError"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- قسم عرض البواليص الحالية -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card border-info">
+                                <div class="card-header bg-info text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-list me-2"></i>
+                                        البواليص المرفوعة
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    {% if orders_with_policies %}
+                                        <div class="table-responsive">
+                                            <table class="table table-striped table-hover">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>رقم الطلب</th>
+                                                        <th>اسم العميل</th>
+                                                        <th>تاريخ الطلب</th>
+                                                        <th>المبلغ</th>
+                                                        <th>البوليصة</th>
+                                                        <th>الإجراءات</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for order in orders_with_policies %}
+                                                    <tr id="order-{{ order.id }}">
+                                                        <td>
+                                                            <strong>{{ order.id }}</strong>
+                                                            {% if order.reference_id %}
+                                                            <br><small class="text-muted">مرجع: {{ order.reference_id }}</small>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>{{ order.customer_name or 'غير محدد' }}</td>
+                                                        <td>
+                                                            {% if order.created_at %}
+                                                                {{ order.created_at|format_date }}
+                                                            {% else %}
+                                                                غير محدد
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>{{ order.total_amount or 0 }} {{ order.currency or 'SAR' }}</td>
+                                                        <td>
+                                                            {% if order.shipping_policy_image %}
+                                                                <span class="badge bg-success">
+                                                                    <i class="fas fa-check-circle me-1"></i>مرفوعة
+                                                                </span>
+                                                            {% else %}
+                                                                <span class="badge bg-danger">
+                                                                    <i class="fas fa-times-circle me-1"></i>غير مرفوعة
+                                                                </span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            <div class="btn-group btn-group-sm">
+                                                                {% if order.shipping_policy_image %}
+                                                                    <button class="btn btn-outline-primary" 
+                                                                            onclick="viewPolicy('{{ order.id }}', '{{ order.shipping_policy_image }}')"
+                                                                            title="معاينة البوليصة">
+                                                                        <i class="fas fa-eye"></i>
+                                                                    </button>
+                                                                    <button class="btn btn-outline-success" 
+                                                                            onclick="downloadPolicy('{{ order.shipping_policy_image }}')"
+                                                                            title="تحميل البوليصة">
+                                                                        <i class="fas fa-download"></i>
+                                                                    </button>
+                                                                    <button class="btn btn-outline-danger" 
+                                                                            onclick="deletePolicy('{{ order.id }}')"
+                                                                            title="حذف البوليصة">
+                                                                        <i class="fas fa-trash"></i>
+                                                                    </button>
+                                                                {% else %}
+                                                                    <button class="btn btn-outline-success" 
+                                                                            onclick="quickUpload('{{ order.id }}')"
+                                                                            title="رفع بوليصة">
+                                                                        <i class="fas fa-upload"></i>
+                                                                    </button>
+                                                                {% endif %}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center py-4">
+                                            <i class="fas fa-file-invoice fa-3x text-muted mb-3"></i>
+                                            <h5 class="text-muted">لا توجد بواليص مرفوعة بعد</h5>
+                                            <p class="text-muted">استخدم نموذج الرفع أعلاه لرفع أول بوليصة شحن</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal معاينة البوليصة -->
+<div class="modal fade" id="viewPolicyModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">معاينة بوليصة الشحن - <span id="modalOrderId"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="policyContent">
+                    <!-- سيتم تحميل المحتوى هنا -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a href="#" class="btn btn-success" id="downloadModalLink" download>
+                    <i class="fas fa-download me-2"></i>تحميل
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal الرفع السريع -->
+<div class="modal fade" id="quickUploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">رفع بوليصة للطلب <span id="quickUploadOrderId"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="quickUploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="quickPolicyFile" class="form-label">صورة البوليصة</label>
+                        <input class="form-control" type="file" id="quickPolicyFile" 
+                               name="shipping_policy_image" 
+                               accept=".png,.jpg,.jpeg,.gif,.pdf,.webp" required>
+                    </div>
+                </form>
+                <div class="progress mt-3" style="display: none;" id="quickUploadProgress">
+                    <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div class="alert alert-danger mt-3" style="display: none;" id="quickUploadError"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" onclick="submitQuickUpload()">رفع</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.policy-image {
+    max-height: 70vh;
+    max-width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.policy-pdf-placeholder {
+    padding: 60px 20px;
+    background: #f8f9fa;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.policy-pdf-placeholder i {
+    font-size: 48px;
+    color: #6c757d;
+    margin-bottom: 15px;
+}
+
+.card {
+    border: 1px solid rgba(0,0,0,0.125);
+    border-radius: 0.5rem;
+}
+
+.card-header {
+    border-bottom: 1px solid rgba(0,0,0,0.125);
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentQuickUploadOrderId = null;
+
+// تهيئة الصفحة
+document.addEventListener('DOMContentLoaded', function() {
+    initializeForm();
+});
+
+// تهيئة نموذج الرفع
+function initializeForm() {
+    const uploadForm = document.getElementById('uploadPolicyForm');
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', handleFormSubmit);
+    }
+}
+
+// معالجة تقديم النموذج
+async function handleFormSubmit(e) {
+    e.preventDefault();
+    
+    const orderId = document.getElementById('orderSelect').value;
+    const fileInput = document.getElementById('policyFile');
+    const file = fileInput.files[0];
+    
+    if (!orderId) {
+        showError('يرجى اختيار طلب');
+        return;
+    }
+    
+    if (!file) {
+        showError('يرجى اختيار ملف');
+        return;
+    }
+    
+    // التحقق من حجم الملف
+    if (file.size > 16 * 1024 * 1024) {
+        showError('حجم الملف كبير جداً. الحد الأقصى 16MB');
+        return;
+    }
+    
+    await uploadPolicy(orderId, file, 'uploadProgress', 'uploadError');
+}
+
+// رفع البوليصة
+async function uploadPolicy(orderId, file, progressId, errorId) {
+    const formData = new FormData();
+    formData.append('shipping_policy_image', file);
+    
+    showLoading(true, progressId, errorId);
+    
+    try {
+        const response = await fetch(`/orders/${orderId}/shipping-policy`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showSuccess('تم رفع البوليصة بنجاح');
+            resetForm();
+            // إعادة تحميل الصفحة لعرض البوليصة الجديدة
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            throw new Error(data.error || 'فشل في رفع الملف');
+        }
+    } catch (error) {
+        console.error('Upload error:', error);
+        showError(error.message, errorId);
+    } finally {
+        showLoading(false, progressId, errorId);
+    }
+}
+
+// معاينة البوليصة
+function viewPolicy(orderId, imageUrl) {
+    document.getElementById('modalOrderId').textContent = orderId;
+    document.getElementById('downloadModalLink').href = imageUrl;
+    
+    const policyContent = document.getElementById('policyContent');
+    policyContent.innerHTML = '';
+    
+    if (imageUrl.toLowerCase().endsWith('.pdf')) {
+        // عرض مكان holder لـ PDF
+        policyContent.innerHTML = `
+            <div class="policy-pdf-placeholder">
+                <i class="fas fa-file-pdf"></i>
+                <h5>ملف PDF للبوليصة</h5>
+                <p>انقر على زر التحميل لتحميل ملف البوليصة</p>
+            </div>
+        `;
+    } else {
+        // عرض الصورة
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.alt = 'بوليصة الشحن';
+        img.className = 'policy-image';
+        policyContent.appendChild(img);
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('viewPolicyModal'));
+    modal.show();
+}
+
+// تحميل البوليصة
+function downloadPolicy(imageUrl) {
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = 'بوليصة_الشحن_' + new Date().getTime();
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// حذف البوليصة
+async function deletePolicy(orderId) {
+    const result = await Swal.fire({
+        title: 'هل أنت متأكد؟',
+        text: "لن تتمكن من استعادة البوليصة بعد الحذف!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'نعم، احذف!',
+        cancelButtonText: 'إلغاء',
+        reverseButtons: true
+    });
+    
+    if (result.isConfirmed) {
+        try {
+            const response = await fetch(`/orders/${orderId}/shipping-policy`, {
+                method: 'DELETE'
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                Swal.fire('تم الحذف!', 'تم حذف البوليصة بنجاح.', 'success');
+                // إزالة الصف من الجدول
+                const row = document.getElementById(`order-${orderId}`);
+                if (row) {
+                    row.remove();
+                }
+            } else {
+                throw new Error(data.error || 'فشل في حذف البوليصة');
+            }
+        } catch (error) {
+            console.error('Delete error:', error);
+            Swal.fire('خطأ!', error.message, 'error');
+        }
+    }
+}
+
+// الرفع السريع
+function quickUpload(orderId) {
+    currentQuickUploadOrderId = orderId;
+    document.getElementById('quickUploadOrderId').textContent = orderId;
+    document.getElementById('quickUploadForm').reset();
+    document.getElementById('quickUploadError').style.display = 'none';
+    
+    const modal = new bootstrap.Modal(document.getElementById('quickUploadModal'));
+    modal.show();
+}
+
+// تقديم الرفع السريع
+async function submitQuickUpload() {
+    const fileInput = document.getElementById('quickPolicyFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        document.getElementById('quickUploadError').textContent = 'يرجى اختيار ملف';
+        document.getElementById('quickUploadError').style.display = 'block';
+        return;
+    }
+    
+    // التحقق من حجم الملف
+    if (file.size > 16 * 1024 * 1024) {
+        document.getElementById('quickUploadError').textContent = 'حجم الملف كبير جداً. الحد الأقصى 16MB';
+        document.getElementById('quickUploadError').style.display = 'block';
+        return;
+    }
+    
+    await uploadPolicy(currentQuickUploadOrderId, file, 'quickUploadProgress', 'quickUploadError');
+    
+    // إغلاق الـ modal بعد الرفع الناجح
+    const modal = bootstrap.Modal.getInstance(document.getElementById('quickUploadModal'));
+    modal.hide();
+}
+
+// دوال مساعدة
+function showLoading(show, progressId, errorId) {
+    const progress = document.getElementById(progressId);
+    const error = document.getElementById(errorId);
+    
+    if (progress) {
+        progress.style.display = show ? 'block' : 'none';
+        if (show) {
+            progress.querySelector('.progress-bar').style.width = '0%';
+        }
+    }
+    
+    if (error) {
+        error.style.display = 'none';
+    }
+    
+    const uploadBtn = document.getElementById('uploadBtn');
+    if (uploadBtn) {
+        uploadBtn.disabled = show;
+    }
+}
+
+function showError(message, errorId = 'uploadError') {
+    const errorElement = document.getElementById(errorId);
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
+}
+
+function showSuccess(message) {
+    Swal.fire({
+        icon: 'success',
+        title: 'نجح',
+        text: message,
+        timer: 2000,
+        showConfirmButton: false
+    });
+}
+
+function resetForm() {
+    document.getElementById('uploadPolicyForm').reset();
+}
+</script>
+{% endblock %}

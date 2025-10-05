@@ -109,6 +109,16 @@ class Config:
         'fallback': os.environ.get('ENCRYPTION_KEY_FALLBACK') or Fernet.generate_key().decode()
     }
     
+    # ⭐⭐ إعدادات DigitalOcean Spaces ⭐⭐
+    DO_SPACES_KEY = os.environ.get('DO_SPACES_KEY')
+    DO_SPACES_SECRET = os.environ.get('DO_SPACES_SECRET')
+    DO_SPACES_BUCKET = os.environ.get('DO_SPACES_BUCKET')
+    DO_SPACES_REGION = os.environ.get('DO_SPACES_REGION', 'nyc3')
+    
+    # إعدادات رفع الملفات
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'webp'}
+    MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB
+    
     # ------ إعدادات التطوير ------
     DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
     TESTING = os.environ.get('TESTING', 'False').lower() == 'true'
