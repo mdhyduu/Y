@@ -1400,18 +1400,21 @@ function generatePrintHTML(printData) {
             border: 1px solid #000000 !important;
         }
 
-        .barcode-container {
-            background: #ffffff !important;
-            border: 1px solid #000000 !important;
-            min-height: 60px !important;
-            
-             }
+.barcode-container {
+    background: #ffffff !important;
+    border: 1px solid #000000 !important;
+    min-height: 60px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
 
-        .barcode-image {
-        height:100%;
-        width:100%;
-        }
-
+.barcode-image {
+    height: 100%;
+    width: 100%;
+    object-fit: contain; /* يحافظ على نسبة الباركود */
+}
         .order-ref-link {
             color: #000000 !important;
             text-decoration: none !important;
@@ -1544,7 +1547,35 @@ font-size:2px; }
         
         // معالجة الصور التالفة وتحسين النصوص
         document.addEventListener('DOMContentLoaded', function() {
-            const images = document.querySelectorAll('.product-image, .barcode-image');
+            const images = document.querySelectorAll('.product-image, ..barcode-container {
+    background: #ffffff !important;
+    border: 1px solid #000000 !important;
+    min-height: 60px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.barcode-image {
+    height: 100%;
+    width: 100%;
+    object-fit: contain; /* يحافظ على نسبة الباركود */
+}.barcode-container {
+    background: #ffffff !important;
+    border: 1px solid #000000 !important;
+    min-height: 60px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.barcode-image {
+    height: 100%;
+    width: 100%;
+    object-fit: contain; /* يحافظ على نسبة الباركود */
+}-image');
             images.forEach(img => {
                 img.addEventListener('error', function() {
                     this.style.display = 'none';
