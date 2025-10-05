@@ -106,10 +106,13 @@ def create_app():
         if request.path.startswith('/webhook/'):
             return response
     
-        # ⭐⭐ CSP معدل خصيصاً لسلة ومصادرها ⭐⭐
+        # ⭐⭐ CSP معدل خصيصاً لسلة ومصادرها + Tesseract.js ⭐⭐
         csp = (
             "default-src 'self' https: data:; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob: data:; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob: data: "
+            "https://cdnjs.cloudflare.com "  # ⭐⭐ السماح لـ Tesseract.js من cdnjs
+            "https://cdn.jsdelivr.net "      # ⭐⭐ السماح لـ Tesseract.js من jsDelivr
+            "https://unpkg.com;"             # ⭐⭐ السماح لـ Tesseract.js من unpkg
             "style-src 'self' 'unsafe-inline' https:; "
             # ⭐⭐ السماح لجميع نطاقات سلة و CDN الخاصة بها ⭐⭐
             "img-src 'self' data: blob: https: "
@@ -118,11 +121,19 @@ def create_app():
             "https://s.salla.sa "    # ⭐ النطاق الإداري
             "https://*.salla.sa "    # ⭐ جميع النطاقات الفرعية
             "https://*.cdn.salla.sa " # ⭐ جميع نطاقات CDN الفرعية
-            "https://*.digitaloceanspaces.com;" # ⭐⭐ السماح لـ DigitalOcean Spaces ⭐⭐
+            "https://*.digitaloceanspaces.com " # ⭐⭐ السماح لـ DigitalOcean Spaces ⭐⭐
+            "https://cdnjs.cloudflare.com "     # ⭐⭐ السماح لـ Tesseract.js worker
+            "https://cdn.jsdelivr.net "         # ⭐⭐ السماح لـ Tesseract.js worker
+            "https://unpkg.com;"                # ⭐⭐ السماح لـ Tesseract.js worker
             "font-src 'self' https: data:; "
             "connect-src 'self' https: wss: "
             "https://api.salla.dev "  # ⭐ واجهة برمجة التطبيقات
-            "https://api.salla.sa;"   # ⭐ واجهة برمجة التطبيقات
+            "https://api.salla.sa "   # ⭐ واجهة برمجة التطبيقات
+            "https://cdnjs.cloudflare.com " # ⭐⭐ السماح لـ Tesseract.js worker
+            "https://cdn.jsdelivr.net "     # ⭐⭐ السماح لـ Tesseract.js worker
+            "https://unpkg.com;"            # ⭐⭐ السماح لـ Tesseract.js worker
+            "worker-src 'self' blob: "      # ⭐⭐ السماح لـ Web Workers (مطلوب لـ Tesseract)
+            "child-src 'self' blob:;"       # ⭐⭐ السماح لـ Workers
             "frame-ancestors 'none'; "
             "form-action 'self'; "
             "base-uri 'self'; "
