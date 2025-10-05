@@ -1,4 +1,4 @@
-from flask import request, jsonify, current_app
+from flask import request, jsonify, current_app, flash, redirect
 from werkzeug.utils import secure_filename
 import os
 from . import orders_bp
@@ -6,23 +6,7 @@ from ..models import SallaOrder, db
 from ..services.storage_service import do_storage
 from flask import render_template
 from sqlalchemy import or_
-from flask_login import current_user
-from functools import wraps
-
-def store_required(f):
-    """ديكوراتور للتحقق من وجود متجر للمستخدم"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not hasattr(current_user, 'store_id') or not current_user.store_id:
-            return jsonify({'error': 'غير مصرح بالوصول'}), 403
-        return f(*args, **kwargs)
-    return decorated_function
-
-def get_current_store_id():
-    """الحصول على store_id للمستخدم الحالي"""
-    if hasattr(current_user, 'store_id') and current_user.store_id:
-        return current_user.store_id
-    return None
+from app.utils import get_user_from_cookies  # استيراد نفس الدالة المستخدمة في routes
 
 def allowed_file(filename):
     """التحقق من نوع الملف المسموح به"""
@@ -30,12 +14,19 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
 
 @orders_bp.route('/orders/<order_id>/shipping-policy', methods=['POST'])
-@store_required
 def upload_shipping_policy(order_id):
     """رفع صورة البوليصة لطلب معين"""
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        return jsonify({'error': 'الرجاء تسجيل الدخول أولاً'}), 401
+    
+    store_id = user.store_id
+    if not store_id:
+        return jsonify({'error': 'غير مصرح بالوصول'}), 403
+    
     try:
         # البحث عن الطلب مع التحقق من أنه ينتمي للمتجر الحالي
-        store_id = get_current_store_id()
         order = SallaOrder.query.filter_by(
             id=order_id, 
             store_id=store_id
@@ -84,11 +75,18 @@ def upload_shipping_policy(order_id):
         return jsonify({'error': 'حدث خطأ أثناء رفع الملف'}), 500
 
 @orders_bp.route('/orders/<order_id>/shipping-policy', methods=['DELETE'])
-@store_required
 def delete_shipping_policy(order_id):
     """حذف صورة البوليصة"""
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        return jsonify({'error': 'الرجاء تسجيل الدخول أولاً'}), 401
+    
+    store_id = user.store_id
+    if not store_id:
+        return jsonify({'error': 'غير مصرح بالوصول'}), 403
+    
     try:
-        store_id = get_current_store_id()
         order = SallaOrder.query.filter_by(
             id=order_id, 
             store_id=store_id
@@ -113,11 +111,18 @@ def delete_shipping_policy(order_id):
         return jsonify({'error': 'حدث خطأ أثناء حذف الملف'}), 500
 
 @orders_bp.route('/<order_id>/shipping-policy', methods=['GET'])
-@store_required
 def get_shipping_policy(order_id):
     """الحصول على معلومات صورة البوليصة"""
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        return jsonify({'error': 'الرجاء تسجيل الدخول أولاً'}), 401
+    
+    store_id = user.store_id
+    if not store_id:
+        return jsonify({'error': 'غير مصرح بالوصول'}), 403
+    
     try:
-        store_id = get_current_store_id()
         order = SallaOrder.query.filter_by(
             id=order_id, 
             store_id=store_id
@@ -137,19 +142,36 @@ def get_shipping_policy(order_id):
         return jsonify({'error': 'حدث خطأ أثناء جلب معلومات الملف'}), 500
 
 @orders_bp.route('/shipping-policies/upload', methods=['GET'])
-@store_required
 def upload_shipping_policy_page():
     """عرض صفحة رفع بواليص الشحن"""
-    store_id = get_current_store_id()
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        flash('الرجاء تسجيل الدخول أولاً', 'error')
+        return redirect(url_for('user_auth.login'))
+    
+    store_id = user.store_id
+    if not store_id:
+        flash('غير مصرح بالوصول', 'error')
+        return redirect(url_for('user_auth.login'))
+    
     return render_template('upload_shipping_policy.html', store_id=store_id)
 
 @orders_bp.route('/shipping-policies/manage', methods=['GET'])
-@store_required
 def manage_shipping_policies():
     """عرض صفحة إدارة بواليص الشحن"""
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        flash('الرجاء تسجيل الدخول أولاً', 'error')
+        return redirect(url_for('user_auth.login'))
+    
+    store_id = user.store_id
+    if not store_id:
+        flash('غير مصرح بالوصول', 'error')
+        return redirect(url_for('user_auth.login'))
+    
     try:
-        store_id = get_current_store_id()
-        
         # جلب جميع الطلبات التي تحتوي على صور بواليص للمتجر الحالي فقط
         orders_with_policies = SallaOrder.query.filter(
             SallaOrder.store_id == store_id,
@@ -171,14 +193,21 @@ def manage_shipping_policies():
         return render_template('manage_shipping_policies.html', 
                              orders_with_policies=[],
                              total_policies=0,
-                             store_id=get_current_store_id())
+                             store_id=store_id)
 
 @orders_bp.route('/api/search-orders', methods=['GET'])
-@store_required
 def search_orders():
     """بحث الطلبات برقم الطلب أو المرجع للمتجر الحالي فقط"""
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        return jsonify({'error': 'الرجاء تسجيل الدخول أولاً'}), 401
+    
+    store_id = user.store_id
+    if not store_id:
+        return jsonify({'error': 'غير مصرح بالوصول'}), 403
+    
     search_term = request.args.get('q', '').strip()
-    store_id = get_current_store_id()
     
     if not search_term:
         return jsonify({'orders': []})
@@ -212,12 +241,18 @@ def search_orders():
         return jsonify({'error': 'حدث خطأ أثناء البحث'}), 500
 
 @orders_bp.route('/orders/shipping-policy-by-number', methods=['POST'])
-@store_required
 def upload_shipping_policy_by_number():
     """رفع صورة البوليصة باستخدام رقم الطلب للمتجر الحالي فقط"""
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        return jsonify({'error': 'الرجاء تسجيل الدخول أولاً'}), 401
+    
+    store_id = user.store_id
+    if not store_id:
+        return jsonify({'error': 'غير مصرح بالوصول'}), 403
+    
     try:
-        store_id = get_current_store_id()
-        
         # الحصول على رقم الطلب من النموذج
         order_number = request.form.get('order_number')
         if not order_number:
@@ -279,11 +314,18 @@ def upload_shipping_policy_by_number():
         return jsonify({'error': 'حدث خطأ أثناء رفع الملف'}), 500
 
 @orders_bp.route('/orders/bulk-shipping-policies', methods=['POST'])
-@store_required
 def bulk_upload_shipping_policies():
     """رفع جماعي للبواليص للطلبات المستخرجة من PDF للمتجر الحالي فقط"""
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        return jsonify({'error': 'الرجاء تسجيل الدخول أولاً'}), 401
+    
+    store_id = user.store_id
+    if not store_id:
+        return jsonify({'error': 'غير مصرح بالوصول'}), 403
+    
     try:
-        store_id = get_current_store_id()
         orders_data = request.json.get('orders', [])
         
         if not orders_data:
@@ -373,12 +415,18 @@ def bulk_upload_shipping_policies():
         return jsonify({'error': 'حدث خطأ أثناء المعالجة'}), 500
 
 @orders_bp.route('/api/store-orders', methods=['GET'])
-@store_required
 def get_store_orders():
     """جلب الطلبات الخاصة بالمتجر الحالي فقط للإحصائيات"""
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        return jsonify({'error': 'الرجاء تسجيل الدخول أولاً'}), 401
+    
+    store_id = user.store_id
+    if not store_id:
+        return jsonify({'error': 'غير مصرح بالوصول'}), 403
+    
     try:
-        store_id = get_current_store_id()
-        
         # إحصائيات الطلبات
         total_orders = SallaOrder.query.filter_by(store_id=store_id).count()
         orders_with_policies = SallaOrder.query.filter(
