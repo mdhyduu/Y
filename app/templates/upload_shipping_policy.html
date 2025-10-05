@@ -45,6 +45,14 @@
 
                                     <div class="status mb-3" id="status"></div>
 
+                                    <!-- معاينة الصفحات -->
+                                    <div id="pagesPreview" style="display: none;" class="mb-3">
+                                        <h6 class="mb-2">معاينة الصفحات المستخرجة:</h6>
+                                        <div id="pagesContainer" class="row">
+                                            <!-- سيتم تعبئة معاينة الصفحات هنا -->
+                                        </div>
+                                    </div>
+
                                     <div class="card" id="extractedOrders" style="display: none;">
                                         <div class="card-header bg-light">
                                             <h6 class="mb-0">
@@ -60,6 +68,9 @@
                                                 <button class="btn btn-sm btn-outline-secondary" id="deselectAllBtn">
                                                     <i class="fas fa-square me-1"></i>إلغاء التحديد
                                                 </button>
+                                                <button class="btn btn-sm btn-success" id="uploadSelectedBtn" style="display: none;">
+                                                    <i class="fas fa-upload me-1"></i>رفع البواليص للمحدد
+                                                </button>
                                             </div>
                                             <div id="extractedOrdersList" class="list-group" style="max-height: 400px; overflow-y: auto;">
                                                 <!-- سيتم تعبئة الطلبات المستخرجة هنا -->
@@ -71,14 +82,14 @@
                         </div>
                     </div>
 
-                    <!-- قسم رفع البوليصة -->
+                    <!-- قسم رفع البوليصة التقليدي -->
                     <div class="row">
                         <div class="col-12">
                             <div class="card border-success">
                                 <div class="card-header bg-success text-white">
                                     <h5 class="mb-0">
                                         <i class="fas fa-upload me-2"></i>
-                                        رفع بوليصة شحن جديدة
+                                        رفع بوليصة شحن يدوياً
                                     </h5>
                                 </div>
                                 <div class="card-body">
@@ -142,18 +153,6 @@
                                                         <div class="col-md-2">
                                                             <strong>التاريخ:</strong> <span id="selectedDate"></span>
                                                         </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- الطلبات المحددة من PDF -->
-                                        <div class="col-12" id="selectedOrdersFromPDF" style="display: none;">
-                                            <div class="card border-warning">
-                                                <div class="card-body py-2">
-                                                    <h6 class="card-title mb-2">الطلبات المحددة من ملف PDF:</h6>
-                                                    <div id="selectedOrdersList">
-                                                        <!-- سيتم تعبئة الطلبات المحددة هنا -->
                                                     </div>
                                                 </div>
                                             </div>
@@ -291,6 +290,63 @@
     font-size: 0.85rem;
     margin-right: 10px;
 }
+
+.page-preview {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 5px;
+    margin-bottom: 10px;
+    background: white;
+}
+
+.page-preview img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 3px;
+}
+
+.page-info {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 5px;
+    text-align: center;
+}
+
+.order-with-image {
+    display: flex;
+    align-items: flex-start;
+    padding: 10px;
+    border: 1px solid #e9ecef;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    background: #f8f9fa;
+}
+
+.order-image-preview {
+    width: 80px;
+    height: 80px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-left: 10px;
+    flex-shrink: 0;
+}
+
+.order-image-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.order-details {
+    flex-grow: 1;
+}
+
+.order-actions {
+    display: flex;
+    align-items: center;
+    margin-top: 5px;
+}
 </style>
 {% endblock %}
 
@@ -345,68 +401,6 @@ async function handleFormSubmit(e) {
     if (selectedOrder) {
         await uploadPolicy(selectedOrder.id, file, 'uploadProgress', 'uploadError');
     }
-    
-    // إذا كان هناك طلبات محددة من PDF
-    if (selectedOrdersFromPDF.length > 0) {
-        await uploadPoliciesForSelectedOrders(file);
-    }
-}
-
-// رفع البوليصة لطلبات متعددة
-async function uploadPoliciesForSelectedOrders(file) {
-    const progress = document.getElementById('uploadProgress');
-    const error = document.getElementById('uploadError');
-    
-    showLoading(true, 'uploadProgress', 'uploadError');
-    
-    let successCount = 0;
-    let errorCount = 0;
-    
-    for (let i = 0; i < selectedOrdersFromPDF.length; i++) {
-        const orderNumber = selectedOrdersFromPDF[i];
-        
-        try {
-            // تحديث شريط التقدم
-            const progressPercent = Math.round(((i + 1) / selectedOrdersFromPDF.length) * 100);
-            progress.querySelector('.progress-bar').style.width = `${progressPercent}%`;
-            
-            // رفع البوليصة للطلب الحالي
-            await uploadPolicyForOrderNumber(orderNumber, file);
-            successCount++;
-        } catch (error) {
-            console.error(`Error uploading policy for order ${orderNumber}:`, error);
-            errorCount++;
-        }
-    }
-    
-    showLoading(false, 'uploadProgress', 'uploadError');
-    
-    if (errorCount === 0) {
-        showSuccess(`تم رفع البواليص بنجاح لجميع الطلبات المحددة (${successCount})`);
-        resetForm();
-    } else {
-        showError(`تم رفع البواليص لـ ${successCount} طلب، وفشل رفع ${errorCount} طلب`);
-    }
-}
-
-// رفع بوليصة لرقم طلب معين
-async function uploadPolicyForOrderNumber(orderNumber, file) {
-    const formData = new FormData();
-    formData.append('shipping_policy_image', file);
-    formData.append('order_number', orderNumber);
-    
-    const response = await fetch('/orders/shipping-policy-by-number', {
-        method: 'POST',
-        body: formData
-    });
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
-        throw new Error(data.error || 'فشل في رفع الملف');
-    }
-    
-    return data;
 }
 
 // إعداد البحث
@@ -519,7 +513,6 @@ function selectOrder(order) {
     
     // إظهار قسم التفاصيل
     document.getElementById('orderDetails').style.display = 'block';
-    document.getElementById('selectedOrdersFromPDF').style.display = 'none';
     
     // تفعيل زر الرفع
     document.getElementById('uploadBtn').disabled = false;
@@ -557,6 +550,9 @@ function setupPDFUpload() {
     const dropArea = document.getElementById('dropArea');
     const selectAllBtn = document.getElementById('selectAllBtn');
     const deselectAllBtn = document.getElementById('deselectAllBtn');
+    const uploadSelectedBtn = document.getElementById('uploadSelectedBtn');
+    const pagesPreview = document.getElementById('pagesPreview');
+    const pagesContainer = document.getElementById('pagesContainer');
     
     // إعداد السحب والإفلات
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -616,6 +612,11 @@ function setupPDFUpload() {
         updateSelectedOrdersFromPDF();
     });
     
+    // حدث رفع الطلبات المحددة
+    uploadSelectedBtn.addEventListener('click', function() {
+        uploadSelectedOrders();
+    });
+    
     function loadPDF(file) {
         status.textContent = 'جاري تحميل الملف...';
         progress.style.display = 'block';
@@ -623,13 +624,15 @@ function setupPDFUpload() {
         progressBar.textContent = '0%';
         extractedOrdersDiv.style.display = 'none';
         extractedOrdersList.innerHTML = '';
+        pagesPreview.style.display = 'none';
+        pagesContainer.innerHTML = '';
         extractedOrders = [];
         selectedOrdersFromPDF = [];
+        uploadSelectedBtn.style.display = 'none';
         
         // إلغاء تحديد أي طلب من البحث
         selectedOrder = null;
         document.getElementById('orderDetails').style.display = 'none';
-        document.getElementById('selectedOrdersFromPDF').style.display = 'none';
         document.getElementById('uploadBtn').disabled = true;
         
         const fileReader = new FileReader();
@@ -639,7 +642,7 @@ function setupPDFUpload() {
             
             pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
                 status.textContent = `تم تحميل الملف، عدد الصفحات: ${pdf.numPages}`;
-                extractOrdersFromPDF(pdf);
+                extractOrdersAndImagesFromPDF(pdf);
             }).catch(function(error) {
                 status.textContent = 'حدث خطأ أثناء تحميل الملف: ' + error.message;
             });
@@ -648,16 +651,16 @@ function setupPDFUpload() {
         fileReader.readAsArrayBuffer(file);
     }
     
-    function extractOrdersFromPDF(pdf) {
+    function extractOrdersAndImagesFromPDF(pdf) {
         extractedOrders = [];
         
-        // استخراج الطلبات من جميع الصفحات
+        // استخراج الطلبات والصور من جميع الصفحات
         const pagePromises = [];
         for (let i = 1; i <= pdf.numPages; i++) {
-            pagePromises.push(extractOrderFromPage(pdf, i));
+            pagePromises.push(extractOrderAndImageFromPage(pdf, i));
         }
         
-        Promise.all(pagePromises).then(() => {
+        Promise.all(pagePromises).then((results) => {
             progressBar.style.width = '100%';
             progressBar.textContent = '100%';
             
@@ -666,6 +669,7 @@ function setupPDFUpload() {
                 
                 if (extractedOrders.length > 0) {
                     displayExtractedOrders();
+                    displayPagesPreview(results);
                     status.textContent = `تم استخراج ${extractedOrders.length} طلب من الملف`;
                 } else {
                     status.textContent = 'لم يتم العثور على أرقام طلبات في الملف';
@@ -674,9 +678,23 @@ function setupPDFUpload() {
         });
     }
     
-    function extractOrderFromPage(pdf, pageNumber) {
+    function extractOrderAndImageFromPage(pdf, pageNumber) {
         return pdf.getPage(pageNumber).then(function(page) {
-            return page.getTextContent().then(function(textContent) {
+            const viewport = page.getViewport({ scale: 1.0 });
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            
+            const renderContext = {
+                canvasContext: ctx,
+                viewport: viewport
+            };
+            
+            return Promise.all([
+                page.render(renderContext).promise,
+                page.getTextContent()
+            ]).then(function([renderResult, textContent]) {
                 let text = textContent.items.map(item => item.str).join(' ');
                 
                 // البحث عن نمط أرقام الطلبات (يمكن تعديل النمط حسب الحاجة)
@@ -685,33 +703,77 @@ function setupPDFUpload() {
                 
                 if (!orderNumber) {
                     const fallbackMatch = text.match(/\b\d{9}\b/);
-                    orderNumber = fallbackMatch ? fallbackMatch[0] : null;
+                    orderNumber = fallbackMatch ? fallbackMatch[0] : `page_${pageNumber}`;
                 }
                 
-                if (orderNumber && !extractedOrders.includes(orderNumber)) {
-                    extractedOrders.push(orderNumber);
-                }
-                
-                // تحديث شريط التقدم
-                const progressPercent = Math.round((pageNumber / pdf.numPages) * 100);
-                progressBar.style.width = `${progressPercent}%`;
-                progressBar.textContent = `${progressPercent}%`;
-                
-                return orderNumber;
+                // تحويل canvas إلى صورة
+                return new Promise((resolve) => {
+                    canvas.toBlob(function(blob) {
+                        const imageUrl = URL.createObjectURL(blob);
+                        
+                        const orderData = {
+                            pageNumber: pageNumber,
+                            orderNumber: orderNumber,
+                            imageUrl: imageUrl,
+                            imageBlob: blob
+                        };
+                        
+                        if (orderNumber && !extractedOrders.some(order => order.orderNumber === orderNumber)) {
+                            extractedOrders.push(orderData);
+                        }
+                        
+                        // تحديث شريط التقدم
+                        const progressPercent = Math.round((pageNumber / pdf.numPages) * 100);
+                        progressBar.style.width = `${progressPercent}%`;
+                        progressBar.textContent = `${progressPercent}%`;
+                        
+                        resolve(orderData);
+                    }, 'image/png');
+                });
             });
         });
+    }
+    
+    function displayPagesPreview(pagesData) {
+        pagesContainer.innerHTML = '';
+        
+        pagesData.forEach(pageData => {
+            const col = document.createElement('div');
+            col.className = 'col-md-3 col-sm-6 mb-3';
+            col.innerHTML = `
+                <div class="page-preview">
+                    <img src="${pageData.imageUrl}" alt="صفحة ${pageData.pageNumber}">
+                    <div class="page-info">
+                        الصفحة ${pageData.pageNumber} - ${pageData.orderNumber}
+                    </div>
+                </div>
+            `;
+            pagesContainer.appendChild(col);
+        });
+        
+        pagesPreview.style.display = 'block';
     }
     
     function displayExtractedOrders() {
         extractedOrdersList.innerHTML = '';
         
-        extractedOrders.forEach(orderNumber => {
+        extractedOrders.forEach(orderData => {
             const orderItem = document.createElement('div');
-            orderItem.className = 'extracted-order-item';
+            orderItem.className = 'order-with-image';
             orderItem.innerHTML = `
-                <input type="checkbox" class="form-check-input order-checkbox" value="${orderNumber}">
-                <span class="order-number-badge">${orderNumber}</span>
-                <span>طلب رقم ${orderNumber}</span>
+                <div class="order-image-preview">
+                    <img src="${orderData.imageUrl}" alt="طلب ${orderData.orderNumber}">
+                </div>
+                <div class="order-details">
+                    <div class="d-flex align-items-center mb-2">
+                        <input type="checkbox" class="form-check-input order-checkbox" value="${orderData.orderNumber}">
+                        <span class="order-number-badge ms-2">${orderData.orderNumber}</span>
+                        <strong>طلب رقم ${orderData.orderNumber}</strong>
+                    </div>
+                    <div class="order-actions">
+                        <small class="text-muted">الصفحة: ${orderData.pageNumber}</small>
+                    </div>
+                </div>
             `;
             extractedOrdersList.appendChild(orderItem);
         });
@@ -730,29 +792,94 @@ function setupPDFUpload() {
             selectedOrdersFromPDF.push(checkbox.value);
         });
         
-        // تحديث عرض الطلبات المحددة
-        const selectedOrdersList = document.getElementById('selectedOrdersList');
+        // عرض/إخفاء زر الرفع
         if (selectedOrdersFromPDF.length > 0) {
-            selectedOrdersList.innerHTML = '';
-            selectedOrdersFromPDF.forEach(orderNumber => {
-                const orderBadge = document.createElement('span');
-                orderBadge.className = 'badge bg-warning text-dark me-2 mb-2';
-                orderBadge.textContent = orderNumber;
-                selectedOrdersList.appendChild(orderBadge);
-            });
-            
-            document.getElementById('selectedOrdersFromPDF').style.display = 'block';
-            document.getElementById('orderDetails').style.display = 'none';
-            document.getElementById('uploadBtn').disabled = false;
+            uploadSelectedBtn.style.display = 'inline-block';
+            uploadSelectedBtn.textContent = `رفع البواليص للمحدد (${selectedOrdersFromPDF.length})`;
             
             // إلغاء تحديد الطلب من البحث
             selectedOrder = null;
             document.getElementById('selectedOrderId').value = '';
+            document.getElementById('orderDetails').style.display = 'none';
+            document.getElementById('uploadBtn').disabled = true;
         } else {
-            document.getElementById('selectedOrdersFromPDF').style.display = 'none';
-            document.getElementById('uploadBtn').disabled = selectedOrder === null;
+            uploadSelectedBtn.style.display = 'none';
         }
     }
+    
+    async function uploadSelectedOrders() {
+        if (selectedOrdersFromPDF.length === 0) {
+            showError('يرجى اختيار طلبات لرفع بواليصها');
+            return;
+        }
+        
+        const progress = document.getElementById('uploadProgress');
+        const error = document.getElementById('uploadError');
+        
+        showLoading(true, 'uploadProgress', 'uploadError');
+        
+        let successCount = 0;
+        let errorCount = 0;
+        let errors = [];
+        
+        for (let i = 0; i < selectedOrdersFromPDF.length; i++) {
+            const orderNumber = selectedOrdersFromPDF[i];
+            
+            try {
+                // تحديث شريط التقدم
+                const progressPercent = Math.round(((i + 1) / selectedOrdersFromPDF.length) * 100);
+                progress.querySelector('.progress-bar').style.width = `${progressPercent}%`;
+                
+                // العثور على بيانات الطلب
+                const orderData = extractedOrders.find(order => order.orderNumber === orderNumber);
+                if (orderData) {
+                    // رفع البوليصة للطلب الحالي
+                    await uploadPolicyForOrderNumber(orderNumber, orderData.imageBlob);
+                    successCount++;
+                } else {
+                    throw new Error(`لم يتم العثور على بيانات للطلب ${orderNumber}`);
+                }
+            } catch (error) {
+                console.error(`Error uploading policy for order ${orderNumber}:`, error);
+                errorCount++;
+                errors.push(`الطلب ${orderNumber}: ${error.message}`);
+            }
+        }
+        
+        showLoading(false, 'uploadProgress', 'uploadError');
+        
+        if (errorCount === 0) {
+            showSuccess(`تم رفع البواليص بنجاح لجميع الطلبات المحددة (${successCount})`);
+            resetForm();
+        } else {
+            const errorMessage = `تم رفع البواليص لـ ${successCount} طلب، وفشل رفع ${errorCount} طلب`;
+            if (errors.length > 0) {
+                showError(errorMessage + '<br>' + errors.join('<br>'));
+            } else {
+                showError(errorMessage);
+            }
+        }
+    }
+}
+
+// رفع بوليصة لرقم طلب معين
+async function uploadPolicyForOrderNumber(orderNumber, imageBlob) {
+    const formData = new FormData();
+    formData.append('shipping_policy_image', imageBlob, `${orderNumber}.png`);
+    formData.append('order_number', orderNumber);
+    
+    const response = await fetch('/orders/shipping-policy-by-number', {
+        method: 'POST',
+        body: formData
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+        throw new Error(data.error || 'فشل في رفع الملف');
+    }
+    
+    return data;
 }
 
 // رفع البوليصة
@@ -820,12 +947,17 @@ function showLoading(show, progressId, errorId) {
     if (uploadBtn) {
         uploadBtn.disabled = show;
     }
+    
+    const uploadSelectedBtn = document.getElementById('uploadSelectedBtn');
+    if (uploadSelectedBtn) {
+        uploadSelectedBtn.disabled = show;
+    }
 }
 
 function showError(message, errorId = 'uploadError') {
     const errorElement = document.getElementById(errorId);
     if (errorElement) {
-        errorElement.textContent = message;
+        errorElement.innerHTML = message;
         errorElement.style.display = 'block';
     }
 }
@@ -844,12 +976,20 @@ function resetForm() {
     document.getElementById('uploadPolicyForm').reset();
     document.getElementById('orderDetails').style.display = 'none';
     document.getElementById('searchResults').style.display = 'none';
-    document.getElementById('selectedOrdersFromPDF').style.display = 'none';
     document.getElementById('uploadBtn').disabled = true;
     document.getElementById('extractedOrders').style.display = 'none';
+    document.getElementById('pagesPreview').style.display = 'none';
+    document.getElementById('uploadSelectedBtn').style.display = 'none';
     selectedOrder = null;
     selectedOrdersFromPDF = [];
     extractedOrders = [];
+    
+    // تحرير الذاكرة من URLs
+    extractedOrders.forEach(order => {
+        if (order.imageUrl) {
+            URL.revokeObjectURL(order.imageUrl);
+        }
+    });
 }
 </script>
 {% endblock %}
