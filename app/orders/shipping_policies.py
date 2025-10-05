@@ -1,4 +1,3 @@
-
 from flask import request, jsonify, current_app
 from werkzeug.utils import secure_filename
 import os
@@ -7,6 +6,23 @@ from ..models import SallaOrder, db
 from ..services.storage_service import do_storage
 from flask import render_template
 from sqlalchemy import or_
+from flask_login import current_user
+from functools import wraps
+
+def store_required(f):
+    """ديكوراتور للتحقق من وجود متجر للمستخدم"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not hasattr(current_user, 'store_id') or not current_user.store_id:
+            return jsonify({'error': 'غير مصرح بالوصول'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+def get_current_store_id():
+    """الحصول على store_id للمستخدم الحالي"""
+    if hasattr(current_user, 'store_id') and current_user.store_id:
+        return current_user.store_id
+    return None
 
 def allowed_file(filename):
     """التحقق من نوع الملف المسموح به"""
@@ -14,10 +30,16 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
 
 @orders_bp.route('/orders/<order_id>/shipping-policy', methods=['POST'])
+@store_required
 def upload_shipping_policy(order_id):
     """رفع صورة البوليصة لطلب معين"""
     try:
-        order = SallaOrder.query.get_or_404(order_id)
+        # البحث عن الطلب مع التحقق من أنه ينتمي للمتجر الحالي
+        store_id = get_current_store_id()
+        order = SallaOrder.query.filter_by(
+            id=order_id, 
+            store_id=store_id
+        ).first_or_404()
         
         # التحقق من وجود ملف في الطلب
         if 'shipping_policy_image' not in request.files:
@@ -61,11 +83,16 @@ def upload_shipping_policy(order_id):
         current_app.logger.error(f"خطأ في رفع صورة البوليصة: {str(e)}")
         return jsonify({'error': 'حدث خطأ أثناء رفع الملف'}), 500
 
-@orders_bp.route('/<order_id>/shipping-policy', methods=['DELETE'])
+@orders_bp.route('/orders/<order_id>/shipping-policy', methods=['DELETE'])
+@store_required
 def delete_shipping_policy(order_id):
     """حذف صورة البوليصة"""
     try:
-        order = SallaOrder.query.get_or_404(order_id)
+        store_id = get_current_store_id()
+        order = SallaOrder.query.filter_by(
+            id=order_id, 
+            store_id=store_id
+        ).first_or_404()
         
         if not order.shipping_policy_image:
             return jsonify({'error': 'لا توجد صورة بوليصة لحذفها'}), 404
@@ -86,10 +113,15 @@ def delete_shipping_policy(order_id):
         return jsonify({'error': 'حدث خطأ أثناء حذف الملف'}), 500
 
 @orders_bp.route('/<order_id>/shipping-policy', methods=['GET'])
+@store_required
 def get_shipping_policy(order_id):
     """الحصول على معلومات صورة البوليصة"""
     try:
-        order = SallaOrder.query.get_or_404(order_id)
+        store_id = get_current_store_id()
+        order = SallaOrder.query.filter_by(
+            id=order_id, 
+            store_id=store_id
+        ).first_or_404()
         
         if not order.shipping_policy_image:
             return jsonify({'error': 'لا توجد صورة بوليصة'}), 404
@@ -105,16 +137,22 @@ def get_shipping_policy(order_id):
         return jsonify({'error': 'حدث خطأ أثناء جلب معلومات الملف'}), 500
 
 @orders_bp.route('/shipping-policies/upload', methods=['GET'])
+@store_required
 def upload_shipping_policy_page():
     """عرض صفحة رفع بواليص الشحن"""
-    return render_template('upload_shipping_policy.html')
+    store_id = get_current_store_id()
+    return render_template('upload_shipping_policy.html', store_id=store_id)
 
 @orders_bp.route('/shipping-policies/manage', methods=['GET'])
+@store_required
 def manage_shipping_policies():
     """عرض صفحة إدارة بواليص الشحن"""
     try:
-        # جلب جميع الطلبات التي تحتوي على صور بواليص
+        store_id = get_current_store_id()
+        
+        # جلب جميع الطلبات التي تحتوي على صور بواليص للمتجر الحالي فقط
         orders_with_policies = SallaOrder.query.filter(
+            SallaOrder.store_id == store_id,
             SallaOrder.shipping_policy_image.isnot(None)
         ).order_by(SallaOrder.created_at.desc()).all()
         
@@ -124,26 +162,31 @@ def manage_shipping_policies():
         return render_template(
             'manage_shipping_policies.html', 
             orders_with_policies=orders_with_policies,
-            total_policies=total_policies
+            total_policies=total_policies,
+            store_id=store_id
         )
         
     except Exception as e:
         current_app.logger.error(f"خطأ في جلب بيانات إدارة البواليص: {str(e)}")
         return render_template('manage_shipping_policies.html', 
                              orders_with_policies=[],
-                             total_policies=0)
+                             total_policies=0,
+                             store_id=get_current_store_id())
 
 @orders_bp.route('/api/search-orders', methods=['GET'])
+@store_required
 def search_orders():
-    """بحث الطلبات برقم الطلب أو المرجع"""
+    """بحث الطلبات برقم الطلب أو المرجع للمتجر الحالي فقط"""
     search_term = request.args.get('q', '').strip()
+    store_id = get_current_store_id()
     
     if not search_term:
         return jsonify({'orders': []})
     
     try:
-        # البحث في id و reference_id
+        # البحث في id و reference_id للطلبات الخاصة بالمتجر الحالي فقط
         orders = SallaOrder.query.filter(
+            SallaOrder.store_id == store_id,
             or_(
                 SallaOrder.id.ilike(f'%{search_term}%'),
                 SallaOrder.reference_id.ilike(f'%{search_term}%')
@@ -158,7 +201,8 @@ def search_orders():
                 'customer_name': order.customer_name or 'غير محدد',
                 'total_amount': order.total_amount or 0,
                 'currency': order.currency or 'SAR',
-                'created_at': order.created_at.strftime('%Y-%m-%d %H:%M') if order.created_at else 'غير محدد'
+                'created_at': order.created_at.strftime('%Y-%m-%d %H:%M') if order.created_at else 'غير محدد',
+                'store_id': order.store_id
             })
         
         return jsonify({'orders': orders_data})
@@ -166,17 +210,22 @@ def search_orders():
     except Exception as e:
         current_app.logger.error(f"خطأ في البحث: {str(e)}")
         return jsonify({'error': 'حدث خطأ أثناء البحث'}), 500
+
 @orders_bp.route('/orders/shipping-policy-by-number', methods=['POST'])
+@store_required
 def upload_shipping_policy_by_number():
-    """رفع صورة البوليصة باستخدام رقم الطلب"""
+    """رفع صورة البوليصة باستخدام رقم الطلب للمتجر الحالي فقط"""
     try:
+        store_id = get_current_store_id()
+        
         # الحصول على رقم الطلب من النموذج
         order_number = request.form.get('order_number')
         if not order_number:
             return jsonify({'error': 'لم يتم تقديم رقم الطلب'}), 400
 
-        # البحث عن الطلب باستخدام رقم الطلب أو المرجع
+        # البحث عن الطلب باستخدام رقم الطلب أو المرجع للمتجر الحالي فقط
         order = SallaOrder.query.filter(
+            SallaOrder.store_id == store_id,
             or_(
                 SallaOrder.id == order_number,
                 SallaOrder.reference_id == order_number
@@ -184,7 +233,7 @@ def upload_shipping_policy_by_number():
         ).first()
 
         if not order:
-            return jsonify({'error': f'لم يتم العثور على طلب بالرقم {order_number}'}), 404
+            return jsonify({'error': f'لم يتم العثور على طلب بالرقم {order_number} في متجرك'}), 404
         
         # التحقق من وجود ملف في الطلب
         if 'shipping_policy_image' not in request.files:
@@ -230,9 +279,11 @@ def upload_shipping_policy_by_number():
         return jsonify({'error': 'حدث خطأ أثناء رفع الملف'}), 500
 
 @orders_bp.route('/orders/bulk-shipping-policies', methods=['POST'])
+@store_required
 def bulk_upload_shipping_policies():
-    """رفع جماعي للبواليص للطلبات المستخرجة من PDF"""
+    """رفع جماعي للبواليص للطلبات المستخرجة من PDF للمتجر الحالي فقط"""
     try:
+        store_id = get_current_store_id()
         orders_data = request.json.get('orders', [])
         
         if not orders_data:
@@ -254,8 +305,9 @@ def bulk_upload_shipping_policies():
                 })
                 continue
             
-            # البحث عن الطلب في قاعدة البيانات
+            # البحث عن الطلب في قاعدة البيانات للمتجر الحالي فقط
             order = SallaOrder.query.filter(
+                SallaOrder.store_id == store_id,
                 or_(
                     SallaOrder.id == order_number,
                     SallaOrder.reference_id == order_number
@@ -265,7 +317,7 @@ def bulk_upload_shipping_policies():
             if not order:
                 results['failed'].append({
                     'order_number': order_number,
-                    'error': 'الطلب غير موجود في قاعدة البيانات'
+                    'error': 'الطلب غير موجود في قاعدة البيانات أو لا ينتمي لمتجرك'
                 })
                 continue
             
@@ -311,10 +363,54 @@ def bulk_upload_shipping_policies():
         
         return jsonify({
             'message': f'تم معالجة {len(orders_data)} طلب',
-            'results': results
+            'results': results,
+            'store_id': store_id
         }), 200
         
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"خطأ في الرفع الجماعي للبواليص: {str(e)}")
         return jsonify({'error': 'حدث خطأ أثناء المعالجة'}), 500
+
+@orders_bp.route('/api/store-orders', methods=['GET'])
+@store_required
+def get_store_orders():
+    """جلب الطلبات الخاصة بالمتجر الحالي فقط للإحصائيات"""
+    try:
+        store_id = get_current_store_id()
+        
+        # إحصائيات الطلبات
+        total_orders = SallaOrder.query.filter_by(store_id=store_id).count()
+        orders_with_policies = SallaOrder.query.filter(
+            SallaOrder.store_id == store_id,
+            SallaOrder.shipping_policy_image.isnot(None)
+        ).count()
+        
+        # أحدث الطلبات مع البواليص
+        recent_orders_with_policies = SallaOrder.query.filter(
+            SallaOrder.store_id == store_id,
+            SallaOrder.shipping_policy_image.isnot(None)
+        ).order_by(SallaOrder.created_at.desc()).limit(10).all()
+        
+        recent_orders_data = []
+        for order in recent_orders_with_policies:
+            recent_orders_data.append({
+                'id': order.id,
+                'customer_name': order.customer_name or 'غير محدد',
+                'created_at': order.created_at.strftime('%Y-%m-%d %H:%M') if order.created_at else 'غير محدد',
+                'image_url': order.shipping_policy_image
+            })
+        
+        return jsonify({
+            'store_id': store_id,
+            'statistics': {
+                'total_orders': total_orders,
+                'orders_with_policies': orders_with_policies,
+                'coverage_percentage': round((orders_with_policies / total_orders * 100), 2) if total_orders > 0 else 0
+            },
+            'recent_orders': recent_orders_data
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"خطأ في جلب إحصائيات المتجر: {str(e)}")
+        return jsonify({'error': 'حدث خطأ أثناء جلب البيانات'}), 500
