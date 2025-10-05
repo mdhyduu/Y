@@ -6,32 +6,35 @@
 
 <div class="container-fluid g-0 m-0 w-100 full-width-container">
   <!-- رأس الصفحة -->
-  <div class="bg-light p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <h2 class="mb-0 fs-4">
-      <i class="fas fa-file-invoice ms-2"></i> تفاصيل الطلب #{{ order.reference_id | safe }}
-    </h2>
-    <div>
-      <a href="{{ url_for('orders.index') }}" class="btn btn-outline-secondary btn-sm">
-        <i class="fas fa-arrow-left ms-1"></i> العودة للطلبات
-      </a>
-      
-    </div>
-  </div>
-<!-- في قسم رأس الصفحة - بعد زر العودة -->
-<div class="d-flex gap-2 flex-wrap">
-    <a href="{{ url_for('orders.index') }}" class="btn btn-outline-secondary btn-sm">
-        <i class="fas fa-arrow-left ms-1"></i> العودة للطلبات
+<!-- رأس الصفحة -->
+<div class="bg-light p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <h2 class="mb-0 fs-4">
+    <i class="fas fa-file-invoice ms-2"></i> تفاصيل الطلب #{{ order.reference_id | safe }}
+  </h2>
+  <div>
+    <!-- زر طباعة HTML -->
+    <a href="{{ url_for('orders.download_orders_html', order_ids=order.id) }}" 
+       class="btn btn-primary btn-sm" target="_blank">
+      <i class="fas fa-print ms-1"></i> طباعة HTML
     </a>
     
-    <!-- زر طباعة الطلب كـ PDF -->
-    <button onclick="printOrderAsPDF('{{ order.id }}')" class="btn btn-primary btn-sm">
-        <i class="fas fa-file-pdf me-1"></i> طباعة الطلب
-    </button>
+    <!-- زر تحميل PDF -->
+    <a href="{{ url_for('orders.download_pdf', order_ids=order.id) }}" 
+       class="btn btn-success btn-sm">
+      <i class="fas fa-file-pdf ms-1"></i> تحميل PDF
+    </a>
     
-    <!-- زر طباعة العنوان -->
-    <button onclick="printOrderAddress('{{ order.id }}')" class="btn btn-success btn-sm">
-        <i class="fas fa-truck me-1"></i> طباعة العنوان
-    </button>
+    <!-- زر معاينة العناوين -->
+    <a href="{{ url_for('orders.preview_addresses_html', order_ids=order.id) }}" 
+       class="btn btn-info btn-sm" target="_blank">
+      <i class="fas fa-address-card ms-1"></i> معاينة العنوان
+    </a>
+    
+    <!-- زر العودة الأصلي -->
+    <a href="{{ url_for('orders.index') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="fas fa-arrow-left ms-1"></i> العودة للطلبات
+    </a>
+  </div>
 </div>
   <div class="row g-0 mx-0">
     <!-- القسم الرئيسي - تفاصيل الطلب -->
@@ -1060,68 +1063,5 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
-
-// دالة لطباعة الطلب كـ PDF
-function printOrderAsPDF(orderId) {
-    if (!orderId) {
-        Swal.fire({
-            title: 'خطأ!',
-            text: 'معرف الطلب غير صالح',
-            icon: 'error',
-            confirmButtonText: 'حسناً'
-        });
-        return;
-    }
-    
-    // إظهار تحميل
-    Swal.fire({
-        title: 'جاري التحميل...',
-        text: 'يتم تجهيز الطلب للطباعة',
-        icon: 'info',
-        showConfirmButton: false,
-        allowOutsideClick: false
-    });
-    
-    // فتح نافذة جديدة لتحميل PDF
-    const pdfUrl = `{{ url_for('orders.download_single_order_pdf') }}?order_id=${orderId}`;
-    window.open(pdfUrl, '_blank');
-    
-    // إغلاق تحميل SweetAlert بعد ثانيتين
-    setTimeout(() => {
-        Swal.close();
-    }, 2000);
-}
-
-// دالة لطباعة العنوان
-function printOrderAddress(orderId) {
-    if (!orderId) {
-        Swal.fire({
-            title: 'خطأ!',
-            text: 'معرف الطلب غير صالح',
-            icon: 'error',
-            confirmButtonText: 'حسناً'
-        });
-        return;
-    }
-    
-    // إظهار تحميل
-    Swal.fire({
-        title: 'جاري التحميل...',
-        text: 'يتم تجهيز العنوان للطباعة',
-        icon: 'info',
-        showConfirmButton: false,
-        allowOutsideClick: false
-    });
-    
-    // فتح نافذة جديدة لتحميل PDF العنوان
-    const pdfUrl = `{{ url_for('orders.download_single_address_pdf') }}?order_id=${orderId}`;
-    window.open(pdfUrl, '_blank');
-    
-    // إغلاق تحميل SweetAlert بعد ثانيتين
-    setTimeout(() => {
-        Swal.close();
-    }, 2000);
-}
 </script>
-
 {% endblock %}

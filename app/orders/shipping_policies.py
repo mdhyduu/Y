@@ -6,6 +6,7 @@ from . import orders_bp
 from ..models import SallaOrder, db
 from ..services.storage_service import do_storage
 from flask import render_template
+from sqlalchemy import or_
 
 def allowed_file(filename):
     """التحقق من نوع الملف المسموح به"""
@@ -106,13 +107,7 @@ def get_shipping_policy(order_id):
 @orders_bp.route('/shipping-policies/upload', methods=['GET'])
 def upload_shipping_policy_page():
     """عرض صفحة رفع بواليص الشحن"""
-    # جلب جميع الطلبات من قاعدة البيانات
-    all_orders = SallaOrder.query.order_by(SallaOrder.created_at.desc()).all()
-    
-    return render_template(
-        'upload_shipping_policy.html', 
-        all_orders=all_orders
-    )
+    return render_template('upload_shipping_policy.html')
 
 @orders_bp.route('/shipping-policies/manage', methods=['GET'])
 def manage_shipping_policies():
@@ -126,4 +121,37 @@ def manage_shipping_policies():
         'manage_shipping_policies.html', 
         orders_with_policies=orders_with_policies
     )
+
+@orders_bp.route('/api/search-orders', methods=['GET'])
+def search_orders():
+    """بحث الطلبات برقم الطلب أو المرجع"""
+    search_term = request.args.get('q', '').strip()
     
+    if not search_term:
+        return jsonify({'orders': []})
+    
+    try:
+        # البحث في id و reference_id
+        orders = SallaOrder.query.filter(
+            or_(
+                SallaOrder.id.ilike(f'%{search_term}%'),
+                SallaOrder.reference_id.ilike(f'%{search_term}%')
+            )
+        ).order_by(SallaOrder.created_at.desc()).limit(50).all()
+        
+        orders_data = []
+        for order in orders:
+            orders_data.append({
+                'id': order.id,
+                'reference_id': order.reference_id or '',
+                'customer_name': order.customer_name or 'غير محدد',
+                'total_amount': order.total_amount or 0,
+                'currency': order.currency or 'SAR',
+                'created_at': order.created_at.strftime('%Y-%m-%d %H:%M') if order.created_at else 'غير محدد'
+            })
+        
+        return jsonify({'orders': orders_data})
+        
+    except Exception as e:
+        current_app.logger.error(f"خطأ في البحث: {str(e)}")
+        return jsonify({'error': 'حدث خطأ أثناء البحث'}), 500

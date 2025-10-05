@@ -31,27 +31,31 @@
                                 <div class="card-body">
                                     <form id="uploadPolicyForm" enctype="multipart/form-data" class="row g-3">
                                         <div class="col-md-6">
-                                            <label for="orderSelect" class="form-label">اختر الطلب</label>
-                                            <select class="form-select" id="orderSelect" required>
-                                                <option value="">-- اختر طلب من القائمة --</option>
-                                                {% for order in all_orders %}
-                                                    <option value="{{ order.id }}" 
-                                                            data-customer="{{ order.customer_name or 'غير محدد' }}"
-                                                            data-amount="{{ order.total_amount or 0 }}"
-                                                            data-currency="{{ order.currency or 'SAR' }}"
-                                                            data-date="{{ order.created_at|format_date if order.created_at else 'غير محدد' }}">
-                                                        {{ order.id }} - {{ order.customer_name or 'غير محدد' }} - 
-                                                        {{ order.total_amount or 0 }} {{ order.currency or 'SAR' }} - 
-                                                        {{ order.created_at|format_date if order.created_at else 'غير محدد' }}
-                                                    </option>
-                                                {% endfor %}
-                                            </select>
-                                            {% if not all_orders %}
-                                                <div class="alert alert-warning mt-2">
-                                                    <i class="fas fa-exclamation-triangle me-2"></i>
-                                                    لا توجد طلبات في قاعدة البيانات
+                                            <label for="orderSearch" class="form-label">ابحث عن الطلب</label>
+                                            <div class="input-group mb-3">
+                                                <input type="text" 
+                                                       class="form-control" 
+                                                       id="orderSearch" 
+                                                       placeholder="ابحث برقم الطلب أو المرجع...">
+                                                <button class="btn btn-outline-primary" type="button" id="searchBtn">
+                                                    <i class="fas fa-search"></i> بحث
+                                                </button>
+                                            </div>
+                                            
+                                            <div class="form-text mb-3">
+                                                ابحث برقم الطلب (ID) أو رقم المرجع (Reference ID)
+                                            </div>
+                                            
+                                            <!-- نتائج البحث -->
+                                            <div id="searchResults" class="mt-3" style="display: none;">
+                                                <label class="form-label">اختر الطلب من نتائج البحث:</label>
+                                                <div id="ordersList" class="list-group" style="max-height: 300px; overflow-y: auto;">
+                                                    <!-- سيتم تعبئة نتائج البحث هنا -->
                                                 </div>
-                                            {% endif %}
+                                            </div>
+                                            
+                                            <!-- حقل الطلب المختار مخفي -->
+                                            <input type="hidden" id="selectedOrderId" name="order_id">
                                         </div>
                                         
                                         <div class="col-md-6">
@@ -71,15 +75,18 @@
                                                     <h6 class="card-title mb-2">تفاصيل الطلب المختار:</h6>
                                                     <div class="row">
                                                         <div class="col-md-3">
-                                                            <strong>رقم الطلب:</strong> <span id="selectedOrderId"></span>
+                                                            <strong>رقم الطلب:</strong> <span id="selectedOrderNumber"></span>
+                                                        </div>
+                                                        <div class="col-md-2">
+                                                            <strong>المرجع:</strong> <span id="selectedReference"></span>
                                                         </div>
                                                         <div class="col-md-3">
                                                             <strong>العميل:</strong> <span id="selectedCustomer"></span>
                                                         </div>
-                                                        <div class="col-md-3">
+                                                        <div class="col-md-2">
                                                             <strong>المبلغ:</strong> <span id="selectedAmount"></span>
                                                         </div>
-                                                        <div class="col-md-3">
+                                                        <div class="col-md-2">
                                                             <strong>التاريخ:</strong> <span id="selectedDate"></span>
                                                         </div>
                                                     </div>
@@ -88,7 +95,7 @@
                                         </div>
                                         
                                         <div class="col-12">
-                                            <button type="submit" class="btn btn-success" id="uploadBtn" {% if not all_orders %}disabled{% endif %}>
+                                            <button type="submit" class="btn btn-success" id="uploadBtn" disabled>
                                                 <i class="fas fa-upload me-2"></i>رفع البوليصة
                                             </button>
                                         </div>
@@ -118,15 +125,44 @@
 .card-header {
     border-bottom: 1px solid rgba(0,0,0,0.125);
 }
+
+.order-item {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.order-item:hover {
+    background-color: #f8f9fa;
+}
+
+.order-item.selected {
+    background-color: #e3f2fd;
+    border-color: #2196f3;
+}
+
+.order-badge {
+    font-size: 0.75rem;
+}
+
+.search-loading {
+    position: absolute;
+    right: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+}
 </style>
 {% endblock %}
 
 {% block scripts %}
 <script>
+// متغيرات عامة
+let selectedOrder = null;
+
 // تهيئة الصفحة
 document.addEventListener('DOMContentLoaded', function() {
     initializeForm();
-    setupOrderSearch();
+    setupSearch();
 });
 
 // تهيئة نموذج الرفع
@@ -141,14 +177,13 @@ function initializeForm() {
 async function handleFormSubmit(e) {
     e.preventDefault();
     
-    const orderId = document.getElementById('orderSelect').value;
-    const fileInput = document.getElementById('policyFile');
-    const file = fileInput.files[0];
-    
-    if (!orderId) {
-        showError('يرجى اختيار طلب');
+    if (!selectedOrder) {
+        showError('يرجى اختيار طلب من نتائج البحث');
         return;
     }
+    
+    const fileInput = document.getElementById('policyFile');
+    const file = fileInput.files[0];
     
     if (!file) {
         showError('يرجى اختيار ملف');
@@ -161,47 +196,140 @@ async function handleFormSubmit(e) {
         return;
     }
     
-    await uploadPolicy(orderId, file, 'uploadProgress', 'uploadError');
+    await uploadPolicy(selectedOrder.id, file, 'uploadProgress', 'uploadError');
 }
 
-// عرض تفاصيل الطلب المختار
-document.getElementById('orderSelect').addEventListener('change', function() {
-    const selectedOption = this.options[this.selectedIndex];
-    const orderDetails = document.getElementById('orderDetails');
+// إعداد البحث
+function setupSearch() {
+    const searchInput = document.getElementById('orderSearch');
+    const searchBtn = document.getElementById('searchBtn');
     
-    if (this.value) {
-        // عرض تفاصيل الطلب
-        document.getElementById('selectedOrderId').textContent = this.value;
-        document.getElementById('selectedCustomer').textContent = selectedOption.getAttribute('data-customer');
-        document.getElementById('selectedAmount').textContent = selectedOption.getAttribute('data-amount') + ' ' + selectedOption.getAttribute('data-currency');
-        document.getElementById('selectedDate').textContent = selectedOption.getAttribute('data-date');
-        orderDetails.style.display = 'block';
-    } else {
-        orderDetails.style.display = 'none';
-    }
-});
-
-// بحث في قائمة الطلبات
-function setupOrderSearch() {
-    const orderSelect = document.getElementById('orderSelect');
-    const searchInput = document.createElement('input');
-    searchInput.type = 'text';
-    searchInput.className = 'form-control mb-2';
-    searchInput.placeholder = 'ابحث برقم الطلب أو اسم العميل...';
+    // البحث عند الضغط على زر البحث
+    searchBtn.addEventListener('click', performSearch);
     
-    // إضافة حقل البحث فوق القائمة المنسدلة
-    orderSelect.parentNode.insertBefore(searchInput, orderSelect);
-    
-    searchInput.addEventListener('input', function() {
-        const searchTerm = this.value.toLowerCase();
-        const options = orderSelect.getElementsByTagName('option');
-        
-        for (let i = 1; i < options.length; i++) { // تخطي الخيار الأول
-            const option = options[i];
-            const text = option.textContent.toLowerCase();
-            option.style.display = text.includes(searchTerm) ? '' : 'none';
+    // البحث عند الضغط على Enter
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            performSearch();
         }
     });
+}
+
+// تنفيذ البحث
+async function performSearch() {
+    const searchTerm = document.getElementById('orderSearch').value.trim();
+    const searchBtn = document.getElementById('searchBtn');
+    const searchResults = document.getElementById('searchResults');
+    const ordersList = document.getElementById('ordersList');
+    
+    if (!searchTerm) {
+        showError('يرجى إدخال رقم الطلب أو المرجع للبحث');
+        return;
+    }
+    
+    // عرض حالة التحميل
+    searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري البحث...';
+    searchBtn.disabled = true;
+    
+    try {
+        const response = await fetch(`/api/search-orders?q=${encodeURIComponent(searchTerm)}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            // مسح القائمة الحالية
+            ordersList.innerHTML = '';
+            
+            // إضافة نتائج البحث
+            if (data.orders && data.orders.length > 0) {
+                data.orders.forEach(order => {
+                    const orderItem = document.createElement('div');
+                    orderItem.className = 'list-group-item order-item';
+                    orderItem.innerHTML = `
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">${order.customer_name}</h6>
+                                <p class="mb-1">
+                                    <span class="badge bg-primary order-badge">رقم: ${order.id}</span>
+                                    ${order.reference_id ? `<span class="badge bg-secondary order-badge">مرجع: ${order.reference_id}</span>` : ''}
+                                </p>
+                                <small class="text-muted">
+                                    ${order.total_amount} ${order.currency} - ${order.created_at}
+                                </small>
+                            </div>
+                            <button class="btn btn-sm btn-outline-success select-order-btn" data-order='${JSON.stringify(order)}'>
+                                اختر
+                            </button>
+                        </div>
+                    `;
+                    ordersList.appendChild(orderItem);
+                });
+                
+                // إضافة مستمعين لأزرار الاختيار
+                document.querySelectorAll('.select-order-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        selectOrder(JSON.parse(this.getAttribute('data-order')));
+                    });
+                });
+                
+                searchResults.style.display = 'block';
+                showSuccess(`تم العثور على ${data.orders.length} طلب`);
+            } else {
+                searchResults.style.display = 'none';
+                showError('لم يتم العثور على طلبات تطابق بحثك');
+            }
+        } else {
+            throw new Error(data.error || 'فشل في البحث');
+        }
+    } catch (error) {
+        console.error('Search error:', error);
+        showError(error.message);
+        searchResults.style.display = 'none';
+    } finally {
+        // إعادة زر البحث لحالته الأصلية
+        searchBtn.innerHTML = '<i class="fas fa-search"></i> بحث';
+        searchBtn.disabled = false;
+    }
+}
+
+// اختيار طلب
+function selectOrder(order) {
+    selectedOrder = order;
+    
+    // تحديث الحقل المخفي
+    document.getElementById('selectedOrderId').value = order.id;
+    
+    // تحديث عرض التفاصيل
+    document.getElementById('selectedOrderNumber').textContent = order.id;
+    document.getElementById('selectedReference').textContent = order.reference_id || 'لا يوجد';
+    document.getElementById('selectedCustomer').textContent = order.customer_name;
+    document.getElementById('selectedAmount').textContent = order.total_amount + ' ' + order.currency;
+    document.getElementById('selectedDate').textContent = order.created_at;
+    
+    // إظهار قسم التفاصيل
+    document.getElementById('orderDetails').style.display = 'block';
+    
+    // تفعيل زر الرفع
+    document.getElementById('uploadBtn').disabled = false;
+    
+    // تمييز العنصر المختار
+    document.querySelectorAll('.order-item').forEach(item => {
+        item.classList.remove('selected');
+    });
+    
+    // البحث عن العنصر المختار وتمييزه
+    const selectedItem = Array.from(document.querySelectorAll('.select-order-btn')).find(btn => {
+        return JSON.parse(btn.getAttribute('data-order')).id === order.id;
+    });
+    
+    if (selectedItem) {
+        selectedItem.closest('.order-item').classList.add('selected');
+        selectedItem.innerHTML = '<i class="fas fa-check"></i> مختار';
+        selectedItem.classList.remove('btn-outline-success');
+        selectedItem.classList.add('btn-success');
+    }
+    
+    showSuccess('تم اختيار الطلب بنجاح');
 }
 
 // رفع البوليصة
@@ -292,6 +420,9 @@ function showSuccess(message) {
 function resetForm() {
     document.getElementById('uploadPolicyForm').reset();
     document.getElementById('orderDetails').style.display = 'none';
+    document.getElementById('searchResults').style.display = 'none';
+    document.getElementById('uploadBtn').disabled = true;
+    selectedOrder = null;
 }
 </script>
 {% endblock %}

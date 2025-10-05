@@ -61,9 +61,7 @@
 
 <!-- في القائمة الجانبية في base.html -->
 <div class="sidebar-section">
-  <div class="sidebar-section-header">
-    <i class="fas fa-file-invoice"></i> بواليص الشحن
-  </div>
+
   <div class="sidebar-section-links">
     <a class="nav-link {% if request.path == url_for('orders.upload_shipping_policy_page') %}active{% endif %}" 
        href="{{ url_for('orders.upload_shipping_policy_page') }}">
