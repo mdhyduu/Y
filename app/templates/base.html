@@ -60,10 +60,21 @@
 {% endif %}
 
 <!-- في القائمة الجانبية في base.html -->
-<a class="nav-link {% if request.path == url_for('orders.manage_shipping_policies') %}active{% endif %}" 
-   href="{{ url_for('orders.manage_shipping_policies') }}">
+<div class="sidebar-section">
+  <div class="sidebar-section-header">
     <i class="fas fa-file-invoice"></i> بواليص الشحن
-</a>
+  </div>
+  <div class="sidebar-section-links">
+    <a class="nav-link {% if request.path == url_for('orders.upload_shipping_policy_page') %}active{% endif %}" 
+       href="{{ url_for('orders.upload_shipping_policy_page') }}">
+      <i class="fas fa-upload"></i> رفع بوليصة
+    </a>
+    <a class="nav-link {% if request.path == url_for('orders.manage_shipping_policies') %}active{% endif %}" 
+       href="{{ url_for('orders.manage_shipping_policies') }}">
+      <i class="fas fa-cogs"></i> إدارة البواليص
+    </a>
+  </div>
+</div>
       
       {% if request.cookies.get('is_admin') == 'true' %}
         <a class="nav-link {% if request.path == url_for('employees.list_employees') %}active{% endif %}" href="{{ url_for('employees.list_employees') }}">

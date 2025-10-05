@@ -1,0 +1,297 @@
+
+{% extends "base.html" %}
+
+{% block title %}رفع بوليصة الشحن{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="fas fa-file-invoice me-2"></i>
+                        رفع بوليصة الشحن
+                    </h4>
+                    <a href="{{ url_for('orders.manage_shipping_policies') }}" class="btn btn-light btn-sm">
+                        <i class="fas fa-cogs me-1"></i>إدارة البواليص
+                    </a>
+                </div>
+                <div class="card-body">
+                    <!-- قسم رفع البوليصة -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-upload me-2"></i>
+                                        رفع بوليصة شحن جديدة
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="uploadPolicyForm" enctype="multipart/form-data" class="row g-3">
+                                        <div class="col-md-6">
+                                            <label for="orderSelect" class="form-label">اختر الطلب</label>
+                                            <select class="form-select" id="orderSelect" required>
+                                                <option value="">-- اختر طلب من القائمة --</option>
+                                                {% for order in all_orders %}
+                                                    <option value="{{ order.id }}" 
+                                                            data-customer="{{ order.customer_name or 'غير محدد' }}"
+                                                            data-amount="{{ order.total_amount or 0 }}"
+                                                            data-currency="{{ order.currency or 'SAR' }}"
+                                                            data-date="{{ order.created_at|format_date if order.created_at else 'غير محدد' }}">
+                                                        {{ order.id }} - {{ order.customer_name or 'غير محدد' }} - 
+                                                        {{ order.total_amount or 0 }} {{ order.currency or 'SAR' }} - 
+                                                        {{ order.created_at|format_date if order.created_at else 'غير محدد' }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                            {% if not all_orders %}
+                                                <div class="alert alert-warning mt-2">
+                                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                                    لا توجد طلبات في قاعدة البيانات
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <label for="policyFile" class="form-label">صورة البوليصة</label>
+                                            <input class="form-control" type="file" id="policyFile" 
+                                                   name="shipping_policy_image" 
+                                                   accept=".png,.jpg,.jpeg,.gif,.pdf,.webp" required>
+                                            <div class="form-text">
+                                                الأنواع المسموحة: PNG, JPG, JPEG, GIF, PDF, WEBP (بحد أقصى 16MB)
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- عرض تفاصيل الطلب المختار -->
+                                        <div class="col-12" id="orderDetails" style="display: none;">
+                                            <div class="card border-info">
+                                                <div class="card-body py-2">
+                                                    <h6 class="card-title mb-2">تفاصيل الطلب المختار:</h6>
+                                                    <div class="row">
+                                                        <div class="col-md-3">
+                                                            <strong>رقم الطلب:</strong> <span id="selectedOrderId"></span>
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <strong>العميل:</strong> <span id="selectedCustomer"></span>
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <strong>المبلغ:</strong> <span id="selectedAmount"></span>
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <strong>التاريخ:</strong> <span id="selectedDate"></span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-12">
+                                            <button type="submit" class="btn btn-success" id="uploadBtn" {% if not all_orders %}disabled{% endif %}>
+                                                <i class="fas fa-upload me-2"></i>رفع البوليصة
+                                            </button>
+                                        </div>
+                                    </form>
+                                    
+                                    <div class="progress mt-3" style="display: none;" id="uploadProgress">
+                                        <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                    </div>
+                                    
+                                    <div class="alert alert-danger mt-3" style="display: none;" id="uploadError"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    border: 1px solid rgba(0,0,0,0.125);
+    border-radius: 0.5rem;
+}
+
+.card-header {
+    border-bottom: 1px solid rgba(0,0,0,0.125);
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// تهيئة الصفحة
+document.addEventListener('DOMContentLoaded', function() {
+    initializeForm();
+    setupOrderSearch();
+});
+
+// تهيئة نموذج الرفع
+function initializeForm() {
+    const uploadForm = document.getElementById('uploadPolicyForm');
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', handleFormSubmit);
+    }
+}
+
+// معالجة تقديم النموذج
+async function handleFormSubmit(e) {
+    e.preventDefault();
+    
+    const orderId = document.getElementById('orderSelect').value;
+    const fileInput = document.getElementById('policyFile');
+    const file = fileInput.files[0];
+    
+    if (!orderId) {
+        showError('يرجى اختيار طلب');
+        return;
+    }
+    
+    if (!file) {
+        showError('يرجى اختيار ملف');
+        return;
+    }
+    
+    // التحقق من حجم الملف
+    if (file.size > 16 * 1024 * 1024) {
+        showError('حجم الملف كبير جداً. الحد الأقصى 16MB');
+        return;
+    }
+    
+    await uploadPolicy(orderId, file, 'uploadProgress', 'uploadError');
+}
+
+// عرض تفاصيل الطلب المختار
+document.getElementById('orderSelect').addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    const orderDetails = document.getElementById('orderDetails');
+    
+    if (this.value) {
+        // عرض تفاصيل الطلب
+        document.getElementById('selectedOrderId').textContent = this.value;
+        document.getElementById('selectedCustomer').textContent = selectedOption.getAttribute('data-customer');
+        document.getElementById('selectedAmount').textContent = selectedOption.getAttribute('data-amount') + ' ' + selectedOption.getAttribute('data-currency');
+        document.getElementById('selectedDate').textContent = selectedOption.getAttribute('data-date');
+        orderDetails.style.display = 'block';
+    } else {
+        orderDetails.style.display = 'none';
+    }
+});
+
+// بحث في قائمة الطلبات
+function setupOrderSearch() {
+    const orderSelect = document.getElementById('orderSelect');
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'form-control mb-2';
+    searchInput.placeholder = 'ابحث برقم الطلب أو اسم العميل...';
+    
+    // إضافة حقل البحث فوق القائمة المنسدلة
+    orderSelect.parentNode.insertBefore(searchInput, orderSelect);
+    
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        const options = orderSelect.getElementsByTagName('option');
+        
+        for (let i = 1; i < options.length; i++) { // تخطي الخيار الأول
+            const option = options[i];
+            const text = option.textContent.toLowerCase();
+            option.style.display = text.includes(searchTerm) ? '' : 'none';
+        }
+    });
+}
+
+// رفع البوليصة
+async function uploadPolicy(orderId, file, progressId, errorId) {
+    const formData = new FormData();
+    formData.append('shipping_policy_image', file);
+    
+    showLoading(true, progressId, errorId);
+    
+    try {
+        const response = await fetch(`/orders/${orderId}/shipping-policy`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showSuccess('تم رفع البوليصة بنجاح');
+            resetForm();
+            // عرض رابط للانتقال إلى صفحة الإدارة
+            setTimeout(() => {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'تم الرفع بنجاح',
+                    text: 'تم رفع البوليصة بنجاح',
+                    showCancelButton: true,
+                    confirmButtonText: 'الذهاب للإدارة',
+                    cancelButtonText: 'البقاء هنا',
+                    reverseButtons: true
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.location.href = "{{ url_for('orders.manage_shipping_policies') }}";
+                    }
+                });
+            }, 1000);
+        } else {
+            throw new Error(data.error || 'فشل في رفع الملف');
+        }
+    } catch (error) {
+        console.error('Upload error:', error);
+        showError(error.message, errorId);
+    } finally {
+        showLoading(false, progressId, errorId);
+    }
+}
+
+// دوال مساعدة
+function showLoading(show, progressId, errorId) {
+    const progress = document.getElementById(progressId);
+    const error = document.getElementById(errorId);
+    
+    if (progress) {
+        progress.style.display = show ? 'block' : 'none';
+        if (show) {
+            progress.querySelector('.progress-bar').style.width = '0%';
+        }
+    }
+    
+    if (error) {
+        error.style.display = 'none';
+    }
+    
+    const uploadBtn = document.getElementById('uploadBtn');
+    if (uploadBtn) {
+        uploadBtn.disabled = show;
+    }
+}
+
+function showError(message, errorId = 'uploadError') {
+    const errorElement = document.getElementById(errorId);
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
+}
+
+function showSuccess(message) {
+    Swal.fire({
+        icon: 'success',
+        title: 'نجح',
+        text: message,
+        timer: 2000,
+        showConfirmButton: false
+    });
+}
+
+function resetForm() {
+    document.getElementById('uploadPolicyForm').reset();
+    document.getElementById('orderDetails').style.display = 'none';
+}
+</script>
+{% endblock %}

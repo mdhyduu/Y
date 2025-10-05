@@ -1,3 +1,4 @@
+
 from flask import request, jsonify, current_app
 from werkzeug.utils import secure_filename
 import os
@@ -101,7 +102,19 @@ def get_shipping_policy(order_id):
     except Exception as e:
         current_app.logger.error(f"خطأ في جلب صورة البوليصة: {str(e)}")
         return jsonify({'error': 'حدث خطأ أثناء جلب معلومات الملف'}), 500
-@orders_bp.route('/shipping-policies', methods=['GET'])
+
+@orders_bp.route('/shipping-policies/upload', methods=['GET'])
+def upload_shipping_policy_page():
+    """عرض صفحة رفع بواليص الشحن"""
+    # جلب جميع الطلبات من قاعدة البيانات
+    all_orders = SallaOrder.query.order_by(SallaOrder.created_at.desc()).all()
+    
+    return render_template(
+        'upload_shipping_policy.html', 
+        all_orders=all_orders
+    )
+
+@orders_bp.route('/shipping-policies/manage', methods=['GET'])
 def manage_shipping_policies():
     """عرض صفحة إدارة بواليص الشحن"""
     # جلب جميع الطلبات التي تحتوي على صور بواليص
@@ -109,11 +122,8 @@ def manage_shipping_policies():
         SallaOrder.shipping_policy_image.isnot(None)
     ).order_by(SallaOrder.created_at.desc()).all()
     
-    # جلب جميع الطلبات من قاعدة البيانات (ليس وهمية)
-    all_orders = SallaOrder.query.order_by(SallaOrder.created_at.desc()).all()
-    
     return render_template(
-        'shipping_policies.html', 
-        orders_with_policies=orders_with_policies,
-        all_orders=all_orders  # تغيير الاسم ليعكس أنه جميع الطلبات الحقيقية
-    ) 
+        'manage_shipping_policies.html', 
+        orders_with_policies=orders_with_policies
+    )
+    
