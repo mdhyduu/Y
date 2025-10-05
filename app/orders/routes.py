@@ -146,12 +146,10 @@ def index():
             )
         
         if search_query:
+            # البحث فقط من خلال reference_id
             search_filter = f'%{search_query}%'
             orders_query = orders_query.filter(
-                or_(
-                    SallaOrder.customer_name.ilike(search_filter),
-                    SallaOrder.id.ilike(search_filter)
-                )
+                SallaOrder.reference_id.ilike(search_filter)
             )
         
         if date_from and date_to:
