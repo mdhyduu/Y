@@ -679,9 +679,9 @@ function setupPDFUpload() {
         });
     }
     
-    function extractOrderAndImageFromPage(pdf, pageNumber) {
+function extractOrderAndImageFromPage(pdf, pageNumber) {
         return pdf.getPage(pageNumber).then(function(page) {
-            const viewport = page.getViewport({ scale: 2.0 }); // زيادة الدقة
+            const viewport = page.getViewport({ scale: 1.0 });
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.height = viewport.height;
@@ -698,34 +698,13 @@ function setupPDFUpload() {
             ]).then(function([renderResult, textContent]) {
                 let text = textContent.items.map(item => item.str).join(' ');
                 
-                // تحسين أنماط البحث عن أرقام الطلبات
-                const orderPatterns = [
-                    /Order[:\s]*([A-Za-z0-9_-]+)/i,
-                    /طلب[:\s]*([A-Za-z0-9_-]+)/i,
-                    /رقم[:\s]*الطلب[:\s]*([A-Za-z0-9_-]+)/i,
-                    /ID[:\s]*([A-Za-z0-9_-]+)/i,
-                    /Reference[:\s]*([A-Za-z0-9_-]+)/i,
-                    /مرجع[:\s]*([A-Za-z0-9_-]+)/i,
-                    /\b\d{4,}\b/, // أي رقم مكون من 4 أرقام أو أكثر
-                    /PCs:\s*1\s*(\d{9})/ // النمط الموجود حالياً
-                ];
-                
-                let orderNumber = null;
-                
-                for (let pattern of orderPatterns) {
-                    const match = text.match(pattern);
-                    if (match) {
-                        orderNumber = match[1] || match[0];
-                        // تنظيف الرقم من المسافات والرموز غير المرغوب فيها
-                        orderNumber = orderNumber.replace(/[^\w-]/g, '').trim();
-                        if (orderNumber.length >= 3) { // التأكد من أن الرقم ذو معنى
-                            break;
-                        }
-                    }
-                }
+                // البحث عن نمط أرقام الطلبات (يمكن تعديل النمط حسب الحاجة)
+                const orderNumberMatch = text.match(/PCs:\s*1\s*(\d{9})/);
+                let orderNumber = orderNumberMatch ? orderNumberMatch[1] : null;
                 
                 if (!orderNumber) {
-                    orderNumber = `page_${pageNumber}`;
+                    const fallbackMatch = text.match(/\b\d{9}\b/);
+                    orderNumber = fallbackMatch ? fallbackMatch[0] : `page_${pageNumber}`;
                 }
                 
                 // تحويل canvas إلى صورة
@@ -737,17 +716,10 @@ function setupPDFUpload() {
                             pageNumber: pageNumber,
                             orderNumber: orderNumber,
                             imageUrl: imageUrl,
-                            imageBlob: blob,
-                            extractedText: text.substring(0, 200) + '...' // حفظ جزء من النص للمراجعة
+                            imageBlob: blob
                         };
                         
-                        // التحقق من عدم تكرار الرقم
-                        const existingOrder = extractedOrders.find(order => order.orderNumber === orderNumber);
-                        if (!existingOrder) {
-                            extractedOrders.push(orderData);
-                        } else {
-                            // إذا كان مكرراً، إضافة رقم الصفحة للتمييز
-                            orderData.orderNumber = `${orderNumber}_p${pageNumber}`;
+                        if (orderNumber && !extractedOrders.some(order => order.orderNumber === orderNumber)) {
                             extractedOrders.push(orderData);
                         }
                         
@@ -757,12 +729,11 @@ function setupPDFUpload() {
                         progressBar.textContent = `${progressPercent}%`;
                         
                         resolve(orderData);
-                    }, 'image/png', 0.8); // تقليل الجودة لتقليل الحجم
+                    }, 'image/png');
                 });
             });
         });
     }
-    
     function displayPagesPreview(pagesData) {
         pagesContainer.innerHTML = '';
         
