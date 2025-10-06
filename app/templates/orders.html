@@ -2677,7 +2677,7 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
     
     Swal.fire({
         title: 'جاري إنشاء الملفات',
-        html: `يتم الآن إنشاء ${selectedOrders.length} ملف PDF...<br><div class="progress mt-3"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div></div>`,
+        html: `يتم الآن إنشاء ملفات PDF للطلبات والبوليصلات...<br><div class="progress mt-3"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div></div>`,
         allowOutsideClick: false,
         showConfirmButton: false,
         didOpen: () => {
@@ -2687,26 +2687,47 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
     
     try {
         let completed = 0;
+        const totalFiles = selectedOrders.length * 2; // طلب + بوليصة لكل طلب
         
         for (const orderId of selectedOrders) {
             try {
                 // جلب بيانات الطلب الفردي
                 const orderData = await getSingleOrderData(orderId);
                 if (orderData) {
-                    // إنشاء PDF للطلب
-                    const pdfBlob = await generateOrderPDF(orderData, jsPDF);
+                    // ⭐⭐ 1. إنشاء PDF للطلب ⭐⭐
+                    const orderPdfBlob = await generateOrderPDF(orderData, jsPDF);
+                    const orderFilename = `طلب_${orderData.reference_id || orderData.id}.pdf`;
+                    zip.file(orderFilename, orderPdfBlob);
                     
-                    // إضافة PDF إلى الأرشيف
-                    const filename = `order_${orderData.reference_id || orderData.id}.pdf`;
-                    zip.file(filename, pdfBlob);
+                    completed++;
+                    updateProgress(completed, totalFiles);
+                    
+                    // ⭐⭐ 2. إنشاء PDF للبوليصة (إذا كانت موجودة) ⭐⭐
+                    if (orderData.shipping && orderData.shipping.has_shipping_policy && orderData.shipping.shipping_policy_url) {
+                        try {
+                            const policyPdfBlob = await generateShippingPolicyImagePDF(orderData, jsPDF);
+                            if (policyPdfBlob) {
+                                const policyFilename = `بوليصة_${orderData.reference_id || orderData.id}.pdf`;
+                                zip.file(policyFilename, policyPdfBlob);
+                            }
+                        } catch (policyError) {
+                            console.error(`❌ خطأ في معالجة بوليصة الشحن للطلب ${orderId}:`, policyError);
+                            // نستمر حتى إذا فشل تحميل البوليصة
+                        }
+                    }
+                    
+                    completed++;
+                    updateProgress(completed, totalFiles);
+                } else {
+                    // إذا فشل جلب بيانات الطلب، نزيد العداد مرتين
+                    completed += 2;
+                    updateProgress(completed, totalFiles);
                 }
-                
-                completed++;
-                const progress = Math.round((completed / selectedOrders.length) * 100);
-                $('.progress-bar').css('width', `${progress}%`);
                 
             } catch (error) {
                 console.error(`❌ خطأ في معالجة الطلب ${orderId}:`, error);
+                completed += 2; // تخطي الطلب والبوليصة
+                updateProgress(completed, totalFiles);
             }
         }
         
@@ -2714,13 +2735,13 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
         const zipBlob = await zip.generateAsync({ type: 'blob' });
         
         // تحميل الملف
-        const filename = `orders_${new Date().toISOString().slice(0, 10)}.zip`;
+        const filename = `طلبات_وبوليصلات_${new Date().toISOString().slice(0, 10)}.zip`;
         saveAs(zipBlob, filename);
         
         Swal.fire({
             icon: 'success',
             title: 'تم التحميل بنجاح',
-            text: `تم إنشاء ${completed} ملف PDF في الأرشيف`,
+            text: `تم إنشاء ${selectedOrders.length} طلب و ${selectedOrders.length} بوليصة في الأرشيف`,
             confirmButtonText: 'موافق'
         });
         
@@ -2734,6 +2755,12 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
         });
     }
 });
+
+// دالة مساعدة لتحديث شريط التقدم
+function updateProgress(completed, total) {
+    const progress = Math.round((completed / total) * 100);
+    $('.progress-bar').css('width', `${progress}%`);
+}
 
 // دالة لجلب بيانات طلب فردي
 async function getSingleOrderData(orderId) {
@@ -2966,6 +2993,80 @@ function generateOptionsHTML(options) {
             </div>
         </div>
     `;
+}
+
+// ⭐⭐ دالة لإنشاء PDF للبوليصة يحتوي فقط على الصورة ⭐⭐
+async function generateShippingPolicyImagePDF(orderData, jsPDF) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const shipping = orderData.shipping || {};
+            const policyUrl = shipping.shipping_policy_url;
+            
+            if (!policyUrl) {
+                reject(new Error('لا يوجد رابط بوليصة'));
+                return;
+            }
+            
+            // استخدام الـ proxy لتحميل صورة البوليصة
+            const proxyUrl = new URL('{{ url_for("orders.proxy_image") }}', window.location.origin);
+            proxyUrl.searchParams.set('url', policyUrl);
+            
+            // تحميل الصورة
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            img.onload = function() {
+                try {
+                    // إنشاء PDF جديد
+                    const pdf = new jsPDF({
+                        orientation: 'portrait',
+                        unit: 'mm',
+                        format: 'a4'
+                    });
+                    
+                    const pageWidth = pdf.internal.pageSize.getWidth();
+                    const pageHeight = pdf.internal.pageSize.getHeight();
+                    
+                    // حساب أبعاد الصورة لتناسب الصفحة مع الحفاظ على التناسب
+                    const imgWidth = img.width;
+                    const imgHeight = img.height;
+                    const ratio = imgWidth / imgHeight;
+                    
+                    let displayWidth = pageWidth - 20; // هامش 10 ملم من كل جانب
+                    let displayHeight = displayWidth / ratio;
+                    
+                    // إذا كانت الصورة أطول من الصفحة، نضبط الارتفاع
+                    if (displayHeight > pageHeight - 20) {
+                        displayHeight = pageHeight - 20;
+                        displayWidth = displayHeight * ratio;
+                    }
+                    
+                    // حساب المركز
+                    const x = (pageWidth - displayWidth) / 2;
+                    const y = (pageHeight - displayHeight) / 2;
+                    
+                    // ⭐⭐ إضافة الصورة فقط إلى PDF - بدون أي نص ⭐⭐
+                    pdf.addImage(img, 'JPEG', x, y, displayWidth, displayHeight);
+                    
+                    // إرجاع PDF كـ Blob
+                    const pdfBlob = pdf.output('blob');
+                    resolve(pdfBlob);
+                    
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            
+            img.onerror = function() {
+                reject(new Error('فشل تحميل صورة البوليصة'));
+            };
+            
+            img.src = proxyUrl.toString();
+            
+        } catch (error) {
+            reject(error);
+        }
+    });
 }
 </script>
 {% endblock %}

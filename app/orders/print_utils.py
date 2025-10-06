@@ -881,7 +881,7 @@ from io import BytesIO
 
 @orders_bp.route('/get_single_order_data', methods=['POST'])
 def get_single_order_data():
-    """جلب بيانات طلب فردي للاستخدام في المتصفح"""
+    """جلب بيانات طلب فردي للاستخدام في المتصفح مع معلومات الشحن"""
     try:
         user, employee = get_user_from_cookies()
         
@@ -900,9 +900,34 @@ def get_single_order_data():
         if not orders:
             return jsonify({'success': False, 'error': 'لم يتم العثور على الطلب'}), 404
         
+        order_data = orders[0]
+        
+        # ⭐⭐ إضافة معلومات الشحن والبوليصة ⭐⭐
+        try:
+            # جلب الطلب الكامل للحصول على بيانات الشحن
+            order = SallaOrder.query.filter_by(id=str(order_id), store_id=user.store_id).first()
+            if order and order.full_order_data:
+                # استخراج معلومات الشحن
+                shipping_info = extract_shipping_info(order.full_order_data)
+                order_data['shipping'] = shipping_info
+                
+                # ⭐⭐ البحث عن رابط البوليصة في shipments ⭐⭐
+                shipments = order.full_order_data.get('shipments', [])
+                for shipment in shipments:
+                    if isinstance(shipment, dict):
+                        # البحث عن رابط البوليصة في shipment
+                        label = shipment.get('label', {})
+                        if isinstance(label, dict) and label.get('url'):
+                            shipping_info['shipping_policy_url'] = label.get('url')
+                            shipping_info['has_shipping_policy'] = True
+                            break
+                
+        except Exception as e:
+            logger.error(f"❌ خطأ في إضافة معلومات الشحن للطلب {order_id}: {str(e)}")
+        
         return jsonify({
             'success': True,
-            'order': orders[0]  # إرجاع الطلب الأول
+            'order': order_data
         })
         
     except Exception as e:
