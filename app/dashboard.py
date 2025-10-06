@@ -17,7 +17,7 @@ from datetime import datetime
 from functools import wraps
 from sqlalchemy.orm import joinedload
 import logging
-from .scheduler_tasks import check_and_update_late_orders 
+
 # إعداد المسجل للإنتاج
 logger = logging.getLogger('__init__')
 
@@ -629,32 +629,81 @@ from wtforms import ValidationError
 def check_late_orders():
     """فحص الطلبات المتأخرة يدوياً"""
     try:
-        # التحقق من CSRF token للطلبات غير GET
-        if request.method == 'POST':
-            try:
-                validate_csrf(request.headers.get('X-CSRFToken'))
-            except ValidationError:
-                return {
-                    'success': False,
-                    'message': 'رمز التحقق من الصلاحية غير صالح'
-                }, 400
+        logger.info("🔍 بدء فحص الطلبات المتأخرة - طلب POST مستلم")
         
-        # استدعاء الدالة من scheduler_tasks.py
-        updated_count = check_and_update_late_orders()
+        # التحقق من CSRF Token
+        csrf_token = request.headers.get('X-CSRFToken') or request.form.get('csrf_token')
+        if not csrf_token:
+            logger.warning("❌ طلب بدون CSRF token")
+            return {
+                'success': False,
+                'message': 'رمز التحقق من الصلاحية مطلوب'
+            }, 400
+        
+        try:
+            validate_csrf(csrf_token)
+            logger.info("✅ CSRF token صالح")
+        except ValidationError as e:
+            logger.error(f"❌ CSRF token غير صالح: {str(e)}")
+            return {
+                'success': False,
+                'message': 'رمز التحقق من الصلاحية غير صالح'
+            }, 400
+        
+        # تسجيل معلومات المستخدم
+        is_admin = request.cookies.get('is_admin') == 'true'
+        logger.info(f"👤 نوع المستخدم: {'مدير' if is_admin else 'موظف'}")
+        
+        if is_admin:
+            user = request.current_user
+            store_id = user.store_id
+            logger.info(f"🏪 متجر المدير: {store_id}, البريد: {user.email}")
+        else:
+            employee = request.current_user
+            store_id = employee.store_id
+            logger.info(f"🏪 متجر الموظف: {store_id}, البريد: {employee.email}")
+        
+        if not store_id:
+            logger.error("❌ خطأ: لا يوجد متجر مرتبط بحسابك")
+            return {
+                'success': False,
+                'message': 'لا يوجد متجر مرتبط بحسابك'
+            }, 400
+        
+        logger.info(f"🔍 جاري استيراد الدالة من scheduler_tasks...")
+        
+        # استيراد الدالة بشكل آمن
+        try:
+            from .scheduler_tasks import check_and_update_late_orders_for_store
+            logger.info("✅ تم استيراد الدالة بنجاح")
+        except ImportError as e:
+            logger.error(f"❌ فشل استيراد الدالة: {str(e)}")
+            return {
+                'success': False,
+                'message': 'فشل في تحميل وظيفة الفحص'
+            }, 500
+        
+        logger.info(f"🚀 بدء فحص الطلبات المتأخرة للمتجر {store_id}")
+        
+        # استدعاء الدالة من scheduler_tasks.py للمتجر الحالي فقط
+        updated_count = check_and_update_late_orders_for_store(store_id)
         
         if updated_count > 0:
-            flash(f'✅ تم تحديث {updated_count} طلب إلى حالة متأخر', 'success')
+            message = f'تم تحديث {updated_count} طلب إلى حالة متأخر في متجرك'
+            logger.info(f"✅ {message}")
         else:
-            flash('✅ لا توجد طلبات متأخرة تحتاج تحديث', 'info')
+            message = 'لا توجد طلبات متأخرة تحتاج تحديث في متجرك'
+            logger.info(f"✅ {message}")
             
         return {
             'success': True,
-            'message': f'تم تحديث {updated_count} طلب',
-            'updated_count': updated_count
+            'message': message,
+            'updated_count': updated_count,
+            'store_id': store_id
         }
         
     except Exception as e:
-        logger.error(f"خطأ في فحص الطلبات المتأخرة: {str(e)}")
+        logger.error(f"❌ خطأ في فحص الطلبات المتأخرة: {str(e)}", exc_info=True)
         return {
             'success': False,
             'message': f'حدث خطأ أثناء فحص الطلبات المتأخرة: {str(e)}'
