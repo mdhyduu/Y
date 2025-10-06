@@ -793,21 +793,40 @@ def preview_addresses_html():
         logger.error(traceback.format_exc())
         flash('حدث خطأ أثناء إنشاء المعاينة', 'error')
         return redirect(url_for('orders.index'))
+import urllib.parse
+
 @orders_bp.route('/proxy-image')
 def proxy_image():
-    """خدمة Proxy لتحميل الصور وتجنب مشاكل CORS"""
-    try:
+    """خدمة Proxy محسنة لتحميل الصور وتجنب مشاكل CORS"""
+    try:  
         image_url = request.args.get('url')
         
         if not image_url:
             return redirect(url_for('static', filename='images/no-image.png'))
         
+        # فك تشفير الرابط مرة واحدة فقط
+        try:
+            # فك التشفير إذا كان الرابط مشفراً
+            decoded_url = urllib.parse.unquote(image_url)
+        except Exception as e:
+            logger.warning(f"⚠️ لا يمكن فك تشفير الرابط، استخدام الرابط الأصلي: {image_url}")
+            decoded_url = image_url
+        
+        # تنظيف الرابط وإصلاحه إذا لزم الأمر
+        cleaned_url = clean_image_url(decoded_url)
+        
+        if not cleaned_url:
+            return redirect(url_for('static', filename='images/no-image.png'))
+        
         # تحميل الصورة من المصدر الأصلي
         response = requests.get(
-            image_url, 
+            cleaned_url, 
             timeout=10,
             headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+                'Accept-Language': 'ar,en;q=0.9',
+                'Referer': 'https://salla.sa/'
             }
         )
         
@@ -816,13 +835,47 @@ def proxy_image():
             proxy_response = make_response(response.content)
             proxy_response.headers.set('Content-Type', response.headers.get('Content-Type', 'image/jpeg'))
             proxy_response.headers.set('Cache-Control', 'public, max-age=86400') # كاش لمدة يوم
+            proxy_response.headers.set('Access-Control-Allow-Origin', '*') # ✅ السماح لجميع المصادر
             return proxy_response
         else:
+            logger.warning(f"⚠️ فشل تحميل الصورة {cleaned_url}: {response.status_code}")
             return redirect(url_for('static', filename='images/no-image.png'))
             
+    except requests.exceptions.Timeout:
+        logger.error(f"⏰ انتهت مهلة تحميل الصورة: {image_url}")
+        return redirect(url_for('static', filename='images/no-image.png'))
     except Exception as e:
         logger.error(f"❌ خطأ في proxy الصورة: {str(e)}")
         return redirect(url_for('static', filename='images/no-image.png'))
+
+def clean_image_url(url):
+    """تنظيف وإصلاح رابط الصورة"""
+    if not url:
+        return None
+    
+    try:
+        # إزالة أي تشفير زائد
+        cleaned = urllib.parse.unquote(url)
+        
+        # التأكد من أن الرابط يبدأ بـ http:// أو https://
+        if not cleaned.startswith(('http://', 'https://')):
+            # إذا كان الرابط نسبياً، نضيف domain سلة
+            if cleaned.startswith('/'):
+                cleaned = f"https://cdn.salla.sa{cleaned}"
+            else:
+                # إذا كان الرابط بدون scheme، نضيف https://
+                cleaned = f"https://{cleaned}"
+        
+        # التحقق من صحة الرابط
+        parsed = urllib.parse.urlparse(cleaned)
+        if not parsed.netloc:
+            return None
+            
+        return cleaned
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في تنظيف الرابط {url}: {str(e)}")
+        return None
 import zipfile
 from io import BytesIO
 

@@ -2884,19 +2884,36 @@ function generateOrderHTML(order) {
 
 // دالة لإنشاء HTML للمنتجات
 // دالة لتحويل الصور عبر Proxy لتجنب CORS
+// دالة محسنة لتحويل الصور عبر Proxy - بدون تشفير مزدوج
 function proxyImage(url) {
     if (!url) return '/static/images/no-image.png';
     
-    // إذا كانت الصورة من سلة، نستخدم proxy بسيط
-    if (url.includes('salla.sa') || url.includes('cdn.salla.sa')) {
-        // نعيد نفس الرابط مع إضافة timestamp لتجنب الكاش
-        return url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+    try {
+        // التحقق من أن الرابط ليس مشفراً مسبقاً
+        let decodedUrl = url;
+        try {
+            // محاولة فك التشفير إذا كان الرابط مشفراً
+            if (url.includes('%')) {
+                decodedUrl = decodeURIComponent(url);
+            }
+        } catch (e) {
+            console.warn('⚠️ لا يمكن فك تشفير الرابط، استخدام الرابط الأصلي:', url);
+            decodedUrl = url;
+        }
+        
+        // استخدام خدمة Proxy في الخادم
+        const proxyUrl = new URL('{{ url_for("orders.proxy_image") }}', window.location.origin);
+        
+        // تمرير الرابط بدون تشفير إضافي (لأن fetch سيتعامل معه تلقائياً)
+        proxyUrl.searchParams.set('url', decodedUrl);
+        proxyUrl.searchParams.set('t', Date.now()); // تجنب الكاش
+        
+        return proxyUrl.toString();
+    } catch (error) {
+        console.error('❌ خطأ في إنشاء رابط Proxy:', error);
+        return '/static/images/no-image.png';
     }
-    
-    // للصور الأخرى، يمكن استخدام خدمة proxy (اختياري)
-    return url;
 }
-
 // تحديث دالة generateProductsHTML لاستخدام proxy
 function generateProductsHTML(products) {
     if (products.length === 0) {
