@@ -17,7 +17,7 @@ from datetime import datetime
 from functools import wraps
 from sqlalchemy.orm import joinedload
 import logging
-
+from .scheduler_tasks import check_and_update_late_orders 
 # إعداد المسجل للإنتاج
 logger = logging.getLogger('__init__')
 
@@ -626,7 +626,6 @@ def filter_orders():
 def check_late_orders():
     """فحص الطلبات المتأخرة يدوياً"""
     try:
-        from .scheduler_tasks import check_and_update_late_orders
         
         # استدعاء الدالة من scheduler_tasks.py
         updated_count = check_and_update_late_orders()

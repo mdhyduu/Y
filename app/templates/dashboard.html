@@ -215,7 +215,7 @@
                 </div>
             </div>
         </div>
-    </div>
+    </div> 
 <!-- زر فحص الطلبات المتأخرة -->
 <div class="row mb-4">
     <div class="col-12">
@@ -361,8 +361,8 @@ document.addEventListener('DOMContentLoaded', function() {
         statusChart.resize();
     });
 });
-// فحص الطلبات المتأخرة - بنفس نمط routes.py
-document.getElementById('checkLateOrdersBtn')?.addEventListener('click', function() {
+// فحص الطلبات المتأخرة
+document.getElementById('checkLateOrdersBtn').addEventListener('click', function() {
     const btn = this;
     const originalText = btn.innerHTML;
     const resultDiv = document.getElementById('checkLateOrdersResult');
@@ -372,12 +372,11 @@ document.getElementById('checkLateOrdersBtn')?.addEventListener('click', functio
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>جاري الفحص...';
     resultDiv.innerHTML = '';
     
-    // إرسال طلب AJAX بنفس نمط routes.py
+    // إرسال طلب AJAX
     fetch('{{ url_for("dashboard.check_late_orders") }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
         }
     })
     .then(response => response.json())
@@ -413,7 +412,7 @@ document.getElementById('checkLateOrdersBtn')?.addEventListener('click', functio
                 <strong>خطأ في الاتصال!</strong> حدث خطأ أثناء الاتصال بالخادم
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
-        `; 
+        `;
     })
     .finally(() => {
         // إعادة تمكين الزر
@@ -421,6 +420,7 @@ document.getElementById('checkLateOrdersBtn')?.addEventListener('click', functio
         btn.innerHTML = originalText;
     });
 });
+
 </script>
 
 <style>
