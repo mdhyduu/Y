@@ -14,6 +14,7 @@ from app.utils import (
     get_postgres_engine,
     generate_barcode
 )
+from .route import extract_shipping_info
 from app.models import SallaOrder, CustomOrder, OrderAddress # إضافة الاستيراد
 from app.config import Config
 import logging
@@ -797,7 +798,7 @@ import urllib.parse
 
 @orders_bp.route('/proxy-image')
 def proxy_image():
-    """خدمة Proxy محسنة لتحميل الصور وتجنب مشاكل CORS"""
+    """خدمة Proxy محسنة لتحميل الصور وتجنب مشاكل CORS - تدعم البواليص"""
     try:  
         image_url = request.args.get('url')
         
@@ -806,7 +807,6 @@ def proxy_image():
         
         # فك تشفير الرابط مرة واحدة فقط
         try:
-            # فك التشفير إذا كان الرابط مشفراً
             decoded_url = urllib.parse.unquote(image_url)
         except Exception as e:
             logger.warning(f"⚠️ لا يمكن فك تشفير الرابط، استخدام الرابط الأصلي: {image_url}")
@@ -818,24 +818,46 @@ def proxy_image():
         if not cleaned_url:
             return redirect(url_for('static', filename='images/no-image.png'))
         
+        # ⭐⭐ إضافة headers إضافية للبواليص ⭐⭐
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+            'Accept-Language': 'ar,en;q=0.9',
+            'Referer': 'https://salla.sa/'
+        }
+        
+        # إذا كان الرابط من سلة، نضيف المزيد من headers
+        if 'salla.sa' in cleaned_url or 'cdn.salla.sa' in cleaned_url:
+            headers.update({
+                'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                'Sec-Fetch-Dest': 'image',
+                'Sec-Fetch-Mode': 'no-cors',
+                'Sec-Fetch-Site': 'same-site'
+            })
+        
         # تحميل الصورة من المصدر الأصلي
         response = requests.get(
             cleaned_url, 
-            timeout=10,
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-                'Accept-Language': 'ar,en;q=0.9',
-                'Referer': 'https://salla.sa/'
-            }
+            timeout=15,  # زيادة المهلة للبواليص
+            headers=headers,
+            stream=True  # لتحميل الملفات الكبيرة
         )
         
         if response.status_code == 200:
+            # تحديد نوع المحتوى
+            content_type = response.headers.get('Content-Type', 'image/jpeg')
+            
             # إرجاع الصورة مع الرأس المناسب
             proxy_response = make_response(response.content)
-            proxy_response.headers.set('Content-Type', response.headers.get('Content-Type', 'image/jpeg'))
+            proxy_response.headers.set('Content-Type', content_type)
             proxy_response.headers.set('Cache-Control', 'public, max-age=86400') # كاش لمدة يوم
-            proxy_response.headers.set('Access-Control-Allow-Origin', '*') # ✅ السماح لجميع المصادر
+            proxy_response.headers.set('Access-Control-Allow-Origin', '*')
+            
+            # ⭐⭐ إضافة headers إضافية للصور الكبيرة ⭐⭐
+            content_length = response.headers.get('Content-Length')
+            if content_length:
+                proxy_response.headers.set('Content-Length', content_length)
+                
             return proxy_response
         else:
             logger.warning(f"⚠️ فشل تحميل الصورة {cleaned_url}: {response.status_code}")
