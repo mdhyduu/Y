@@ -626,90 +626,24 @@ def filter_orders():
 def check_late_orders():
     """فحص الطلبات المتأخرة يدوياً"""
     try:
-        logger.info("🔍 بدء فحص الطلبات المتأخرة - طلب POST مستلم")
+        from .scheduler_tasks import check_and_update_late_orders
         
-        # تسجيل معلومات المستخدم
-        is_admin = request.cookies.get('is_admin') == 'true'
-        logger.info(f"👤 نوع المستخدم: {'مدير' if is_admin else 'موظف'}")
-        
-        if is_admin:
-            user = request.current_user
-            store_id = user.store_id
-            logger.info(f"🏪 متجر المدير: {store_id}, البريد: {user.email}")
-        else:
-            employee = request.current_user
-            store_id = employee.store_id
-            logger.info(f"🏪 متجر الموظف: {store_id}, البريد: {employee.email}")
-        
-        if not store_id:
-            logger.error("❌ خطأ: لا يوجد متجر مرتبط بحسابك")
-            return {
-                'success': False,
-                'message': 'لا يوجد متجر مرتبط بحسابك'
-            }, 400
-        
-        logger.info(f"🔍 جاري استيراد الدالة من scheduler_tasks...")
-        
-        # استيراد الدالة بشكل آمن - استخدام المسار المطلق
-        try:
-            # محاولة الاستيراد المطلق أولاً
-            from app.scheduler_tasks import check_and_update_late_orders_for_store
-            logger.info("✅ تم استيراد الدالة بنجاح من app.scheduler_tasks")
-        except ImportError as e1:
-            logger.warning(f"⚠️ المحاولة الأولى فشلت: {str(e1)}")
-            try:
-                # محاولة الاستيراد النسبي
-                from .scheduler_tasks import check_and_update_late_orders_for_store
-                logger.info("✅ تم استيراد الدالة بنجاح من .scheduler_tasks")
-            except ImportError as e2:
-                logger.error(f"❌ فشل استيراد الدالة من كلا المسارين: {str(e2)}")
-                # محاولة بديلة: استيراد الدالة مباشرة
-                try:
-                    import sys
-                    import os
-                    # إضافة المسار الحالي إلى sys.path
-                    current_dir = os.path.dirname(os.path.abspath(__file__))
-                    if current_dir not in sys.path:
-                        sys.path.insert(0, current_dir)
-                    
-                    from scheduler_tasks import check_and_update_late_orders_for_store
-                    logger.info("✅ تم استيراد الدالة بنجاح مباشرة")
-                except ImportError as e3:
-                    logger.error(f"❌ فشل جميع محاولات الاستيراد: {str(e3)}")
-                    return {
-                        'success': False,
-                        'message': f'فشل في تحميل وظيفة الفحص: {str(e3)}'
-                    }, 500
-        
-        # التحقق من وجود الدالة
-        if 'check_and_update_late_orders_for_store' not in globals():
-            logger.error("❌ الدالة غير موجودة في السياق العام")
-            return {
-                'success': False,
-                'message': 'وظيفة الفحص غير متوفرة في الذاكرة'
-            }, 500
-            
-        logger.info(f"🚀 بدء فحص الطلبات المتأخرة للمتجر {store_id}")
-        
-        # استدعاء الدالة
-        updated_count = check_and_update_late_orders_for_store(store_id)
+        # استدعاء الدالة من scheduler_tasks.py
+        updated_count = check_and_update_late_orders()
         
         if updated_count > 0:
-            message = f'تم تحديث {updated_count} طلب إلى حالة متأخر في متجرك'
-            logger.info(f"✅ {message}")
+            flash(f'✅ تم تحديث {updated_count} طلب إلى حالة متأخر', 'success')
         else:
-            message = 'لا توجد طلبات متأخرة تحتاج تحديث في متجرك'
-            logger.info(f"✅ {message}")
+            flash('✅ لا توجد طلبات متأخرة تحتاج تحديث', 'info')
             
         return {
             'success': True,
-            'message': message,
-            'updated_count': updated_count,
-            'store_id': store_id
+            'message': f'تم تحديث {updated_count} طلب',
+            'updated_count': updated_count
         }
         
     except Exception as e:
-        logger.error(f"❌ خطأ في فحص الطلبات المتأخرة: {str(e)}", exc_info=True)
+        logger.error(f"خطأ في فحص الطلبات المتأخرة: {str(e)}")
         return {
             'success': False,
             'message': f'حدث خطأ أثناء فحص الطلبات المتأخرة: {str(e)}'
