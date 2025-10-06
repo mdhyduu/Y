@@ -2078,9 +2078,23 @@ function generateOrdersHTML(products) {
         reloadOrders();
     });
     
-    $(document).on('input', '#search-order-id', _.debounce(function() {
-        reloadOrders();
-    }, 500));
+// في قسم البحث السريع - استبدال الكود الحالي
+$(document).on('input', '#search-order-id', _.debounce(function() {
+    const searchValue = $(this).val().trim();
+    
+    // التحقق من أن الرقم يتكون من 9 أرقام بالضبط
+    if (searchValue && !/^\d{9}$/.test(searchValue)) {
+        // عرض رسالة تحذير
+        showSweetAlert('warning', 'رقم الطلب غير صالح', 'يجب أن يتكون رقم الطلب من 9 أرقام بالضبط');
+        
+        // إفراغ الحقل أو منع البحث
+        $(this).val('');
+        return;
+    }
+    
+    // إذا كان الرقم صالحاً (9 أرقام) أو الحقل فارغ، متابعة البحث
+    reloadOrders();
+}, 500));
     
     $(document).on('change', '#filter-order-status, #filter-employee, #filter-custom-status, #filter-special-status, #per-page-select', _.debounce(function() {
         reloadOrders();
