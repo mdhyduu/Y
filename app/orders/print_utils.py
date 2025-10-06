@@ -893,3 +893,33 @@ def download_orders_zip_pdf():
         logger.error(traceback.format_exc())
         flash('حدث خطأ أثناء إنشاء ملف ZIP', 'error')
         return redirect(url_for('orders.index'))
+        
+@orders_bp.route('/get_single_order_data', methods=['POST'])
+def get_single_order_data():
+    """جلب بيانات طلب فردي للاستخدام في المتصفح"""
+    try:
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            return jsonify({'success': False, 'error': 'الرجاء تسجيل الدخول أولاً'}), 401
+        
+        data = request.get_json()
+        order_id = data.get('order_id')
+        
+        if not order_id:
+            return jsonify({'success': False, 'error': 'لم يتم تحديد الطلب'}), 400
+        
+        # جلب الطلب من قاعدة البيانات
+        orders = get_orders_from_local_database([order_id], user.store_id)
+        
+        if not orders:
+            return jsonify({'success': False, 'error': 'لم يتم العثور على الطلب'}), 404
+        
+        return jsonify({
+            'success': True,
+            'order': orders[0]  # إرجاع الطلب الأول
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في جلب بيانات الطلب الفردي: {str(e)}")
+        return jsonify({'success': False, 'error': 'حدث خطأ أثناء جلب البيانات'}), 500
