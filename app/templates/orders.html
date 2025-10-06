@@ -2087,11 +2087,24 @@ function generateOrdersHTML(products) {
     });
     
 // استبدال دالة البحث الحالية بهذا الكود
-// استبدال دالة البحث الحالية بهذا الكود
 $(document).on('input', '#search-order-id', _.debounce(function() {
     const searchValue = $(this).val().trim();
     const previousValue = $(this).data('previous-value') || '';
     
+    // حفظ القيمة الحالية للمقارنة في المرة القادمة
+    $(this).data('previous-value', searchValue);
+    
+    // إذا كان الحقل فارغاً، إعادة تحميل الصفحة بدون فلترة
+    if (!searchValue) {
+        reloadOrders();
+        return;
+    }
+    
+    // إذا كان الرقم 9 أرقام بالضبط، إجراء البحث
+    if (/^\d{9}$/.test(searchValue)) {
+        reloadOrders();
+    }
+    // إذا كان الرقم أقل أو أكثر من 9 أرقام، لا نقوم بأي شيء
 }, 300));
     $(document).on('change', '#filter-order-status, #filter-employee, #filter-custom-status, #filter-special-status, #per-page-select', _.debounce(function() {
         reloadOrders();
@@ -2677,11 +2690,7 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
     
     Swal.fire({
         title: 'جاري إنشاء الملفات',
-        html: `يتم الآن إنشاء ملفات PDF للطلبات والبوليصلات...<br>
-              <div class="progress mt-3">
-                 <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
-              </div>
-              <small class="text-muted mt-2" id="progress-details">0/${selectedOrders.length * 2}</small>`,
+        html: `يتم الآن إنشاء ${selectedOrders.length} ملف PDF...<br><div class="progress mt-3"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div></div>`,
         allowOutsideClick: false,
         showConfirmButton: false,
         didOpen: () => {
@@ -2691,59 +2700,26 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
     
     try {
         let completed = 0;
-        const totalFiles = selectedOrders.length * 2; // طلب + بوليصة لكل طلب
-        let successfulPolicies = 0;
         
         for (const orderId of selectedOrders) {
             try {
                 // جلب بيانات الطلب الفردي
                 const orderData = await getSingleOrderData(orderId);
                 if (orderData) {
-                    const orderNumber = orderData.reference_id || orderData.id;
+                    // إنشاء PDF للطلب
+                    const pdfBlob = await generateOrderPDF(orderData, jsPDF);
                     
-                    // ⭐⭐ 1. إنشاء PDF للطلب ⭐⭐
-                    try {
-                        const orderPdfBlob = await generateOrderPDF(orderData, jsPDF);
-                        const orderFilename = `طلب_${orderNumber}.pdf`;
-                        zip.file(orderFilename, orderPdfBlob);
-                        logger.info(`✅ تم إنشاء PDF للطلب: ${orderNumber}`);
-                    } catch (orderError) {
-                        logger.error(`❌ فشل إنشاء PDF للطلب ${orderNumber}:`, orderError);
-                    }
-                    
-                    completed++;
-                    updateProgress(completed, totalFiles, orderNumber, 'طلب');
-                    
-                    // ⭐⭐ 2. تحميل البوليصة كملف PDF أصلي ⭐⭐
-                    if (orderData.shipping && orderData.shipping.has_shipping_policy && orderData.shipping.shipping_policy_url) {
-                        try {
-                            const policyPdfBlob = await generateShippingPolicyImagePDF(orderData, jsPDF);
-                            if (policyPdfBlob) {
-                                const policyFilename = `بوليصة_${orderNumber}.pdf`;
-                                zip.file(policyFilename, policyPdfBlob);
-                                successfulPolicies++;
-                                logger.info(`✅ تم إضافة بوليصة للطلب: ${orderNumber}`);
-                            }
-                        } catch (policyError) {
-                            logger.error(`❌ فشل تحميل بوليصة الشحن للطلب ${orderNumber}:`, policyError);
-                            // نستمر حتى إذا فشل تحميل البوليصة
-                        }
-                    } else {
-                        logger.warn(`⚠️ لا توجد بوليصة شحن للطلب: ${orderNumber}`);
-                    }
-                    
-                    completed++;
-                    updateProgress(completed, totalFiles, orderNumber, 'بوليصة');
-                } else {
-                    // إذا فشل جلب بيانات الطلب، نزيد العداد مرتين
-                    completed += 2;
-                    updateProgress(completed, totalFiles, orderId, 'خطأ');
+                    // إضافة PDF إلى الأرشيف
+                    const filename = `order_${orderData.reference_id || orderData.id}.pdf`;
+                    zip.file(filename, pdfBlob);
                 }
+                
+                completed++;
+                const progress = Math.round((completed / selectedOrders.length) * 100);
+                $('.progress-bar').css('width', `${progress}%`);
                 
             } catch (error) {
                 console.error(`❌ خطأ في معالجة الطلب ${orderId}:`, error);
-                completed += 2; // تخطي الطلب والبوليصة
-                updateProgress(completed, totalFiles, orderId, 'خطأ');
             }
         }
         
@@ -2751,16 +2727,13 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
         const zipBlob = await zip.generateAsync({ type: 'blob' });
         
         // تحميل الملف
-        const filename = `طلبات_وبوليصلات_${new Date().toISOString().slice(0, 10)}.zip`;
+        const filename = `orders_${new Date().toISOString().slice(0, 10)}.zip`;
         saveAs(zipBlob, filename);
         
         Swal.fire({
             icon: 'success',
             title: 'تم التحميل بنجاح',
-            html: `تم إنشاء:<br>
-                  • ${selectedOrders.length} ملف طلب<br>
-                  • ${successfulPolicies} ملف بوليصة<br>
-                  <small class="text-muted">في الأرشيف المضغوط</small>`,
+            text: `تم إنشاء ${completed} ملف PDF في الأرشيف`,
             confirmButtonText: 'موافق'
         });
         
@@ -2774,14 +2747,6 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
         });
     }
 });
-
-// دالة مساعدة لتحديث شريط التقدم
-function updateProgress(completed, total, orderNumber, type) {
-    const progress = Math.round((completed / total) * 100);
-    $('.progress-bar').css('width', `${progress}%`);
-    $('#progress-details').text(`${completed}/${total} - ${type} ${orderNumber}`);
-}
-// دالة مساعدة لتحديث شريط التقدم
 
 // دالة لجلب بيانات طلب فردي
 async function getSingleOrderData(orderId) {
@@ -3014,90 +2979,6 @@ function generateOptionsHTML(options) {
             </div>
         </div>
     `;
-}
-
-// ⭐⭐ دالة لإنشاء PDF للبوليصة يحتوي فقط على الصورة ⭐⭐
-// إضافة دالة لفحص نوع الملف
-function isPdfUrl(url) {
-    return url.toLowerCase().endsWith('.pdf') || url.includes('/pdf') || url.includes('application/pdf');
-}
-
-// تحديث دالة تحميل البوليصة للتحقق من نوع الملف
-// ⭐⭐ دالة محسنة لتحميل البوليصة كملف PDF أصلي ⭐⭐
-async function generateShippingPolicyImagePDF(orderData, jsPDF) {
-    return new Promise(async (resolve, reject) => {
-        try {
-            const shipping = orderData.shipping || {};
-            const policyUrl = shipping.shipping_policy_url;
-            const orderNumber = orderData.reference_id || orderData.id;
-            
-            if (!policyUrl) {
-                console.log(`❌ لا يوجد رابط بوليصة للطلب ${orderNumber}`);
-                reject(new Error('لا يوجد رابط بوليصة'));
-                return;
-            }
-
-            console.log(`📥 جاري تحميل البوليصة للطلب ${orderNumber}:`, policyUrl);
-
-            // استخدام الـ proxy الجديد لتحميل ملف PDF البوليصة
-            const proxyUrl = "{{ url_for('orders.proxy_pdf') }}?url=" + encodeURIComponent(policyUrl) + "&t=" + Date.now();
-
-            console.log(`🔗 رابط الـ Proxy: ${proxyUrl}`);
-
-            // تحميل ملف PDF باستخدام fetch مع معالجة محسنة
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => {
-                controller.abort();
-                console.log(`⏰ انتهت مهلة تحميل البوليصة للطلب ${orderNumber}`);
-            }, 30000); // 30 ثانية
-
-            try {
-                const response = await fetch(proxyUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/pdf, */*'
-                    },
-                    signal: controller.signal
-                });
-
-                clearTimeout(timeoutId);
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error(`❌ فشل تحميل البوليصة للطلب ${orderNumber}:`, response.status, errorText);
-                    throw new Error(`فشل تحميل البوليصة: ${response.status} ${response.statusText}`);
-                }
-
-                // التحقق من نوع المحتوى
-                const contentType = response.headers.get('content-type');
-                console.log(`📄 نوع محتوى الاستجابة: ${contentType}`);
-
-                // تحويل الاستجابة إلى Blob
-                const pdfBlob = await response.blob();
-                
-                if (pdfBlob.size === 0) {
-                    console.error(`❌ ملف البوليصة فارغ للطلب ${orderNumber}`);
-                    throw new Error('ملف البوليصة فارغ');
-                }
-
-                console.log(`✅ تم تحميل البوليصة بنجاح للطلب ${orderNumber}، الحجم: ${pdfBlob.size} بايت`);
-                resolve(pdfBlob);
-                
-            } catch (fetchError) {
-                clearTimeout(timeoutId);
-                if (fetchError.name === 'AbortError') {
-                    console.error(`⏰ انتهت مهلة تحميل البوليصة للطلب ${orderNumber}`);
-                    reject(new Error('انتهت مهلة تحميل البوليصة'));
-                } else {
-                    throw fetchError;
-                }
-            }
-            
-        } catch (error) {
-            console.error(`❌ خطأ في تحميل البوليصة: ${error.message}`);
-            reject(error);
-        }
-    });
 }
 </script>
 {% endblock %}
