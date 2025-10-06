@@ -145,13 +145,18 @@ def index():
             orders_query = orders_query.join(SallaOrder.employee_statuses).filter(
                 OrderEmployeeStatus.status_id == custom_status_id
             )
-        
+                
         if search_query:
-            # البحث فقط من خلال reference_id
-            search_filter = f'%{search_query}%'
-            orders_query = orders_query.filter(
-                SallaOrder.reference_id.ilike(search_filter)
-            )
+            # البحث عن أرقام طلبات متعددة مفصولة بفواصل
+            search_terms = [term.strip() for term in search_query.split(',')]
+            
+            search_filters = []
+            for term in search_terms:
+                if term:
+                    search_filters.append(SallaOrder.reference_id.ilike(f'%{term}%'))
+            
+            if search_filters:
+                orders_query = orders_query.filter(or_(*search_filters))
         
         if date_from and date_to:
             try:

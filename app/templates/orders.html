@@ -2087,6 +2087,7 @@ function generateOrdersHTML(products) {
     });
     
 // استبدال دالة البحث الحالية بهذا الكود
+// استبدال دالة البحث الحالية بهذا الكود
 $(document).on('input', '#search-order-id', _.debounce(function() {
     const searchValue = $(this).val().trim();
     const previousValue = $(this).data('previous-value') || '';
@@ -2100,11 +2101,12 @@ $(document).on('input', '#search-order-id', _.debounce(function() {
         return;
     }
     
-    // إذا كان الرقم 9 أرقام بالضبط، إجراء البحث
-    if (/^\d{9}$/.test(searchValue)) {
+    // ✅ التعديل: السماح بأرقام متعددة مفصولة بفواصل
+    // النمط الجديد: أرقام مفصولة بفواصل، مع أو بدون مسافات
+    if (/^[\d\s,]+$/.test(searchValue)) {
         reloadOrders();
     }
-    // إذا كان الرقم أقل أو أكثر من 9 أرقام، لا نقوم بأي شيء
+    // إذا كان الإدخال لا يحتوي على أرقام وفواصل فقط، لا نقوم بأي شيء
 }, 300));
     $(document).on('change', '#filter-order-status, #filter-employee, #filter-custom-status, #filter-special-status, #per-page-select', _.debounce(function() {
         reloadOrders();
