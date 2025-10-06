@@ -21,7 +21,7 @@ def check_and_update_late_orders_for_store(store_id):
             (OrderStatus.slug == 'in_progress') | 
             (OrderStatus.name.contains('قيد التنفيذ'))
         ).first()
-        
+         
         if not processing_status:
             logger.warning(f"⚠️ لم يتم العثور على حالة 'قيد التنفيذ' في المتجر {store_id}")
             return 0
