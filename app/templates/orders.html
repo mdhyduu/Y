@@ -2092,21 +2092,6 @@ $(document).on('input', '#search-order-id', _.debounce(function() {
     const searchValue = $(this).val().trim();
     const previousValue = $(this).data('previous-value') || '';
     
-    // حفظ القيمة الحالية للمقارنة في المرة القادمة
-    $(this).data('previous-value', searchValue);
-    
-    // إذا كان الحقل فارغاً، إعادة تحميل الصفحة بدون فلترة
-    if (!searchValue) {
-        reloadOrders();
-        return;
-    }
-    
-    // ✅ التعديل: السماح بأرقام متعددة مفصولة بفواصل
-    // النمط الجديد: أرقام مفصولة بفواصل، مع أو بدون مسافات
-    if (/^[\d\s,]+$/.test(searchValue)) {
-        reloadOrders();
-    }
-    // إذا كان الإدخال لا يحتوي على أرقام وفواصل فقط، لا نقوم بأي شيء
 }, 300));
     $(document).on('change', '#filter-order-status, #filter-employee, #filter-custom-status, #filter-special-status, #per-page-select', _.debounce(function() {
         reloadOrders();
