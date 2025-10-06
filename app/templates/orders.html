@@ -2774,84 +2774,66 @@ async function getSingleOrderData(orderId) {
 }
 
 // دالة لإنشاء PDF للطلب الفردي
-// دالة لإنشاء PDF للطلب الفردي - معدلة لدعم الصور
 async function generateOrderPDF(orderData, jsPDF) {
     return new Promise((resolve, reject) => {
         try {
-            // إنشاء عنصر HTML مؤقت
+            // إنشاء عنصر HTML مؤقت لعرض الطلب
             const tempDiv = document.createElement('div');
-            tempDiv.style.position = 'fixed';
-            tempDiv.style.left = '0';
+            tempDiv.style.position = 'absolute';
+            tempDiv.style.left = '-9999px';
             tempDiv.style.top = '0';
             tempDiv.style.width = '210mm';
-            tempDiv.style.minHeight = '297mm';
             tempDiv.style.padding = '20px';
             tempDiv.style.background = 'white';
-            tempDiv.style.fontFamily = "'Tajawal', Arial, sans-serif";
+            tempDiv.style.fontFamily = 'Tajawal, Arial, sans-serif';
             tempDiv.style.direction = 'rtl';
-            tempDiv.style.zIndex = '-1000';
-            tempDiv.style.visibility = 'hidden';
             
-            // بناء محتوى HTML مع معالجة الصور
+            // بناء محتوى HTML للطلب
             tempDiv.innerHTML = generateOrderHTML(orderData);
             
             document.body.appendChild(tempDiv);
             
-            // الانتظار حتى تحميل جميع الصور
-            const loadImages = () => {
-                const images = tempDiv.getElementsByTagName('img');
-                const promises = [];
+            // استخدام html2canvas لالتقاط الصورة
+            html2canvas(tempDiv, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                width: tempDiv.offsetWidth,
+                height: tempDiv.offsetHeight,
+                onclone: function(clonedDoc) {
+                    const clonedDiv = clonedDoc.querySelector('div');
+                    clonedDiv.style.visibility = 'visible';
+                }
+            }).then(canvas => {
+                // تحويل Canvas إلى PDF
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgData = canvas.toDataURL('image/jpeg', 0.9);
                 
-                for (let img of images) {
-                    if (!img.complete) {
-                        const promise = new Promise((resolve, reject) => {
-                            img.onload = resolve;
-                            img.onerror = resolve; // نستمر حتى لو فشلت صورة
-                        });
-                        promises.push(promise);
-                    }
+                const imgWidth = 210; // A4 width in mm
+                const pageHeight = 295; // A4 height in mm
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                
+                let heightLeft = imgHeight;
+                let position = 0;
+                
+                pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+                
+                // إضافة صفحات إضافية إذا كان المحتوى طويلاً
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
                 }
                 
-                return Promise.all(promises);
-            };
-            
-            loadImages().then(() => {
-                // استخدام html2canvas مع إعدادات محسنة للصور
-                html2canvas(tempDiv, {
-                    scale: 2,
-                    useCORS: true, // ✅ مهم للصور من مصادر خارجية
-                    allowTaint: true, // ✅ يسمح بصور من مصادر مختلفة
-                    logging: false,
-                    width: tempDiv.offsetWidth,
-                    height: tempDiv.offsetHeight,
-                    onclone: function(clonedDoc) {
-                        // نضمن أن المحتوى مرئي في النسخة المستنسخة
-                        const clonedDiv = clonedDoc.querySelector('div');
-                        clonedDiv.style.visibility = 'visible';
-                        clonedDiv.style.position = 'fixed';
-                        clonedDiv.style.left = '0';
-                        clonedDiv.style.top = '0';
-                    }
-                }).then(canvas => {
-                    // تحويل Canvas إلى PDF
-                    const pdf = new jsPDF('p', 'mm', 'a4');
-                    const imgData = canvas.toDataURL('image/jpeg', 0.9);
-                    
-                    const imgWidth = 210; // عرض A4 بـ mm
-                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                    
-                    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
-                    
-                    // تنظيف
-                    document.body.removeChild(tempDiv);
-                    
-                    const pdfBlob = pdf.output('blob');
-                    resolve(pdfBlob);
-                    
-                }).catch(error => {
-                    document.body.removeChild(tempDiv);
-                    reject(error);
-                });
+                // تنظيف العنصر المؤقت
+                document.body.removeChild(tempDiv);
+                
+                // إرجاع PDF كـ Blob
+                const pdfBlob = pdf.output('blob');
+                resolve(pdfBlob);
+                
             }).catch(error => {
                 document.body.removeChild(tempDiv);
                 reject(error);
@@ -2862,6 +2844,7 @@ async function generateOrderPDF(orderData, jsPDF) {
         }
     });
 }
+
 // دالة لإنشاء HTML للطلب الفردي
 function generateOrderHTML(order) {
     return `
