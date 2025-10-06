@@ -17,7 +17,7 @@ from datetime import datetime
 from functools import wraps
 from sqlalchemy.orm import joinedload
 import logging
-
+from .utils import get_user_from_cookies
 # إعداد المسجل للإنتاج
 logger = logging.getLogger('__init__')
 
@@ -619,31 +619,82 @@ def filter_orders():
     except Exception as e:
         logger.error(f"خطأ في filter_orders: {str(e)}")
         return "حدث خطأ أثناء جلب الطلبات", 500
-        
+         
         
 @dashboard_bp.route('/check_late_orders', methods=['POST'])
 @login_required
 def check_late_orders():
-    """فحص الطلبات المتأخرة يدوياً"""
+    """فحص الطلبات المتأخرة يدوياً - بنفس طريقة routes.py"""
     try:
-        from .scheduler_tasks import check_and_update_late_orders
+        from .scheduler_tasks import check_and_update_late_orders_for_store
         
-        # استدعاء الدالة من scheduler_tasks.py
-        updated_count = check_and_update_late_orders()
+        # نفس الطريقة المستخدمة في routes.py
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            return {
+                'success': False,
+                'message': 'الرجاء تسجيل الدخول أولاً'
+            }, 401
+
+        # تحديد صلاحيات المستخدم بنفس طريقة routes.py
+        is_admin = request.cookies.get('is_admin') == 'true'
+        is_reviewer = False
+        is_delivery_personnel = False
+        
+        if is_admin:
+            is_reviewer = True
+            if not user.salla_access_token:
+                return {
+                    'success': False,
+                    'message': 'يجب ربط المتجر مع سلة أولاً'
+                }, 400
+        else:
+            if not employee:
+                return {
+                    'success': False,
+                    'message': 'غير مصرح لك بالوصول'
+                }, 403
+            
+            if not user.salla_access_token:
+                return {
+                    'success': False,
+                    'message': 'المتجر غير مرتبط بسلة'
+                }, 400
+            
+            is_reviewer = employee.role in ['reviewer', 'manager']
+            is_delivery_personnel = employee.role in ['delivery_manager', 'delivery']
+
+        # تحديد المتجر الحالي بنفس الطريقة
+        store_id = user.store_id
+        
+        if not store_id:
+            return {
+                'success': False,
+                'message': 'لا يوجد متجر مرتبط بحسابك'
+            }, 400
+        
+        logger.info(f"🔍 بدء فحص الطلبات المتأخرة يدوياً - المتجر: {store_id}")
+        
+        # استدعاء الدالة من scheduler_tasks.py للمتجر الحالي فقط
+        updated_count = check_and_update_late_orders_for_store(store_id)
         
         if updated_count > 0:
-            flash(f'✅ تم تحديث {updated_count} طلب إلى حالة متأخر', 'success')
+            message = f'تم تحديث {updated_count} طلب إلى حالة متأخر في متجرك'
+            logger.info(f"✅ {message}")
         else:
-            flash('✅ لا توجد طلبات متأخرة تحتاج تحديث', 'info')
+            message = 'لا توجد طلبات متأخرة تحتاج تحديث في متجرك'
+            logger.info(f"✅ {message}")
             
         return {
             'success': True,
-            'message': f'تم تحديث {updated_count} طلب',
-            'updated_count': updated_count
+            'message': message,
+            'updated_count': updated_count,
+            'store_id': store_id
         }
         
     except Exception as e:
-        logger.error(f"خطأ في فحص الطلبات المتأخرة: {str(e)}")
+        logger.error(f"❌ خطأ في فحص الطلبات المتأخرة: {str(e)}")
         return {
             'success': False,
             'message': f'حدث خطأ أثناء فحص الطلبات المتأخرة: {str(e)}'

@@ -5,34 +5,35 @@ import logging
 
 logger = logging.getLogger('salla_app')
 
-def check_and_update_late_orders():
-    """فحص الطلبات المتأخرة"""
+def check_and_update_late_orders_for_store(store_id):
+    """فحص الطلبات المتأخرة لمتجر محدد - بنفس منطق routes.py"""
     try:
         # حساب التاريخ قبل يومين
         two_days_ago = datetime.utcnow() - timedelta(days=2)
         
-        logger.info(f"🔍 بدء فحص الطلبات المتأخرة - البحث في OrderStatus قبل: {two_days_ago}")
+        logger.info(f"🔍 فحص الطلبات المتأخرة للمتجر {store_id}")
         
         late_orders_count = 0
         
-        # البحث عن حالة "قيد التنفيذ" في OrderStatus
+        # البحث عن حالة "قيد التنفيذ" في OrderStatus لهذا المتجر المحدد
         processing_status = OrderStatus.query.filter(
-            (OrderStatus.slug == 'in_progress')
+            OrderStatus.store_id == store_id,
+            (OrderStatus.slug == 'in_progress') | 
+            (OrderStatus.name.contains('قيد التنفيذ'))
         ).first()
         
         if not processing_status:
-            logger.warning("⚠️ لم يتم العثور على حالة 'قيد التنفيذ' في OrderStatus")
+            logger.warning(f"⚠️ لم يتم العثور على حالة 'قيد التنفيذ' في المتجر {store_id}")
             return 0
         
-        logger.info(f"✅ وجدت حالة قيد التنفيذ: {processing_status.name} (ID: {processing_status.id})")
-        
-        # البحث عن طلبات Salla التي في حالة "قيد التنفيذ" منذ أكثر من يومين
+        # البحث عن طلبات Salla في هذا المتجر المحدد
         late_salla_orders = SallaOrder.query.filter(
+            SallaOrder.store_id == store_id,
             SallaOrder.status_id == processing_status.id,
             SallaOrder.created_at <= two_days_ago
         ).all()
         
-        logger.info(f"📊 وجد {len(late_salla_orders)} طلب Salla في حالة قيد التنفيذ منذ أكثر من يومين")
+        logger.info(f"📊 وجد {len(late_salla_orders)} طلب في حالة قيد التنفيذ منذ أكثر من يومين")
         
         for order in late_salla_orders:
             # التحقق من عدم وجود حالة "متأخر" مسبقاً
@@ -54,13 +55,13 @@ def check_and_update_late_orders():
         
         if late_orders_count > 0:
             db.session.commit()
-            logger.info(f"🎯 تم تحديث {late_orders_count} طلب Salla إلى حالة متأخر")
+            logger.info(f"🎯 تم تحديث {late_orders_count} طلب إلى حالة متأخر في المتجر {store_id}")
         else:
-            logger.info("✅ لا توجد طلبات Salla تحتاج تحديث")
+            logger.info(f"✅ لا توجد طلبات تحتاج تحديث في المتجر {store_id}")
         
         return late_orders_count
         
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ خطأ في فحص الطلبات المتأخرة: {str(e)}")
+        logger.error(f"❌ خطأ في فحص الطلبات المتأخرة للمتجر {store_id}: {str(e)}")
         return 0
