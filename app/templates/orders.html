@@ -2078,10 +2078,27 @@ function generateOrdersHTML(products) {
         reloadOrders();
     });
     
-    $(document).on('input', '#search-order-id', _.debounce(function() {
-        reloadOrders();
-    },  ));
+// استبدال دالة البحث الحالية بهذا الكود
+$(document).on('input', '#search-order-id', _.debounce(function() {
+    const searchValue = $(this).val().trim();
+    const previousValue = $(this).data('previous-value') || '';
     
+    // حفظ القيمة الحالية للمقارنة في المرة القادمة
+    $(this).data('previous-value', searchValue);
+    
+    // إذا كان الحقل فارغاً، إعادة تحميل الصفحة بدون فلترة
+    if (!searchValue) {
+        reloadOrders();
+        return;
+    }
+    
+    // إذا كان الرقم 9 أرقام بالضبط، إجراء البحث
+    if (/^\d{9}$/.test(searchValue)) {
+        console.log('🔍 بحث تلقائي برقم الطلب:', searchValue);
+        reloadOrders();
+    }
+    // إذا كان الرقم أقل أو أكثر من 9 أرقام، لا نقوم بأي شيء
+}, 300));
     $(document).on('change', '#filter-order-status, #filter-employee, #filter-custom-status, #filter-special-status, #per-page-select', _.debounce(function() {
         reloadOrders();
     }, 300));
