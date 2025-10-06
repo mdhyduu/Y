@@ -621,11 +621,23 @@ def filter_orders():
         return "حدث خطأ أثناء جلب الطلبات", 500
         
         
+from flask_wtf.csrf import validate_csrf
+from wtforms import ValidationError
+
 @dashboard_bp.route('/check_late_orders', methods=['POST'])
 @login_required
 def check_late_orders():
     """فحص الطلبات المتأخرة يدوياً"""
     try:
+        # التحقق من CSRF token للطلبات غير GET
+        if request.method == 'POST':
+            try:
+                validate_csrf(request.headers.get('X-CSRFToken'))
+            except ValidationError:
+                return {
+                    'success': False,
+                    'message': 'رمز التحقق من الصلاحية غير صالح'
+                }, 400
         
         # استدعاء الدالة من scheduler_tasks.py
         updated_count = check_and_update_late_orders()

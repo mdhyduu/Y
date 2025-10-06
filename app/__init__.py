@@ -323,5 +323,35 @@ def create_app():
     def shutdown_session(exception=None):
         db.session.remove()   # يغلق الجلسة ويرجع الاتصال للـ pool
 
- 
+    def scheduled_late_orders_check():
+        """دالة مجدولة مع سياق التطبيق"""
+        with app.app_context():
+            try:
+                # في app/__init__.py
+                from .scheduler_tasks import check_and_update_late_orders
+                
+                # ثم استخدمها كما في الكود السابق
+                check_and_update_late_orders()
+            except Exception as e:
+                app.logger.error(f"خطأ في المهمة المجدولة: {str(e)}")
+    
+    def init_scheduler():
+        """تهيئة المهمات المجدولة"""
+        scheduler = BackgroundScheduler()
+        
+        # ✅ استخدام الدالة المعدلة التي تضمن سياق التطبيق
+        scheduler.add_job(
+            func=scheduled_late_orders_check,
+            trigger='interval',
+            hours=1,  # تغيير من minutes=1 إلى hours=24
+            id='check_late_orders',
+            name='فحص الطلبات المتأخرة كل 24 ساعة',
+            replace_existing=True
+        ) 
+        
+        scheduler.start()
+        app.logger.info("✅ تم تشغيل مجدول فحص الطلبات المتأخرة (كل 24 ساعة)")
+    
+    # بدء المخطط
+    init_scheduler()
     return app

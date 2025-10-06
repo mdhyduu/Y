@@ -215,7 +215,7 @@
                 </div>
             </div>
         </div>
-    </div> 
+    </div>
 <!-- زر فحص الطلبات المتأخرة -->
 <div class="row mb-4">
     <div class="col-12">
@@ -361,6 +361,7 @@ document.addEventListener('DOMContentLoaded', function() {
         statusChart.resize();
     });
 });
+
 // فحص الطلبات المتأخرة
 document.getElementById('checkLateOrdersBtn').addEventListener('click', function() {
     const btn = this;
@@ -372,14 +373,25 @@ document.getElementById('checkLateOrdersBtn').addEventListener('click', function
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>جاري الفحص...';
     resultDiv.innerHTML = '';
     
-    // إرسال طلب AJAX
+    // الحصول على CSRF token من meta tag (يجب إضافته في base.html)
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    
+    // إرسال طلب AJAX مع CSRF token
     fetch('{{ url_for("dashboard.check_late_orders") }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-        }
+            'X-CSRFToken': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin' // إرسال الكوكيز مع الطلب
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`خطأ في الخادم: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             resultDiv.innerHTML = `
@@ -409,7 +421,7 @@ document.getElementById('checkLateOrdersBtn').addEventListener('click', function
         resultDiv.innerHTML = `
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 <i class="fas fa-exclamation-circle me-2"></i>
-                <strong>خطأ في الاتصال!</strong> حدث خطأ أثناء الاتصال بالخادم
+                <strong>خطأ في الاتصال!</strong> ${error.message}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         `;
@@ -420,7 +432,6 @@ document.getElementById('checkLateOrdersBtn').addEventListener('click', function
         btn.innerHTML = originalText;
     });
 });
-
 </script>
 
 <style>
