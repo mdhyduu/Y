@@ -14,7 +14,7 @@ from app.utils import (
     get_postgres_engine,
     generate_barcode
 )
-from .route import extract_shipping_info
+
 from app.models import SallaOrder, CustomOrder, OrderAddress # إضافة الاستيراد
 from app.config import Config
 import logging
@@ -900,7 +900,83 @@ def clean_image_url(url):
         return None
 import zipfile
 from io import BytesIO
-
+def extract_shipping_info(order_data):
+    """استخراج معلومات الشحن من بيانات الطلب مع إضافة رابط البوليصة"""
+    try:
+        shipments_data = order_data.get('shipments', [])
+        
+        shipping_info = {
+            'has_shipping': bool(shipments_data),
+            'status': '',
+            'tracking_number': None,
+            'tracking_link': None,
+            'has_tracking': False,
+            'has_shipping_policy': False,
+            'shipping_policy_url': None,  # رابط البوليصة
+            'shipment_details': []
+        }
+        
+        for shipment in shipments_data:
+            shipment_tracking_link = shipment.get('tracking_link')
+            shipment_tracking_number = shipment.get('tracking_number')
+            shipment_label = shipment.get('label')
+            
+            # ⭐⭐ إضافة استخراج رابط البوليصة ⭐⭐
+            shipment_policy_url = None
+            if shipment_label and isinstance(shipment_label, dict):
+                shipment_policy_url = shipment_label.get('url')
+            
+            shipment_has_tracking = False
+            final_tracking_link = None
+            
+            if shipment_tracking_link and shipment_tracking_link not in ["", "0", "null", "None"]:
+                if shipment_tracking_link.startswith(('http://', 'https://')):
+                    final_tracking_link = shipment_tracking_link
+                else:
+                    final_tracking_link = f"https://track.salla.sa/track/{shipment_tracking_link}"
+                shipment_has_tracking = True
+            
+            if not final_tracking_link and shipment_tracking_number:
+                final_tracking_link = f"https://track.salla.sa/track/{shipment_tracking_number}"
+                shipment_has_tracking = True
+            
+            shipment_info = {
+                'id': shipment.get('id'),
+                'courier_name': shipment.get('courier_name', ''),
+                'courier_logo': shipment.get('courier_logo', ''),
+                'tracking_number': shipment_tracking_number,
+                'tracking_link': final_tracking_link,
+                'has_tracking': shipment_has_tracking,
+                'status': shipment.get('status', ''),
+                'label': shipment_label,
+                'has_label': bool(shipment_label and shipment_label not in ["", "0", "null"]),
+                'shipping_policy_url': shipment_policy_url,  # إضافة رابط البوليصة
+                'has_shipping_policy': bool(shipment_policy_url),  # التحقق من وجود بوليصة
+                'shipping_number': shipment.get('shipping_number'),
+                'total_weight': shipment.get('total_weight', {}),
+                'packages': shipment.get('packages', [])
+            }
+            
+            shipping_info['shipment_details'].append(shipment_info)
+            
+            # ⭐⭐ تحديث معلومات البوليصة العامة ⭐⭐
+            if shipment_info['has_shipping_policy'] and not shipping_info['has_shipping_policy']:
+                shipping_info['has_shipping_policy'] = True
+                shipping_info['shipping_policy_url'] = shipment_policy_url
+            
+            if not shipping_info['status'] and shipment_info['status']:
+                shipping_info['status'] = shipment_info['status']
+            
+            if shipment_has_tracking and not shipping_info['has_tracking']:
+                shipping_info['tracking_link'] = final_tracking_link
+                shipping_info['tracking_number'] = shipment_tracking_number
+                shipping_info['has_tracking'] = True
+        
+        return shipping_info
+    
+    except Exception as e:
+        logger.error(f"Error extracting shipping info: {str(e)}")
+        return {}
 @orders_bp.route('/get_single_order_data', methods=['POST'])
 def get_single_order_data():
     """جلب بيانات طلب فردي للاستخدام في المتصفح مع معلومات الشحن"""
