@@ -5,44 +5,36 @@ import logging
 
 logger = logging.getLogger('salla_app')
 
-def check_and_update_late_orders_for_store(store_id):
-    """فحص الطلبات المتأخرة لمتجر محدد - بنفس منطق routes.py"""
+def check_and_update_late_orders():
+    """فحص الطلبات المتأخرة"""
     try:
         # حساب التاريخ قبل يومين
         two_days_ago = datetime.utcnow() - timedelta(days=2)
         
-        logger.info(f"🔍 فحص الطلبات المتأخرة للمتجر {store_id}")
+        logger.info(f"🔍 بدء فحص الطلبات المتأخرة - البحث في OrderStatus قبل: {two_days_ago}")
         
         late_orders_count = 0
+        processed_orders = []
         
-        # البحث عن حالة "قيد التنفيذ" في OrderStatus لهذا المتجر المحدد
+        # البحث عن حالة "قيد التنفيذ" في OrderStatus
         processing_status = OrderStatus.query.filter(
-            OrderStatus.store_id == store_id,
-            (OrderStatus.slug == 'in_progress') 
+            (OrderStatus.slug == 'in_progress') | 
+            (OrderStatus.name.contains('قيد التنفيذ'))
         ).first()
         
         if not processing_status:
-            logger.warning(f"⚠️ لم يتم العثور على حالة 'قيد التنفيذ' في المتجر {store_id}")
-            # محاولة العثور على أي حالة تحتوي على كلمة "قيد"
-            processing_status = OrderStatus.query.filter(
-                OrderStatus.store_id == store_id,
-                OrderStatus.name.contains('قيد')
-            ).first()
-            
-            if not processing_status:
-                logger.error(f"❌ لا توجد أي حالة تحتوي على 'قيد' في المتجر {store_id}")
-                return 0
+            logger.warning("⚠️ لم يتم العثور على حالة 'قيد التنفيذ' في OrderStatus")
+            return 0
         
-        logger.info(f"✅ تم العثور على حالة: {processing_status.name} (ID: {processing_status.id})")
+        logger.info(f"✅ وجدت حالة قيد التنفيذ: {processing_status.name} (ID: {processing_status.id})")
         
-        # البحث عن طلبات Salla في هذا المتجر المحدد
+        # البحث عن طلبات Salla التي في حالة "قيد التنفيذ" منذ أكثر من يومين
         late_salla_orders = SallaOrder.query.filter(
-            SallaOrder.store_id == store_id,
             SallaOrder.status_id == processing_status.id,
             SallaOrder.created_at <= two_days_ago
         ).all()
         
-        logger.info(f"📊 وجد {len(late_salla_orders)} طلب في حالة {processing_status.name} منذ أكثر من يومين")
+        logger.info(f"📊 وجد {len(late_salla_orders)} طلب Salla في حالة قيد التنفيذ منذ أكثر من يومين")
         
         for order in late_salla_orders:
             # التحقق من عدم وجود حالة "متأخر" مسبقاً
@@ -56,24 +48,22 @@ def check_and_update_late_orders_for_store(store_id):
                 late_note = OrderStatusNote(
                     order_id=order.id,
                     status_flag='late',
-                    note=f'تم تعيين الحالة تلقائياً بسبب تأخر الطلب منذ {order.created_at.strftime("%Y-%m-%d %H:%M")}',
-                    created_at=datetime.utcnow(),
-                    admin_id=None,  # النظام هو الذي قام بالتحديث
-                    employee_id=None
+                    note=f'تم تعيين الحالة تلقائياً بسبب تأخر الطلب منذ {order.created_at.strftime("%Y-%m-%d %H:%M")}'
                 )
                 db.session.add(late_note)
                 late_orders_count += 1
+                processed_orders.append(order.id)
                 logger.info(f"⏰ تم تعيين حالة متأخر تلقائياً للطلب {order.id}")
         
         if late_orders_count > 0:
             db.session.commit()
-            logger.info(f"🎯 تم تحديث {late_orders_count} طلب إلى حالة متأخر في المتجر {store_id}")
+            logger.info(f"🎯 تم تحديث {late_orders_count} طلب Salla إلى حالة متأخر: {processed_orders}")
         else:
-            logger.info(f"✅ لا توجد طلبات تحتاج تحديث في المتجر {store_id}")
+            logger.info("✅ لا توجد طلبات Salla تحتاج تحديث")
         
         return late_orders_count
         
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ خطأ في فحص الطلبات المتأخرة للمتجر {store_id}: {str(e)}", exc_info=True)
+        logger.error(f"❌ خطأ في فحص الطلبات المتأخرة: {str(e)}")
         return 0
