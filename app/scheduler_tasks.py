@@ -65,3 +65,42 @@ def check_and_update_late_orders_for_store(store_id):
         db.session.rollback()
         logger.error(f"❌ خطأ في فحص الطلبات المتأخرة للمتجر {store_id}: {str(e)}")
         return 0
+        
+        
+def handle_order_completion(store_id, order_id, new_status_slug):
+    """معالجة اكتمال الطلب وإزالة الحالات المتأخرة"""
+    try:
+        logger.info(f"🔍 معالجة اكتمال الطلب {order_id} - الحالة الجديدة: {new_status_slug}")
+        
+        # قائمة بجميع الحالات التي تعتبر "مكتملة"
+        completed_statuses = [
+            'completed', 'delivered', 'مكتمل', 'تم_التوصيل', 
+            'منتهي', 'مستلم', 'تم_التسليم', 'منفذ', 'منفذة'
+        ]
+        
+        # التحقق إذا الحالة الجديدة تعتبر حالة اكتمال
+        is_completed = any(completed in new_status_slug for completed in completed_statuses)
+        
+        if is_completed:
+            # البحث عن حالة "متأخر" وحذفها
+            late_status_note = OrderStatusNote.query.filter_by(
+                order_id=order_id,
+                status_flag='late'
+            ).first()
+            
+            if late_status_note:
+                db.session.delete(late_status_note)
+                db.session.commit()
+                logger.info(f"✅ تم إزالة حالة المتأخر للطلب {order_id} بعد اكتماله")
+                return True
+            else:
+                logger.info(f"ℹ️ لا توجد حالة متأخر لإزالتها للطلب {order_id}")
+                return False
+        else:
+            logger.info(f"ℹ️ الطلب {order_id} ليس في حالة اكتمال - الحالة: {new_status_slug}")
+            return False
+            
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ خطأ في معالجة اكتمال الطلب {order_id}: {str(e)}")
+        return False

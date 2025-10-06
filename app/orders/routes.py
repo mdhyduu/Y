@@ -7,6 +7,7 @@ from flask import (render_template, request, flash, redirect, url_for, jsonify,
                    make_response, current_app)
 import requests
 from sqlalchemy import nullslast, or_, and_, func
+from app.scheduler_tasks import handle_order_completion
 from weasyprint import HTML
 import traceback
 from sqlalchemy.orm import selectinload
@@ -1036,6 +1037,7 @@ def order_status_webhook():
 
             # ⭐⭐ الإصلاح: تحديث الحالة في كلا الحدثين ⭐⭐
             status_updated = False
+            store_id = order.store_id
             
             # تحديث حالة الطلب في حدث order.status.updated
             if event == 'order.status.updated':
@@ -1049,6 +1051,10 @@ def order_status_webhook():
                         order.status_id = status.id
                         status_updated = True
                         print(f"✅ تم تحديث حالة الطلب {order_id} إلى {status_slug}")
+                        
+                        # ⭐⭐ التحقق وإزالة حالة "متأخر" إذا أصبح الطلب مكتملاً ⭐⭐
+                        print(f"🔄 التحقق من إزالة حالة المتأخر للطلب {order_id}")
+                        handle_order_completion(store_id, order_id, status_slug)
 
             # ⭐⭐ تحديث الحالة أيضاً في حدث order.updated (من الكود الثاني) ⭐⭐
             elif event == 'order.updated':
@@ -1062,12 +1068,17 @@ def order_status_webhook():
                         order.status_id = status.id
                         status_updated = True
                         print(f"✅ تم تحديث حالة الطلب {order_id} إلى {status_slug}")
+                        
+                        # ⭐⭐ التحقق وإزالة حالة "متأخر" إذا أصبح الطلب مكتملاً ⭐⭐
+                        print(f"🔄 التحقق من إزالة حالة المتأخر للطلب {order_id}")
+                        handle_order_completion(store_id, order_id, status_slug)
 
                 if 'payment_method' in order_data:
                     order.payment_method = order_data.get('payment_method')
                     payment_updated = True
                     print(f"✅ تم تحديث طريقة الدفع للطلب {order_id} إلى {order.payment_method}")
-                            # تحديث المنتجات باستخدام الدالة الجديدة
+                            
+                # تحديث المنتجات باستخدام الدالة الجديدة
                 update_order_items_from_webhook(order, order_data)
 
                 # تحديث العنوان إذا تغير
