@@ -2677,7 +2677,11 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
     
     Swal.fire({
         title: 'جاري إنشاء الملفات',
-        html: `يتم الآن إنشاء ملفات PDF للطلبات والبوليصلات...<br><div class="progress mt-3"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div></div>`,
+        html: `يتم الآن إنشاء ملفات PDF للطلبات والبوليصلات...<br>
+              <div class="progress mt-3">
+                 <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+              </div>
+              <small class="text-muted mt-2" id="progress-details">0/${selectedOrders.length * 2}</small>`,
         allowOutsideClick: false,
         showConfirmButton: false,
         didOpen: () => {
@@ -2688,46 +2692,58 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
     try {
         let completed = 0;
         const totalFiles = selectedOrders.length * 2; // طلب + بوليصة لكل طلب
+        let successfulPolicies = 0;
         
         for (const orderId of selectedOrders) {
             try {
                 // جلب بيانات الطلب الفردي
                 const orderData = await getSingleOrderData(orderId);
                 if (orderData) {
+                    const orderNumber = orderData.reference_id || orderData.id;
+                    
                     // ⭐⭐ 1. إنشاء PDF للطلب ⭐⭐
-                    const orderPdfBlob = await generateOrderPDF(orderData, jsPDF);
-                    const orderFilename = `طلب_${orderData.reference_id || orderData.id}.pdf`;
-                    zip.file(orderFilename, orderPdfBlob);
+                    try {
+                        const orderPdfBlob = await generateOrderPDF(orderData, jsPDF);
+                        const orderFilename = `طلب_${orderNumber}.pdf`;
+                        zip.file(orderFilename, orderPdfBlob);
+                        logger.info(`✅ تم إنشاء PDF للطلب: ${orderNumber}`);
+                    } catch (orderError) {
+                        logger.error(`❌ فشل إنشاء PDF للطلب ${orderNumber}:`, orderError);
+                    }
                     
                     completed++;
-                    updateProgress(completed, totalFiles);
+                    updateProgress(completed, totalFiles, orderNumber, 'طلب');
                     
-                    // ⭐⭐ 2. إنشاء PDF للبوليصة (إذا كانت موجودة) ⭐⭐
+                    // ⭐⭐ 2. تحميل البوليصة كملف PDF أصلي ⭐⭐
                     if (orderData.shipping && orderData.shipping.has_shipping_policy && orderData.shipping.shipping_policy_url) {
                         try {
                             const policyPdfBlob = await generateShippingPolicyImagePDF(orderData, jsPDF);
                             if (policyPdfBlob) {
-                                const policyFilename = `بوليصة_${orderData.reference_id || orderData.id}.pdf`;
+                                const policyFilename = `بوليصة_${orderNumber}.pdf`;
                                 zip.file(policyFilename, policyPdfBlob);
+                                successfulPolicies++;
+                                logger.info(`✅ تم إضافة بوليصة للطلب: ${orderNumber}`);
                             }
                         } catch (policyError) {
-                            console.error(`❌ خطأ في معالجة بوليصة الشحن للطلب ${orderId}:`, policyError);
+                            logger.error(`❌ فشل تحميل بوليصة الشحن للطلب ${orderNumber}:`, policyError);
                             // نستمر حتى إذا فشل تحميل البوليصة
                         }
+                    } else {
+                        logger.warn(`⚠️ لا توجد بوليصة شحن للطلب: ${orderNumber}`);
                     }
                     
                     completed++;
-                    updateProgress(completed, totalFiles);
+                    updateProgress(completed, totalFiles, orderNumber, 'بوليصة');
                 } else {
                     // إذا فشل جلب بيانات الطلب، نزيد العداد مرتين
                     completed += 2;
-                    updateProgress(completed, totalFiles);
+                    updateProgress(completed, totalFiles, orderId, 'خطأ');
                 }
                 
             } catch (error) {
                 console.error(`❌ خطأ في معالجة الطلب ${orderId}:`, error);
                 completed += 2; // تخطي الطلب والبوليصة
-                updateProgress(completed, totalFiles);
+                updateProgress(completed, totalFiles, orderId, 'خطأ');
             }
         }
         
@@ -2741,7 +2757,10 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
         Swal.fire({
             icon: 'success',
             title: 'تم التحميل بنجاح',
-            text: `تم إنشاء ${selectedOrders.length} طلب و ${selectedOrders.length} بوليصة في الأرشيف`,
+            html: `تم إنشاء:<br>
+                  • ${selectedOrders.length} ملف طلب<br>
+                  • ${successfulPolicies} ملف بوليصة<br>
+                  <small class="text-muted">في الأرشيف المضغوط</small>`,
             confirmButtonText: 'موافق'
         });
         
@@ -2757,10 +2776,12 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
 });
 
 // دالة مساعدة لتحديث شريط التقدم
-function updateProgress(completed, total) {
+function updateProgress(completed, total, orderNumber, type) {
     const progress = Math.round((completed / total) * 100);
     $('.progress-bar').css('width', `${progress}%`);
+    $('#progress-details').text(`${completed}/${total} - ${type} ${orderNumber}`);
 }
+// دالة مساعدة لتحديث شريط التقدم
 
 // دالة لجلب بيانات طلب فردي
 async function getSingleOrderData(orderId) {

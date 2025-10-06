@@ -14,7 +14,6 @@ from app.utils import (
     get_postgres_engine,
     generate_barcode
 )
-
 from app.models import SallaOrder, CustomOrder, OrderAddress # إضافة الاستيراد
 from app.config import Config
 import logging
@@ -798,7 +797,7 @@ import urllib.parse
 
 @orders_bp.route('/proxy-image')
 def proxy_image():
-    """خدمة Proxy محسنة لتحميل الصور وتجنب مشاكل CORS - تدعم البواليص"""
+    """خدمة Proxy محسنة لتحميل الصور وتجنب مشاكل CORS"""
     try:  
         image_url = request.args.get('url')
         
@@ -807,6 +806,7 @@ def proxy_image():
         
         # فك تشفير الرابط مرة واحدة فقط
         try:
+            # فك التشفير إذا كان الرابط مشفراً
             decoded_url = urllib.parse.unquote(image_url)
         except Exception as e:
             logger.warning(f"⚠️ لا يمكن فك تشفير الرابط، استخدام الرابط الأصلي: {image_url}")
@@ -818,46 +818,24 @@ def proxy_image():
         if not cleaned_url:
             return redirect(url_for('static', filename='images/no-image.png'))
         
-        # ⭐⭐ إضافة headers إضافية للبواليص ⭐⭐
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-            'Accept-Language': 'ar,en;q=0.9',
-            'Referer': 'https://salla.sa/'
-        }
-        
-        # إذا كان الرابط من سلة، نضيف المزيد من headers
-        if 'salla.sa' in cleaned_url or 'cdn.salla.sa' in cleaned_url:
-            headers.update({
-                'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-                'Sec-Fetch-Dest': 'image',
-                'Sec-Fetch-Mode': 'no-cors',
-                'Sec-Fetch-Site': 'same-site'
-            })
-        
         # تحميل الصورة من المصدر الأصلي
         response = requests.get(
             cleaned_url, 
-            timeout=15,  # زيادة المهلة للبواليص
-            headers=headers,
-            stream=True  # لتحميل الملفات الكبيرة
+            timeout=10,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+                'Accept-Language': 'ar,en;q=0.9',
+                'Referer': 'https://salla.sa/'
+            }
         )
         
         if response.status_code == 200:
-            # تحديد نوع المحتوى
-            content_type = response.headers.get('Content-Type', 'image/jpeg')
-            
             # إرجاع الصورة مع الرأس المناسب
             proxy_response = make_response(response.content)
-            proxy_response.headers.set('Content-Type', content_type)
+            proxy_response.headers.set('Content-Type', response.headers.get('Content-Type', 'image/jpeg'))
             proxy_response.headers.set('Cache-Control', 'public, max-age=86400') # كاش لمدة يوم
-            proxy_response.headers.set('Access-Control-Allow-Origin', '*')
-            
-            # ⭐⭐ إضافة headers إضافية للصور الكبيرة ⭐⭐
-            content_length = response.headers.get('Content-Length')
-            if content_length:
-                proxy_response.headers.set('Content-Length', content_length)
-                
+            proxy_response.headers.set('Access-Control-Allow-Origin', '*') # ✅ السماح لجميع المصادر
             return proxy_response
         else:
             logger.warning(f"⚠️ فشل تحميل الصورة {cleaned_url}: {response.status_code}")
@@ -900,6 +878,95 @@ def clean_image_url(url):
         return None
 import zipfile
 from io import BytesIO
+@orders_bp.route('/proxy-pdf')
+def proxy_pdf():
+    """خدمة Proxy لتحميل ملفات PDF (مثل بواليص الشحن)"""
+    try:  
+        pdf_url = request.args.get('url')
+        
+        if not pdf_url:
+            return jsonify({'error': 'لا يوجد رابط PDF'}), 400
+        
+        # فك تشفير الرابط
+        try:
+            decoded_url = urllib.parse.unquote(pdf_url)
+        except Exception as e:
+            logger.warning(f"⚠️ لا يمكن فك تشفير الرابط، استخدام الرابط الأصلي: {pdf_url}")
+            decoded_url = pdf_url
+        
+        # تنظيف الرابط
+        cleaned_url = clean_pdf_url(decoded_url)
+        
+        if not cleaned_url:
+            return jsonify({'error': 'رابط PDF غير صالح'}), 400
+        
+        logger.info(f"📥 جاري تحميل PDF من: {cleaned_url}")
+        
+        # تحميل ملف PDF
+        response = requests.get(
+            cleaned_url, 
+            timeout=30,  # زيادة المهلة لملفات PDF
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'application/pdf, */*',
+                'Accept-Language': 'ar,en;q=0.9',
+                'Referer': 'https://salla.sa/'
+            },
+            stream=True
+        )
+        
+        if response.status_code == 200:
+            # الحصول على محتوى PDF
+            pdf_content = response.content
+            
+            # إرجاع PDF مع الرأس المناسب
+            proxy_response = make_response(pdf_content)
+            proxy_response.headers.set('Content-Type', 'application/pdf')
+            proxy_response.headers.set('Cache-Control', 'public, max-age=86400')
+            proxy_response.headers.set('Access-Control-Allow-Origin', '*')
+            proxy_response.headers.set('Content-Disposition', 'inline; filename="shipping_policy.pdf"')
+            
+            logger.info(f"✅ تم تحميل PDF بنجاح، الحجم: {len(pdf_content)} بايت")
+            return proxy_response
+        else:
+            logger.warning(f"⚠️ فشل تحميل PDF {cleaned_url}: {response.status_code}")
+            return jsonify({'error': f'فشل تحميل الملف: {response.status_code}'}), 400
+            
+    except requests.exceptions.Timeout:
+        logger.error(f"⏰ انتهت مهلة تحميل PDF: {pdf_url}")
+        return jsonify({'error': 'انتهت مهلة تحميل الملف'}), 408
+    except Exception as e:
+        logger.error(f"❌ خطأ في proxy PDF: {str(e)}")
+        return jsonify({'error': 'حدث خطأ أثناء تحميل الملف'}), 500
+
+def clean_pdf_url(url):
+    """تنظيف وإصلاح رابط PDF"""
+    if not url:
+        return None
+    
+    try:
+        # إزالة أي تشفير زائد
+        cleaned = urllib.parse.unquote(url)
+        
+        # التأكد من أن الرابط يبدأ بـ http:// أو https://
+        if not cleaned.startswith(('http://', 'https://')):
+            # إذا كان الرابط نسبياً، نضيف domain سلة
+            if cleaned.startswith('/'):
+                cleaned = f"https://cdn.salla.sa{cleaned}"
+            else:
+                # إذا كان الرابط بدون scheme، نضيف https://
+                cleaned = f"https://{cleaned}"
+        
+        # التحقق من صحة الرابط
+        parsed = urllib.parse.urlparse(cleaned)
+        if not parsed.netloc:
+            return None
+            
+        return cleaned
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في تنظيف رابط PDF {url}: {str(e)}")
+        return None
 def extract_shipping_info(order_data):
     """استخراج معلومات الشحن من بيانات الطلب مع إضافة رابط البوليصة"""
     try:
@@ -1009,16 +1076,29 @@ def get_single_order_data():
                 shipping_info = extract_shipping_info(order.full_order_data)
                 order_data['shipping'] = shipping_info
                 
-                # ⭐⭐ البحث عن رابط البوليصة في shipments ⭐⭐
+                # ⭐⭐ البحث المتعمق عن رابط البوليصة في shipments ⭐⭐
                 shipments = order.full_order_data.get('shipments', [])
                 for shipment in shipments:
                     if isinstance(shipment, dict):
-                        # البحث عن رابط البوليصة في shipment
+                        # البحث في label عن رابط البوليصة
                         label = shipment.get('label', {})
-                        if isinstance(label, dict) and label.get('url'):
-                            shipping_info['shipping_policy_url'] = label.get('url')
-                            shipping_info['has_shipping_policy'] = True
-                            break
+                        if isinstance(label, dict):
+                            policy_url = label.get('url')
+                            if policy_url:
+                                shipping_info['shipping_policy_url'] = policy_url
+                                shipping_info['has_shipping_policy'] = True
+                                logger.info(f"✅ تم العثور على بوليصة للطلب {order_id}: {policy_url}")
+                                break
+                        
+                        # البحث في أجزاء أخرى من shipment
+                        for key, value in shipment.items():
+                            if isinstance(value, dict) and value.get('url'):
+                                policy_url = value.get('url')
+                                if policy_url and 'shipping' in policy_url.lower() or 'policy' in policy_url.lower():
+                                    shipping_info['shipping_policy_url'] = policy_url
+                                    shipping_info['has_shipping_policy'] = True
+                                    logger.info(f"✅ تم العثور على بوليصة في {key} للطلب {order_id}")
+                                    break
                 
         except Exception as e:
             logger.error(f"❌ خطأ في إضافة معلومات الشحن للطلب {order_id}: {str(e)}")
