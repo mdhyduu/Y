@@ -3017,6 +3017,12 @@ function generateOptionsHTML(options) {
 }
 
 // ⭐⭐ دالة لإنشاء PDF للبوليصة يحتوي فقط على الصورة ⭐⭐
+// إضافة دالة لفحص نوع الملف
+function isPdfUrl(url) {
+    return url.toLowerCase().endsWith('.pdf') || url.includes('/pdf') || url.includes('application/pdf');
+}
+
+// تحديث دالة تحميل البوليصة للتحقق من نوع الملف
 async function generateShippingPolicyImagePDF(orderData, jsPDF) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -3027,65 +3033,63 @@ async function generateShippingPolicyImagePDF(orderData, jsPDF) {
                 reject(new Error('لا يوجد رابط بوليصة'));
                 return;
             }
+
+            // التحقق من أن الرابط لملف PDF
+            if (!isPdfUrl(policyUrl)) {
+                logger.warn(`⚠️ الرابط لا يشير إلى ملف PDF: ${policyUrl}`);
+                reject(new Error('الرابط ليس لملف PDF'));
+                return;
+            }
+
+            logger.info(`📥 جاري تحميل البوليصة PDF من: ${policyUrl}`);
+
+            // استخدام الـ proxy الجديد لتحميل ملف PDF البوليصة
+            const proxyUrl = new URL('{{ url_for("orders.proxy_pdf") }}', window.location.origin);
+            proxyUrl.searchParams.set('url', encodeURIComponent(policyUrl));
+            proxyUrl.searchParams.set('t', Date.now());
+
+            // تحميل ملف PDF مع مهلة أطول
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 ثانية
+
+            const response = await fetch(proxyUrl.toString(), {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/pdf, */*'
+                },
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`فشل تحميل البوليصة: ${response.status} ${response.statusText}`);
+            }
+
+            // التحقق من نوع المحتوى
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('pdf')) {
+                throw new Error(`نوع الملف غير متوقع: ${contentType}`);
+            }
+
+            // تحويل الاستجابة إلى Blob
+            const pdfBlob = await response.blob();
             
-            // استخدام الـ proxy لتحميل صورة البوليصة
-            const proxyUrl = new URL('{{ url_for("orders.proxy_image") }}', window.location.origin);
-            proxyUrl.searchParams.set('url', policyUrl);
-            
-            // تحميل الصورة
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            
-            img.onload = function() {
-                try {
-                    // إنشاء PDF جديد
-                    const pdf = new jsPDF({
-                        orientation: 'portrait',
-                        unit: 'mm',
-                        format: 'a4'
-                    });
-                    
-                    const pageWidth = pdf.internal.pageSize.getWidth();
-                    const pageHeight = pdf.internal.pageSize.getHeight();
-                    
-                    // حساب أبعاد الصورة لتناسب الصفحة مع الحفاظ على التناسب
-                    const imgWidth = img.width;
-                    const imgHeight = img.height;
-                    const ratio = imgWidth / imgHeight;
-                    
-                    let displayWidth = pageWidth - 20; // هامش 10 ملم من كل جانب
-                    let displayHeight = displayWidth / ratio;
-                    
-                    // إذا كانت الصورة أطول من الصفحة، نضبط الارتفاع
-                    if (displayHeight > pageHeight - 20) {
-                        displayHeight = pageHeight - 20;
-                        displayWidth = displayHeight * ratio;
-                    }
-                    
-                    // حساب المركز
-                    const x = (pageWidth - displayWidth) / 2;
-                    const y = (pageHeight - displayHeight) / 2;
-                    
-                    // ⭐⭐ إضافة الصورة فقط إلى PDF - بدون أي نص ⭐⭐
-                    pdf.addImage(img, 'JPEG', x, y, displayWidth, displayHeight);
-                    
-                    // إرجاع PDF كـ Blob
-                    const pdfBlob = pdf.output('blob');
-                    resolve(pdfBlob);
-                    
-                } catch (error) {
-                    reject(error);
-                }
-            };
-            
-            img.onerror = function() {
-                reject(new Error('فشل تحميل صورة البوليصة'));
-            };
-            
-            img.src = proxyUrl.toString();
+            if (pdfBlob.size === 0) {
+                throw new Error('ملف البوليصة فارغ');
+            }
+
+            logger.info(`✅ تم تحميل البوليصة بنجاح، الحجم: ${pdfBlob.size} بايت، النوع: ${contentType}`);
+            resolve(pdfBlob);
             
         } catch (error) {
-            reject(error);
+            if (error.name === 'AbortError') {
+                logger.error(`⏰ انتهت مهلة تحميل البوليصة: ${policyUrl}`);
+                reject(new Error('انتهت مهلة تحميل البوليصة'));
+            } else {
+                logger.error(`❌ خطأ في تحميل البوليصة: ${error.message}`);
+                reject(error);
+            }
         }
     });
 }
