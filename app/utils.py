@@ -147,40 +147,23 @@ import barcode
 from barcode.writer import ImageWriter
 
 def _strip_bottom_text(image, tolerance=10, extra_crop=2):
-    """
-    يقص الجزء السفلي اللي غالباً بيحتوي الرقم البشري.
-    tolerance: عدد البيكسلات السوداء اللي نعتبرها باركود.
-    extra_crop: بيكسلات إضافية نزيلها بعد تحديد الموضع.
-    """
-    # تأكد RGB
+    """يقص أي نص أو شريط داكن بأسفل الصورة"""
     if image.mode != "RGB":
         image = image.convert("RGB")
 
     px = image.load()
     w, h = image.size
-
-    # نبحث من الأسفل للأعلى عن أول صف يحتوي على بكسل داكن (احتمال إنه جزء من الباركود)
-    threshold = 200  # قيمة لمعرفة البيكسل "فاتح"؛ أقل منها = داكن
+    threshold = 200
     cut_y = 0
     for y in range(h - 1, -1, -1):
-        row_has_dark = False
-        for x in range(w):
-            r, g, b = px[x, y]
-            if r < threshold or g < threshold or b < threshold:
-                row_has_dark = True
-                break
+        row_has_dark = any(px[x, y][0] < threshold or px[x, y][1] < threshold or px[x, y][2] < threshold for x in range(w))
         if row_has_dark:
-            # وجدنا آخر صف فيه لون داكن - هذا نهاية الباركود، نقطع تحتها
             cut_y = max(0, y - extra_crop)
             break
 
     if cut_y == 0:
-        # لم نعثر على صف داكن -> لا نقص
         return image
-
-    # crop فوق cut_y
-    cropped = image.crop((0, 0, w, cut_y))
-    return cropped
+    return image.crop((0, 0, w, cut_y))
 
 def save_with_dpi_optimized(buffer, dpi=300):
     """تحسين الصورة + قص المساحات البيضاء والزائدة وإزالة النص السفلي إن لزم"""
@@ -247,13 +230,12 @@ def generate_barcode(data, dpi=300):
 
         # خيارات مقترحة لجعل الباركود أكبر وواضح ويمنع طباعة النص
         writer.set_options({
-            'write_text': False,      # محاولة لإخفاء الرقم البشري
-            'text': '',
-            'module_width': 1.2,      # زِد القيمة لعرض أوسع للشرائط (مثال 1.0 أو 0.8)
-            'module_height': 100.0,    # زِد الارتفاع ليصبح الباركود أطول ومقروء
-            'quiet_zone': 4.0,        # مسافة سلامة حول الباركود
-            'background': 'white',
-            'foreground': 'black',
+            'write_text': False,      # ✅ لا تكتب أي نص بشري
+            'module_width': 0.9,      # عرض الشرائط (مناسب للمسح)
+            'module_height': 80.0,    # ارتفاع ممتاز للكاميرات
+            'quiet_zone': 2.0,        # حافة بسيطة حول الباركود
+            'background': 'white',    # خلفية ناصعة
+            'foreground': 'black',    # خطوط سوداء قوية
             'dpi': dpi,
             'font_size': 0,
             'text_distance': 0,
