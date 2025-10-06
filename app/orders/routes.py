@@ -411,7 +411,7 @@ def order_details(order_id):
         return redirect(url_for('orders.index'))
 
 def extract_shipping_info(order_data):
-    """استخراج معلومات الشحن من بيانات الطلب اعتمادًا على الشحنات (shipments)"""
+    """استخراج معلومات الشحن من بيانات الطلب مع إضافة رابط البوليصة"""
     try:
         shipments_data = order_data.get('shipments', [])
         
@@ -421,6 +421,8 @@ def extract_shipping_info(order_data):
             'tracking_number': None,
             'tracking_link': None,
             'has_tracking': False,
+            'has_shipping_policy': False,  # إضافة خاصية جديدة
+            'shipping_policy_url': None,   # رابط البوليصة
             'shipment_details': []
         }
         
@@ -428,6 +430,11 @@ def extract_shipping_info(order_data):
             shipment_tracking_link = shipment.get('tracking_link')
             shipment_tracking_number = shipment.get('tracking_number')
             shipment_label = shipment.get('label')
+            
+            # ⭐⭐ إضافة استخراج رابط البوليصة ⭐⭐
+            shipment_policy_url = None
+            if shipment_label and isinstance(shipment_label, dict):
+                shipment_policy_url = shipment_label.get('url')
             
             shipment_has_tracking = False
             final_tracking_link = None
@@ -453,12 +460,19 @@ def extract_shipping_info(order_data):
                 'status': shipment.get('status', ''),
                 'label': shipment_label,
                 'has_label': bool(shipment_label and shipment_label not in ["", "0", "null"]),
+                'shipping_policy_url': shipment_policy_url,  # إضافة رابط البوليصة
+                'has_shipping_policy': bool(shipment_policy_url),  # التحقق من وجود بوليصة
                 'shipping_number': shipment.get('shipping_number'),
                 'total_weight': shipment.get('total_weight', {}),
                 'packages': shipment.get('packages', [])
             }
             
             shipping_info['shipment_details'].append(shipment_info)
+            
+            # تحديث المعلومات العامة إذا كانت هذه أول شحنة تحتوي على بوليصة
+            if shipment_info['has_shipping_policy'] and not shipping_info['has_shipping_policy']:
+                shipping_info['has_shipping_policy'] = True
+                shipping_info['shipping_policy_url'] = shipment_policy_url
             
             if not shipping_info['status'] and shipment_info['status']:
                 shipping_info['status'] = shipment_info['status']
@@ -473,7 +487,6 @@ def extract_shipping_info(order_data):
     except Exception as e:
         logger.error(f"Error extracting shipping info: {str(e)}")
         return {}
-
 def ensure_valid_access_token(user):
     """التأكد من وجود توكن وصول صالح مع معالجة الأخطاء المحسنة"""
     try:

@@ -497,6 +497,56 @@
     <i class="fas fa-info-circle me-2"></i>
     لا توجد معلومات شحن متاحة لهذا الطلب
 </div>
+<!-- في قسم معلومات الشحن -->
+<div class="shipping-section">
+    <h4>معلومات الشحن</h4>
+    
+    {% if order.shipping.has_shipping %}
+        <div class="shipping-actions">
+            <!-- زر بوليصة الشحن -->
+            {% if order.shipping.has_shipping_policy %}
+            <a href="{{ order.shipping.shipping_policy_url }}" 
+               target="_blank" 
+               class="btn btn-primary btn-sm">
+                <i class="fas fa-file-pdf"></i> عرض بوليصة الشحن
+            </a>
+            {% endif %}
+            
+            <!-- زر تتبع الشحن -->
+            {% if order.shipping.has_tracking %}
+            <a href="{{ order.shipping.tracking_link }}" 
+               target="_blank" 
+               class="btn btn-info btn-sm">
+                <i class="fas fa-truck"></i> تتبع الشحنة
+            </a>
+            {% endif %}
+        </div>
+        
+        <!-- عرض تفاصيل الشحنات -->
+        {% for shipment in order.shipping.shipment_details %}
+        <div class="shipment-detail">
+            <h5>الشحنة {{ loop.index }}</h5>
+            <p><strong>شركة الشحن:</strong> {{ shipment.courier_name }}</p>
+            <p><strong>حالة الشحنة:</strong> {{ shipment.status }}</p>
+            
+            {% if shipment.tracking_number %}
+            <p><strong>رقم التتبع:</strong> {{ shipment.tracking_number }}</p>
+            {% endif %}
+            
+            <!-- زر بوليصة الشحن للشحنة المحددة -->
+            {% if shipment.has_shipping_policy %}
+            <a href="{{ shipment.shipping_policy_url }}" 
+               target="_blank" 
+               class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-download"></i> تحميل بوليصة الشحنة {{ loop.index }}
+            </a>
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+        <p class="text-muted">لا توجد معلومات شحن متاحة</p>
+    {% endif %}
+</div>
 {% endif %}
 <style>
   /* أنماط عامة للجدول */

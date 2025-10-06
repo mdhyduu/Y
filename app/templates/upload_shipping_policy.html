@@ -929,47 +929,86 @@ function setupPDFUpload() {
 
         return orderData;
     }
+        // تحسين إعدادات Tesseract للغة العربية
+async function extractTextWithTesseract(canvas) {
+    const worker = await Tesseract.createWorker('ara+eng'); // العربية + الإنجليزية
     
+    // تحسين الإعدادات للغة العربية
+    await worker.setParameters({
+        tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
+        tessedit_char_whitelist: '0123456789', // للأرقام فقط
+        preserve_interword_spaces: '1',
+        textord_min_linesize: '0.5'
+    });
+    
+    const { data: { text } } = await worker.recognize(canvas);
+    await worker.terminate();
+    return text;
+}
     // دالة محسنة لاستخراج رقم الطلب من النص
     function extractOrderNumberFromText(text) {
-        // تطبيع النص
-        const normalizedText = text.replace(/\s+/g, ' ').trim();
+    const normalizedText = text.replace(/\s+/g, ' ').trim();
+    
+    console.log("🔍 جاري تحليل النص للملف الأول:", normalizedText.substring(0, 300));
+    
+    // أنماط مخصصة للملف الأول
+    const patternsForFirstFile = [
+        // النمط الأساسي للملف الأول: أرقام تبدأ بـ 21
+        /\b(21\d{7})\b/,
+        /PCs?:\s*1[\r\n\s]*([\s\S]{0,50}?2\d{8})/i,
+        /PCs?:\s*[\r\n\s]*[\s\S]{0,100}?(\d{9})/i,
+        // نمط مخصص للملف الأول بعد PCs: 1
+        /PCs?:\s*1\s*n[\r\n\s]*\s*(\d{9})/i,
         
-        // أنماط متنوعة لاستخراج أرقام الطلبات
-        const patterns = [
-            // نمط من المثال: 211444630
-            /\b(2\d{5,8})\b/,
-            // نمط آخر: رقم طلب بعد كلمات محددة
-            /(?:طلب|رقم|Order|ID)[\s:]*(\d{6,15})/i,
-            // نمط للتعرف على الأرقام في سياق معين
-            /(?:COD|SAR)[\s:]*\d*[\s\S]{0,100}?(\d{6,15})/i,
-            // نمط للتعرف على أرقام في جداول
-            /PCs?:\s*1\s*[\r\n]*\s*(\d{6,15})/i,
-            // نمط عام لأرقام طويلة
-            /\b\d{6,15}\b/
-        ];
+        // البحث بالقرب من "Ship Date"
+        /Ship\s*Date[\s\S]{0,50}?(\d{9})/i,
         
-        function normalizeDigits(s) {
-            return s ? s.replace(/\D/g, '') : s;
-        }
+        // البحث بالقرب من "WGT"
+        /WGT[\s\S]{0,50}?(\d{9})/i,
+        
+        // نمط عام للملف الأول
+        /\b(21\d{7})\b/,
+        
+        // الاحتياطي: أي 9 أرقام
+        /\b(\d{9})\b/
+    ];
 
-        let orderNumber = null;
-        for (const pat of patterns) {
-            const matches = normalizedText.match(pat);
-            if (matches) {
-                const extracted = matches[1] || matches[0];
-                const normalized = normalizeDigits(extracted);
-                if (normalized && normalized.length >= 6 && normalized.length <= 15) {
-                    orderNumber = normalized;
-                    console.log(`✅ رقم الطلب تم استخراجه: ${orderNumber}`);
-                    break;
-                }
+    // تجربة الأنماط المخصصة أولاً
+    for (let i = 0; i < patternsForFirstFile.length; i++) {
+        const matches = normalizedText.match(patternsForFirstFile[i]);
+        if (matches) {
+            let extracted = matches[1] || matches[0];
+            const normalized = normalizeDigits(extracted);
+            
+            if (normalized && normalized.length === 9) {
+                console.log(`✅ تم العثور على الرقم '${normalized}' باستخدام النمط ${i}`);
+                return normalized;
             }
         }
-        
-        return orderNumber;
     }
     
+    // إذا فشلت الأنماط المخصصة، جرب الأنماط العامة
+    const generalPatterns = [
+        /PCs?:\s*1\s*[\r\n]*\s*(\d{6,15})/i,
+        /\b(2\d{5,8})\b/,
+        /\b\d{6,15}\b/
+    ];
+    
+    for (let pattern of generalPatterns) {
+        const matches = normalizedText.match(pattern);
+        if (matches) {
+            let extracted = matches[1] || matches[0];
+            const normalized = normalizeDigits(extracted);
+            if (normalized && normalized.length >= 6 && normalized.length <= 15) {
+                console.log(`⚠️ تم العثور بالنمط العام: ${normalized}`);
+                return normalized;
+            }
+        }
+    }
+    
+    console.log('❌ لم يتم العثور على أرقام طلبات');
+    return null;
+}
     // دالة لتحسين الصورة لاستخراج النص
     async function enhanceImageForOCR(canvas, ctx) {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
