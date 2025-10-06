@@ -793,6 +793,36 @@ def preview_addresses_html():
         logger.error(traceback.format_exc())
         flash('حدث خطأ أثناء إنشاء المعاينة', 'error')
         return redirect(url_for('orders.index'))
+@orders_bp.route('/proxy-image')
+def proxy_image():
+    """خدمة Proxy لتحميل الصور وتجنب مشاكل CORS"""
+    try:
+        image_url = request.args.get('url')
+        
+        if not image_url:
+            return redirect(url_for('static', filename='images/no-image.png'))
+        
+        # تحميل الصورة من المصدر الأصلي
+        response = requests.get(
+            image_url, 
+            timeout=10,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        )
+        
+        if response.status_code == 200:
+            # إرجاع الصورة مع الرأس المناسب
+            proxy_response = make_response(response.content)
+            proxy_response.headers.set('Content-Type', response.headers.get('Content-Type', 'image/jpeg'))
+            proxy_response.headers.set('Cache-Control', 'public, max-age=86400') # كاش لمدة يوم
+            return proxy_response
+        else:
+            return redirect(url_for('static', filename='images/no-image.png'))
+            
+    except Exception as e:
+        logger.error(f"❌ خطأ في proxy الصورة: {str(e)}")
+        return redirect(url_for('static', filename='images/no-image.png'))
 import zipfile
 from io import BytesIO
 
