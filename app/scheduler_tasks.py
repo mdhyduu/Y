@@ -18,13 +18,22 @@ def check_and_update_late_orders_for_store(store_id):
         # البحث عن حالة "قيد التنفيذ" في OrderStatus لهذا المتجر المحدد
         processing_status = OrderStatus.query.filter(
             OrderStatus.store_id == store_id,
-            (OrderStatus.slug == 'in_progress') | 
-            (OrderStatus.name.contains('قيد التنفيذ'))
+            (OrderStatus.slug == 'in_progress') 
         ).first()
         
         if not processing_status:
             logger.warning(f"⚠️ لم يتم العثور على حالة 'قيد التنفيذ' في المتجر {store_id}")
-            return 0
+            # محاولة العثور على أي حالة تحتوي على كلمة "قيد"
+            processing_status = OrderStatus.query.filter(
+                OrderStatus.store_id == store_id,
+                OrderStatus.name.contains('قيد')
+            ).first()
+            
+            if not processing_status:
+                logger.error(f"❌ لا توجد أي حالة تحتوي على 'قيد' في المتجر {store_id}")
+                return 0
+        
+        logger.info(f"✅ تم العثور على حالة: {processing_status.name} (ID: {processing_status.id})")
         
         # البحث عن طلبات Salla في هذا المتجر المحدد
         late_salla_orders = SallaOrder.query.filter(
@@ -33,7 +42,7 @@ def check_and_update_late_orders_for_store(store_id):
             SallaOrder.created_at <= two_days_ago
         ).all()
         
-        logger.info(f"📊 وجد {len(late_salla_orders)} طلب في حالة قيد التنفيذ منذ أكثر من يومين")
+        logger.info(f"📊 وجد {len(late_salla_orders)} طلب في حالة {processing_status.name} منذ أكثر من يومين")
         
         for order in late_salla_orders:
             # التحقق من عدم وجود حالة "متأخر" مسبقاً
@@ -47,7 +56,10 @@ def check_and_update_late_orders_for_store(store_id):
                 late_note = OrderStatusNote(
                     order_id=order.id,
                     status_flag='late',
-                    note=f'تم تعيين الحالة تلقائياً بسبب تأخر الطلب منذ {order.created_at.strftime("%Y-%m-%d %H:%M")}'
+                    note=f'تم تعيين الحالة تلقائياً بسبب تأخر الطلب منذ {order.created_at.strftime("%Y-%m-%d %H:%M")}',
+                    created_at=datetime.utcnow(),
+                    admin_id=None,  # النظام هو الذي قام بالتحديث
+                    employee_id=None
                 )
                 db.session.add(late_note)
                 late_orders_count += 1
@@ -63,5 +75,5 @@ def check_and_update_late_orders_for_store(store_id):
         
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ خطأ في فحص الطلبات المتأخرة للمتجر {store_id}: {str(e)}")
+        logger.error(f"❌ خطأ في فحص الطلبات المتأخرة للمتجر {store_id}: {str(e)}", exc_info=True)
         return 0

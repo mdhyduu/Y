@@ -650,20 +650,48 @@ def check_late_orders():
         
         logger.info(f"🔍 جاري استيراد الدالة من scheduler_tasks...")
         
-        # استيراد الدالة بشكل آمن
+        # استيراد الدالة بشكل آمن - استخدام المسار المطلق
         try:
-            from .scheduler_tasks import check_and_update_late_orders_for_store
-            logger.info("✅ تم استيراد الدالة بنجاح")
-        except ImportError as e:
-            logger.error(f"❌ فشل استيراد الدالة: {str(e)}")
+            # محاولة الاستيراد المطلق أولاً
+            from app.scheduler_tasks import check_and_update_late_orders_for_store
+            logger.info("✅ تم استيراد الدالة بنجاح من app.scheduler_tasks")
+        except ImportError as e1:
+            logger.warning(f"⚠️ المحاولة الأولى فشلت: {str(e1)}")
+            try:
+                # محاولة الاستيراد النسبي
+                from .scheduler_tasks import check_and_update_late_orders_for_store
+                logger.info("✅ تم استيراد الدالة بنجاح من .scheduler_tasks")
+            except ImportError as e2:
+                logger.error(f"❌ فشل استيراد الدالة من كلا المسارين: {str(e2)}")
+                # محاولة بديلة: استيراد الدالة مباشرة
+                try:
+                    import sys
+                    import os
+                    # إضافة المسار الحالي إلى sys.path
+                    current_dir = os.path.dirname(os.path.abspath(__file__))
+                    if current_dir not in sys.path:
+                        sys.path.insert(0, current_dir)
+                    
+                    from scheduler_tasks import check_and_update_late_orders_for_store
+                    logger.info("✅ تم استيراد الدالة بنجاح مباشرة")
+                except ImportError as e3:
+                    logger.error(f"❌ فشل جميع محاولات الاستيراد: {str(e3)}")
+                    return {
+                        'success': False,
+                        'message': f'فشل في تحميل وظيفة الفحص: {str(e3)}'
+                    }, 500
+        
+        # التحقق من وجود الدالة
+        if 'check_and_update_late_orders_for_store' not in globals():
+            logger.error("❌ الدالة غير موجودة في السياق العام")
             return {
                 'success': False,
-                'message': 'فشل في تحميل وظيفة الفحص'
+                'message': 'وظيفة الفحص غير متوفرة في الذاكرة'
             }, 500
-        
+            
         logger.info(f"🚀 بدء فحص الطلبات المتأخرة للمتجر {store_id}")
         
-        # استدعاء الدالة من scheduler_tasks.py للمتجر الحالي فقط
+        # استدعاء الدالة
         updated_count = check_and_update_late_orders_for_store(store_id)
         
         if updated_count > 0:
