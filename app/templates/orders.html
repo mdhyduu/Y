@@ -122,20 +122,15 @@
         <span id="selected-orders-count">0</span> إسناد
     </button>
     {% endif %}
-    <!-- في قسم أزرار الإجراءات السريعة - أضف هذا الزر -->
-<button type="button" class="btn btn-success rounded-pill px-3 me-2" id="download-zip-pdf-btn" disabled>
-    <i class="fas fa-file-archive me-1"></i> 
-    <span id="selected-orders-count-zip">0</span> تحميل PDFs مضغوط
-</button>
-<button type="button" class="btn btn-success rounded-pill px-3 me-2" id="download-zip-pdf-client-btn" disabled>
-    <i class="fas fa-file-archive me-1"></i> 
-    <span id="selected-orders-count-zip-client">0</span> تحميل PDFs مضغوط (عميل)
-</button>
+    
     <button type="button" class="btn btn-warning rounded-pill px-3 me-2" id="update-salla-status-btn" disabled>
         <i class="fas fa-sync-alt me-1"></i> 
         <span id="selected-orders-count-salla">0</span> تحديث في سلة
     </button>
-    
+    <button type="button" class="btn btn-success rounded-pill px-3 me-2" id="download-zip-pdf-client-btn" disabled>
+    <i class="fas fa-file-archive me-1"></i> 
+    <span id="selected-orders-count-zip-client">0</span> تحميل PDFs مضغوط (عميل)
+</button>
     <!-- ⭐⭐ زر طباعة العناوين الجديد ⭐⭐ -->
     <button type="button" class="btn btn-dark rounded-pill px-3 me-2" id="print-addresses-btn" disabled>
         <i class="fas fa-map-marker-alt me-1"></i> 
@@ -594,13 +589,12 @@
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js" integrity="sha384-ssUzPQXjLHLO39a9AiuwxnnyDxIvOMUxEQpqfreUaW7jLEdDAXiF6UooZRO53F6Z" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/locale/ar.js" integrity="sha384-WOFOhfe03USRUKDbteptsFbkQE1Sisvl6Amq1jey7Pwrbr//TWZ676qtUweo1usp" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" integrity="sha384-ms4yaO2qHEUIRbq8CXAqtz3qhnO7nYo/xAWv23Zx/iX9tT+nvVZP66kSXwT/7a0J" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js" integrity="sha384-H6KKS1H1WwuERMSm+54dYLzjg0fKqRK5ZRyASdbrI/lwrCc6bXEmtGYr5SwvP1pZ" crossorigin="anonymous"></script
+<script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js" integrity="sha384-H6KKS1H1WwuERMSm+54dYLzjg0fKqRK5ZRyASdbrI/lwrCc6bXEmtGYr5SwvP1pZ" crossorigin="anonymous"></script>
 <!-- إضافة المكتبات المطلوبة -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
 <script>
 $(document).ready(function () {
     // --- المتغيرات العامة ---
@@ -2681,46 +2675,7 @@ $(document).on('change', '#selectAllQuickList', function() {
         $('.sidebar__backdrop').removeClass('show');
     }
 });
-// 18. تحميل الطلبات كملف ZIP يحتوي على PDFs منفصلة
-$(document).on('click', '#download-zip-pdf-btn', function() {
-    const selectedOrders = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
-    
-    if (selectedOrders.length === 0) {
-        showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للتحميل');
-        return;
-    }
-    
-    Swal.fire({
-        title: 'تحميل الطلبات كملف ZIP',
-        html: `سيتم تحميل <span class="fw-bold text-primary">${selectedOrders.length}</span> طلب كملف ZIP يحتوي على كل طلب في ملف PDF منفصل`,
-        icon: 'info',
-        showCancelButton: true,
-        confirmButtonText: 'موافق، تحميل ZIP',
-        cancelButtonText: 'إلغاء',
-        customClass: {
-            confirmButton: 'btn btn-success',
-            cancelButton: 'btn btn-outline-secondary ms-2'
-        },
-        buttonsStyling: false
-    }).then((result) => {
-        if (result.isConfirmed) {
-            const downloadBtn = $('#download-zip-pdf-btn');
-            const originalText = downloadBtn.html();
-            downloadBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
-            
-            const downloadLink = document.createElement('a');
-            downloadLink.href = `{{ url_for('orders.download_orders_zip_pdf') }}?order_ids=${selectedOrders.join(',')}`;
-            downloadLink.style.display = 'none';
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
-            
-            setTimeout(() => {
-                downloadBtn.prop('disabled', false).html(originalText);
-            }, 3000);
-        }
-    });
-});
+
 // 19. تحميل الطلبات كملف ZIP باستخدام المتصفح فقط
 $(document).on('click', '#download-zip-pdf-client-btn', async function() {
     const selectedOrders = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
@@ -2928,6 +2883,21 @@ function generateOrderHTML(order) {
 }
 
 // دالة لإنشاء HTML للمنتجات
+// دالة لتحويل الصور عبر Proxy لتجنب CORS
+function proxyImage(url) {
+    if (!url) return '/static/images/no-image.png';
+    
+    // إذا كانت الصورة من سلة، نستخدم proxy بسيط
+    if (url.includes('salla.sa') || url.includes('cdn.salla.sa')) {
+        // نعيد نفس الرابط مع إضافة timestamp لتجنب الكاش
+        return url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+    }
+    
+    // للصور الأخرى، يمكن استخدام خدمة proxy (اختياري)
+    return url;
+}
+
+// تحديث دالة generateProductsHTML لاستخدام proxy
 function generateProductsHTML(products) {
     if (products.length === 0) {
         return '<p style="text-align: center; color: #666;">لا توجد منتجات</p>';
@@ -2935,14 +2905,25 @@ function generateProductsHTML(products) {
     
     return `
         <div class="products-list" style="display: grid; gap: 15px;">
-            ${products.map(product => `
+            ${products.map(product => {
+                const imageUrl = product.main_image ? proxyImage(product.main_image) : '';
+                return `
                 <div class="product-item" style="padding: 15px; border: 1px solid #ddd; border-radius: 8px; background: white;">
                     <div style="display: flex; gap: 15px; align-items: start;">
-                        ${product.main_image ? `
+                        ${imageUrl ? `
                             <div class="product-image" style="flex: 0 0 80px;">
-                                <img src="${product.main_image}" alt="${product.name}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid #eee;">
+                                <img src="${imageUrl}" 
+                                     alt="${product.name}" 
+                                     style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid #eee;"
+                                     onerror="this.src='/static/images/no-image.png'">
                             </div>
-                        ` : ''}
+                        ` : `
+                            <div class="product-image" style="flex: 0 0 80px;">
+                                <img src="/static/images/no-image.png" 
+                                     alt="لا توجد صورة"
+                                     style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid #eee;">
+                            </div>
+                        `}
                         <div class="product-details" style="flex: 1;">
                             <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: bold;">${product.name || 'منتج بدون اسم'}</h4>
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 5px; font-size: 12px;">
@@ -2959,7 +2940,8 @@ function generateProductsHTML(products) {
                         </div>
                     </div>
                 </div>
-            `).join('')}
+                `;
+            }).join('')}
         </div>
     `;
 }
