@@ -2884,21 +2884,17 @@ function generateOrderHTML(order) {
 
 // دالة لإنشاء HTML للمنتجات
 // دالة لتحويل الصور عبر Proxy لتجنب CORS
-// دالة محسنة لتحويل الصور عبر Proxy
 function proxyImage(url) {
     if (!url) return '/static/images/no-image.png';
     
-    try {
-        // استخدام خدمة Proxy في الخادم
-        const proxyUrl = new URL('{{ url_for("orders.proxy_image") }}', window.location.origin);
-        proxyUrl.searchParams.set('url', encodeURIComponent(url));
-        proxyUrl.searchParams.set('t', Date.now()); // تجنب الكاش
-        
-        return proxyUrl.toString();
-    } catch (error) {
-        console.error('خطأ في إنشاء رابط Proxy:', error);
-        return '/static/images/no-image.png';
+    // إذا كانت الصورة من سلة، نستخدم proxy بسيط
+    if (url.includes('salla.sa') || url.includes('cdn.salla.sa')) {
+        // نعيد نفس الرابط مع إضافة timestamp لتجنب الكاش
+        return url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
     }
+    
+    // للصور الأخرى، يمكن استخدام خدمة proxy (اختياري)
+    return url;
 }
 
 // تحديث دالة generateProductsHTML لاستخدام proxy
