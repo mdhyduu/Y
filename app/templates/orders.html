@@ -3023,73 +3023,79 @@ function isPdfUrl(url) {
 }
 
 // تحديث دالة تحميل البوليصة للتحقق من نوع الملف
+// ⭐⭐ دالة محسنة لتحميل البوليصة كملف PDF أصلي ⭐⭐
 async function generateShippingPolicyImagePDF(orderData, jsPDF) {
     return new Promise(async (resolve, reject) => {
         try {
             const shipping = orderData.shipping || {};
             const policyUrl = shipping.shipping_policy_url;
+            const orderNumber = orderData.reference_id || orderData.id;
             
             if (!policyUrl) {
+                console.log(`❌ لا يوجد رابط بوليصة للطلب ${orderNumber}`);
                 reject(new Error('لا يوجد رابط بوليصة'));
                 return;
             }
 
-            // التحقق من أن الرابط لملف PDF
-            if (!isPdfUrl(policyUrl)) {
-                logger.warn(`⚠️ الرابط لا يشير إلى ملف PDF: ${policyUrl}`);
-                reject(new Error('الرابط ليس لملف PDF'));
-                return;
-            }
-
-            logger.info(`📥 جاري تحميل البوليصة PDF من: ${policyUrl}`);
+            console.log(`📥 جاري تحميل البوليصة للطلب ${orderNumber}:`, policyUrl);
 
             // استخدام الـ proxy الجديد لتحميل ملف PDF البوليصة
-            const proxyUrl = new URL('{{ url_for("orders.proxy_pdf") }}', window.location.origin);
-            proxyUrl.searchParams.set('url', encodeURIComponent(policyUrl));
-            proxyUrl.searchParams.set('t', Date.now());
+            const proxyUrl = "{{ url_for('orders.proxy_pdf') }}?url=" + encodeURIComponent(policyUrl) + "&t=" + Date.now();
 
-            // تحميل ملف PDF مع مهلة أطول
+            console.log(`🔗 رابط الـ Proxy: ${proxyUrl}`);
+
+            // تحميل ملف PDF باستخدام fetch مع معالجة محسنة
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 ثانية
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+                console.log(`⏰ انتهت مهلة تحميل البوليصة للطلب ${orderNumber}`);
+            }, 30000); // 30 ثانية
 
-            const response = await fetch(proxyUrl.toString(), {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/pdf, */*'
-                },
-                signal: controller.signal
-            });
+            try {
+                const response = await fetch(proxyUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/pdf, */*'
+                    },
+                    signal: controller.signal
+                });
 
-            clearTimeout(timeoutId);
+                clearTimeout(timeoutId);
 
-            if (!response.ok) {
-                throw new Error(`فشل تحميل البوليصة: ${response.status} ${response.statusText}`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`❌ فشل تحميل البوليصة للطلب ${orderNumber}:`, response.status, errorText);
+                    throw new Error(`فشل تحميل البوليصة: ${response.status} ${response.statusText}`);
+                }
+
+                // التحقق من نوع المحتوى
+                const contentType = response.headers.get('content-type');
+                console.log(`📄 نوع محتوى الاستجابة: ${contentType}`);
+
+                // تحويل الاستجابة إلى Blob
+                const pdfBlob = await response.blob();
+                
+                if (pdfBlob.size === 0) {
+                    console.error(`❌ ملف البوليصة فارغ للطلب ${orderNumber}`);
+                    throw new Error('ملف البوليصة فارغ');
+                }
+
+                console.log(`✅ تم تحميل البوليصة بنجاح للطلب ${orderNumber}، الحجم: ${pdfBlob.size} بايت`);
+                resolve(pdfBlob);
+                
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+                if (fetchError.name === 'AbortError') {
+                    console.error(`⏰ انتهت مهلة تحميل البوليصة للطلب ${orderNumber}`);
+                    reject(new Error('انتهت مهلة تحميل البوليصة'));
+                } else {
+                    throw fetchError;
+                }
             }
-
-            // التحقق من نوع المحتوى
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('pdf')) {
-                throw new Error(`نوع الملف غير متوقع: ${contentType}`);
-            }
-
-            // تحويل الاستجابة إلى Blob
-            const pdfBlob = await response.blob();
-            
-            if (pdfBlob.size === 0) {
-                throw new Error('ملف البوليصة فارغ');
-            }
-
-            logger.info(`✅ تم تحميل البوليصة بنجاح، الحجم: ${pdfBlob.size} بايت، النوع: ${contentType}`);
-            resolve(pdfBlob);
             
         } catch (error) {
-            if (error.name === 'AbortError') {
-                logger.error(`⏰ انتهت مهلة تحميل البوليصة: ${policyUrl}`);
-                reject(new Error('انتهت مهلة تحميل البوليصة'));
-            } else {
-                logger.error(`❌ خطأ في تحميل البوليصة: ${error.message}`);
-                reject(error);
-            }
+            console.error(`❌ خطأ في تحميل البوليصة: ${error.message}`);
+            reject(error);
         }
     });
 }

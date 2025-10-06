@@ -885,60 +885,123 @@ def proxy_pdf():
         pdf_url = request.args.get('url')
         
         if not pdf_url:
+            current_app.logger.error("❌ لا يوجد رابط PDF في الطلب")
             return jsonify({'error': 'لا يوجد رابط PDF'}), 400
         
         # فك تشفير الرابط
         try:
             decoded_url = urllib.parse.unquote(pdf_url)
         except Exception as e:
-            logger.warning(f"⚠️ لا يمكن فك تشفير الرابط، استخدام الرابط الأصلي: {pdf_url}")
+            current_app.logger.warning(f"⚠️ لا يمكن فك تشفير الرابط، استخدام الرابط الأصلي: {pdf_url}")
             decoded_url = pdf_url
         
         # تنظيف الرابط
         cleaned_url = clean_pdf_url(decoded_url)
         
         if not cleaned_url:
+            current_app.logger.error(f"❌ رابط PDF غير صالح: {pdf_url}")
             return jsonify({'error': 'رابط PDF غير صالح'}), 400
         
-        logger.info(f"📥 جاري تحميل PDF من: {cleaned_url}")
+        current_app.logger.info(f"📥 جاري تحميل PDF من: {cleaned_url}")
         
-        # تحميل ملف PDF
-        response = requests.get(
-            cleaned_url, 
-            timeout=30,  # زيادة المهلة لملفات PDF
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'application/pdf, */*',
-                'Accept-Language': 'ar,en;q=0.9',
-                'Referer': 'https://salla.sa/'
-            },
-            stream=True
-        )
+        # ⭐⭐ إضافة headers محسنة لسلة ⭐⭐
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/pdf,application/octet-stream,*/*',
+            'Accept-Language': 'ar,en;q=0.9,en-US;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Referer': 'https://salla.sa/',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'cross-site',
+        }
         
-        if response.status_code == 200:
-            # الحصول على محتوى PDF
-            pdf_content = response.content
+        # ⭐⭐ إذا كان الرابط من سلة، نضيف المزيد من headers ⭐⭐
+        if 'salla.sa' in cleaned_url or 'cdn.salla.sa' in cleaned_url:
+            headers.update({
+                'Origin': 'https://salla.sa',
+                'Host': 'cdn.salla.sa' if 'cdn.salla.sa' in cleaned_url else 'salla.sa'
+            })
+        
+        # تحميل ملف PDF مع معالجة أفضل للأخطاء
+        try:
+            response = requests.get(
+                cleaned_url, 
+                timeout=25,  # زيادة المهلة
+                headers=headers,
+                stream=True,
+                verify=True  # التأكد من SSL
+            )
             
-            # إرجاع PDF مع الرأس المناسب
-            proxy_response = make_response(pdf_content)
-            proxy_response.headers.set('Content-Type', 'application/pdf')
-            proxy_response.headers.set('Cache-Control', 'public, max-age=86400')
-            proxy_response.headers.set('Access-Control-Allow-Origin', '*')
-            proxy_response.headers.set('Content-Disposition', 'inline; filename="shipping_policy.pdf"')
+            current_app.logger.info(f"📊 استجابة الخادم: {response.status_code}")
             
-            logger.info(f"✅ تم تحميل PDF بنجاح، الحجم: {len(pdf_content)} بايت")
-            return proxy_response
-        else:
-            logger.warning(f"⚠️ فشل تحميل PDF {cleaned_url}: {response.status_code}")
-            return jsonify({'error': f'فشل تحميل الملف: {response.status_code}'}), 400
+            if response.status_code == 200:
+                # الحصول على محتوى PDF
+                pdf_content = response.content
+                content_type = response.headers.get('Content-Type', 'application/pdf')
+                
+                current_app.logger.info(f"✅ تم تحميل PDF بنجاح، الحجم: {len(pdf_content)} بايت، النوع: {content_type}")
+                
+                # التحقق من أن المحتوى هو PDF
+                if not content_type.lower().startswith('application/pdf'):
+                    current_app.logger.warning(f"⚠️ نوع الملف غير متوقع: {content_type}")
+                    # نستمر رغم ذلك قد يكون PDF لكن Content-Type خاطئ
+                
+                # إرجاع PDF مع الرأس المناسب
+                proxy_response = make_response(pdf_content)
+                proxy_response.headers.set('Content-Type', 'application/pdf')
+                proxy_response.headers.set('Cache-Control', 'public, max-age=3600') # ساعة واحدة
+                proxy_response.headers.set('Access-Control-Allow-Origin', '*')
+                proxy_response.headers.set('Content-Disposition', 'inline; filename="shipping_policy.pdf"')
+                
+                return proxy_response
+            else:
+                current_app.logger.error(f"❌ فشل تحميل PDF {cleaned_url}: {response.status_code}")
+                return jsonify({
+                    'error': f'فشل تحميل الملف: {response.status_code}',
+                    'url': cleaned_url,
+                    'content_type': response.headers.get('Content-Type'),
+                    'content_length': response.headers.get('Content-Length')
+                }), 400
+                
+        except requests.exceptions.SSLError as ssl_error:
+            current_app.logger.error(f"❌ خطأ SSL في تحميل PDF: {ssl_error}")
+            # محاولة بدون التحقق من SSL
+            try:
+                response = requests.get(
+                    cleaned_url, 
+                    timeout=25,
+                    headers=headers,
+                    stream=True,
+                    verify=False  # محاولة بدون SSL verification
+                )
+                
+                if response.status_code == 200:
+                    pdf_content = response.content
+                    proxy_response = make_response(pdf_content)
+                    proxy_response.headers.set('Content-Type', 'application/pdf')
+                    proxy_response.headers.set('Cache-Control', 'public, max-age=3600')
+                    proxy_response.headers.set('Access-Control-Allow-Origin', '*')
+                    return proxy_response
+                else:
+                    raise Exception(f"فشل بعد إلغاء SSL: {response.status_code}")
+                    
+            except Exception as fallback_error:
+                current_app.logger.error(f"❌ فشل التحميل حتى بدون SSL: {fallback_error}")
+                return jsonify({'error': 'خطأ في اتصال SSL'}), 500
+                
+        except requests.exceptions.Timeout:
+            current_app.logger.error(f"⏰ انتهت مهلة تحميل PDF: {cleaned_url}")
+            return jsonify({'error': 'انتهت مهلة تحميل الملف'}), 408
             
-    except requests.exceptions.Timeout:
-        logger.error(f"⏰ انتهت مهلة تحميل PDF: {pdf_url}")
-        return jsonify({'error': 'انتهت مهلة تحميل الملف'}), 408
+        except requests.exceptions.ConnectionError as conn_error:
+            current_app.logger.error(f"🔌 خطأ اتصال في تحميل PDF: {conn_error}")
+            return jsonify({'error': 'فشل في الاتصال بالخادم'}), 503
+            
     except Exception as e:
-        logger.error(f"❌ خطأ في proxy PDF: {str(e)}")
-        return jsonify({'error': 'حدث خطأ أثناء تحميل الملف'}), 500
-
+        current_app.logger.error(f"❌ خطأ غير متوقع في proxy PDF: {str(e)}")
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({'error': 'حدث خطأ غير متوقع أثناء تحميل الملف'}), 500
 def clean_pdf_url(url):
     """تنظيف وإصلاح رابط PDF"""
     if not url:
