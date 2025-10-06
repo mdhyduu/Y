@@ -619,3 +619,32 @@ def filter_orders():
     except Exception as e:
         logger.error(f"خطأ في filter_orders: {str(e)}")
         return "حدث خطأ أثناء جلب الطلبات", 500
+        
+        
+@dashboard_bp.route('/check_late_orders', methods=['POST'])
+@login_required
+def check_late_orders():
+    """فحص الطلبات المتأخرة يدوياً"""
+    try:
+        from .scheduler_tasks import check_and_update_late_orders
+        
+        # استدعاء الدالة من scheduler_tasks.py
+        updated_count = check_and_update_late_orders()
+        
+        if updated_count > 0:
+            flash(f'✅ تم تحديث {updated_count} طلب إلى حالة متأخر', 'success')
+        else:
+            flash('✅ لا توجد طلبات متأخرة تحتاج تحديث', 'info')
+            
+        return {
+            'success': True,
+            'message': f'تم تحديث {updated_count} طلب',
+            'updated_count': updated_count
+        }
+        
+    except Exception as e:
+        logger.error(f"خطأ في فحص الطلبات المتأخرة: {str(e)}")
+        return {
+            'success': False,
+            'message': f'حدث خطأ أثناء فحص الطلبات المتأخرة: {str(e)}'
+        }, 500

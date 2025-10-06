@@ -249,9 +249,9 @@ def generate_barcode(data, dpi=300):
         writer.set_options({
             'write_text': False,      # محاولة لإخفاء الرقم البشري
             'text': '',
-            'module_width': 1.0,      # زِد القيمة لعرض أوسع للشرائط (مثال 1.0 أو 0.8)
+            'module_width': 1.2,      # زِد القيمة لعرض أوسع للشرائط (مثال 1.0 أو 0.8)
             'module_height': 100.0,    # زِد الارتفاع ليصبح الباركود أطول ومقروء
-            'quiet_zone': 1.0,        # مسافة سلامة حول الباركود
+            'quiet_zone': 4.0,        # مسافة سلامة حول الباركود
             'background': 'white',
             'foreground': 'black',
             'dpi': dpi,
