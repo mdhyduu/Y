@@ -793,3 +793,103 @@ def preview_addresses_html():
         logger.error(traceback.format_exc())
         flash('حدث خطأ أثناء إنشاء المعاينة', 'error')
         return redirect(url_for('orders.index'))
+        
+        
+import zipfile
+from io import BytesIO
+
+@orders_bp.route('/download_orders_zip_pdf')
+def download_orders_zip_pdf():
+    """تحميل الطلبات كملف ZIP يحتوي على كل طلب في ملف PDF منفصل باستخدام القالب الحالي"""
+    logger.info("بدء تحميل الطلبات كملف ZIP (كل طلب في ملف PDF منفصل)")
+    
+    try:
+        user, employee = get_user_from_cookies()
+        
+        if not user:
+            flash('الرجاء تسجيل الدخول أولاً', 'error')
+            return redirect(url_for('user_auth.login'))
+        
+        order_ids = request.args.get('order_ids', '').split(',')
+        
+        # تصفية القائمة من القيم الفارغة
+        order_ids = [order_id.strip() for order_id in order_ids if order_id.strip()]
+        
+        if not order_ids:
+            flash('لم يتم تحديد أي طلبات للتحميل', 'error')
+            return redirect(url_for('orders.index'))
+        
+        logger.info(f"🔄 معالجة {len(order_ids)} طلب لتحويل ZIP PDF من البيانات المحلية")
+        
+        # استخدام البيانات المحلية
+        orders = get_orders_from_local_database(order_ids, user.store_id)
+        
+        if not orders:
+            logger.warning("⚠️ لم يتم العثور على طلبات في البيانات المحلية، جاري استخدام API كبديل")
+            # العودة إلى الطريقة القديمة كبديل
+            access_token = user.salla_access_token
+            if not access_token:
+                flash('يجب ربط المتجر مع سلة أولاً', 'error')
+                return redirect(url_for('auth.link_store'))
+            
+            max_workers = max(1, min(current_app.config.get('MAX_WORKERS', 10), len(order_ids)))
+            orders = process_orders_concurrently(order_ids, access_token, max_workers)
+        
+        if not orders:
+            flash('لم يتم العثور على أي طلبات للتحميل', 'error')
+            return redirect(url_for('orders.index'))
+        
+        current_time = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        
+        # تحسين أداء إنشاء PDF
+        optimized_orders = optimize_pdf_generation(orders)
+        
+        # إنشاء ملف ZIP في الذاكرة
+        zip_buffer = BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for order in optimized_orders:
+                try:
+                    # استخدام القالب الحالي print_orders.html ولكن مع طلب واحد فقط
+                    html = render_template('print_orders.html', 
+                                         orders=[order],  # قائمة تحتوي على طلب واحد فقط
+                                         current_time=current_time)
+                    
+                    # تحويل HTML إلى PDF
+                    pdf = HTML(
+                        string=html,
+                        base_url=request.host_url
+                    ).write_pdf(
+                        optimize_size=(),
+                        jpeg_quality=80
+                    )
+                    
+                    # اسم الملف بناءً على رقم الطلب
+                    filename = f"order_{order.get('reference_id', order.get('id', 'unknown'))}.pdf"
+                    
+                    # إضافة الملف إلى الأرشيف
+                    zip_file.writestr(filename, pdf)
+                    
+                    logger.info(f"✅ تم إضافة الطلب {order.get('id')} إلى الأرشيف")
+                    
+                except Exception as e:
+                    logger.error(f"❌ خطأ في معالجة الطلب {order.get('id', 'unknown')} للأرشيف: {str(e)}")
+                    continue
+        
+        # إعداد الاستجابة
+        zip_buffer.seek(0)
+        filename = f"orders_pdf_{current_time}.zip"
+        
+        response = make_response(zip_buffer.read())
+        response.headers['Content-Type'] = 'application/zip'
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        response.headers['Content-Length'] = zip_buffer.tell()
+        
+        logger.info(f"✅ تم إنشاء ZIP بنجاح: {filename} يحتوي على {len(optimized_orders)} طلب")
+        return response
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في إنشاء ZIP: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash('حدث خطأ أثناء إنشاء ملف ZIP', 'error')
+        return redirect(url_for('orders.index'))

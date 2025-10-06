@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+p{% extends 'base.html' %}
 {% block styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/orders.css') }}">
 
@@ -122,7 +122,11 @@
         <span id="selected-orders-count">0</span> إسناد
     </button>
     {% endif %}
-    
+    <!-- في قسم أزرار الإجراءات السريعة - أضف هذا الزر -->
+<button type="button" class="btn btn-success rounded-pill px-3 me-2" id="download-zip-pdf-btn" disabled>
+    <i class="fas fa-file-archive me-1"></i> 
+    <span id="selected-orders-count-zip">0</span> تحميل PDFs مضغوط
+</button>
     <button type="button" class="btn btn-warning rounded-pill px-3 me-2" id="update-salla-status-btn" disabled>
         <i class="fas fa-sync-alt me-1"></i> 
         <span id="selected-orders-count-salla">0</span> تحديث في سلة
@@ -659,9 +663,10 @@ function updateAssignButtonState() {
     $('#selected-orders-count-2').text(checkedCount);
     $('#selected-orders-count-html').text(checkedCount);
     $('#selected-orders-count-salla').text(checkedCount);
-    $('#selected-orders-count-address').text(checkedCount); // ⭐ إضافة العداد الجديد
+    $('#selected-orders-count-address').text(checkedCount);
+    $('#selected-orders-count-zip').text(checkedCount); // ⭐ إضافة العداد الجديد
     
-    const buttons = $('#assign-orders-btn, #change-status-btn, #download-html-btn, #quickListViewBtn, #update-salla-status-btn, #print-addresses-btn');
+    const buttons = $('#assign-orders-btn, #change-status-btn, #download-html-btn, #quickListViewBtn, #update-salla-status-btn, #print-addresses-btn, #download-zip-pdf-btn');
     buttons.prop('disabled', checkedCount === 0);
     
     if (checkedCount > 0) {
@@ -2667,7 +2672,46 @@ $(document).on('change', '#selectAllQuickList', function() {
         $('.sidebar__backdrop').removeClass('show');
     }
 });
-
+// 18. تحميل الطلبات كملف ZIP يحتوي على PDFs منفصلة
+$(document).on('click', '#download-zip-pdf-btn', function() {
+    const selectedOrders = $('.order-checkbox:checked').map((_, el) => $(el).val()).get();
+    
+    if (selectedOrders.length === 0) {
+        showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للتحميل');
+        return;
+    }
+    
+    Swal.fire({
+        title: 'تحميل الطلبات كملف ZIP',
+        html: `سيتم تحميل <span class="fw-bold text-primary">${selectedOrders.length}</span> طلب كملف ZIP يحتوي على كل طلب في ملف PDF منفصل`,
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'موافق، تحميل ZIP',
+        cancelButtonText: 'إلغاء',
+        customClass: {
+            confirmButton: 'btn btn-success',
+            cancelButton: 'btn btn-outline-secondary ms-2'
+        },
+        buttonsStyling: false
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const downloadBtn = $('#download-zip-pdf-btn');
+            const originalText = downloadBtn.html();
+            downloadBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التجهيز');
+            
+            const downloadLink = document.createElement('a');
+            downloadLink.href = `{{ url_for('orders.download_orders_zip_pdf') }}?order_ids=${selectedOrders.join(',')}`;
+            downloadLink.style.display = 'none';
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            
+            setTimeout(() => {
+                downloadBtn.prop('disabled', false).html(originalText);
+            }, 3000);
+        }
+    });
+});
 </script>
 {% endblock %}
 {% endblock %}  
