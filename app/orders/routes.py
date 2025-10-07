@@ -77,7 +77,7 @@ def index():
     
     if page < 1: 
         page = 1
-    if per_page not in [10, 25, 50, 100, 125, 150]: 
+    if per_page not in [10, 25, 50, 100, 125, 150, 200, 250, 300]: 
         per_page = 25
     
     is_general_employee = False
