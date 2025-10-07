@@ -416,8 +416,90 @@ def order_details(order_id):
         logger.exception(f"Unexpected error: {str(e)}")
         return redirect(url_for('orders.index'))
 
+from weasyprint import HTML
+from flask import send_file
+from io import BytesIO
+import tempfile
+import os
+
+@orders_bp.route('/<order_id>/shipping_policy/<int:shipment_index>')
+def download_shipping_policy(order_id, shipment_index=0):
+    """تحميل البوليصة كملف PDF مباشرة بدون أي إضافات"""
+    user, current_employee = get_user_from_cookies()
+    
+    if not user:
+        flash("الرجاء تسجيل الدخول أولاً", "error")
+        return redirect(url_for('user_auth.login'))
+
+    try:
+        # جلب بيانات الطلب
+        order = SallaOrder.query.filter_by(id=str(order_id), store_id=user.store_id).first()
+        if not order:
+            flash('الطلب غير موجود', 'error')
+            return redirect(url_for('orders.index'))
+
+        # استخراج معلومات الشحن
+        order_data = order.full_order_data or {}
+        shipping_info = extract_shipping_info(order_data)
+        
+        # التحقق من وجود الشحنة المطلوبة
+        shipment_details = shipping_info.get('shipment_details', [])
+        if shipment_index >= len(shipment_details):
+            flash('بيانات الشحن غير موجودة', 'error')
+            return redirect(url_for('orders.order_details', order_id=order_id))
+
+        shipment = shipment_details[shipment_index]
+        
+        # التحقق من وجود بوليصة شحن
+        if not shipment.get('has_shipping_policy') or not shipment.get('shipping_policy_url'):
+            flash('لا توجد بوليصة شحن متاحة', 'error')
+            return redirect(url_for('orders.order_details', order_id=order_id))
+
+        # استخدام reference_id كاسم للملف
+        reference_id = order.reference_id or order.id
+        filename = f"بوليصة_شحن_{reference_id}.pdf"
+
+        # جلب ملف البوليصة مباشرة
+        access_token = ensure_valid_access_token(user)
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Accept': 'application/pdf,application/octet-stream'
+        }
+        
+        policy_url = shipment['shipping_policy_url']
+        response = requests.get(policy_url, headers=headers, timeout=30, stream=True)
+        
+        if response.status_code == 200:
+            # التحقق من أن الملف هو PDF
+            content_type = response.headers.get('content-type', '')
+            if 'pdf' in content_type.lower() or policy_url.lower().endswith('.pdf'):
+                pdf_data = BytesIO(response.content)
+                return send_file(
+                    pdf_data,
+                    as_attachment=True,
+                    download_name=filename,
+                    mimetype='application/pdf'
+                )
+            else:
+                # إذا لم يكن PDF، نعيد الملف كما هو بدون تحويل
+                file_data = BytesIO(response.content)
+                return send_file(
+                    file_data,
+                    as_attachment=True,
+                    download_name=filename,
+                    mimetype=content_type
+                )
+        else:
+            flash('فشل في تحميل البوليصة', 'error')
+            return redirect(url_for('orders.order_details', order_id=order_id))
+
+    except Exception as e:
+        error_msg = f"خطأ في تحميل البوليصة: {str(e)}"
+        flash(error_msg, "error")
+        logger.exception(f"Error downloading shipping policy: {str(e)}")
+        return redirect(url_for('orders.order_details', order_id=order_id))
 def extract_shipping_info(order_data):
-    """استخراج معلومات الشحن من بيانات الطلب مع إضافة رابط البوليصة"""
+    """استخراج معلومات الشحن من بيانات الطلب مع تحسينات البوليصة"""
     try:
         shipments_data = order_data.get('shipments', [])
         
@@ -427,8 +509,8 @@ def extract_shipping_info(order_data):
             'tracking_number': None,
             'tracking_link': None,
             'has_tracking': False,
-            'has_shipping_policy': False,  # إضافة خاصية جديدة
-            'shipping_policy_url': None,   # رابط البوليصة
+            'has_shipping_policy': False,
+            'shipping_policy_url': None,
             'shipment_details': []
         }
         
@@ -437,10 +519,20 @@ def extract_shipping_info(order_data):
             shipment_tracking_number = shipment.get('tracking_number')
             shipment_label = shipment.get('label')
             
-            # ⭐⭐ إضافة استخراج رابط البوليصة ⭐⭐
+            # استخراج رابط البوليصة
             shipment_policy_url = None
             if shipment_label and isinstance(shipment_label, dict):
                 shipment_policy_url = shipment_label.get('url')
+            
+            # إذا لم يكن هناك رابط مباشر، نبحث في أماكن أخرى
+            if not shipment_policy_url:
+                shipment_policy_url = shipment.get('shipping_policy_url')
+            
+            if not shipment_policy_url and shipment.get('documents'):
+                for doc in shipment.get('documents', []):
+                    if doc.get('type') == 'shipping_policy':
+                        shipment_policy_url = doc.get('url')
+                        break
             
             shipment_has_tracking = False
             final_tracking_link = None
@@ -466,8 +558,8 @@ def extract_shipping_info(order_data):
                 'status': shipment.get('status', ''),
                 'label': shipment_label,
                 'has_label': bool(shipment_label and shipment_label not in ["", "0", "null"]),
-                'shipping_policy_url': shipment_policy_url,  # إضافة رابط البوليصة
-                'has_shipping_policy': bool(shipment_policy_url),  # التحقق من وجود بوليصة
+                'shipping_policy_url': shipment_policy_url,
+                'has_shipping_policy': bool(shipment_policy_url),
                 'shipping_number': shipment.get('shipping_number'),
                 'total_weight': shipment.get('total_weight', {}),
                 'packages': shipment.get('packages', [])
@@ -475,7 +567,7 @@ def extract_shipping_info(order_data):
             
             shipping_info['shipment_details'].append(shipment_info)
             
-            # تحديث المعلومات العامة إذا كانت هذه أول شحنة تحتوي على بوليصة
+            # تحديث المعلومات العامة
             if shipment_info['has_shipping_policy'] and not shipping_info['has_shipping_policy']:
                 shipping_info['has_shipping_policy'] = True
                 shipping_info['shipping_policy_url'] = shipment_policy_url

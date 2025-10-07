@@ -441,14 +441,17 @@
             {% endif %}
             
             <!-- زر بوليصة الشحن للشحنة المحددة -->
-            {% if shipment.has_shipping_policy %}
-            <a href="{{ shipment.shipping_policy_url }}" 
-               target="_blank" 
-               class="btn btn-outline-primary btn-sm">
-                <i class="fas fa-download"></i> تحميل بوليصة الشحنة {{ loop.index }}
-            </a>
-            {% endif %}
+            
+    {% if shipment.has_shipping_policy %}
+        <a href="{{ url_for('orders.download_shipping_policy', order_id=order.id, shipment_index=loop.index0) }}" 
+           class="btn btn-primary btn-sm" 
+           target="_blank">
+            📄 تحميل البوليصة
+        </a>
+    {% endif %}
+    
         </div>
+        
         {% endfor %}
     {% else %}
         <p class="text-muted">لا توجد معلومات شحن متاحة</p>
