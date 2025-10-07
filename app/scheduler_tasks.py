@@ -74,8 +74,8 @@ def handle_order_completion(store_id, order_id, new_status_slug):
         
         # قائمة بجميع الحالات التي تعتبر "مكتملة"
         completed_statuses = [
-            'completed', 'delivered', 'مكتمل', 'تم_التوصيل', 
-            'منتهي', 'مستلم', 'تم_التسليم', 'منفذ', 'منفذة'
+            'completed', 'delivered', 'delivering', 'shipped', 
+            'منتهي', 'مستلم', 'canceled', 'منفذ', 'منفذة'
         ]
         
         # التحقق إذا الحالة الجديدة تعتبر حالة اكتمال
