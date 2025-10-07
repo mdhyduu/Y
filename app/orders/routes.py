@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 from . import orders_bp
 from app.models import (db, SallaOrder, CustomOrder, OrderStatus,User, Employee, 
                      OrderAssignment, EmployeeCustomStatus, OrderStatusNote, 
-                     OrderEmployeeStatus, OrderProductStatus, CustomNoteStatus, OrderAddress)
+                     OrderEmployeeStatus, OrderProductStatus, CustomNoteStatus, OrderAddress, SallaStatusChange)
 from app.utils import get_user_from_cookies, process_order_data, format_date,  humanize_time
 from app.token_utils import refresh_salla_token
 from app.config import Config
