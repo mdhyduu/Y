@@ -2130,52 +2130,70 @@ $(document).on('input', '#search-order-id', _.debounce(function() {
             // ⭐⭐ ترتيب متقدم حسب الكلمات المفتاحية ⭐⭐
 const keywordGroups = [
   [
-    'سلسال', 'سلاسل', 'سلسلة', 'سلسله', 'اسوارة', 'أسوارة', 'سوار', 'كف', 
-    'اقراط', 'حلق', 'تاج', 'طوق', 'اطوق', 'خواتم', 'خاتم', 'سبح', 
-    'قلم', 'ميدالية', 'ميداليه', 'مفاتيح', 'كسرة', 'تعليقة', 
-    'كسره', 'سياره', 'سيارة', 'بروش', 'قلادة', 'قلاده'
+    'سلسال', 'سلاسل', 'سلسلة', 'سلسله', 'قلادة', 'قلاده',
+    'اسوارة', 'أسوارة', 'سوار', 'كف',
+    'اقراط', 'حلق', 'تاج', 'طوق', 'اطوق',
+    'خواتم', 'خاتم', 'سبح', 'سبحة',
+    'قلم', 'ميدالية', 'ميداليه', 'مفاتيح',
+    'كسرة', 'كسره', 'تعليقة', 'تعليقه',
+    'سياره', 'سيارة', 'بروش', 'مبخرة', 'مبخره'
   ],
   [
-    'ساعة', 'ساعه', 'طقم ساعة', 'تيشرت', 'هودي', 'عباية', 'عبايه', 
-    'بشت', 'شتوي', 'شال', 'وشاح', 'تطريز', 'سديري', 'دقلة', 'دقله', 'فساتين','فستان'
+    'ساعة', 'ساعه', 'طقم ساعة'
+  ],
+  [
+    'تيشرت', 'هودي', 'بلوفر', 'جاكيت',
+    'عباية', 'عبايه', 'بشت', 'شال', 'وشاح',
+    'سديري', 'دقلة', 'دقله', 'فروة', 'فروه',
+    'شتوي', 'فساتين', 'فستان'
   ],
   [
     'نادي', 'لوحة', 'شعار', 'عائلة', 'كوب', 'مق'
   ]
 ];
- data.products.sort((a, b) => {
-                // دالة مساعدة للعثور على مجموعة الكلمة المفتاحية
-                function findKeywordGroup(name) {
-                    const cleanName = name.toLowerCase().trim();
-                    for (let i = 0; i < keywordGroups.length; i++) {
-                        for (const keyword of keywordGroups[i]) {
-                            if (cleanName.includes(keyword.toLowerCase())) {
-                                return i;
-                            }
-                        }
-                    }
-                    return keywordGroups.length; // المنتجات التي لا تنتمي لأي مجموعة
-                }
 
-                const groupA = findKeywordGroup(a.name);
-                const groupB = findKeywordGroup(b.name);
+data.products.sort((a, b) => {
+  // دالة ترجع ترتيب المنتج حسب المجموعات والكلمة المحددة
+  function findKeywordRank(name) {
+    const cleanName = name.toLowerCase().trim();
 
-                // إذا كانا في نفس المجموعة، نرتب أبجدياً داخل المجموعة
-                if (groupA === groupB) {
-                    // إذا كانت الأسماء متشابهة، نرتب حسب SKU
-                    const cleanNameA = a.name.trim().toLowerCase().replace(/\s+/g, ' ');
-                    const cleanNameB = b.name.trim().toLowerCase().replace(/\s+/g, ' ');
-                    
-                    if (cleanNameA === cleanNameB) {
-                        return a.sku.localeCompare(b.sku);
-                    }
-                    
-                    return a.name.localeCompare(b.name, 'ar');
-                }
+    for (let i = 0; i < keywordGroups.length; i++) {
+      const group = keywordGroups[i];
+      for (let j = 0; j < group.length; j++) {
+        if (cleanName.includes(group[j].toLowerCase())) {
+          // نرجع ترتيب مركّب: رقم المجموعة + ترتيب الكلمة داخلها
+          return [i, j];
+        }
+      }
+    }
 
-                // نرتب حسب المجموعة أولاً
-                return groupA - groupB;
-            });
+    // إذا ما وجدنا أي تطابق، نحطه في آخر شيء
+    return [keywordGroups.length, Number.MAX_SAFE_INTEGER];
+  }
+
+  const [groupA, indexA] = findKeywordRank(a.name);
+  const [groupB, indexB] = findKeywordRank(b.name);
+
+  // أولًا: ترتيب حسب رقم المجموعة
+  if (groupA !== groupB) {
+    return groupA - groupB;
+  }
+
+  // ثانيًا: داخل المجموعة، حسب ترتيب الكلمة داخل المجموعة
+  if (indexA !== indexB) {
+    return indexA - indexB;
+  }
+
+  // وأخيرًا: إذا نفس الكلمة، نرتب أبجديًا ثم حسب SKU
+  const cleanNameA = a.name.trim().toLowerCase().replace(/\s+/g, ' ');
+  const cleanNameB = b.name.trim().toLowerCase().replace(/\s+/g, ' ');
+
+  if (cleanNameA === cleanNameB) {
+    return a.sku.localeCompare(b.sku);
+  }
+
+  return a.name.localeCompare(b.name, 'ar', { sensitivity: 'base' });
+});
             // في قسم نجاح استدعاء AJAX للقائمة السريعة - تحديث كود المنتج
 data.products.forEach(product => {
     html += `
