@@ -5,32 +5,30 @@
 {% endblock %}
 
 {% block content %} 
-
 <div class="card shadow-lg mb-4 border-0">
     <div class="card-header py-3 bg-gradient-primary text-white">
         <div class="d-flex justify-content-between align-items-center">
             <h6 class="m-0 font-weight-bold">
                 <i class="fas fa-tasks me-2"></i>لوحة تحكم الطلبات
             </h6>
-          <div class="d-flex align-items-center">
-    <div id="sync-progress" class="me-3 d-none">
-        <div class="progress" style="height: 6px; width: 150px;">
-            <div class="progress-bar progress-bar-striped progress-bar-animated bg-white" 
-                 role="progressbar" style="width: 0%"></div>
+            <div class="d-flex align-items-center">
+                <div id="sync-progress" class="me-3 d-none">
+                    <div class="progress" style="height: 6px; width: 150px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-white" 
+                             role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <small class="sync-details text-white-50 mt-1 d-block"></small>
+                </div>
+                <button class="btn btn-primary btn-sm rounded-pill me-2" id="sync-statuses-btn">
+                    <i class="fas fa-list-alt me-1"></i>
+                </button>
+                <button class="btn btn-primary btn-sm rounded-pill" id="sync-orders-btn">
+                    <i class="fas fa-sync-alt me-1"></i>
+                </button>
+            </div>
         </div>
-        <small class="sync-details text-white-50 mt-1 d-block"></small>
     </div>
-  <button class="btn btn-primary btn-sm rounded-pill me-2" id="sync-statuses-btn">
-    <i class="fas fa-list-alt me-1"></i>
 
-</button>
-<button class="btn btn-primary btn-sm rounded-pill" id="sync-orders-btn">
-    <i class="fas fa-sync-alt me-1"></i>
-</button>
-</div>
-        </div>
-    </div>
-    
     <div class="card-body p-0">
         <div class="p-4 border-bottom">
             <form id="advanced-filters" class="row g-3 align-items-end">
@@ -43,6 +41,7 @@
                                data-debounce="500">
                     </div>
                 </div>
+                
                 {% if is_reviewer %}
                 <div class="col-md-2">
                     <label for="filter-order-status" class="form-label small text-muted mb-1">حالة الطلب</label>
@@ -55,8 +54,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                {% endif %}
-                {% if is_reviewer %}
+                
                 <div class="col-md-2">
                     <label for="filter-employee" class="form-label small text-muted mb-1">الموظف المسؤول</label>
                     <select id="filter-employee" class="form-select">
@@ -78,7 +76,7 @@
                         <option value="refunded" {% if filters.status == 'refunded' %}selected{% endif %}>مرتجعات</option>
                     </select>
                 </div>
-                
+                  
                 <div class="col-md-3">
                     <label class="form-label small text-muted mb-1">الفترة الزمنية</label>
                     <div class="input-daterange input-group">
@@ -89,7 +87,7 @@
                                id="date-to" name="date_to" value="{{ filters.date_to }}">
                     </div>
                 </div>
-                
+                  
                 <div class="col-md-2 d-flex">
                     <button type="submit" class="btn btn-primary me-2 flex-grow-1">
                         <i class="fas fa-filter me-1"></i> تطبيق
@@ -100,47 +98,46 @@
                 </div>
             </form>
         </div>
-        
-        <!-- إضافة أزرار الإجراءات السريعة -->
-    <!-- إضافة أزرار الإجراءات السريعة -->
-<!-- في قسم أزرار الإجراءات السريعة - أضف هذا الزر -->
-<!-- في قسم أزرار الإجراءات السريعة -->
-<div class="d-flex p-3" class="card-body" id="quick-actions">
-    {% if is_reviewer and employees %}
-    <button type="button" class="btn btn-success rounded-pill px-3 me-2" id="assign-orders-btn" disabled>
-        <i class="fas fa-user-check me-1"></i> 
-        <span id="selected-orders-count">0</span> إسناد
-    </button>
-    {% endif %}
-    
-    <button type="button" class="btn btn-warning rounded-pill px-3 me-2" id="update-salla-status-btn" disabled>
-        <i class="fas fa-sync-alt me-1"></i> 
-        <span id="selected-orders-count-salla">0</span> تحديث في سلة
-    </button>
-    <button type="button" class="btn btn-success rounded-pill px-3 me-2" id="download-zip-pdf-client-btn" disabled>
-    <i class="fas fa-file-archive me-1"></i> 
-    <span id="selected-orders-count-zip-client">0</span> تحميل PDFs مضغوط (عميل)
-</button>
-    <!-- ⭐⭐ زر طباعة العناوين الجديد ⭐⭐ -->
-    <button type="button" class="btn btn-dark rounded-pill px-3 me-2" id="print-addresses-btn" disabled>
-        <i class="fas fa-map-marker-alt me-1"></i> 
-        <span id="selected-orders-count-address">0</span> طباعة عناوين
-    </button>
-    
-    <button type="button" class="btn btn-primary rounded-pill px-3 me-2" id="download-html-btn" disabled>
-        <i class="fas fa-download me-1"></i> 
-        <span id="selected-orders-count-html">0</span> تحميل 
-    </button> 
 
-    <button type="button" class="btn btn-info rounded-pill px-3 me-2" id="change-status-btn" disabled>
-        <i class="fas fa-tag me-1"></i> 
-        <span id="selected-orders-count-2">0</span> تغيير الحالة
-    </button>
+        <!-- أزرار الإجراءات السريعة -->
+        <div class="d-flex p-3" id="quick-actions">
+            {% if is_reviewer and employees %}
+            <button type="button" class="btn btn-success rounded-pill px-3 me-2" id="assign-orders-btn" disabled>
+                <i class="fas fa-user-check me-1"></i> 
+                <span id="selected-orders-count">0</span> إسناد
+            </button>
+            {% endif %}
+            
+            <button type="button" class="btn btn-warning rounded-pill px-3 me-2" id="update-salla-status-btn" disabled>
+                <i class="fas fa-sync-alt me-1"></i> 
+                <span id="selected-orders-count-salla">0</span> تحديث في سلة
+            </button>
+            
+            <button type="button" class="btn btn-success rounded-pill px-3 me-2" id="download-zip-pdf-client-btn" disabled>
+                <i class="fas fa-file-archive me-1"></i> 
+                <span id="selected-orders-count-zip-client">0</span> تحميل PDFs مضغوط (عميل)
+            </button>
+            
+            <button type="button" class="btn btn-dark rounded-pill px-3 me-2" id="print-addresses-btn" disabled>
+                <i class="fas fa-map-marker-alt me-1"></i> 
+                <span id="selected-orders-count-address">0</span> طباعة عناوين
+            </button>
+            
+            <button type="button" class="btn btn-primary rounded-pill px-3 me-2" id="download-html-btn" disabled>
+                <i class="fas fa-download me-1"></i> 
+                <span id="selected-orders-count-html">0</span> تحميل 
+            </button>
 
-    <button type="button" class="btn btn-secondary mb-3" id="quickListViewBtn" disabled>
-        <i class="fas fa-eye"></i> قائمة سريعة
-    </button>
-</div>
+            <button type="button" class="btn btn-info rounded-pill px-3 me-2" id="change-status-btn" disabled>
+                <i class="fas fa-tag me-1"></i> 
+                <span id="selected-orders-count-2">0</span> تغيير الحالة
+            </button>
+
+            <button type="button" class="btn btn-secondary mb-3" id="quickListViewBtn" disabled>
+                <i class="fas fa-eye"></i> قائمة سريعة
+            </button>
+        </div>
+
         {% if orders %}
         <div class="table-responsive position-relative">
             <div id="table-loading" class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center d-none" style="z-index: 10;">
@@ -148,125 +145,124 @@
                     <span class="visually-hidden">جاري التحميل...</span>
                 </div>
             </div>
-            
-            <table class="table table-hover mb-0" id="orders-table">
-   <!-- في قسم thead -->
-<thead class="table">
-    <tr>
-        <th width="5%" class="ps-4">
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="select-all-header">
-            </div>
-        </th>
-        <th>رقم الطلب</th>
-        <th class="d-none d-md-table-cell">الحالة</th>
-        <th>الحالة المخصصة</th>
-        <!-- ⭐⭐ إضافة عمود طريقة الدفع هنا ⭐⭐ -->
-        <th class="d-none d-lg-table-cell">طريقة الدفع</th>
-        <th>العلامات</th>
-        <th class="d-none d-md-table-cell">التاريخ</th>
-        {% if is_reviewer %}
-        <th class="d-none d-md-table-cell">المسند إليه</th>
-        {% endif %}
-        <th width="15%" class="text-end pe-4">الإجراءات</th>
-    </tr>
-</thead>
-             <tbody>
-    {% for order in orders %}
-    <tr data-order-id="{{ order.id }}" data-order-type="{{ order.type }}" data-order-status="{{ order.status.slug if order.status else 'unknown' }}" class="align-middle clickable-row">
-        <td class="ps-4">
-            <div class="form-check">
-                <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}" data-type="{{ order.type }}">
-            </div>
-        </td>
-        <td>
-            <span class="fw-bold">#{{ order.reference_id }}</span>
-        </td>
-        <td class="d-none d-md-table-cell">
-            {% if order.status %}
-                <span class="status-badge status-{{ order.status.slug }}" 
-                      data-bs-toggle="tooltip" 
-                      title="{{ order.status.name }} ({{ order.status.type }})">
-                    <i class="fas fa-circle me-1 small"></i>
-                    {{ order.status.name }}
-                </span>
-            {% else %}
-                <span class="status-badge status-unknown" data-bs-toggle="tooltip" title="حالة غير معروفة">
-                    <i class="fas fa-circle me-1 small"></i>
-                    غير محدد
-                </span>
-            {% endif %}
-        </td>
-        <td>
-            {% if order.employee_statuses %}
-                {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
-                <span class="badge rounded-pill" style="background-color: {{ last_custom_status.status.color }}; color: white">
-                    {{ last_custom_status.status.name }}
-                </span>
-            {% else %}
-                <span class="text-muted small">-</span>
-            {% endif %}
-        </td>
-        <!-- ⭐⭐ إضافة خلية طريقة الدفع هنا ⭐⭐ -->
-        <td class="d-none d-lg-table-cell">
-            {% if order.payment_method %}
-                {% set payment_class = "payment-" + (order.payment_method.replace('_', '-') if order.payment_method else 'unknown') %}
-                <span class="payment-method-badge {{ payment_class }}" data-bs-toggle="tooltip" title="{{ order.payment_method_name }}">
-                    {% if order.payment_method == 'tabby_installment' %}
-                        <i class="fas fa-credit-card payment-icon"></i>تابي
-                    {% elif order.payment_method == 'mada' %}
-                        <i class="fas fa-credit-card payment-icon"></i>مدى
-                    {% elif order.payment_method == 'visa' or order.payment_method == 'mastercard' %}
-                        <i class="fab fa-cc-visa payment-icon"></i>بطاقة
-                    {% elif order.payment_method == 'cash' %}
-                        <i class="fas fa-money-bill-wave payment-icon"></i>نقدي
-                    {% elif order.payment_method == 'bank' %}
-                        <i class="fas fa-university payment-icon"></i>بنكي
-                    {% else %}
-                        <i class="fas fa-wallet payment-icon"></i>{{ order.payment_method_name|default('غير محدد', true)|truncate(10) }}
-                    {% endif %}
-                </span>
-            {% else %}
-                <span class="payment-method-badge payment-unknown" data-bs-toggle="tooltip" title="طريقة دفع غير محددة">
-                    <i class="fas fa-wallet payment-icon"></i>غير محدد
-                </span>
-            {% endif %}
-        </td>
-        <td>
-            {% set last_note = order.status_notes | sort(attribute='created_at', reverse=true) | first %}
 
-    {% if last_note %}
-        <div class="d-flex align-items-center">
-            {% if last_note.custom_status %}
-                <!-- حالة مخصصة مع لون مخصص -->
-                <span class="badge rounded-pill me-1" 
-                      style="background-color: {{ last_note.custom_status.color }}; color: white">
-                    {{ last_note.custom_status.name }}
-                </span>
-            {% elif last_note.status_flag %}
-                <!-- حالة خاصة (status_flag) -->
-                {% set flag_class = "badge-" + last_note.status_flag %}
-                {% set flag_text = {
-                    'late': 'متأخر',
-                    'missing': 'واصل ناقص',
-                    'refunded': 'مرتجع',
-                    'not_shipped': 'لم يشحن'
-                }.get(last_note.status_flag, last_note.status_flag) %}
-                <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
-            {% endif %} 
-        </div>
-    {% else %}
-        <span class="text-muted small">-</span>
-    {% endif %}
-</td>
+            <table class="table table-hover mb-0" id="orders-table">
+                <thead class="table">
+                    <tr>
+                        <th width="5%" class="ps-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="select-all-header">
+                            </div>
+                        </th>
+                        <th>رقم الطلب</th>
+                        <th class="d-none d-md-table-cell">الحالة</th>
+                        <th>الحالة المخصصة</th>
+                        <th class="d-none d-lg-table-cell">طريقة الدفع</th>
+                        <th>العلامات</th>
+                        <th class="d-none d-md-table-cell">التاريخ</th>
+                        {% if is_reviewer %}
+                        <th class="d-none d-md-table-cell">المسند إليه</th>
+                        {% endif %}
+                        <th width="15%" class="text-end pe-4">الإجراءات</th>
+                    </tr>
+                </thead>
+                
+                <tbody>
+                    {% for order in orders %}
+                    <tr data-order-id="{{ order.id }}" data-order-type="{{ order.type }}" data-order-status="{{ order.status.slug if order.status else 'unknown' }}" class="align-middle clickable-row">
+                        <td class="ps-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}" data-type="{{ order.type }}">
+                            </div>
+                        </td>
+                        <td>
+                            <span class="fw-bold">#{{ order.reference_id }}</span>
+                        </td>
+                        <td class="d-none d-md-table-cell">
+                            {% if order.status %}
+                                <span class="status-badge status-{{ order.status.slug }}" 
+                                      data-bs-toggle="tooltip" 
+                                      title="{{ order.status.name }} ({{ order.status.type }})">
+                                    <i class="fas fa-circle me-1 small"></i>
+                                    {{ order.status.name }}
+                                </span>
+                            {% else %}
+                                <span class="status-badge status-unknown" data-bs-toggle="tooltip" title="حالة غير معروفة">
+                                    <i class="fas fa-circle me-1 small"></i>
+                                    غير محدد
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if order.employee_statuses %}
+                                {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
+                                <span class="badge rounded-pill" style="background-color: {{ last_custom_status.status.color }}; color: white">
+                                    {{ last_custom_status.status.name }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted small">-</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td class="d-none d-lg-table-cell">
+                            {% if order.payment_method %}
+                                {% set payment_class = "payment-" + (order.payment_method.replace('_', '-') if order.payment_method else 'unknown') %}
+                                <span class="payment-method-badge {{ payment_class }}" data-bs-toggle="tooltip" title="{{ order.payment_method_name }}">
+                                    {% if order.payment_method == 'tabby_installment' %}
+                                        <i class="fas fa-credit-card payment-icon"></i>تابي
+                                    {% elif order.payment_method == 'mada' %}
+                                        <i class="fas fa-credit-card payment-icon"></i>مدى
+                                    {% elif order.payment_method == 'visa' or order.payment_method == 'mastercard' %}
+                                        <i class="fab fa-cc-visa payment-icon"></i>بطاقة
+                                    {% elif order.payment_method == 'cash' %}
+                                        <i class="fas fa-money-bill-wave payment-icon"></i>نقدي
+                                    {% elif order.payment_method == 'bank' %}
+                                        <i class="fas fa-university payment-icon"></i>بنكي
+                                    {% else %}
+                                        <i class="fas fa-wallet payment-icon"></i>{{ order.payment_method_name|default('غير محدد', true)|truncate(10) }}
+                                    {% endif %}
+                                </span>
+                            {% else %}
+                                <span class="payment-method-badge payment-unknown" data-bs-toggle="tooltip" title="طريقة دفع غير محددة">
+                                    <i class="fas fa-wallet payment-icon"></i>غير محدد
+                                </span>
+                            {% endif %}
+                        </td>
+                        
+                        <td>
+                            {% set last_note = order.status_notes | sort(attribute='created_at', reverse=true) | first %}
+                            {% if last_note %}
+                                <div class="d-flex align-items-center">
+                                    {% if last_note.custom_status %}
+                                        <span class="badge rounded-pill me-1" 
+                                              style="background-color: {{ last_note.custom_status.color }}; color: white">
+                                            {{ last_note.custom_status.name }}
+                                        </span>
+                                    {% elif last_note.status_flag %}
+                                        {% set flag_class = "badge-" + last_note.status_flag %}
+                                        {% set flag_text = {
+                                            'late': 'متأخر',
+                                            'missing': 'واصل ناقص',
+                                            'refunded': 'مرتجع',
+                                            'not_shipped': 'لم يشحن'
+                                        }.get(last_note.status_flag, last_note.status_flag) %}
+                                        <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span class="text-muted small">-</span>
+                            {% endif %}
+                        </td>
+                        
                         <td class="d-none d-md-table-cell">
                             <span class="time-ago small" data-bs-toggle="tooltip" title="{{ order.raw_created_at|format_date }}">
                                 {{ order.created_at }}
                             </span>
                         </td>
+                        
                         {% if is_reviewer %}
                         <td class="d-none d-md-table-cell">
-                            {% if order.assignments %} 
+                            {% if order.assignments %}
                                 <div class="avatar-group">
                                     {% for assignment in order.assignments[:3] %}
                                         {% if assignment.employee.role == 'delivery' %}
@@ -295,10 +291,11 @@
                                     {% endif %}
                                 </div>
                             {% else %}
-                                <span class="badge  text-muted">غير مسند</span>
+                                <span class="badge text-muted">غير مسند</span>
                             {% endif %}
                         </td>
                         {% endif %}
+                        
                         <td class="text-end pe-4 actions-cell">
                             <div class="d-flex justify-content-end gap-2">
                                 {% if order.type == 'custom' %}
@@ -330,62 +327,62 @@
                 </tbody>
             </table>
         </div>
-        
+
         <div class="d-flex justify-content-between align-items-center p-4 border-top">
             <div class="d-flex align-items-center">
                 <span class="text-muted small me-3">العناصر لكل صفحة:</span>
-   <select class="form-select form-select-sm w-auto" id="per-page-select">
+                <select class="form-select form-select-sm w-auto" id="per-page-select">
                     <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10</option>
                     <option value="25" {% if pagination.per_page == 25 %}selected{% endif %}>25</option>
                     <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50</option>
                     <option value="100" {% if pagination.per_page == 100 %}selected{% endif %}>100</option>
-                                        <option value="125" {% if pagination.per_page == 125 %}selected{% endif %}>125</option>
-                                                            <option value="150" {% if pagination.per_page == 150 %}selected{% endif %}>150</option>
-                                                                                        <option value="200" {% if pagination.per_page == 200 %}selected{% endif %}>200</option>                                                               <option value="250" {% if pagination.per_page == 250 %}selected{% endif %}>250</option>                                                                          <option value="300" {% if pagination.per_page == 300 %}selected{% endif %}>300</option>               
-                </select
+                    <option value="125" {% if pagination.per_page == 125 %}selected{% endif %}>125</option>
+                    <option value="150" {% if pagination.per_page == 150 %}selected{% endif %}>150</option>
+                    <option value="200" {% if pagination.per_page == 200 %}selected{% endif %}>200</option>
+                    <option value="250" {% if pagination.per_page == 250 %}selected{% endif %}>250</option>
+                    <option value="300" {% if pagination.per_page == 300 %}selected{% endif %}>300</option>
+                </select>
             </div>
             
-           <div class="d-flex flex-column align-items-end">
-    <nav aria-label="Page navigation">
-        <ul class="pagination pagination-sm justify-content-center mb-1">
-            {% if pagination.has_prev %}
-            <li class="page-item">
-                <a class="page-link" href="?page={{ pagination.prev_page }}&per_page={{ pagination.per_page }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.employee %}&employee={{ filters.employee }}{% endif %}{% if filters.custom_status %}&custom_status={{ filters.custom_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.search %}&search={{ filters.search }}{% endif %}{% if filters.order_type %}&order_type={{ filters.order_type }}{% endif %}">
-                    <i class="fas fa-chevron-right"></i>
-                </a>
-            </li>
-            {% else %}
-            <li class="page-item disabled"><a class="page-link" href="#"><i class="fas fa-chevron-right"></i></a></li>
-            {% endif %}
-            
-            {% set start_page = [1, pagination.page - 2]|max %}
-            {% set end_page = [pagination.total_pages, pagination.page + 2]|min %}
-            {% for p in range(start_page, end_page + 1) %}
-                <li class="page-item {% if p == pagination.page %}active{% endif %}">
-                    <a class="page-link" href="?page={{ p }}&per_page={{ pagination.per_page }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.employee %}&employee={{ filters.employee }}{% endif %}{% if filters.custom_status %}&custom_status={{ filters.custom_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.search %}&search={{ filters.search }}{% endif %}{% if filters.order_type %}&order_type={{ filters.order_type }}{% endif %}">
-                        {{ p }}
-                    </a>
-                </li>
-            {% endfor %}
+            <div class="d-flex flex-column align-items-end">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination pagination-sm justify-content-center mb-1">
+                        {% if pagination.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ pagination.prev_page }}&per_page={{ pagination.per_page }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.employee %}&employee={{ filters.employee }}{% endif %}{% if filters.custom_status %}&custom_status={{ filters.custom_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.search %}&search={{ filters.search }}{% endif %}{% if filters.order_type %}&order_type={{ filters.order_type }}{% endif %}">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled"><a class="page-link" href="#"><i class="fas fa-chevron-right"></i></a></li>
+                        {% endif %}
+                          
+                        {% set start_page = [1, pagination.page - 2]|max %}
+                        {% set end_page = [pagination.total_pages, pagination.page + 2]|min %}
+                        {% for p in range(start_page, end_page + 1) %}
+                            <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                                <a class="page-link" href="?page={{ p }}&per_page={{ pagination.per_page }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.employee %}&employee={{ filters.employee }}{% endif %}{% if filters.custom_status %}&custom_status={{ filters.custom_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.search %}&search={{ filters.search }}{% endif %}{% if filters.order_type %}&order_type={{ filters.order_type }}{% endif %}">
+                                    {{ p }}
+                                </a>
+                            </li>
+                        {% endfor %}
 
-            {% if pagination.has_next %}
-            <li class="page-item">
-                <a class="page-link" href="?page={{ pagination.next_page }}&per_page={{ pagination.per_page }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.employee %}&employee={{ filters.employee }}{% endif %}{% if filters.custom_status %}&custom_status={{ filters.custom_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.search %}&search={{ filters.search }}{% endif %}{% if filters.order_type %}&order_type={{ filters.order_type }}{% endif %}">
-                    <i class="fas fa-chevron-left"></i>
-                </a>
-            </li>
-            {% else %}
-            <li class="page-item disabled"><a class="page-link" href="#"><i class="fas fa-chevron-left"></i></a></li>
-            {% endif %}
-        </ul>
-    </nav>
-    <div class="text-muted small">
-        عرض {{ pagination.start_item }}-{{ pagination.end_item }} من {{ pagination.total_items }}
-    </div>
-</div>
+                        {% if pagination.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ pagination.next_page }}&per_page={{ pagination.per_page }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.employee %}&employee={{ filters.employee }}{% endif %}{% if filters.custom_status %}&custom_status={{ filters.custom_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.search %}&search={{ filters.search }}{% endif %}{% if filters.order_type %}&order_type={{ filters.order_type }}{% endif %}">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled"><a class="page-link" href="#"><i class="fas fa-chevron-left"></i></a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                <div class="text-muted small">
+                    عرض {{ pagination.start_item }}-{{ pagination.end_item }} من {{ pagination.total_items }}
+                </div>
             </div>
         </div>
-
         {% else %}
         <div class="text-center py-5">
             <div class="mb-4">
@@ -403,7 +400,7 @@
     </div>
 </div>
 
-<!-- نافذة اختيار الحالة -->
+<!-- المودالات -->
 <div class="modal fade" id="changeStatusModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -413,7 +410,6 @@
             </div>
             <div class="modal-body">
                 <p>سيتم تطبيق الحالة المحددة على <span id="selected-count-modal" class="fw-bold">0</span> طلب.</p>
-                
                 <div class="mb-3">
                     <label for="status-select" class="form-label">اختر الحالة:</label>
                     <select class="form-select" id="status-select">
@@ -435,6 +431,7 @@
         </div>
     </div>
 </div>
+
 <div class="modal fade" id="quickListModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -455,7 +452,6 @@
                     <!-- سيتم ملء المحتوى هنا عبر JavaScript -->
                 </div>
                 
-                <!-- قسم الإجراءات السريعة - إضافة زر الطباعة هنا -->
                 <div class="mt-4 pt-3 border-top">
                     <h6 class="mb-3"><i class="fas fa-cogs me-2"></i>الإجراءات السريعة</h6>
                     <div class="row">
@@ -493,9 +489,9 @@
                             <button type="button" class="btn btn-success w-100" id="quickListDownloadBtn">
                                 <i class="fas fa-download me-1"></i> تحميل كـ PDF
                             </button>
-                                <button type="button" class="btn btn-outline-secondary w-100" id="toggleAllOrdersBtn">
-        <i class="fas fa-eye me-1"></i> إظهار/إخفاء جميع الطلبات
-    </button>
+                            <button type="button" class="btn btn-outline-secondary w-100 mt-2" id="toggleAllOrdersBtn">
+                                <i class="fas fa-eye me-1"></i> إظهار/إخفاء جميع الطلبات
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -506,9 +502,7 @@
         </div>
     </div>
 </div>
-    </div>
-</div>
-<!-- نافذة تحديث حالة سلة -->
+
 <div class="modal fade" id="updateSallaStatusModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -518,7 +512,6 @@
             </div>
             <div class="modal-body">
                 <p>سيتم تحديث حالة <span id="selected-count-salla-modal" class="fw-bold">0</span> طلب في سلة.</p>
-                
                 <div class="mb-3">
                     <label for="salla-status-select" class="form-label">اختر حالة سلة:</label>
                     <select class="form-select" id="salla-status-select">
@@ -527,7 +520,7 @@
                             <option value="{{ status.slug }}" 
                                     data-status-type="{{ status.type }}"
                                     style="color: {{ status.color or '#000' }}">
-                                {{ status.name }} 
+                                {{ status.name }}
                             </option>
                         {% endfor %}
                     </select>
@@ -538,7 +531,6 @@
                     <textarea class="form-control" id="salla-status-note" rows="3" placeholder="أضف ملاحظة حول التحديث..."></textarea>
                 </div>
 
-                <!-- عرض معلومات الحالة المحددة -->
                 <div id="selected-status-info" class="alert alert-info d-none">
                     <small>
                         <i class="fas fa-info-circle me-1"></i>
@@ -551,42 +543,6 @@
                 <button type="button" class="btn btn-primary" id="confirm-salla-status-update">
                     <i class="fas fa-sync-alt me-1"></i> تحديث الحالة
                 </button>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- نافذة تحديث حالة سلة -->
-<!-- نافذة تحديث حالة سلة -->
-<div class="modal fade" id="quickListModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">القائمة السريعة للطلبات المحددة</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="form-check mb-3">
-                    <input class="form-check-input" type="checkbox" id="selectAllQuickList" checked>
-                    <label class="form-check-label fw-bold" for="selectAllQuickList">
-                        تحديد جميع الطلبات
-                    </label>
-                    <span class="text-muted ms-2" id="selectedOrdersCountQuick">0 طلب محدد</span>
-                </div>
-                
-                <div id="quickListContent">
-                    <!-- سيتم ملء المحتوى هنا عبر JavaScript -->
-                </div>
-                
-                <!-- قسم الإجراءات السريعة -->
-                <div class="mt-4 pt-3 border-top">
-                    <h6 class="mb-3"><i class="fas fa-cogs me-2"></i>الإجراءات السريعة</h6>
-                    <div class="row">
-                        <!-- ... الأزرار الحالية ... -->
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
             </div>
         </div>
     </div>
