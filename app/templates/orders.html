@@ -508,6 +508,53 @@
     </div>
 </div>
 <!-- نافذة تحديث حالة سلة -->
+<div class="modal fade" id="updateSallaStatusModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تحديث حالة الطلبات في سلة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>سيتم تحديث حالة <span id="selected-count-salla-modal" class="fw-bold">0</span> طلب في سلة.</p>
+                
+                <div class="mb-3">
+                    <label for="salla-status-select" class="form-label">اختر حالة سلة:</label>
+                    <select class="form-select" id="salla-status-select">
+                        <option value="">اختر حالة...</option>
+                        {% for status in order_statuses %}
+                            <option value="{{ status.slug }}" 
+                                    data-status-type="{{ status.type }}"
+                                    style="color: {{ status.color or '#000' }}">
+                                {{ status.name }} ({{ status.type }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="salla-status-note" class="form-label">ملاحظة (اختياري):</label>
+                    <textarea class="form-control" id="salla-status-note" rows="3" placeholder="أضف ملاحظة حول التحديث..."></textarea>
+                </div>
+
+                <!-- عرض معلومات الحالة المحددة -->
+                <div id="selected-status-info" class="alert alert-info d-none">
+                    <small>
+                        <i class="fas fa-info-circle me-1"></i>
+                        <span id="status-type-text"></span>
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="confirm-salla-status-update">
+                    <i class="fas fa-sync-alt me-1"></i> تحديث الحالة
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- نافذة تحديث حالة سلة -->
 <!-- نافذة تحديث حالة سلة -->
 <div class="modal fade" id="quickListModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">

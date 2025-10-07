@@ -808,12 +808,11 @@ def update_product_status(order_id, product_id):
 import concurrent.futures
 import threading
 from flask import current_app
-from app import create_app  # تأكد من استيراد create_app
-
+from app import create_app, db
 
 @orders_bp.route('/bulk_update_salla_status', methods=['POST'])
 def bulk_update_salla_status():
-    """تحديث حالة عدة طلبات في سلة دفعة واحدة مع تسجيل بسيط ومعالجة متوازية"""
+    """تحديث حالة عدة طلبات في سلة دفعة واحدة مع التسجيلات البسيطة والمعالجة المتوازية"""
     user, employee = get_user_from_cookies()
     
     if not user:
@@ -825,74 +824,76 @@ def bulk_update_salla_status():
     data = request.get_json()
     order_ids = data.get('order_ids', [])
     status_slug = data.get('status_slug')
+    note = data.get('note', '')
     
     if not order_ids or not status_slug:
         return jsonify({'success': False, 'error': 'بيانات ناقصة'}), 400
+    
+    current_app.logger.info(f"🚀 معالجة سريعة لـ {len(order_ids)} طلب باستخدام المعالجة المتوازية")
+    
+    # إنشاء تطبيق جديد لكل معالجة متوازية
+    app = create_app()
     
     # تحديد من قام بالتغيير
     changed_by = user.email if request.cookies.get('is_admin') == 'true' else employee.email
     user_type = 'admin' if request.cookies.get('is_admin') == 'true' else 'employee'
     
+    # إعداد البيانات المشتركة للخيوط
+    shared_data = {
+        'access_token': user.salla_access_token,
+        'status_slug': status_slug,
+        'note': note,
+        'app': app,
+        'changed_by': changed_by,
+        'user_type': user_type
+    }
+    
+    # استخدام ThreadPoolExecutor للمعالجة المتوازية
     updated_count = 0
     failed_orders = []
     lock = threading.Lock()
     
     def update_single_order(order_id):
         nonlocal updated_count
-        try:
-            headers = {
-                'Authorization': f'Bearer {user.salla_access_token}',
-                'Content-Type': 'application/json'
-            }
-            
-            payload = {'slug': status_slug}
-            
-            response = requests.post(
-                f"{Config.SALLA_ORDERS_API}/{order_id}/status",
-                headers=headers,
-                json=payload,
-                timeout=10
-            )
-            response.raise_for_status()
-            
-            # ✅ تسجيل بسيط لكل طلب
-            with lock:
-                status_change = SallaStatusChange(
-                    order_id=str(order_id),
-                    status_slug=status_slug,
-                    changed_by=changed_by,
-                    user_type=user_type
-                )
-                db.session.add(status_change)
-                updated_count += 1
-            
-        except Exception as e:
-            with lock:
-                failed_orders.append(f"الطلب {order_id}")
+        # استخدام سياق التطبيق الجديد داخل كل خيط
+        with shared_data['app'].app_context():
+            try:
+                result = process_single_order_with_record(order_id, shared_data)
+                
+                with lock:
+                    if result['success']:
+                        updated_count += 1
+                        current_app.logger.info(f"✅ تم تحديث الطلب {order_id} بنجاح")
+                    else:
+                        failed_orders.append(f"الطلب {order_id}: {result['error']}")
+                        current_app.logger.error(f"❌ فشل تحديث {order_id}: {result['error']}")
+                        
+            except Exception as e:
+                with lock:
+                    failed_orders.append(f"الطلب {order_id}: خطأ غير متوقع - {str(e)}")
+                    current_app.logger.error(f"❌ خطأ في {order_id}: {str(e)}")
     
-    # استخدام ThreadPoolExecutor للمعالجة المتوازية
+    # تشغيل المهام بشكل متوازي (بحد أقصى 5 خيوط للحفاظ على الاستقرار)
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         executor.map(update_single_order, order_ids)
     
-    # حفظ جميع التغييرات في قاعدة البيانات
-    try:
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': 'فشل في حفظ سجل التغييرات'}), 500
+    current_app.logger.info(f"📊 النتيجة السريعة: تم تحديث {updated_count} من أصل {len(order_ids)}")
     
     result = {
         'success': updated_count > 0,
         'message': f'تم تحديث {updated_count} طلب في سلة',
-        'updated_count': updated_count
+        'updated_count': updated_count,
+        'failed_count': len(failed_orders),
+        'failed_orders': failed_orders
     }
     
     if failed_orders:
-        result['failed_orders'] = failed_orders
+        result['error'] = 'فشل تحديث بعض الطلبات'
     
     return jsonify(result)
-def process_single_order(order_id, shared_data):
-    """معالجة طلب واحد - دالة مساعدة للمعالجة المتوازية"""
+
+def process_single_order_with_record(order_id, shared_data):
+    """معالجة طلب واحد مع التسجيل في قاعدة البيانات"""
     try:
         headers = {
             'Authorization': f'Bearer {shared_data["access_token"]}',
@@ -914,9 +915,25 @@ def process_single_order(order_id, shared_data):
         )
         
         if response.status_code in [200, 201]:
-            # ✅ تم التحديث في سلة بنجاح - بدون تخزين أي سجلات محلية
-            current_app.logger.info(f"✅ تم تحديث حالة الطلب {order_id} في سلة بنجاح")
-            return {'success': True}
+            # ✅ تسجيل التغيير في قاعدة البيانات
+            try:
+                status_change = SallaStatusChange(
+                    order_id=str(order_id),
+                    status_slug=shared_data['status_slug'],
+                    changed_by=shared_data['changed_by'],
+                    user_type=shared_data['user_type']
+                )
+                db.session.add(status_change)
+                db.session.commit()
+                
+                current_app.logger.info(f"✅ تم تحديث حالة الطلب {order_id} في سلة بنجاح وتم التسجيل")
+                return {'success': True}
+                
+            except Exception as db_error:
+                db.session.rollback()
+                current_app.logger.error(f"❌ فشل تسجيل التغيير للطلب {order_id}: {str(db_error)}")
+                return {'success': False, 'error': f'فشل في التسجيل: {str(db_error)}'}
+                
         else:
             error_message = f"كود الخطأ: {response.status_code}"
             try:
