@@ -178,67 +178,13 @@
     <!-- العمود الجانبي -->
     <div class="col-lg-4 bg-light p-3">
       <!-- قسم الحالات المخصصة للموظف -->
-      <div class="card shadow-sm mb-3 border-0">
-        <div class="card-header bg-white py-2">
-          <h5 class="mb-0 fs-5"><i class="fas fa-tags ms-2"></i>حالة الطلب </h5>
-        </div>
-        <div class="card-body p-2">
-          {% if current_employee %}
-          <form action="{{ url_for('orders.add_employee_status', order_id=order.id) }}" method="POST" id="employee-status-form" class="ajax-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="mb-2">
-              <label class="form-label small">اختر حالة</label>
-              <select class="form-select form-select-sm" name="status_id" required>
-                <option value="">اختر حالة</option>
-                {% for status in current_employee.custom_statuses if status.is_active %}
-                <option value="{{ status.id }}">{{ status.name | safe }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="mb-2">
-              <label for="custom-note" class="form-label small">ملاحظة (اختياري)</label>
-              <textarea class="form-control form-control-sm" id="custom-note" 
-                        name="note" rows="2" placeholder="أدخل ملاحظاتك هنا..." maxlength="500"></textarea>
-            </div>
-            <button type="submit" class="btn btn-primary btn-sm w-100">
-              <i class="fas fa-plus me-1"></i> إضافة حالة
-            </button>
-          </form>
-          {% endif %}
-          
-          <div class="mt-3">
-            <h6 class="border-bottom pb-1 small">الحالات المسجلة</h6>
-            <ul class="list-group list-group-flush small employee-status-list">
-              {% if employee_statuses %}
-                {% for emp_status, custom_status, employee in employee_statuses %}
-                <li class="list-group-item d-flex justify-content-between py-1 px-0">
-                  <div>
-                    <span class="badge" style="background-color: {{ custom_status.color | safe }}; color: white;">
-                      {{ custom_status.name | safe }}
-                    </span>
-                    {% if emp_status.note %}
-                      <span class="ms-2">{{ emp_status.note | safe }}</span>
-                    {% endif %}
-                    <div class="text-muted small mt-1">
-                      <i class="fas fa-user me-1"></i>{{ employee.email | safe }}
-                    </div>
-                  </div>
-                  <div class="text-muted">{{ emp_status.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
-                </li>
-                {% endfor %}
-              {% else %}
-                <li class="list-group-item py-2 text-center text-muted">لا توجد حالات مسجلة</li>
-              {% endif %}
-            </ul>
-          </div> 
-        </div>
-      </div>
+   
 
       <!-- قسم الحالات الخاصة -->
       {% if is_reviewer %}
       <div class="card shadow-sm mb-3 border-0">
         <div class="card-header bg-white py-2">
-          <h5 class="mb-0 fs-5"><i class="fas fa-flag ms-2"></i>حالات خاصة</h5>
+          <h5 class="mb-0 fs-5"><i class="fas fa-flag ms-2"></i> تنبية</h5>
         </div>
         <div class="card-body p-2">
           <form action="{{ url_for('orders.add_status_note', order_id=order.id) }}" method="POST" id="special-status-form" class="ajax-form">
