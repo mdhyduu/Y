@@ -408,6 +408,7 @@ def order_details(order_id):
             order=processed_order,
             status_changes=status_changes,
             order_address=order_address,
+            order_statuses=order_statuses,
             status_notes=db_data['status_notes'],
             employee_statuses=db_data['employee_statuses'],
             custom_note_statuses=db_data['custom_note_statuses'],

@@ -306,7 +306,7 @@
                                 data-status-type="{{ status.type }}"
                                 style="color: {{ status.color or '#000' }}; {% if status.color %}font-weight: bold;{% endif %}">
                             {{ status.name }} 
-                            {% if status.type %}({{ status.type }}){% endif %}
+                            {% if status.type %}{% endif %}
                         </option>
                     {% endfor %}
                 </select>
