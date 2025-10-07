@@ -810,9 +810,10 @@ import threading
 from flask import current_app
 from app import create_app  # تأكد من استيراد create_app
 
+
 @orders_bp.route('/bulk_update_salla_status', methods=['POST'])
 def bulk_update_salla_status():
-    """تحديث حالة عدة طلبات في سلة دفعة واحدة - نسخة سريعة باستخدام المعالجة المتوازية"""
+    """تحديث حالة عدة طلبات في سلة دفعة واحدة مع تسجيل بسيط ومعالجة متوازية"""
     user, employee = get_user_from_cookies()
     
     if not user:
@@ -824,68 +825,72 @@ def bulk_update_salla_status():
     data = request.get_json()
     order_ids = data.get('order_ids', [])
     status_slug = data.get('status_slug')
-    note = data.get('note', '')
     
     if not order_ids or not status_slug:
         return jsonify({'success': False, 'error': 'بيانات ناقصة'}), 400
     
-    current_app.logger.info(f"🚀 معالجة سريعة لـ {len(order_ids)} طلب باستخدام المعالجة المتوازية")
+    # تحديد من قام بالتغيير
+    changed_by = user.email if request.cookies.get('is_admin') == 'true' else employee.email
+    user_type = 'admin' if request.cookies.get('is_admin') == 'true' else 'employee'
     
-    # إنشاء تطبيق جديد لكل معالجة متوازية
-    app = create_app()
-    
-    # إعداد البيانات المشتركة للخيوط
-    shared_data = {
-        'access_token': user.salla_access_token,
-        'status_slug': status_slug,
-        'note': note,
-        'app': app  # تمرير التطبيق للخيوط
-    }
-    
-    # استخدام ThreadPoolExecutor للمعالجة المتوازية
     updated_count = 0
     failed_orders = []
     lock = threading.Lock()
     
     def update_single_order(order_id):
         nonlocal updated_count
-        # استخدام سياق التطبيق الجديد داخل كل خيط
-        with shared_data['app'].app_context():
-            try:
-                result = process_single_order(order_id, shared_data)
-                
-                with lock:
-                    if result['success']:
-                        updated_count += 1
-                        current_app.logger.info(f"✅ تم تحديث الطلب {order_id} بنجاح")
-                    else:
-                        failed_orders.append(f"الطلب {order_id}: {result['error']}")
-                        current_app.logger.error(f"❌ فشل تحديث {order_id}: {result['error']}")
-                        
-            except Exception as e:
-                with lock:
-                    failed_orders.append(f"الطلب {order_id}: خطأ غير متوقع - {str(e)}")
-                    current_app.logger.error(f"❌ خطأ في {order_id}: {str(e)}")
+        try:
+            headers = {
+                'Authorization': f'Bearer {user.salla_access_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            payload = {'slug': status_slug}
+            
+            response = requests.post(
+                f"{Config.SALLA_ORDERS_API}/{order_id}/status",
+                headers=headers,
+                json=payload,
+                timeout=10
+            )
+            response.raise_for_status()
+            
+            # ✅ تسجيل بسيط لكل طلب
+            with lock:
+                status_change = SallaStatusChange(
+                    order_id=str(order_id),
+                    status_slug=status_slug,
+                    changed_by=changed_by,
+                    user_type=user_type
+                )
+                db.session.add(status_change)
+                updated_count += 1
+            
+        except Exception as e:
+            with lock:
+                failed_orders.append(f"الطلب {order_id}")
     
-    # تشغيل المهام بشكل متوازي (بحد أقصى 5 خيوط للحفاظ على الاستقرار)
+    # استخدام ThreadPoolExecutor للمعالجة المتوازية
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         executor.map(update_single_order, order_ids)
     
-    current_app.logger.info(f"📊 النتيجة السريعة: تم تحديث {updated_count} من أصل {len(order_ids)}")
+    # حفظ جميع التغييرات في قاعدة البيانات
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': 'فشل في حفظ سجل التغييرات'}), 500
     
     result = {
         'success': updated_count > 0,
         'message': f'تم تحديث {updated_count} طلب في سلة',
-        'updated_count': updated_count,
-        'failed_count': len(failed_orders),
-        'failed_orders': failed_orders
+        'updated_count': updated_count
     }
     
     if failed_orders:
-        result['error'] = 'فشل تحديث بعض الطلبات'
+        result['failed_orders'] = failed_orders
     
     return jsonify(result)
-
 def process_single_order(order_id, shared_data):
     """معالجة طلب واحد - دالة مساعدة للمعالجة المتوازية"""
     try:
