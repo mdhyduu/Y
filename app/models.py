@@ -608,7 +608,18 @@ class CustomNoteStatus(db.Model):
     admin = relationship('User', foreign_keys=[created_by_admin])
     employee = relationship('Employee', foreign_keys=[created_by_employee])
     notes = relationship('OrderStatusNote', back_populates='custom_status', lazy='selectin')
+class SallaStatusChange(db.Model):
+    __tablename__ = 'salla_status_changes'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.String(50), nullable=False)
+    status_slug = db.Column(db.String(50), nullable=False)
+    changed_by = db.Column(db.String(100), nullable=False)  # email المستخدم أو الموظف
+    user_type = db.Column(db.String(20), nullable=False)  # 'admin' أو 'employee'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    def __repr__(self):
+        return f'<SallaStatusChange {self.order_id} -> {self.status_slug} by {self.changed_by}>'
 class Product(db.Model):
     __tablename__ = 'product'
     __table_args__ = (

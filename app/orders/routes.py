@@ -394,13 +394,16 @@ def order_details(order_id):
             'items': processed_items,
             'full_order_data': order_data
         })
-
+        status_changes = SallaStatusChange.query.filter_by(
+                order_id=str(order_id)
+            ).order_by(SallaStatusChange.created_at.desc()).all()
         db_data = fetch_additional_order_data(user.store_id, str(order_id))
         shipping_info = extract_shipping_info(order_data)
         processed_order['shipping'] = shipping_info
         
         return render_template('order_details.html', 
             order=processed_order,
+            status_changes=status_changes,
             order_address=order_address,
             status_notes=db_data['status_notes'],
             employee_statuses=db_data['employee_statuses'],

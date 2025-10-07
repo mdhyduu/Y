@@ -2,7 +2,7 @@ from flask import (jsonify, request, redirect, url_for, flash, render_template,
                    make_response, current_app)
 from . import orders_bp
 from app.models import (db, OrderStatusNote, EmployeeCustomStatus, OrderEmployeeStatus, 
-                       CustomNoteStatus, OrderProductStatus, OrderAssignment, OrderStatus)
+                       CustomNoteStatus, OrderProductStatus, OrderAssignment, OrderStatus, status_change)
 from app.utils import get_user_from_cookies
 from app.config import Config
 import requests
@@ -13,17 +13,15 @@ import logging
 # إعداد المسجل للإنتاج
 logger = logging.getLogger('salla_app')
 
+
 @orders_bp.route('/<int:order_id>/update_status', methods=['POST'])
 def update_order_status(order_id):
-    """تحديث حالة الطلب في سلة"""
-    user, _ = get_user_from_cookies()
+    """تحديث حالة الطلب في سلة مع تسجيل من قام بالتغيير"""
+    user, employee = get_user_from_cookies()
     
     if not user:
         flash("الرجاء تسجيل الدخول أولاً", "error")
-        response = make_response(redirect(url_for('user_auth.login')))
-        response.set_cookie('user_id', '', expires=0)
-        response.set_cookie('is_admin', '', expires=0)
-        return response
+        return redirect(url_for('user_auth.login'))
     
     if not user.salla_access_token:
         flash('يجب ربط متجرك مع سلة أولاً', 'error')
@@ -39,8 +37,7 @@ def update_order_status(order_id):
 
         headers = {
             'Authorization': f'Bearer {user.salla_access_token}',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Content-Type': 'application/json'
         }
 
         payload = {
@@ -56,6 +53,17 @@ def update_order_status(order_id):
         )
         response.raise_for_status()
 
+        # ✅ تسجيل بسيط لمن قام بالتغيير
+        status_change = SallaStatusChange(
+            order_id=str(order_id),
+            status_slug=new_status,
+            changed_by=user.email if request.cookies.get('is_admin') == 'true' else employee.email,
+            user_type='admin' if request.cookies.get('is_admin') == 'true' else 'employee'
+        )
+        
+        db.session.add(status_change)
+        db.session.commit()
+
         flash("تم تحديث حالة الطلب بنجاح", "success")
         return redirect(url_for('orders.order_details', order_id=order_id))
 
@@ -64,18 +72,10 @@ def update_order_status(order_id):
             flash("انتهت صلاحية الجلسة، الرجاء إعادة الربط مع سلة", "error")
             return redirect(url_for('auth.link_store'))
         
-        error_data = http_err.response.json()
-        error_message = error_data.get('error', {}).get('message', 'حدث خطأ أثناء تحديث الحالة')
-        
-        if http_err.response.status_code == 422:
-            field_errors = error_data.get('error', {}).get('fields', {})
-            for field, errors in field_errors.items():
-                for error in errors:
-                    flash(f"{field}: {error}", "error")
-        else:
-            flash(f"خطأ: {error_message}", "error")
+        flash("حدث خطأ أثناء تحديث الحالة", "error")
         return redirect(url_for('orders.order_details', order_id=order_id))
     except Exception as e:
+        db.session.rollback()
         flash("حدث خطأ غير متوقع", "error")
         return redirect(url_for('orders.order_details', order_id=order_id))
 
