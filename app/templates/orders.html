@@ -519,67 +519,36 @@
 </div>
 <!-- نافذة تحديث حالة سلة -->
 <!-- نافذة تحديث حالة سلة -->
-<div class="modal fade" id="updateSallaStatusModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
+<div class="modal fade" id="quickListModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">تحديث حالة الطلبات في سلة</h5>
+                <h5 class="modal-title">القائمة السريعة للطلبات المحددة</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p>سيتم تحديث الحالة في منصة سلة لـ <span id="selected-count-salla-modal" class="fw-bold">0</span> طلب.</p>
-                
-   <div class="mb-3">
-    <label for="salla-status-select" class="form-label">اختر حالة سلة:</label>
-    <select class="form-select" id="salla-status-select">
-        <option value="">اختر حالة...</option>
-        
-        <!-- الحالات الأصلية من سلة -->
-        <optgroup label="🛒 الحالات الأصلية من سلة">
-            {% for status in order_statuses %}
-                {% if status.type == 'original' and status.is_active %}
-                    <option value="{{ status.slug }}" 
-                            data-bs-toggle="tooltip" 
-                            title="{{ status.name }} - {{ status.type }}">
-                        {{ status.name }}
-                    </option>
-                {% endif %}
-            {% endfor %}
-        </optgroup> 
-        
-        <!-- الحالات المخصصة (إذا أردت تضمينها) -->
-        <optgroup label="⚙️ الحالات المخصصة">
-            {% for status in order_statuses %}
-                {% if status.type == 'custom' and status.is_active %}
-                    <option value="{{ status.slug }}" 
-                            data-bs-toggle="tooltip" 
-                            title="{{ status.name }} - {{ status.type }}">
-                        {{ status.name }} (مخصص)
-                    </option>
-                {% endif %}
-            {% endfor %}
-        </optgroup>
-        
-    </select>
-    <div class="form-text">اختر الحالة المناسبة من قائمة حالات سلة</div>
-</div>
-                <div class="mb-3">
-                    <label for="salla-status-note" class="form-label">ملاحظة (اختياري):</label>
-                    <textarea class="form-control" id="salla-status-note" rows="2" placeholder="ملاحظة تظهر في سلة..."></textarea>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="selectAllQuickList" checked>
+                    <label class="form-check-label fw-bold" for="selectAllQuickList">
+                        تحديد جميع الطلبات
+                    </label>
+                    <span class="text-muted ms-2" id="selectedOrdersCountQuick">0 طلب محدد</span>
                 </div>
                 
-                <div class="alert alert-info">
-                    <small>
-                        <i class="fas fa-info-circle me-1"></i>
-                        سيتم تحديث الحالة مباشرة في منصة سلة وقد تستغرق بضع ثوانٍ.
-                    </small>
+                <div id="quickListContent">
+                    <!-- سيتم ملء المحتوى هنا عبر JavaScript -->
+                </div>
+                
+                <!-- قسم الإجراءات السريعة -->
+                <div class="mt-4 pt-3 border-top">
+                    <h6 class="mb-3"><i class="fas fa-cogs me-2"></i>الإجراءات السريعة</h6>
+                    <div class="row">
+                        <!-- ... الأزرار الحالية ... -->
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                <button type="button" class="btn btn-warning" id="confirm-salla-status-update">
-                    <i class="fas fa-sync-alt me-1"></i> تأكيد التحديث
-                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
             </div>
         </div>
     </div>
@@ -2087,24 +2056,11 @@ function generateOrdersHTML(products) {
     });
     
 // استبدال دالة البحث الحالية بهذا الكود
+// استبدال دالة البحث الحالية بهذا الكود
 $(document).on('input', '#search-order-id', _.debounce(function() {
     const searchValue = $(this).val().trim();
     const previousValue = $(this).data('previous-value') || '';
     
-    // حفظ القيمة الحالية للمقارنة في المرة القادمة
-    $(this).data('previous-value', searchValue);
-    
-    // إذا كان الحقل فارغاً، إعادة تحميل الصفحة بدون فلترة
-    if (!searchValue) {
-        reloadOrders();
-        return;
-    }
-    
-    // إذا كان الرقم 9 أرقام بالضبط، إجراء البحث
-    if (/^\d{9}$/.test(searchValue)) {
-        reloadOrders();
-    }
-    // إذا كان الرقم أقل أو أكثر من 9 أرقام، لا نقوم بأي شيء
 }, 300));
     $(document).on('change', '#filter-order-status, #filter-employee, #filter-custom-status, #filter-special-status, #per-page-select', _.debounce(function() {
         reloadOrders();
@@ -2187,79 +2143,50 @@ const keywordGroups = [
     'نادي', 'لوحة', 'شعار', 'عائلة', 'كوب', 'مق'
   ]
 ];
-            data.products.sort((a, b) => {
-                // دالة مساعدة للعثور على مجموعة الكلمة المفتاحية
-                function findKeywordGroup(name) {
-                    const cleanName = name.toLowerCase().trim();
-                    for (let i = 0; i < keywordGroups.length; i++) {
-                        for (const keyword of keywordGroups[i]) {
-                            if (cleanName.includes(keyword.toLowerCase())) {
-                                return i;
-                            }
-                        }
-                    }
-                    return keywordGroups.length; // المنتجات التي لا تنتمي لأي مجموعة
-                }
-
-                const groupA = findKeywordGroup(a.name);
-                const groupB = findKeywordGroup(b.name);
-
-                // إذا كانا في نفس المجموعة، نرتب أبجدياً داخل المجموعة
-                if (groupA === groupB) {
-                    // إذا كانت الأسماء متشابهة، نرتب حسب SKU
-                    const cleanNameA = a.name.trim().toLowerCase().replace(/\s+/g, ' ');
-                    const cleanNameB = b.name.trim().toLowerCase().replace(/\s+/g, ' ');
-                    
-                    if (cleanNameA === cleanNameB) {
-                        return a.sku.localeCompare(b.sku);
-                    }
-                    
-                    return a.name.localeCompare(b.name, 'ar');
-                }
-
-                // نرتب حسب المجموعة أولاً
-                return groupA - groupB;
-            });
-
-            data.products.forEach(product => {
-                html += `
-    <div class="card mb-4 product-card" data-product-sku="${product.sku}">
-        <div class="card-header bg-light d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-                <div class="form-check me-3">
-                    <input class="form-check-input product-checkbox" type="checkbox" 
-                           id="product-${product.sku}" data-sku="${product.sku}" checked>
-                    <label class="form-check-label" for="product-${product.sku}"></label>
-                </div>
-                <img src="${product.main_image || '/static/images/no-image.png'}" 
-                     alt="${product.name}" 
-                     class="img-thumbnail me-3" 
-                     style="width: 60px; height: 60px; object-fit: cover;"
-                     onerror="this.src='/static/images/no-image.png'">
-                <div>
-                    <h6 class="mb-1 fw-bold">${product.name}</h6>
-                    <small class="text-muted">SKU: ${product.sku}</small>
-                    <div class="mt-1">
-                        <span class="badge bg-primary">الكمية الإجمالية: ${product.total_quantity}</span>
-                        <span class="badge bg-secondary ms-2">موجود في ${product.appearances_count} طلب</span>
-                        ${product.price ? `<span class="badge bg-warning ms-2">السعر: ${product.price} ر.س</span>` : ''}
-                    </div>
-                </div>
+            // في قسم نجاح استدعاء AJAX للقائمة السريعة - تحديث كود المنتج
+data.products.forEach(product => {
+    html += `
+<div class="card mb-4 product-card" data-product-sku="${product.sku}">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <div class="form-check me-3">
+                <input class="form-check-input product-checkbox" type="checkbox" 
+                       id="product-${product.sku}" data-sku="${product.sku}" checked>
+                <label class="form-check-label" for="product-${product.sku}"></label>
             </div>
-            <div class="d-flex align-items-center">
-                <div class="product-selection-info me-3">
-                    <small class="text-muted selected-orders-count" data-sku="${product.sku}">
-                        ${product.order_appearances.length}/${product.order_appearances.length} محدد
-                    </small>
-                </div>
-                <button class="btn btn-sm btn-outline-primary toggle-orders-btn" 
-                        type="button" 
-                        data-sku="${product.sku}"
-                        title="إظهار/إخفاء الطلبات">
-                    <i class="fas fa-chevron-down"></i>
-                </button>
+            <img src="${product.main_image || '/static/images/no-image.png'}" 
+                 alt="${product.name}" 
+                 class="img-thumbnail me-3" 
+                 style="width: 60px; height: 60px; object-fit: cover;"
+                 onerror="this.src='/static/images/no-image.png'">
+            <div>
+           
+
+             
             </div>
         </div>
+        <div class="d-flex align-items-center">
+
+            <div class="product-selection-info me-3">
+                <small class="text-muted selected-orders-count" data-sku="${product.sku}">
+                    ${product.order_appearances.length}/${product.order_appearances.length} محدد
+                </small>
+            </div>
+                        <!-- ⭐⭐ زر الطباعة الجديد ⭐⭐ -->
+            <button class="btn btn-sm btn-outline-dark me-2 product-print-btn" 
+                    type="button" 
+                    data-sku="${product.sku}"
+                    title="طباعة هذا المنتج فقط">
+                <i class="fas fa-print"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-primary toggle-orders-btn" 
+                    type="button" 
+                    data-sku="${product.sku}"
+                    title="إظهار/إخفاء الطلبات">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+        </div>
+    </div>
         <!-- ... باقي كود المنتج ... -->
     
         <div class="card-body orders-container" id="orders-${product.sku}" style="display: none;">
@@ -2423,9 +2350,13 @@ $(document).on('change', '#selectAllQuickList', function() {
     // تحديث جميع العدادات
     updateQuickListSelectionCount();
     updateProductSelectionCounts();
+    updateProductPrintButtons(); // ⭐ إضافة هذا السطر
 });
+
+
     $(document).on('change', '#quickListContent input.quick-list-order', function() {
         updateQuickListSelectionCount();
+        updateProductPrintButtons(); 
     });
     
     // 11. إسناد من القائمة السريعة
@@ -2654,6 +2585,7 @@ $(document).on('change', '#selectAllQuickList', function() {
         
         updateProductSelectionCount(productSku);
         updateQuickListSelectionCount();
+        updateProductPrintButtons(); 
     });
 
     $(document).on('change', '.quick-list-order', function() {
@@ -2663,7 +2595,116 @@ $(document).on('change', '#selectAllQuickList', function() {
         updateProductCheckboxState(productSku);
         updateQuickListSelectionCount();
     });
+// 18. حدث طباعة منتج فردي
+$(document).on('click', '.product-print-btn', function() {
+    const sku = $(this).data('sku');
+    const selectedCount = $(`.order-checkbox-${sku}:checked`).length;
+    
+    if (selectedCount === 0) {
+        showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات لهذا المنتج');
+        return;
+    }
+    
+    const $btn = $(this);
+    const originalHtml = $btn.html();
+    
+    $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
+    
+    setTimeout(() => {
+        const success = printSingleProduct(sku);
+        
+        setTimeout(() => {
+            $btn.prop('disabled', false).html('<i class="fas fa-print"></i>');
+        }, success ? 1000 : 2000);
+    }, 300);
+});
+function printSingleProduct(productSku) {
+    const printData = collectQuickListPrintData();
+    
+    // تصفية البيانات لتحتوي فقط على المنتج المحدد
+    const filteredProducts = printData.products.filter(product => product.sku === productSku);
+    
+    if (filteredProducts.length === 0) {
+        showSweetAlert('warning', 'تحذير', 'لم يتم العثور على بيانات المنتج للطباعة');
+        return false;
+    }
+    
+    const filteredPrintData = {
+        products: filteredProducts,
+        summary: {
+            totalProducts: filteredProducts.length,
+            totalOrders: filteredProducts.reduce((sum, product) => sum + product.orders.length, 0),
+            totalQuantity: filteredProducts.reduce((sum, product) => sum + product.total_quantity, 0),
+            totalItems: filteredProducts.reduce((sum, product) => sum + product.orders.length, 0)
+        }
+    };
+    
+    console.log('🖨️ طباعة منتج واحد:', {
+        productSku: productSku,
+        orders: filteredPrintData.summary.totalOrders,
+        quantity: filteredPrintData.summary.totalQuantity
+    });
+    
+    try {
+        // إنشاء HTML خاص بالمنتج الواحد
+        const htmlContent = generatePrintHTML(filteredPrintData);
+        
+        // إنشاء Blob من المحتوى
+        const blob = new Blob([htmlContent], { type: 'text/html; charset=utf-8' });
+        const blobUrl = URL.createObjectURL(blob);
+        
+        // فتح النافذة مع Blob URL
+        const printWindow = window.open(blobUrl, '_blank', 
+            'width=1200,height=800,scrollbars=yes,resizable=yes');
+        
+        if (!printWindow) {
+            URL.revokeObjectURL(blobUrl);
+            throw new Error('تم منع النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة لهذا الموقع.');
+        }
+        
+        // تنظيف Blob URL بعد فتح النافذة
+        printWindow.addEventListener('load', function() {
+            setTimeout(() => {
+                URL.revokeObjectURL(blobUrl);
+                console.log('🧹 تم تنظيف Blob URL للمنتج الفردي');
+            }, 1000);
+        });
+        
+        showSweetAlert('success', 'تم فتح نافذة الطباعة', 
+            `يتم الآن تحميل ${filteredPrintData.summary.totalOrders} طلب للمنتج المحدد`);
+        
+        return true;
+        
+    } catch (error) {
+        console.error('❌ خطأ في طباعة المنتج:', error);
+        showSweetAlert('error', 'خطأ في الطباعة', 
+            error.message || 'حدث خطأ أثناء فتح نافذة الطباعة. يرجى المحاولة مرة أخرى.');
+        return false;
+    }
+}
 
+// دالة لتحديث أزرار الطباعة للمنتجات
+function updateProductPrintButtons() {
+    $('.product-print-btn').each(function() {
+        const sku = $(this).data('sku');
+        const selectedCount = $(`.order-checkbox-${sku}:checked`).length;
+        
+        if (selectedCount === 0) {
+            $(this).prop('disabled', true).attr('title', 'لا توجد طلبات محددة لهذا المنتج');
+        } else {
+            $(this).prop('disabled', false).attr('title', `طباعة ${selectedCount} طلب لهذا المنتج`);
+        }
+    });
+}
+
+// تحديث دالة updateProductSelectionCounts لتشمل أزرار الطباعة
+function updateProductSelectionCounts() {
+    $('.product-card').each(function() {
+        const sku = $(this).data('product-sku');
+        updateProductSelectionCount(sku);
+        updateProductPrintButtons(); // ⭐ تحديث أزرار الطباعة
+    });
+}
     // --- التشغيل عند تحميل الصفحة ---
     updateTimestamps();
     updateAssignButtonState();
@@ -2675,6 +2716,7 @@ $(document).on('change', '#selectAllQuickList', function() {
         $('.sidebar__backdrop').removeClass('show');
     }
 });
+// دالة لطباعة منتج معين
 
 // 19. تحميل الطلبات كملف ZIP باستخدام المتصفح فقط
 $(document).on('click', '#download-zip-pdf-client-btn', async function() {
@@ -2690,7 +2732,7 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
     
     Swal.fire({
         title: 'جاري إنشاء الملفات',
-        html: `يتم الآن إنشاء ${selectedOrders.length} ملف PDF...<br><div class="progress mt-3"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div></div>`,
+        html: `يتم الآن إنشاء ملفات PDF للطلبات والبوليصلات...<br><div class="progress mt-3"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div></div>`,
         allowOutsideClick: false,
         showConfirmButton: false,
         didOpen: () => {
@@ -2700,26 +2742,47 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
     
     try {
         let completed = 0;
+        const totalFiles = selectedOrders.length * 2; // طلب + بوليصة لكل طلب
         
         for (const orderId of selectedOrders) {
             try {
                 // جلب بيانات الطلب الفردي
                 const orderData = await getSingleOrderData(orderId);
                 if (orderData) {
-                    // إنشاء PDF للطلب
-                    const pdfBlob = await generateOrderPDF(orderData, jsPDF);
+                    // ⭐⭐ 1. إنشاء PDF للطلب ⭐⭐
+                    const orderPdfBlob = await generateOrderPDF(orderData, jsPDF);
+                    const orderFilename = `طلب_${orderData.reference_id || orderData.id}.pdf`;
+                    zip.file(orderFilename, orderPdfBlob);
                     
-                    // إضافة PDF إلى الأرشيف
-                    const filename = `order_${orderData.reference_id || orderData.id}.pdf`;
-                    zip.file(filename, pdfBlob);
+                    completed++;
+                    updateProgress(completed, totalFiles);
+                    
+                    // ⭐⭐ 2. إنشاء PDF للبوليصة (إذا كانت موجودة) ⭐⭐
+                    if (orderData.shipping && orderData.shipping.has_shipping_policy && orderData.shipping.shipping_policy_url) {
+                        try {
+                            const policyPdfBlob = await generateShippingPolicyImagePDF(orderData, jsPDF);
+                            if (policyPdfBlob) {
+                                const policyFilename = `بوليصة_${orderData.reference_id || orderData.id}.pdf`;
+                                zip.file(policyFilename, policyPdfBlob);
+                            }
+                        } catch (policyError) {
+                            console.error(`❌ خطأ في معالجة بوليصة الشحن للطلب ${orderId}:`, policyError);
+                            // نستمر حتى إذا فشل تحميل البوليصة
+                        }
+                    }
+                    
+                    completed++;
+                    updateProgress(completed, totalFiles);
+                } else {
+                    // إذا فشل جلب بيانات الطلب، نزيد العداد مرتين
+                    completed += 2;
+                    updateProgress(completed, totalFiles);
                 }
-                
-                completed++;
-                const progress = Math.round((completed / selectedOrders.length) * 100);
-                $('.progress-bar').css('width', `${progress}%`);
                 
             } catch (error) {
                 console.error(`❌ خطأ في معالجة الطلب ${orderId}:`, error);
+                completed += 2; // تخطي الطلب والبوليصة
+                updateProgress(completed, totalFiles);
             }
         }
         
@@ -2727,13 +2790,13 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
         const zipBlob = await zip.generateAsync({ type: 'blob' });
         
         // تحميل الملف
-        const filename = `orders_${new Date().toISOString().slice(0, 10)}.zip`;
+        const filename = `طلبات_وبوليصلات_${new Date().toISOString().slice(0, 10)}.zip`;
         saveAs(zipBlob, filename);
         
         Swal.fire({
             icon: 'success',
             title: 'تم التحميل بنجاح',
-            text: `تم إنشاء ${completed} ملف PDF في الأرشيف`,
+            text: `تم إنشاء ${selectedOrders.length} طلب و ${selectedOrders.length} بوليصة في الأرشيف`,
             confirmButtonText: 'موافق'
         });
         
@@ -2747,6 +2810,12 @@ $(document).on('click', '#download-zip-pdf-client-btn', async function() {
         });
     }
 });
+
+// دالة مساعدة لتحديث شريط التقدم
+function updateProgress(completed, total) {
+    const progress = Math.round((completed / total) * 100);
+    $('.progress-bar').css('width', `${progress}%`);
+}
 
 // دالة لجلب بيانات طلب فردي
 async function getSingleOrderData(orderId) {
@@ -2979,6 +3048,80 @@ function generateOptionsHTML(options) {
             </div>
         </div>
     `;
+}
+
+// ⭐⭐ دالة لإنشاء PDF للبوليصة يحتوي فقط على الصورة ⭐⭐
+async function generateShippingPolicyImagePDF(orderData, jsPDF) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const shipping = orderData.shipping || {};
+            const policyUrl = shipping.shipping_policy_url;
+            
+            if (!policyUrl) {
+                reject(new Error('لا يوجد رابط بوليصة'));
+                return;
+            }
+            
+            // استخدام الـ proxy لتحميل صورة البوليصة
+            const proxyUrl = new URL('{{ url_for("orders.proxy_image") }}', window.location.origin);
+            proxyUrl.searchParams.set('url', policyUrl);
+            
+            // تحميل الصورة
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            img.onload = function() {
+                try {
+                    // إنشاء PDF جديد
+                    const pdf = new jsPDF({
+                        orientation: 'portrait',
+                        unit: 'mm',
+                        format: 'a4'
+                    });
+                    
+                    const pageWidth = pdf.internal.pageSize.getWidth();
+                    const pageHeight = pdf.internal.pageSize.getHeight();
+                    
+                    // حساب أبعاد الصورة لتناسب الصفحة مع الحفاظ على التناسب
+                    const imgWidth = img.width;
+                    const imgHeight = img.height;
+                    const ratio = imgWidth / imgHeight;
+                    
+                    let displayWidth = pageWidth - 20; // هامش 10 ملم من كل جانب
+                    let displayHeight = displayWidth / ratio;
+                    
+                    // إذا كانت الصورة أطول من الصفحة، نضبط الارتفاع
+                    if (displayHeight > pageHeight - 20) {
+                        displayHeight = pageHeight - 20;
+                        displayWidth = displayHeight * ratio;
+                    }
+                    
+                    // حساب المركز
+                    const x = (pageWidth - displayWidth) / 2;
+                    const y = (pageHeight - displayHeight) / 2;
+                    
+                    // ⭐⭐ إضافة الصورة فقط إلى PDF - بدون أي نص ⭐⭐
+                    pdf.addImage(img, 'JPEG', x, y, displayWidth, displayHeight);
+                    
+                    // إرجاع PDF كـ Blob
+                    const pdfBlob = pdf.output('blob');
+                    resolve(pdfBlob);
+                    
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            
+            img.onerror = function() {
+                reject(new Error('فشل تحميل صورة البوليصة'));
+            };
+            
+            img.src = proxyUrl.toString();
+            
+        } catch (error) {
+            reject(error);
+        }
+    });
 }
 </script>
 {% endblock %}
