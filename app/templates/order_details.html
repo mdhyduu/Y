@@ -533,14 +533,92 @@
   }
   
   /* تحسينات للأزرار في الوضع الليلي */
+  body.dark-mode .btn {
+    transition: all 0.3s ease;
+  }
+  
+  body.dark-mode .btn-primary {
+    background-color: #3a86ff;
+    border-color: #3a86ff;
+    color: white;
+  }
+  
+  body.dark-mode .btn-primary:hover {
+    background-color: #2667cc;
+    border-color: #2667cc;
+  }
+  
+  body.dark-mode .btn-info {
+    background-color: #00b4d8;
+    border-color: #00b4d8;
+    color: white;
+  }
+  
+  body.dark-mode .btn-info:hover {
+    background-color: #0096c7;
+    border-color: #0096c7;
+  }
+  
+  body.dark-mode .btn-success {
+    background-color: #38b000;
+    border-color: #38b000;
+    color: white;
+  }
+  
+  body.dark-mode .btn-success:hover {
+    background-color: #2d8c00;
+    border-color: #2d8c00;
+  }
+  
+  body.dark-mode .btn-warning {
+    background-color: #ff9e00;
+    border-color: #ff9e00;
+    color: #212529;
+  }
+  
+  body.dark-mode .btn-warning:hover {
+    background-color: #cc7e00;
+    border-color: #cc7e00;
+  }
+  
+  body.dark-mode .btn-danger {
+    background-color: #e63946;
+    border-color: #e63946;
+    color: white;
+  }
+  
+  body.dark-mode .btn-danger:hover {
+    background-color: #c1121f;
+    border-color: #c1121f;
+  }
+  
   body.dark-mode .btn-outline-secondary {
-    color: #f8f9fa;
+    color: #adb5bd;
     border-color: #4a4f66;
+    background-color: transparent;
   }
   
   body.dark-mode .btn-outline-secondary:hover {
     background-color: #4a4f66;
+    border-color: #5a5f76;
     color: #f8f9fa;
+  }
+  
+  body.dark-mode .btn-outline-danger {
+    color: #e63946;
+    border-color: #e63946;
+    background-color: transparent;
+  }
+  
+  body.dark-mode .btn-outline-danger:hover {
+    background-color: #e63946;
+    border-color: #e63946;
+    color: white;
+  }
+  
+  body.dark-mode .btn-sm {
+    font-size: 0.875rem;
+    padding: 0.25rem 0.5rem;
   }
   
   /* تحسينات للبطاقات (Cards) في الوضع الليلي */
@@ -574,6 +652,12 @@
     background-color: #664d03;
     border-color: #846404;
     color: #ffecb5;
+  }
+  
+  body.dark-mode .alert-info {
+    background-color: #055160;
+    border-color: #087990;
+    color: #cff4fc;
   }
   
   /* تحسينات للشريط الجانبي الأيمن */
@@ -621,8 +705,52 @@
     background-color: #2c2f42 !important;
     border-color: #3a3f58 !important;
   }
-</style>
 
+  /* تحسين الـ badges في الوضع الليلي */
+  body.dark-mode .badge.bg-primary {
+    background-color: #3a86ff !important;
+  }
+  
+  body.dark-mode .badge.bg-success {
+    background-color: #38b000 !important;
+  }
+  
+  body.dark-mode .badge.bg-warning {
+    background-color: #ff9e00 !important;
+    color: #212529 !important;
+  }
+  
+  body.dark-mode .badge.bg-info {
+    background-color: #00b4d8 !important;
+  }
+  
+  body.dark-mode .badge.bg-danger {
+    background-color: #e63946 !important;
+  }
+  
+  body.dark-mode .badge.bg-secondary {
+    background-color: #6c757d !important;
+  }
+
+  /* تحسينات إضافية للأزرار المعطلة */
+  body.dark-mode .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* تحسينات للزر الرئيسي في الرأس */
+  body.dark-mode .bg-light .btn-primary {
+    box-shadow: 0 2px 4px rgba(58, 134, 255, 0.3);
+  }
+
+  body.dark-mode .bg-light .btn-info {
+    box-shadow: 0 2px 4px rgba(0, 180, 216, 0.3);
+  }
+
+  body.dark-mode .bg-light .btn-outline-secondary {
+    box-shadow: 0 2px 4px rgba(74, 79, 102, 0.3);
+  }
+</style>
 <script>
 // استخدام event delegation للتعامل مع الأحداث الديناميكية
 document.addEventListener('click', function(e) {
