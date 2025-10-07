@@ -67,19 +67,9 @@
                     </select>
                 </div>
                 {% endif %}
-                
+
                 <div class="col-md-2">
-                    <label for="filter-custom-status" class="form-label small text-muted mb-1">حالة مخصصة</label>
-                    <select id="filter-custom-status" class="form-select">
-                        <option value="">الكل</option>
-                        {% for status in custom_statuses %}
-                            <option value="{{ status.id }}" {% if filters.custom_status == status.id|string %}selected{% endif %}>{{ status.name|truncate(15) }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <div class="col-md-2">
-                    <label for="filter-special-status" class="form-label small text-muted mb-1">حالات خاصة</label>
+                    <label for="filter-special-status" class="form-label small text-muted mb-1"> تنبيهات</label>
                     <select id="filter-special-status" class="form-select">
                         <option value="">الكل</option>
                         <option value="late" {% if filters.status == 'late' %}selected{% endif %}>متأخرة</option>
