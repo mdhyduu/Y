@@ -50,7 +50,7 @@
                         <option value="">الكل</option>
                         {% for status in order_statuses %}
                             <option value="{{ status.slug }}" {% if filters.status == status.slug %}selected{% endif %}>
-                                {{ status.name }} ({{ status.type }})
+                                {{ status.name }}
                             </option>
                         {% endfor %}
                     </select>
@@ -527,7 +527,7 @@
                             <option value="{{ status.slug }}" 
                                     data-status-type="{{ status.type }}"
                                     style="color: {{ status.color or '#000' }}">
-                                {{ status.name }} ({{ status.type }})
+                                {{ status.name }} 
                             </option>
                         {% endfor %}
                     </select>
