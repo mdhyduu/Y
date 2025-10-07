@@ -15,14 +15,10 @@
     <!-- زر طباعة HTML -->
     <a href="{{ url_for('orders.download_orders_html', order_ids=order.id) }}" 
        class="btn btn-primary btn-sm" target="_blank">
-      <i class="fas fa-print ms-1"></i> طباعة HTML
+      <i class="fas fa-print ms-1"></i> طباعة الطلب
     </a>
     
-    <!-- زر تحميل PDF -->
-    <a href="{{ url_for('orders.download_pdf', order_ids=order.id) }}" 
-       class="btn btn-success btn-sm">
-      <i class="fas fa-file-pdf ms-1"></i> تحميل PDF
-    </a>
+
     
     <!-- زر معاينة العناوين -->
     <a href="{{ url_for('orders.preview_addresses_html', order_ids=order.id) }}" 
@@ -389,9 +385,10 @@
         <h4> عنوان المستلم:</h4>
         <p><strong>الاسم:</strong> {{ order_address.name }}</p>
         <p><strong>الهاتف:</strong> {{ order_address.phone }}</p>
+        <p> {{ order_address.city }}</p>
         <p><strong>العنوان:</strong> {{ order_address.full_address }}</p>
-        <p><strong>المدينة:</strong> {{ order_address.city }}</p>
-        <p><strong>البلد:</strong> {{ order_address.country }}</p>
+
+        
     </div>
 {% else %}
     <div class="address-info">
