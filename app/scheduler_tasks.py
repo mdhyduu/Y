@@ -9,7 +9,7 @@ def check_and_update_late_orders_for_store(store_id):
     """فحص الطلبات المتأخرة لمتجر محدد"""
     try:
         # حساب التاريخ قبل يومين
-        two_days_ago = datetime.utcnow() - timedelta(days=2)
+        two_days_ago = datetime.utcnow() - timedelta(days=3)
         
         logger.info(f"🔍 فحص الطلبات المتأخرة للمتجر {store_id}")
         
