@@ -286,41 +286,44 @@
 
       <!-- قسم تحديث حالة الطلب -->
 
-      <div class="card shadow-sm mb-3 border-0">
-        <div class="card-header bg-white py-2">
-          <h5 class="mb-0 fs-5"><i class="fas fa-sync-alt ms-2"></i>تحديث حالة الطلب</h5>
-        </div>
-        
-        <div class="card-body p-2">
-          <form id="status-form" action="{{ url_for('orders.update_order_status', order_id=order.id) }}" method="POST">
+<!-- قسم تحديث حالة الطلب -->
+<div class="card shadow-sm mb-3 border-0">
+    <div class="card-header bg-white py-2">
+        <h5 class="mb-0 fs-5"><i class="fas fa-sync-alt ms-2"></i>تحديث حالة الطلب</h5>
+    </div>
+    
+    <div class="card-body p-2">
+        <form id="status-form" action="{{ url_for('orders.update_order_status', order_id=order.id) }}" method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
             <div class="mb-2">
-              <label for="status" class="form-label small">الحالة الجديدة</label>
-              <select class="form-select form-select-sm" id="status" name="status_slug" required>
-                {% for slug, label in [
-                  ('under_review', 'بإنتظار المراجعة'),
-                  ('in_progress', 'قيد التنفيذ'),
-                  ('completed', 'تم التنفيذ'),
-                  ('payment_pending', 'بإنتظار الدفع'),
-                  ('shipped', 'تم الشحن'),
-                  ('delivered', 'تم التوصيل'),
-                  ('canceled', 'ملغي'),
-                  ('restored', 'مسترجع')
-                ] %}
-                <option value="{{ slug }}" {% if order.status.slug == slug %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-              </select>
+                <label for="status" class="form-label small">الحالة الجديدة</label>
+                <select class="form-select form-select-sm" id="status" name="status_slug" required>
+                    <option value="">اختر حالة...</option>
+                    {% for status in order_statuses %}
+                        <option value="{{ status.slug }}" 
+                                {% if order.status.slug == status.slug %}selected{% endif %}
+                                data-status-type="{{ status.type }}"
+                                style="color: {{ status.color or '#000' }}; {% if status.color %}font-weight: bold;{% endif %}">
+                            {{ status.name }} 
+                            {% if status.type %}({{ status.type }}){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
             </div>
+            
             <div class="mb-2">
-              <label for="note" class="form-label small">ملاحظات</label>
-              <textarea class="form-control form-control-sm" id="note" name="note" rows="2" 
-                        placeholder="أدخل ملاحظاتك هنا..." maxlength="500"></textarea>
+                <label for="note" class="form-label small">ملاحظات</label>
+                <textarea class="form-control form-control-sm" id="note" name="note" rows="2" 
+                          placeholder="أدخل ملاحظاتك هنا..." maxlength="500"></textarea>
             </div>
+            
             <button type="submit" class="btn btn-primary btn-sm w-100">
-              <i class="fas fa-save me-1"></i> حفظ التغييرات
+                <i class="fas fa-save me-1"></i> حفظ التغييرات
             </button>
-          </form>
-        </div>
+        </form>
+    </div>
+</div>
         <!-- سجل تغييرات الحالة في سلة -->
 {% if status_changes %}
 <div class="card mt-3">

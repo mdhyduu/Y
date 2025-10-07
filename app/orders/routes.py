@@ -394,6 +394,9 @@ def order_details(order_id):
             'items': processed_items,
             'full_order_data': order_data
         })
+        order_statuses = OrderStatus.query.filter_by(store_id=user.store_id).order_by(OrderStatus.sort).all()  
+        
+        order = SallaOrder.query.filter_by(id=str(order_id), store_id=user.store_id).first()
         status_changes = SallaStatusChange.query.filter_by(
                 order_id=str(order_id)
             ).order_by(SallaStatusChange.created_at.desc()).all()
