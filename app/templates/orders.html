@@ -1054,6 +1054,90 @@ function generatePrintHTML(printData) {
         print-color-adjust: exact;
     }
 
+body {
+        font-family: "Segoe UI", "DejaVu Sans", Arial, sans-serif;
+        line-height: 1.4;
+        margin: 0;
+        padding: 15px;
+        color: #2c3e50;
+        background: #f4f7f9;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+    }
+
+    .print-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .print-header h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 600;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .summary-card {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+        border: 1px solid #e0e0e0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .summary-card h3 {
+        margin: 0;
+        font-size: 24px;
+        color: #667eea;
+        font-weight: 700;
+    }
+
+    .summary-card p {
+        margin: 5px 0 0 0;
+        color: #666;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .orders-container {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+
+    .order-card {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 12px;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+        position: relative;
+    }
+
+    .order-header {
+        display: flex;
+        align-items: stretch;
+        gap: 12px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+        min-height: 85px;
+    }
+
     .product-section {
         display: flex;
         flex-direction: column;
@@ -1072,6 +1156,122 @@ function generatePrintHTML(printData) {
         -webkit-user-select: none;
         user-select: none;
     }
+
+    .order-details {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        width: 100%;
+    }
+
+    .barcode-container {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8f9fa;
+    
+        
+        
+    }
+
+    .barcode-image {
+        width: 100%;
+        height: 100%;
+
+        object-fit: contain;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    /* رابط رقم الطلب - محسن للنسخ */
+    .order-ref-link {
+        font-size: 16px;
+        font-weight: bold;
+        color: #2c3e50;
+        display: block;
+        letter-spacing: 0.5px;
+        text-decoration: none;
+        cursor: pointer;
+        padding: 2px 6px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+        -webkit-user-select: text;
+        user-select: text;
+        text-align: center;
+        width: 100%;
+    }
+
+    .order-quantity {
+        background: #2c3e50;
+        color: white;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 13px;
+        display: inline-block;
+        font-weight: 600;
+        text-align: center;
+        width: fit-content;
+    }
+
+    .options-section, .notes-section {
+        padding: 8px;
+        border-radius: 6px;
+        margin-top: 8px;
+        font-size: 13px;
+    }
+
+    .options-section {
+        background: #e9f5ff;
+        border: 1px solid #b3d7ff;
+    }
+
+    .notes-section {
+        background: #fffbe6;
+        border: 1px solid #ffeccd;
+    }
+
+    .options-title, .notes-title {
+        font-weight: bold;
+        margin-bottom: 5px;
+        font-size: 14px;
+    }
+
+    .option-item {
+        display: block;
+        background: white;
+        padding: 3px 8px;
+        margin-bottom: 3px;
+        border-radius: 4px;
+        font-size: 13px;
+        border: 1px solid #e0e0e0;
+        line-height: 1.3;
+    }
+
+    /* تنسيقات الروابط في الخيارات */
+    .link-option .option-link {
+        font-size: 11px !important;
+        color: #0066cc;
+        text-decoration: underline;
+        word-break: break-all;
+        display: inline-block;
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+
+    .no-data {
+        text-align: center;
+        padding: 50px;
+        color: #6c757d;
+        background: #fff;
+        border-radius: 8px;
+        grid-column: 1 / -1;
+    }
+
 
     /* نسخة الطباعة المحسنة */
 @media print {
