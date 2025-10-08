@@ -16,3 +16,4 @@ from . import custom_orders
 from . import utils_routes
 from . import print_utils
 from . import shipping_policies
+from . import details
