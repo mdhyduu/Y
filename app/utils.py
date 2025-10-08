@@ -154,7 +154,7 @@ from io import BytesIO
 import base64
 from flask import current_app
 import logging
-from ..storage_service import do_storage  # استيراد خدمة التخزين
+from .storage_service import do_storage  # استيراد خدمة التخزين
 
 # ... (بقية الاستيرادات كما هي)
 
