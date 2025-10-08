@@ -1,3 +1,4 @@
+
 {% extends 'base.html' %}
 
 {% block content %}
@@ -115,7 +116,8 @@
             <div class="stats-grid-compact">
                 {% if selected_employee %}
                     {% for item in default_status_stats %}
-                    <a href="{{ url_for('orders.index') }}?status_id={{ item.id }}" class="text-decoration-none">
+                    <!-- تصحيح الرابط لاستخدام status بدلاً من status_id -->
+                    <a href="{{ url_for('orders.index') }}?status={{ item.slug }}&employee={{ selected_employee.id }}" class="text-decoration-none">
                         <div class="stat-card-compact" style="--status-color: {{ item.color }};">
                             <div class="stat-content">
                                 <span class="stat-count">{{ item.count }}</span>
@@ -126,7 +128,8 @@
                     {% endfor %}
                 {% else %}
                     {% for item in all_employee_status_stats %}
-                    <a href="{{ url_for('orders.index') }}?status_id={{ item.id }}" class="text-decoration-none">
+                    <!-- تصحيح الرابط لاستخدام status بدلاً من status_id -->
+                    <a href="{{ url_for('orders.index') }}?status={{ item.slug }}" class="text-decoration-none">
                         <div class="stat-card-compact" style="--status-color: {{ item.color }}; --status-color-rgb: {{ item.color | hex_to_rgb }};">
                              <div class="stat-content">
                                 <span class="stat-count">{{ item.count }}</span>
@@ -144,23 +147,24 @@
 
     <div class="mb-4">
         <h5 class="mb-3 fw-bold"><i class="fas fa-stream me-2"></i>حالات المتابعة الخاصة بي</h5>
- <!-- في قسم حالات المتابعة الخاصة بي، استبدل هذا الكود: -->
-
-<!-- بهذا الكود: -->
-<div class="stats-grid">
-    {% for item in custom_status_stats %}
-    <a href="{{ url_for('orders.index') }}?status_id={{ item.id }}" class="text-decoration-none">
-        <div class="stat-card-item">
-            <div class="stat-card h-100" style="background-color">
-                <div class="stat-card-content">
-                    <h5 class="mb-1 fw-bolder">{{ item.count }}</h5>
-                    <p class="mb-0 small fw-medium">{{ item.name }}</p>
+        <!-- تصحيح الروابط في قسم حالات المتابعة الخاصة بي -->
+        <div class="stats-grid">
+            {% for item in custom_status_stats %}
+            <!-- استخدام status بدلاً من status_id للتوحيد مع dashboard الرئيسي -->
+            <a href="{{ url_for('orders.index') }}?status={{ item.slug }}" class="text-decoration-none">
+                <div class="stat-card-item">
+                    <div class="stat-card h-100" style="background-color">
+                        <div class="stat-card-content">
+                            <h5 class="mb-1 fw-bolder">{{ item.count }}</h5>
+                            <p class="mb-0 small fw-medium">{{ item.name }}</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </a>
+            {% endfor %}
         </div>
-    </a>
-    {% endfor %}
-</div>
+    </div>
+
     <div class="row g-4">
         <div class="col-lg-8">
             <div class="card h-100">
