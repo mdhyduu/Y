@@ -3,7 +3,7 @@ from werkzeug.utils import secure_filename
 import os
 from . import orders_bp
 from ..models import SallaOrder, db
-from ..storage_service import do_storage
+from ..services.storage_service import do_storage
 from flask import render_template
 from sqlalchemy import or_
 from app.utils import get_user_from_cookies  # استيراد نفس الدالة المستخدمة في routes
