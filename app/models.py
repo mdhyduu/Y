@@ -419,7 +419,7 @@ class SallaOrder(db.Model):
     last_synced = db.Column(db.DateTime, nullable=True)
     # إضافة الحقل الجديد
     reference_id = db.Column(db.String(50), nullable=True, index=True)
-    
+    qr_code_url = db.Column(db.Text)
     # العمود الأساسي للربط
     status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'), nullable=True)
     full_order_data = db.Column(JSONB, nullable=True)
@@ -459,6 +459,7 @@ class CustomOrder(db.Model):
     order_image = db.Column(db.String(255))  # مسار حفظ الصورة
     notes = db.Column(db.Text)
     store_id = db.Column(db.Integer, nullable=False)
+    qr_code_url = db.Column(db.Text)
     status_id = db.Column(db.String(50), db.ForeignKey('order_statuses.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

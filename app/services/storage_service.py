@@ -50,6 +50,33 @@ class DigitalOceanStorage:
         except ClientError as e:
             current_app.logger.error(f"خطأ في رفع الملف: {str(e)}")
             return None
+
+    def upload_qr_code(self, file_data, order_id, folder='qrcodes'):
+        """رفع صورة QR Code إلى Spaces"""
+        try:
+            # توليد اسم فريد للملف بناءً على رقم الطلب
+            filename = f"qr_{order_id}.png"
+            unique_filename = f"{uuid.uuid4()}_{filename}"
+            object_key = f"{folder}/{unique_filename}"
+            
+            # رفع الملف
+            self.s3_client.upload_fileobj(
+                file_data,
+                self.bucket_name,
+                object_key,
+                ExtraArgs={
+                    'ACL': 'public-read',
+                    'ContentType': 'image/png'
+                }
+            )
+            
+            # توليد الرابط العام
+            file_url = f"https://{self.bucket_name}.{self.region}.digitaloceanspaces.com/{object_key}"
+            return file_url
+            
+        except ClientError as e:
+            current_app.logger.error(f"خطأ في رفع QR Code: {str(e)}")
+            return None
     
     def delete_file(self, file_url):
         """حذف ملف من Spaces"""

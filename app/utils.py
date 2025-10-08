@@ -146,183 +146,171 @@ import base64
 import barcode
 from barcode.writer import ImageWriter
 
-def _strip_bottom_text(image, tolerance=10, extra_crop=2):
-    """يقص أي نص أو شريط داكن بأسفل الصورة"""
-    if image.mode != "RGB":
-        image = image.convert("RGB")
+from datetime import datetime
+import os
+import qrcode  # استبدال مكتبة الباركود بمكتبة QR Code
+from qrcode.image.pil import PilImage
+from io import BytesIO
+import base64
+from flask import current_app
+import logging
+from .storage_service import do_storage  # استيراد خدمة التخزين
 
-    px = image.load()
-    w, h = image.size
-    threshold = 200
-    cut_y = 0
-    for y in range(h - 1, -1, -1):
-        row_has_dark = any(px[x, y][0] < threshold or px[x, y][1] < threshold or px[x, y][2] < threshold for x in range(w))
-        if row_has_dark:
-            cut_y = max(0, y - extra_crop)
-            break
-
-    if cut_y == 0:
-        return image
-    return image.crop((0, 0, w, cut_y))
-
-def save_with_dpi_optimized(buffer, dpi=300):
-    """تحسين الصورة + قص المساحات البيضاء والزائدة وإزالة النص السفلي إن لزم"""
-    try:
-        buffer.seek(0)
-        image = Image.open(buffer)
-
-        # إذا صورة شفافة نضع خلفية بيضاء
-        if image.mode in ('RGBA', 'LA'):
-            bg = Image.new('RGB', image.size, 'white')
-            bg.paste(image, mask=image.split()[-1])
-            image = bg
-
-        # قص المساحات البيضاء الخارجية (الباوندينج بوكس)
-        bbox = image.getbbox()
-        if bbox:
-            padding = 2
-            bbox = (
-                max(0, bbox[0] - padding),
-                max(0, bbox[1] - padding),
-                min(image.size[0], bbox[2] + padding),
-                min(image.size[1], bbox[3] + padding)
-            )
-            image = image.crop(bbox)
-
-        # محاولة إزالة النص السفلي إن موجود
-        image = _strip_bottom_text(image, tolerance=10, extra_crop=2)
-
-        # التأكد من حجم مناسب (لو عايز تكبير ثابت، تقدر تغير target width)
-        # مثال: لو عايز العرض 800 بكسل:
-        # target_w = 800
-        # w, h = image.size
-        # if w < target_w:
-        #     ratio = target_w / w
-        #     image = image.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
-
-        out_buffer = BytesIO()
-        image.save(out_buffer, format="PNG", dpi=(dpi, dpi), optimize=True)
-        return base64.b64encode(out_buffer.getvalue()).decode('utf-8')
-    except Exception as e:
-        # fallback بسيط
-        try:
-            buffer.seek(0)
-            image = Image.open(buffer)
-            out = BytesIO()
-            image.save(out, format="PNG", dpi=(dpi, dpi))
-            return base64.b64encode(out.getvalue()).decode('utf-8')
-        except Exception:
-            return None
+# ... (بقية الاستيرادات كما هي)
 
 def generate_barcode(data, dpi=300):
-    """إنشاء باركود code128 وإخفاء النص - تكبير شرائط الباركود ليصبح مقروء أكثر"""
+    """إنشاء QR Code بدلاً من الباركود"""
     try:
         data_str = str(data).strip()
         if not data_str:
             return None
 
-        cleaned_data = re.sub(r'[^A-Za-z0-9\s\-]', '', data_str).strip()
-        if not cleaned_data:
-            return None
+        # إنشاء QR Code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(data_str)
+        qr.make(fit=True)
 
-        code_class = barcode.get_barcode_class('code128')
-        writer = ImageWriter()
+        # إنشاء الصورة
+        img = qr.make_image(fill_color="black", back_color="white")
 
-        # خيارات مقترحة لجعل الباركود أكبر وواضح ويمنع طباعة النص
-        writer.set_options({
-            'write_text': False,      # ✅ لا تكتب أي نص بشري
-            'module_width': 0.9,      # عرض الشرائط (مناسب للمسح)
-            'module_height': 80.0,    # ارتفاع ممتاز للكاميرات
-            'quiet_zone': 2.0,        # حافة بسيطة حول الباركود
-            'background': 'white',    # خلفية ناصعة
-            'foreground': 'black',    # خطوط سوداء قوية
-            'dpi': dpi,
-            'font_size': 0,
-            'text_distance': 0,
-        })
-
-        barcode_instance = code_class(cleaned_data, writer=writer)
+        # حفظ الصورة في BytesIO
         buffer = BytesIO()
-        barcode_instance.write(buffer)
-        barcode_base64 = save_with_dpi_optimized(buffer, dpi)
-        if barcode_base64:
-            return f"data:image/png;base64,{barcode_base64}"
-        return None
-    except Exception as e:
-        # لو فشل، نجرب code39 كبديل
-        return generate_barcode_with_code39(data, dpi)
+        img.save(buffer, format='PNG', optimize=True)
+        buffer.seek(0)
 
-def generate_barcode_with_code39(data, dpi=300):
+        # رفع الصورة إلى DigitalOcean Spaces
+        qr_code_url = do_storage.upload_qr_code(buffer, data_str, folder='qrcodes')
+        
+        if qr_code_url:
+            logger.info(f"QR Code generated and uploaded successfully for: {data_str}")
+            return qr_code_url
+        else:
+            logger.error(f"Failed to upload QR Code for: {data_str}")
+            # Fallback: إرجاع base64 إذا فشل الرفع
+            buffer.seek(0)
+            qr_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            return f"data:image/png;base64,{qr_base64}"
+
+    except Exception as e:
+        logger.error(f"Error generating QR code: {str(e)}")
+        return None
+
+def generate_and_store_qr_code(order_id, order_type='salla', store_id=None):
+    """إنشاء وتخزين QR Code مع حفظ الرابط في قاعدة البيانات"""
     try:
-        cleaned_data = re.sub(r'[^A-Za-z0-9\s\-]', '', str(data)).strip()
-        code_class = barcode.get_barcode_class('code39')
-        writer = ImageWriter()
-        writer.set_options({
-            'write_text': False,
-            'text': '',
-            'module_width': 1.0,
-            'module_height': 80.0,
-            'quiet_zone': 1.0,
-            'background': 'white',
-            'foreground': 'black',
-            'dpi': dpi,
-            'font_size': 0,
-            'text_distance': 0,
-        })
-        barcode_instance = code_class(cleaned_data, writer=writer, add_checksum=False)
-        buffer = BytesIO()
-        barcode_instance.write(buffer)
-        barcode_base64 = save_with_dpi_optimized(buffer, dpi)
-        if barcode_base64:
-            return f"data:image/png;base64,{barcode_base64}"
-        return None
+        with app_context():
+            order_id_str = str(order_id).strip()
+            if not order_id_str:
+                logger.error("Empty order ID provided for QR code generation")
+                return None
+            
+            logger.info(f"Attempting to generate QR code for order: {order_id_str}, type: {order_type}")
+            
+            # إنشاء QR Code
+            qr_code_url = generate_barcode(order_id_str)
+            
+            if not qr_code_url:
+                logger.error(f"Failed to generate QR code for order: {order_id_str}")
+                return None
+            
+            # تخزين الرابط في قاعدة البيانات
+            try:
+                engine = get_postgres_engine()
+                with engine.connect() as conn:
+                    if order_type == 'salla':
+                        # البحث عن الطلب أولاً
+                        existing_order_query = text("SELECT id, reference_id FROM salla_orders WHERE id = :id")
+                        result = conn.execute(existing_order_query, {'id': order_id_str})
+                        existing_order = result.fetchone()
+                        
+                        if existing_order:
+                            reference_id = existing_order[1] or order_id_str
+                            logger.info(f"Using reference_id: {reference_id} for order: {order_id_str}")
+                        else:
+                            reference_id = order_id_str
+                        
+                        query = text("""
+                            INSERT INTO salla_orders (id, store_id, qr_code_url, barcode_generated_at, reference_id)
+                            VALUES (:id, :store_id, :qr_code_url, :barcode_generated_at, :reference_id)
+                            ON CONFLICT (id) 
+                            DO UPDATE SET 
+                                qr_code_url = EXCLUDED.qr_code_url,
+                                barcode_generated_at = EXCLUDED.barcode_generated_at,
+                                reference_id = EXCLUDED.reference_id
+                        """)
+                        
+                        params = {
+                            'id': order_id_str,
+                            'store_id': store_id,
+                            'qr_code_url': qr_code_url,  # تخزين رابط QR Code
+                            'barcode_generated_at': datetime.utcnow(),
+                            'reference_id': reference_id
+                        }
+                    
+                    else:
+                        query = text("""
+                            INSERT INTO custom_order (id, qr_code_url, barcode_generated_at)
+                            VALUES (:id, :qr_code_url, :barcode_generated_at)
+                            ON CONFLICT (id) 
+                            DO UPDATE SET 
+                                qr_code_url = EXCLUDED.qr_code_url,
+                                barcode_generated_at = EXCLUDED.barcode_generated_at
+                        """)
+                        
+                        params = {
+                            'id': order_id_str,
+                            'qr_code_url': qr_code_url,  # تخزين رابط QR Code
+                            'barcode_generated_at': datetime.utcnow()
+                        }
+                    
+                    conn.execute(query, params)
+                    conn.commit()
+                    logger.info(f"QR Code URL stored successfully for order: {order_id_str}")
+                    
+            except Exception as storage_error:
+                logger.error(f"Error storing QR code URL: {str(storage_error)}")
+                # محاولة التحديث فقط إذا فشل الإدراج
+                try:
+                    engine = get_postgres_engine()
+                    with engine.connect() as conn:
+                        if order_type == 'salla':
+                            update_query = text("""
+                                UPDATE salla_orders 
+                                SET qr_code_url = :qr_code_url, 
+                                    barcode_generated_at = :barcode_generated_at
+                                WHERE id = :id
+                            """)
+                        else:
+                            update_query = text("""
+                                UPDATE custom_order 
+                                SET qr_code_url = :qr_code_url, 
+                                    barcode_generated_at = :barcode_generated_at
+                                WHERE id = :id
+                            """)
+                        
+                        conn.execute(update_query, {
+                            'id': order_id_str,
+                            'qr_code_url': qr_code_url,
+                            'barcode_generated_at': datetime.utcnow()
+                        })
+                        conn.commit()
+                        logger.info(f"QR Code URL updated successfully for order: {order_id_str}")
+                except Exception as update_error:
+                    logger.error(f"Error updating QR code URL: {str(update_error)}")
+            
+            return qr_code_url
+                
     except Exception as e:
-        return None
-def generate_barcode_alternative(data, dpi=300):
-    """طريقة بديلة باستخدام Code128 مع إزالة النص تماماً"""
-    try:
-        from barcode import Code128
-        from barcode.writer import ImageWriter as AltImageWriter
-
-        cleaned_data = clean_data(data)
-        writer = AltImageWriter()
-        writer.set_options({
-            'write_text': False,      # إخفاء النص
-            'text': '',               # نص فارغ
-            'module_width': 0.2,
-            'module_height': 40.0,
-            'quiet_zone': 0.5,
-            'background': 'white',
-            'foreground': 'black',
-            'dpi': dpi,
-            'font_size': 0,
-            'text_distance': 0,
-        })
-
-        code128 = Code128(cleaned_data, writer=writer)
-        buffer = BytesIO()
-        code128.write(buffer)
-
-        barcode_base64 = save_with_dpi_optimized(buffer, dpi)
-        logger.info(f"Barcode generated with alternative method for order: {cleaned_data}")
-        return f"data:image/png;base64,{barcode_base64}"
-
-    except Exception as e:
-        logger.error(f"All barcode generation methods failed: {str(e)}")
+        logger.error(f"Error in generate_and_store_qr_code: {str(e)}")
         return None
 
-
-
-
-def save_with_dpi_fallback(buffer, dpi=300):
-    """طريقة احتياطية لحفظ الصورة"""
-    buffer.seek(0)
-    image = Image.open(buffer)
-    out_buffer = BytesIO()
-    image.save(out_buffer, format="PNG", dpi=(dpi, dpi))
-    return base64.b64encode(out_buffer.getvalue()).decode('utf-8')
-def get_cached_barcode_data(order_id):
-    """الحصول على بيانات الباركود من التخزين المؤقت"""
+def get_cached_qr_code_url(order_id):
+    """الحصول على رابط QR Code من التخزين المؤقت"""
     try:
         with app_context():
             order_id_str = str(order_id).strip()
@@ -331,25 +319,24 @@ def get_cached_barcode_data(order_id):
             
             order = SallaOrder.query.filter_by(id=order_id_str).first()
             
-            if order and order.barcode_data:
-                barcode_data = order.barcode_data
+            if order and order.qr_code_url:
+                qr_code_url = order.qr_code_url
                 
-                if barcode_data.startswith('data:image'):
-                    return barcode_data
-                elif barcode_data.startswith('iVBOR'):
-                    fixed_barcode = f"data:image/png;base64,{barcode_data}"
-                    return fixed_barcode
+                if qr_code_url.startswith('http') or qr_code_url.startswith('data:image'):
+                    return qr_code_url
                 else:
+                    # إذا كان الرابط غير صالح، نعيد None لإنشاء جديد
+                    logger.warning(f"Invalid QR code URL for order {order_id_str}, generating new one")
                     return None
                     
             return None
             
     except Exception as e:
-        logger.error(f"Error in get_cached_barcode_data: {str(e)}")
+        logger.error(f"Error in get_cached_qr_code_url: {str(e)}")
         return None
 
-def get_barcodes_for_orders_optimized(order_ids):
-    """نسخة محسنة من دالة جلب الباركودات باستخدام PostgreSQL Connection Pool"""
+def get_qr_codes_for_orders_optimized(order_ids):
+    """نسخة محسنة من دالة جلب روابط QR Code"""
     try:
         if not order_ids:
             return {}
@@ -362,33 +349,29 @@ def get_barcodes_for_orders_optimized(order_ids):
         # استخدام connection pool لتحسين الأداء
         engine = get_postgres_engine()
         with engine.connect() as conn:
-            # استعلام واحد لجميع الطلبات باستخدام ANY بدلاً من IN للتعامل مع القوائم الكبيرة
             query = text("""
-                SELECT id, barcode_data 
+                SELECT id, qr_code_url 
                 FROM salla_orders 
-                WHERE id = ANY(:order_ids)
+                WHERE id = ANY(:order_ids) AND qr_code_url IS NOT NULL
             """)
             
             result = conn.execute(query, {'order_ids': order_ids_str})
             rows = result.fetchall()
             
-            barcodes_map = {}
+            qr_codes_map = {}
             for row in rows:
-                barcode_data = row[1]
-                if barcode_data:
-                    if not barcode_data.startswith('data:image') and barcode_data.startswith('iVBOR'):
-                        barcode_data = f"data:image/png;base64,{barcode_data}"
-                    barcodes_map[str(row[0])] = barcode_data
+                qr_code_url = row[1]
+                if qr_code_url and (qr_code_url.startswith('http') or qr_code_url.startswith('data:image')):
+                    qr_codes_map[str(row[0])] = qr_code_url
             
-            return barcodes_map
+            return qr_codes_map
             
     except Exception as e:
-        logger.error(f"Error in get_barcodes_for_orders_optimized: {str(e)}")
-        # Fallback إلى الطريقة العادية
-        return get_barcodes_for_orders_fallback(order_ids)
+        logger.error(f"Error in get_qr_codes_for_orders_optimized: {str(e)}")
+        return get_qr_codes_for_orders_fallback(order_ids)
 
-def get_barcodes_for_orders_fallback(order_ids):
-    """طريقة احتياطية لجلب الباركودات"""
+def get_qr_codes_for_orders_fallback(order_ids):
+    """طريقة احتياطية لجلب روابط QR Code"""
     try:
         with app_context():
             if not order_ids:
@@ -399,208 +382,189 @@ def get_barcodes_for_orders_fallback(order_ids):
             if not order_ids_str:
                 return {}
                 
-            orders = SallaOrder.query.filter(SallaOrder.id.in_(order_ids_str)).all()
+            orders = SallaOrder.query.filter(
+                SallaOrder.id.in_(order_ids_str), 
+                SallaOrder.qr_code_url.isnot(None)
+            ).all()
             
-            barcodes_map = {}
+            qr_codes_map = {}
             for order in orders:
-                if order.barcode_data:
-                    barcode_data = order.barcode_data
-                    
-                    if not barcode_data.startswith('data:image') and barcode_data.startswith('iVBOR'):
-                        barcode_data = f"data:image/png;base64,{barcode_data}"
-                    
-                    barcodes_map[str(order.id)] = barcode_data
+                if order.qr_code_url and (order.qr_code_url.startswith('http') or order.qr_code_url.startswith('data:image')):
+                    qr_codes_map[str(order.id)] = order.qr_code_url
             
-            return barcodes_map
+            return qr_codes_map
             
     except Exception as e:
-        logger.error(f"Error in get_barcodes_for_orders_fallback: {str(e)}")
+        logger.error(f"Error in get_qr_codes_for_orders_fallback: {str(e)}")
         return {}
 
-def get_barcodes_for_orders(order_ids):
-    """واجهة موحدة لجلب الباركودات (تستخدم النسخة المحسنة)"""
-    return get_barcodes_for_orders_optimized(order_ids)
-
-
-def generate_and_store_barcode(order_id, order_type='salla', store_id=None):
-    """إنشاء باركود مع التخزين - معدل لضمان استخدام رقم الطلب الصحيح"""
+def process_order_data(order_id, items_data, qr_code_url=None, store_id=None):
+    """معالجة بيانات الطلب مع استخدام QR Code المخزن"""
     try:
         with app_context():
             order_id_str = str(order_id).strip()
             if not order_id_str:
-                logger.error("Empty order ID provided for barcode generation")
+                logger.error("Empty order ID in process_order_data")
                 return None
-            
-            # تسجيل محاولة إنشاء الباركود
-            logger.info(f"Attempting to generate barcode for order: {order_id_str}, type: {order_type}")
-            
-            # استخدام رقم الطلب الحقيقي لإنشاء الباركود
-            barcode_data = generate_barcode(order_id_str)
-            
-            if not barcode_data:
-                logger.error(f"Failed to generate barcode for order: {order_id_str}")
-                return None
-            
-            # محاولة التخزين في قاعدة البيانات
-            try:
-                engine = get_postgres_engine()
-                with engine.connect() as conn:
-                    if order_type == 'salla':
-                        # البحث عن الطلب أولاً للتأكد من وجوده
-                        existing_order_query = text("SELECT id, reference_id FROM salla_orders WHERE id = :id")
-                        result = conn.execute(existing_order_query, {'id': order_id_str})
-                        existing_order = result.fetchone()
-                        
-                        if existing_order:
-                            # استخدام reference_id إذا كان متاحاً (رقم الطلب الحقيقي)
-                            reference_id = existing_order[1] or order_id_str
-                            logger.info(f"Using reference_id: {reference_id} for order: {order_id_str}")
-                        else:
-                            reference_id = order_id_str
-                        
-                        query = text("""
-                            INSERT INTO salla_orders (id, store_id, barcode_data, barcode_generated_at, reference_id)
-                            VALUES (:id, :store_id, :barcode_data, :barcode_generated_at, :reference_id)
-                            ON CONFLICT (id) 
-                            DO UPDATE SET 
-                                barcode_data = EXCLUDED.barcode_data,
-                                barcode_generated_at = EXCLUDED.barcode_generated_at,
-                                reference_id = EXCLUDED.reference_id
-                        """)
-                        
-                        params = {
-                            'id': order_id_str,
-                            'store_id': store_id,
-                            'barcode_data': barcode_data,
-                            'barcode_generated_at': datetime.utcnow(),
-                            'reference_id': reference_id
-                        }
-                    
-                    else:
-                        query = text("""
-                            INSERT INTO custom_order (id, barcode_data, barcode_generated_at)
-                            VALUES (:id, :barcode_data, :barcode_generated_at)
-                            ON CONFLICT (id) 
-                            DO UPDATE SET 
-                                barcode_data = EXCLUDED.barcode_data,
-                                barcode_generated_at = EXCLUDED.barcode_generated_at
-                        """)
-                        
-                        params = {
-                            'id': order_id_str,
-                            'barcode_data': barcode_data,
-                            'barcode_generated_at': datetime.utcnow()
-                        }
-                    
-                    conn.execute(query, params)
-                    conn.commit()
-                    logger.info(f"Barcode stored successfully for order: {order_id_str}")
-                    
-            except Exception as storage_error:
-                logger.error(f"Error storing barcode: {str(storage_error)}")
-                # محاولة التحديث فقط إذا فشل الإدراج
-                try:
-                    engine = get_postgres_engine()
-                    with engine.connect() as conn:
-                        if order_type == 'salla':
-                            update_query = text("""
-                                UPDATE salla_orders 
-                                SET barcode_data = :barcode_data, 
-                                    barcode_generated_at = :barcode_generated_at
-                                WHERE id = :id
-                            """)
-                        else:
-                            update_query = text("""
-                                UPDATE custom_order 
-                                SET barcode_data = :barcode_data, 
-                                    barcode_generated_at = :barcode_generated_at
-                                WHERE id = :id
-                            """)
-                        
-                        conn.execute(update_query, {
-                            'id': order_id_str,
-                            'barcode_data': barcode_data,
-                            'barcode_generated_at': datetime.utcnow()
-                        })
-                        conn.commit()
-                        logger.info(f"Barcode updated successfully for order: {order_id_str}")
-                except Exception as update_error:
-                    logger.error(f"Error updating barcode: {str(update_error)}")
-            
-            return barcode_data
                 
+            logger.info(f"Processing order data for order: {order_id_str}")
+                
+            items = []
+            
+            for index, item in enumerate(items_data):
+                try:
+                    item_id = item.get('id') or f"temp_{index}"
+                    main_image = get_main_image(item)
+                    
+                    options = []
+                    item_options = item.get('options', [])
+                    if isinstance(item_options, list):
+                        for option in item_options:
+                            raw_value = option.get('value', '')
+                            display_value = 'غير محدد'
+                            
+                            if isinstance(raw_value, dict):
+                                display_value = raw_value.get('name') or raw_value.get('value') or str(raw_value)
+                            elif isinstance(raw_value, list):
+                                values_list = [str(opt.get('name') or opt.get('value') or str(opt)) 
+                                             for opt in raw_value if isinstance(opt, (dict, str))]
+                                display_value = ', '.join(values_list)
+                            else:
+                                display_value = str(raw_value) if raw_value else 'غير محدد'
+                            
+                            options.append({
+                                'name': option.get('name', ''),
+                                'value': display_value,
+                                'type': option.get('type', '')
+                            })
+                    
+                    digital_codes = [{'code': code.get('code', ''), 'status': code.get('status', 'غير معروف')} 
+                                    for code in item.get('codes', []) if isinstance(code, dict)]
+                    
+                    digital_files = [{'url': file.get('url', ''), 'name': file.get('name', ''), 'size': file.get('size', 0)} 
+                                   for file in item.get('files', []) if isinstance(file, dict)]
+                    
+                    reservations = [{'id': res.get('id'), 'from': res.get('from', ''), 'to': res.get('to', ''), 'date': res.get('date', '')} 
+                                  for res in item.get('reservations', []) if isinstance(res, dict)]
+                    
+                    item_data = {
+                        'id': item_id,
+                        'name': item.get('name', ''),
+                        'sku': item.get('sku', ''),
+                        'quantity': item.get('quantity', 0),
+                        'currency': item.get('currency', 'SAR'),
+                        'price': {
+                            'amount': item.get('amounts', {}).get('price_without_tax', {}).get('amount', 0),
+                            'currency': item.get('currency', 'SAR')
+                        },
+                        'tax_percent': item.get('amounts', {}).get('tax', {}).get('percent', '0.00'),
+                        'tax_amount': item.get('amounts', {}).get('tax', {}).get('amount', {}).get('amount', 0),
+                        'total_price': item.get('amounts', {}).get('total', {}).get('amount', 0),
+                        'weight': item.get('weight', 0),
+                        'weight_label': item.get('weight_label', ''),
+                        'notes': item.get('notes', ''),
+                        'options': options,
+                        'main_image': main_image,
+                        'codes': digital_codes,
+                        'files': digital_files,
+                        'reservations': reservations,
+                        'product': {
+                            'id': item_id,
+                            'name': item.get('name', ''),
+                            'description': item.get('notes', '')
+                        }
+                    }
+                    
+                    items.append(item_data)
+                    
+                except Exception as item_error:
+                    logger.error(f"Error processing item: {str(item_error)}")
+                    continue
+
+            # الحصول على رابط QR Code
+            final_qr_code_url = qr_code_url
+            
+            if not final_qr_code_url:
+                final_qr_code_url = get_cached_qr_code_url(order_id_str)
+            
+            if not final_qr_code_url:
+                logger.info(f"Generating new QR code for order: {order_id_str}")
+                final_qr_code_url = generate_and_store_qr_code(order_id_str, 'salla', store_id)
+
+            result = {
+                'id': order_id_str,
+                'order_items': items,
+                'qr_code_url': final_qr_code_url,  # استخدام QR Code بدلاً من الباركود
+                'barcode_order_id': order_id_str
+            }
+            
+            logger.info(f"Order data processed successfully for order: {order_id_str}")
+            return result
+            
     except Exception as e:
-        logger.error(f"Error in generate_and_store_barcode: {str(e)}")
+        logger.error(f"Error in process_order_data: {str(e)}")
         return None
 
-def bulk_generate_and_store_barcodes(order_ids, order_type='salla', store_id=None):
-    """إنشاء وتخزين الباركودات بشكل مجمع باستخدام الخيوط - معدل لضمان استخدام رقم الطلب الصحيح"""
+def bulk_generate_and_store_qr_codes(order_ids, order_type='salla', store_id=None):
+    """إنشاء وتخزين QR Codes بشكل مجمع"""
     try:
         if not order_ids:
-            logger.warning("No order IDs provided for bulk barcode generation")
+            logger.warning("No order IDs provided for bulk QR code generation")
             return {}
         
-        # تسجيل بدء العملية
-        logger.info(f"Starting bulk barcode generation for {len(order_ids)} orders, type: {order_type}")
+        logger.info(f"Starting bulk QR code generation for {len(order_ids)} orders, type: {order_type}")
         
-        barcodes_map = {}
+        qr_codes_map = {}
         records_to_update = []
         lock = Lock()
         
-        # إنشاء الباركودات بشكل متزامن
-        def generate_single_barcode(order_id):
+        def generate_single_qr_code(order_id):
             order_id_str = str(order_id).strip()
             if not order_id_str:
                 logger.warning("Empty order ID in bulk generation")
                 return None, None
                 
             try:
-                # تسجيل محاولة إنشاء الباركود لرقم طلب محدد
-                logger.info(f"Generating barcode for order: {order_id_str}")
+                logger.info(f"Generating QR code for order: {order_id_str}")
                 
-                # استخدام رقم الطلب الحقيقي لإنشاء الباركود
-                barcode_data = generate_barcode(order_id_str)
+                # إنشاء QR Code
+                qr_code_url = generate_barcode(order_id_str)
                 
-                if barcode_data:
-                    # التحقق من أن الباركود يحتوي على رقم الطلب الصحيح
-                    if order_id_str in barcode_data:
-                        logger.info(f"Barcode generated successfully for order: {order_id_str}")
-                    else:
-                        logger.warning(f"Barcode generated but order ID mismatch for: {order_id_str}")
+                if qr_code_url:
+                    logger.info(f"QR code generated successfully for order: {order_id_str}")
                     
                     with lock:
                         records_to_update.append({
                             'id': order_id_str,
-                            'barcode_data': barcode_data,
+                            'qr_code_url': qr_code_url,
                             'barcode_generated_at': datetime.utcnow(),
                             'store_id': store_id
                         })
-                    return order_id_str, barcode_data
+                    return order_id_str, qr_code_url
                 else:
-                    logger.error(f"Failed to generate barcode for order: {order_id_str}")
+                    logger.error(f"Failed to generate QR code for order: {order_id_str}")
                     return order_id_str, None
                     
             except Exception as e:
-                logger.error(f"Error generating barcode for {order_id_str}: {str(e)}")
+                logger.error(f"Error generating QR code for {order_id_str}: {str(e)}")
                 return order_id_str, None
         
-        # استخدام ThreadPoolExecutor لإنشاء الباركودات بشكل متزامن
+        # استخدام ThreadPoolExecutor لإنشاء QR Codes بشكل متزامن
         successful_generations = 0
         failed_generations = 0
         
         with ThreadPoolExecutor(max_workers=5) as executor:
-            future_to_id = {executor.submit(generate_single_barcode, order_id): order_id for order_id in order_ids}
+            future_to_id = {executor.submit(generate_single_qr_code, order_id): order_id for order_id in order_ids}
             
             for future in as_completed(future_to_id):
-                order_id_str, barcode_data = future.result()
-                if barcode_data:
-                    barcodes_map[order_id_str] = barcode_data
+                order_id_str, qr_code_url = future.result()
+                if qr_code_url:
+                    qr_codes_map[order_id_str] = qr_code_url
                     successful_generations += 1
                 else:
                     failed_generations += 1
         
-        # تسجيل نتائج الإنشاء
-        logger.info(f"Barcode generation completed: {successful_generations} successful, {failed_generations} failed")
+        logger.info(f"QR code generation completed: {successful_generations} successful, {failed_generations} failed")
         
         # تخزين مجمع في PostgreSQL
         if records_to_update:
@@ -615,11 +579,11 @@ def bulk_generate_and_store_barcodes(order_ids, order_type='salla', store_id=Non
                             existing_orders = {row[0]: row[1] for row in result.fetchall()}
                             
                             query = text("""
-                                INSERT INTO salla_orders (id, store_id, barcode_data, barcode_generated_at, reference_id)
-                                VALUES (:id, :store_id, :barcode_data, :barcode_generated_at, :reference_id)
+                                INSERT INTO salla_orders (id, store_id, qr_code_url, barcode_generated_at, reference_id)
+                                VALUES (:id, :store_id, :qr_code_url, :barcode_generated_at, :reference_id)
                                 ON CONFLICT (id) 
                                 DO UPDATE SET 
-                                    barcode_data = EXCLUDED.barcode_data,
+                                    qr_code_url = EXCLUDED.qr_code_url,
                                     barcode_generated_at = EXCLUDED.barcode_generated_at,
                                     reference_id = COALESCE(EXCLUDED.reference_id, salla_orders.reference_id)
                             """)
@@ -630,11 +594,11 @@ def bulk_generate_and_store_barcodes(order_ids, order_type='salla', store_id=Non
                                 
                         else:
                             query = text("""
-                                INSERT INTO custom_order (id, barcode_data, barcode_generated_at)
-                                VALUES (:id, :barcode_data, :barcode_generated_at)
+                                INSERT INTO custom_order (id, qr_code_url, barcode_generated_at)
+                                VALUES (:id, :qr_code_url, :barcode_generated_at)
                                 ON CONFLICT (id) 
                                 DO UPDATE SET 
-                                    barcode_data = EXCLUDED.barcode_data,
+                                    qr_code_url = EXCLUDED.qr_code_url,
                                     barcode_generated_at = EXCLUDED.barcode_generated_at
                             """)
                         
@@ -642,10 +606,10 @@ def bulk_generate_and_store_barcodes(order_ids, order_type='salla', store_id=Non
                         result = conn.execute(query, records_to_update)
                         conn.commit()
                         
-                        logger.info(f"Successfully stored {len(records_to_update)} barcodes in database")
+                        logger.info(f"Successfully stored {len(records_to_update)} QR codes in database")
                         
             except Exception as e:
-                logger.error(f"Error in bulk barcode storage: {str(e)}")
+                logger.error(f"Error in bulk QR code storage: {str(e)}")
                 # محاولة التحديث الفردي للطلبات التي فشل تخزينها
                 successful_storages = 0
                 failed_storages = 0
@@ -657,14 +621,14 @@ def bulk_generate_and_store_barcodes(order_ids, order_type='salla', store_id=Non
                             if order_type == 'salla':
                                 update_query = text("""
                                     UPDATE salla_orders 
-                                    SET barcode_data = :barcode_data, 
+                                    SET qr_code_url = :qr_code_url, 
                                         barcode_generated_at = :barcode_generated_at
                                     WHERE id = :id
                                 """)
                             else:
                                 update_query = text("""
                                     UPDATE custom_order 
-                                    SET barcode_data = :barcode_data, 
+                                    SET qr_code_url = :qr_code_url, 
                                         barcode_generated_at = :barcode_generated_at
                                     WHERE id = :id
                                 """)
@@ -673,33 +637,48 @@ def bulk_generate_and_store_barcodes(order_ids, order_type='salla', store_id=Non
                                 try:
                                     conn.execute(update_query, {
                                         'id': record['id'],
-                                        'barcode_data': record['barcode_data'],
+                                        'qr_code_url': record['qr_code_url'],
                                         'barcode_generated_at': record['barcode_generated_at']
                                     })
                                     successful_storages += 1
                                 except Exception as single_update_error:
-                                    logger.error(f"Error updating barcode for {record['id']}: {str(single_update_error)}")
+                                    logger.error(f"Error updating QR code for {record['id']}: {str(single_update_error)}")
                                     failed_storages += 1
                             
                             conn.commit()
                             logger.info(f"Individual update completed: {successful_storages} successful, {failed_storages} failed")
                             
                 except Exception as update_error:
-                    logger.error(f"Error in bulk barcode update: {str(update_error)}")
+                    logger.error(f"Error in bulk QR code update: {str(update_error)}")
         
-        # التحقق النهائي من الباركودات المخزنة
-        logger.info(f"Final barcodes map contains {len(barcodes_map)} entries")
+        # التحقق النهائي من QR Codes المخزنة
+        logger.info(f"Final QR codes map contains {len(qr_codes_map)} entries")
         
-        # تسجيل عينة من الباركودات للتأكد
-        sample_orders = list(barcodes_map.keys())[:3] if barcodes_map else []
+        # تسجيل عينة من QR Codes للتأكد
+        sample_orders = list(qr_codes_map.keys())[:3] if qr_codes_map else []
         for order_id in sample_orders:
-            logger.info(f"Sample - Order {order_id}: Barcode generated successfully")
+            logger.info(f"Sample - Order {order_id}: QR code generated successfully")
         
-        return barcodes_map
+        return qr_codes_map
             
     except Exception as e:
-        logger.error(f"Error in bulk_generate_and_store_barcodes: {str(e)}")
+        logger.error(f"Error in bulk_generate_and_store_qr_codes: {str(e)}")
         return {}
+
+# للحفاظ على التوافق مع الكود القديم، يمكن إضافة دوال تحويل
+def get_barcodes_for_orders(order_ids):
+    """واجهة متوافقة مع الكود القديم (ترجع QR Codes الآن)"""
+    return get_qr_codes_for_orders_optimized(order_ids)
+
+def generate_and_store_barcode(order_id, order_type='salla', store_id=None):
+    """واجهة متوافقة مع الكود القديم (تستخدم QR Code الآن)"""
+    return generate_and_store_qr_code(order_id, order_type, store_id)
+
+def get_cached_barcode_data(order_id):
+    """واجهة متوافقة مع الكود القديم (ترجع QR Code الآن)"""
+    return get_cached_qr_code_url(order_id)
+
+# ... (بقية الدوال كما هي بدون تغيير)
 def get_main_image(item):
     """استخراج الصورة الرئيسية"""
     try:
