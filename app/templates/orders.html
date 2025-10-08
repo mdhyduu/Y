@@ -1280,192 +1280,83 @@ function generatePrintHTML(printData) {
     }
 
     /* نسخة الطباعة المحسنة */
-    @media print {
-        @page {
-            size: A4;
-            margin: 0.8cm;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }
-
-        body {
-            margin: 0 !important;
-            padding: 0 !important;
-            background: white !important;
-            color: #000000 !important;
-            font-family: "Arial", "Helvetica", sans-serif !important;
-            font-size: 10pt !important;
-            line-height: 1.2 !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-        }
-
-        .print-header {
-            display: block !important;
-            background: #ffffff !important;
-            color: #000000 !important;
-            box-shadow: none !important;
-            border: 2px solid #000000 !important;
-            padding: 10px !important;
-            margin-bottom: 10px !important;
-            page-break-after: avoid;
-        }
-
-        .print-header h1 {
-            font-size: 18pt !important;
-            margin: 5px 0 !important;
-        }
-
-        .summary-grid {
-            display: grid !important;
-            background: white !important;
-            margin-bottom: 10px !important;
-            page-break-after: avoid;
-            gap: 8px !important;
-        }
-
-        .summary-card {
-            background: #ffffff !important;
-            border: 1px solid #000000 !important;
-            box-shadow: none !important;
-            color: #000000 !important;
-            padding: 8px !important;
-        }
-
-        .summary-card h3 {
-            font-size: 16pt !important;
-            color: #000000 !important;
-        }
-
-        .summary-card p {
-            font-size: 9pt !important;
-            color: #000000 !important;
-        }
-
-        .orders-container {
-            display: grid !important;
-            grid-template-columns: repeat(3, 1fr) !important;
-            gap: 6px !important;
-        }
-
-        .order-card {
-            border: 1px solid #000000 !important;
-            box-shadow: none !important;
-            background: #ffffff !important;
-            padding: 6px !important;
-            color: #000000 !important;
-            page-break-inside: avoid;
-            break-inside: avoid;
-            font-size: 8pt !important;
-            line-height: 1.1 !important;
-        }
-
-        .product-section {
-            width: 65px !important;
-        }
-
-        .product-image {
-            width: 55px !important;
-            height: 55px !important;
-            border: 1px solid #000000 !important;
-        }
-
-.barcode-container {
-    background: #ffffff !important;
-    border: none;
-    min-height: 60px !important;
-    display: flex;
-    padding:0 !important;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-}
-
-.barcode-image {
-    height: 100%;
-    width: 100%;
-    object-fit: contain; /* يحافظ على نسبة الباركود */
-}
-        .order-ref-link {
-            color: #000000 !important;
-            text-decoration: none !important;
-            font-weight: bold !important;
-            background: transparent !important;
-            font-size: 9pt !important;
-            padding: 1px 3px !important;
-        }
-
-        .order-quantity {
-            background: #ffffff !important;
-            color: #000000 !important;
-            border: 1px solid #000000 !important;
-            font-size: 8pt !important;
-            padding: 2px 6px !important;
-        }
-
-        .options-section, .notes-section {
-            background: #ffffff !important;
-            border: 1px solid #000000 !important;
-            color: #000000 !important;
-            padding: 4px !important;
-            margin-top: 4px !important;
-            font-size: 7pt !important;
-        }
-
-        .options-title, .notes-title {
-            font-size: 8pt !important;
-            margin-bottom: 3px !important;
-        }
-
-        .option-item {
-            background: #ffffff !important;
-            border: 1px solid #cccccc !important;
-            padding: 2px 4px !important;
-            margin-bottom: 2px !important;
-            font-size: 7pt !important;
-            line-height: 1.1 !important;
-        }
-
-        /* ⭐⭐ التصحيح المهم: تنسيق الروابط في الطباعة ⭐⭐ */
-        .link-option .option-link {
-            font-size: 7pt !important;
-            color: #000000 !important;
-            text-decoration: underline !important;
-            pointer-events: none !important;
-            max-width: 80px !important;
-            display: inline-block !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
-            white-space: nowrap !important;
-            vertical-align: bottom !important;
-            line-height: 1 !important;
-        }
-
-        /* إظهار الرابط الكامل كعنوان فقط بدون إضافة نص */
-        .link-option .option-link:after {
-            content: "" !important;
-            display: none !important;
-        }
-
-        /* جعل كل النصوص قابلة للنسخ */
-        * {
-            -webkit-user-select: text !important;
-            -moz-user-select: text !important;
-            -ms-user-select: text !important;
-            user-select: text !important;
-        }
-
-        /* منع انقطاع العناصر */
-        h1, h2, h3, h4, h5, h6 {
-            page-break-after: avoid;
-        }
-a{
-font-size:2px; }
-        table, figure, .order-card {
-            page-break-inside: avoid;
-        }
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 0.8cm;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
     }
 
+    body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        font-family: "Arial", sans-serif !important;
+        font-size: 9pt !important;
+        line-height: 1.2 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* ✅  تثبيت عدد الأعمدة في الطباعة */
+    .orders-container {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important; /* اثنين بدل 3 للطباعة الواضحة */
+        gap: 10px !important;
+        page-break-inside: avoid;
+    }
+
+    .order-card {
+        border: 1px solid #000000 !important;
+        background: #ffffff !important;
+        padding: 8px !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    /* ✅ ضبط الباركود للطباعة من كروم */
+    .barcode-container {
+        background: #ffffff !important;
+        border: 1px solid #000000 !important;
+        height: 70px !important; /* ارتفاع ثابت */
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin-top: 5px !important;
+        overflow: hidden !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    .barcode-image {
+        width: auto !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        object-fit: contain !important;
+        image-rendering: crisp-edges !important;
+        -webkit-user-select: none !important;
+        user-select: none !important;
+    }
+
+    /* ✅ تحسين دقة الطباعة في كروم */
+    img, canvas {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        image-rendering: optimizeQuality !important;
+    }
+
+    /* ✅ منع تقطيع العناصر */
+    .order-card, table, figure {
+        page-break-inside: avoid !important;
+    }
+
+    /* ✅ إظهار الخلفيات عند الطباعة */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
     /* تحسين إخفاء الصور التالفة */
     .product-image[style*="display: none"] {
         display: none !important;
@@ -1528,25 +1419,8 @@ font-size:2px; }
     overflow: hidden;
 }
 
-.barcode-image {
-    height: 100%;
-    width: 100%;
-    object-fit: contain; /* يحافظ على نسبة الباركود */
-}.barcode-container {
-    background: #ffffff !important;
-    border:none;
-    min-height: 60px !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-}
 
-.barcode-image {
-    height: 100%;
-    width: 100%;
-    object-fit: contain; /* يحافظ على نسبة الباركود */
-}-image');
+-image');
             images.forEach(img => {
                 img.addEventListener('error', function() {
                     this.style.display = 'none';
