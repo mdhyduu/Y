@@ -24,7 +24,32 @@ import logging
 from concurrent import futures
 logger = logging.getLogger('salla_app')
 @orders_bp.route('/')
+def get_cipher():
+    key = base64.urlsafe_b64encode(Config.SECRET_KEY[:32].encode().ljust(32, b'0'))
+    return Fernet(key)
 
+# دوال التشفير وفك التشفير
+def encrypt_data(data):
+    """تشفير البيانات النصية"""
+    if not data:
+        return data
+    try:
+        cipher = get_cipher()
+        return cipher.encrypt(data.encode()).decode()
+    except Exception as e:
+        logger.error(f"خطأ في تشفير البيانات: {str(e)}")
+        return data
+
+def decrypt_data(encrypted_data):
+    """فك تشفير البيانات"""
+    if not encrypted_data:
+        return encrypted_data
+    try:
+        cipher = get_cipher()
+        return cipher.decrypt(encrypted_data.encode()).decode()
+    except Exception as e:
+        logger.error(f"خطأ في فك تشفير البيانات: {str(e)}")
+        return encrypted_data
 def index():
     user, employee = get_user_from_cookies()
     
