@@ -22,6 +22,24 @@
                 </button>
             </div>
 
+            <!-- قسم عرض معلومات الطلب بعد المسح -->
+            <div id="order-info" class="mt-4" style="display: none;">
+                <div class="card border-success">
+                    <div class="card-body">
+                        <h5 class="card-title text-success">
+                            <i class="fas fa-check-circle me-2"></i>تم مسح الكود بنجاح
+                        </h5>
+                        <p id="order-details" class="card-text"></p>
+                        <button id="view-order-btn" class="btn btn-success me-2">
+                            <i class="fas fa-eye me-1"></i>عرض الطلب
+                        </button>
+                        <button id="scan-again-btn" class="btn btn-outline-secondary">
+                            <i class="fas fa-redo me-1"></i>مسح مرة أخرى
+                        </button>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
@@ -79,6 +97,14 @@
         50% { top: 80%; }
         100% { top: 20%; }
     }
+    
+    /* تخصيص HTML5 QR Code Scanner */
+    #reader video {
+        border-radius: 10px;
+    }
+    #reader__dashboard_section {
+        display: none !important;
+    }
 </style>
 
 <script>
@@ -89,11 +115,16 @@ class ModernBarcodeScanner {
             stopButton: document.getElementById('stopButton'),
             readerDiv: document.getElementById('reader'),
             statusDiv: document.getElementById('scan-status'),
-            statusText: document.querySelector('#scan-status span')
+            statusText: document.querySelector('#scan-status span'),
+            orderInfo: document.getElementById('order-info'),
+            orderDetails: document.getElementById('order-details'),
+            viewOrderBtn: document.getElementById('view-order-btn'),
+            scanAgainBtn: document.getElementById('scan-again-btn')
         };
         
         this.scanner = new Html5Qrcode(this.elements.readerDiv.id);
         this.isScanning = false;
+        this.currentOrderId = null;
         
         this.bindEvents();
         // بدء المسح تلقائياً عند إنشاء الكائن
@@ -102,6 +133,8 @@ class ModernBarcodeScanner {
 
     bindEvents() {
         this.elements.stopButton.addEventListener('click', () => this.stop());
+        this.elements.viewOrderBtn.addEventListener('click', () => this.viewOrder());
+        this.elements.scanAgainBtn.addEventListener('click', () => this.scanAgain());
     }
 
     updateStatus(message, type = 'info', showSpinner = true) {
@@ -131,13 +164,27 @@ class ModernBarcodeScanner {
                         const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
                         const qrboxSize = Math.floor(minEdge * 0.7);
                         return { width: qrboxSize, height: qrboxSize };
-                    }
+                    },
+                    // إضافة دعم لجميع أنواع الباركود والQR
+                    formatsToSupport: [
+                        Html5QrcodeSupportedFormats.QR_CODE,
+                        Html5QrcodeSupportedFormats.CODE_128,
+                        Html5QrcodeSupportedFormats.CODE_39,
+                        Html5QrcodeSupportedFormats.CODE_93,
+                        Html5QrcodeSupportedFormats.EAN_13,
+                        Html5QrcodeSupportedFormats.EAN_8,
+                        Html5QrcodeSupportedFormats.UPC_A,
+                        Html5QrcodeSupportedFormats.UPC_E
+                    ]
                 },
-                (decodedText, decodedResult) => this.onScanSuccess(decodedText),
-                (errorMessage) => { /* تجاهل أخطاء عدم العثور على كود */ }
+                (decodedText, decodedResult) => this.onScanSuccess(decodedText, decodedResult),
+                (errorMessage) => { 
+                    // تجاهل أخطاء عدم العثور على كود (هذا طبيعي)
+                    console.log('Scan error (normal):', errorMessage);
+                }
             );
             this.isScanning = true;
-            this.updateStatus('وجه الكاميرا نحو باركود الطلب', 'info', false);
+            this.updateStatus('وجه الكاميرا نحو QR Code أو باركود الطلب', 'info', false);
         } catch (error) {
             this.handleScanError(error);
         }
@@ -156,15 +203,43 @@ class ModernBarcodeScanner {
         window.history.back();
     }
 
-    onScanSuccess(code) {
+    onScanSuccess(decodedText, decodedResult) {
         if (!this.isScanning) return;
         
         this.isScanning = false; 
         
-        this.updateStatus(`تم العثور على الكود: <strong>${code}</strong>. جاري التوجيه...`, 'success', true);
+        // إضافة صوت عند المسح الناجح
+        this.playScanSound();
         
-        setTimeout(() => this.scanner.stop(), 500);
-        this.processScannedCode(code);
+        this.updateStatus(`تم العثور على الكود: <strong>${decodedText}</strong>. جاري المعالجة...`, 'success', true);
+        
+        setTimeout(() => {
+            this.scanner.stop().catch(err => console.log('Error stopping scanner:', err));
+            this.processScannedCode(decodedText, decodedResult);
+        }, 500);
+    }
+
+    playScanSound() {
+        // إنشاء صوت بسيط للمسح الناجح
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.5);
+        } catch (e) {
+            console.log('Could not play scan sound:', e);
+        }
     }
 
     handleScanError(error) {
@@ -174,9 +249,12 @@ class ModernBarcodeScanner {
                 message = 'تم رفض الوصول للكاميرا. يرجى تفعيلها من إعدادات المتصفح.';
             } else if (error.includes('NotFoundError') || error.includes('OverconstrainedError')) {
                 message = 'لم يتم العثور على كاميرا خلفية مناسبة.';
+            } else if (error.includes('NotSupportedError')) {
+                message = 'المتصفح لا يدعم الكاميرا. يرجى استخدام متصفح حديث.';
             }
         }
         this.updateStatus(message, 'danger', false);
+        
         // إعادة المحاولة بعد 3 ثواني
         setTimeout(() => {
             this.updateStatus('جاري إعادة المحاولة...', 'info', true);
@@ -184,28 +262,122 @@ class ModernBarcodeScanner {
         }, 3000);
     }
 
-    processScannedCode(code) {
-        setTimeout(() => {
-            const cleanCode = code.split('.')[0];
-            let orderId = '';
+    processScannedCode(code, decodedResult = null) {
+        console.log('Processing scanned code:', code);
+        console.log('Decoded result:', decodedResult);
+        
+        let orderId = '';
+        let codeType = 'غير معروف';
 
-            if (cleanCode.startsWith('order_')) {
-                orderId = cleanCode.replace('order_', '');
-            } else if (/^\d+$/.test(cleanCode)) {
-                orderId = cleanCode;
+        // تحديد نوع الكود المسح
+        if (decodedResult && decodedResult.result) {
+            const format = decodedResult.result.format;
+            if (format && format.formatName) {
+                codeType = format.formatName;
             }
+        }
 
-            if (orderId) {
-                window.location.href = `/${orderId}`;
-            } else {
-                this.updateStatus('باركود الطلب غير معروف أو بصيغة غير صحيحة.', 'warning', false);
-                // إعادة تشغيل الماسح بعد 3 ثواني
-                setTimeout(() => {
-                    this.isScanning = true;
-                    this.start();
-                }, 3000);
+        // معالجة أنواع مختلفة من الكود
+        if (code.includes('plankton-app-9im8u.ondigitalocean.app')) {
+            // QR Code يحتوي على الرابط الكامل
+            orderId = this.extractOrderIdFromUrl(code);
+            codeType = 'QR Code (رابط كامل)';
+        } else if (code.startsWith('https://') || code.startsWith('http://')) {
+            // رابط عام - محاولة استخراج رقم الطلب
+            orderId = this.extractOrderIdFromUrl(code);
+            codeType = 'QR Code (رابط)';
+        } else if (code.startsWith('order_')) {
+            // باركود قديم بصيغة order_XXXXX
+            orderId = code.replace('order_', '');
+            codeType = 'باركود (صيغة قديمة)';
+        } else if (/^\d+$/.test(code)) {
+            // باركود يحتوي على أرقام فقط
+            orderId = code;
+            codeType = 'باركود (أرقام فقط)';
+        } else {
+            // محاولة استخراج الأرقام من النص
+            const numbers = code.match(/\d+/g);
+            if (numbers && numbers.length > 0) {
+                orderId = numbers.join('');
+                codeType = 'باركود (مختلط)';
             }
-        }, 2000);
+        }
+
+        if (orderId && /^\d+$/.test(orderId)) {
+            this.currentOrderId = orderId;
+            this.showOrderInfo(orderId, codeType, code);
+        } else {
+            this.updateStatus('كود الطلب غير معروف أو بصيغة غير صحيحة.', 'warning', false);
+            // إعادة تشغيل الماسح بعد 3 ثواني
+            setTimeout(() => {
+                this.isScanning = true;
+                this.start();
+            }, 3000);
+        }
+    }
+
+    extractOrderIdFromUrl(url) {
+        try {
+            const urlObj = new URL(url);
+            const pathSegments = urlObj.pathname.split('/').filter(segment => segment);
+            
+            // البحث عن رقم الطلب في المسار
+            for (let segment of pathSegments) {
+                if (/^\d+$/.test(segment)) {
+                    return segment;
+                }
+            }
+            
+            // إذا لم يتم العثور، نعيد آخر جزء من المسار
+            const lastSegment = pathSegments[pathSegments.length - 1];
+            return lastSegment && /^\d+$/.test(lastSegment) ? lastSegment : '';
+        } catch (e) {
+            console.log('Error parsing URL:', e);
+            // إذا فشل تحليل URL، نحاول استخراج الأرقام
+            const numbers = url.match(/\d+/g);
+            return numbers ? numbers.join('') : '';
+        }
+    }
+
+    showOrderInfo(orderId, codeType, originalCode) {
+        // إخفاء الماسح وإظهار معلومات الطلب
+        this.elements.scannerView.style.display = 'none';
+        this.elements.orderInfo.style.display = 'block';
+        
+        this.elements.orderDetails.innerHTML = `
+            <div class="row text-start">
+                <div class="col-12 mb-2">
+                    <strong>رقم الطلب:</strong> ${orderId}
+                </div>
+                <div class="col-12 mb-2">
+                    <strong>نوع الكود:</strong> ${codeType}
+                </div>
+                <div class="col-12 mb-2">
+                    <strong>الكود الأصلي:</strong> <small class="text-muted">${originalCode}</small>
+                </div>
+                <div class="col-12">
+                    <strong>سيتم التوجيه إلى:</strong> <br>
+                    <small class="text-info">https://plankton-app-9im8u.ondigitalocean.app/${orderId}</small>
+                </div>
+            </div>
+        `;
+    }
+
+    viewOrder() {
+        if (this.currentOrderId) {
+            // استخدام الطريقة الجديدة مع الرابط الكامل
+            const orderUrl = `https://plankton-app-9im8u.ondigitalocean.app/${this.currentOrderId}`;
+            window.location.href = orderUrl;
+        }
+    }
+
+    scanAgain() {
+        // إعادة تعيين وإظهار الماسح مرة أخرى
+        this.elements.orderInfo.style.display = 'none';
+        this.elements.scannerView.style.display = 'block';
+        this.currentOrderId = null;
+        this.isScanning = true;
+        this.start();
     }
 }
 
@@ -213,5 +385,12 @@ class ModernBarcodeScanner {
 document.addEventListener('DOMContentLoaded', () => {
     new ModernBarcodeScanner();
 });
+
+// دالة مساعدة للاختبار (يمكن إزالتها في الإنتاج)
+
 </script>
+
+<!-- قسم الاختبار (يمكن إزالته في الإنتاج) -->
+
+
 {% endblock %}
