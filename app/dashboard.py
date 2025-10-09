@@ -649,7 +649,7 @@ def check_late_orders():
                 'success': False,
                 'message': 'رمز التحقق من الصلاحية غير صالح'
             }, 400
-        
+         
         # تسجيل معلومات المستخدم
         is_admin = request.cookies.get('is_admin') == 'true'
         logger.info(f"👤 نوع المستخدم: {'مدير' if is_admin else 'موظف'}")
@@ -686,19 +686,38 @@ def check_late_orders():
         logger.info(f"🚀 بدء فحص الطلبات المتأخرة للمتجر {store_id}")
         
         # استدعاء الدالة من scheduler_tasks.py للمتجر الحالي فقط
-        updated_count = check_and_update_late_orders_for_store(store_id)
+        result = check_and_update_late_orders_for_store(store_id)
         
-        if updated_count > 0:
-            message = f'تم تحديث {updated_count} طلب إلى حالة متأخر في متجرك'
-            logger.info(f"✅ {message}")
+        # ✅ التعديل هنا: التعامل مع القاموس المرتجع
+        if isinstance(result, dict):
+            late_orders_count = result.get('late_orders', 0)
+            not_shipped_orders_count = result.get('not_shipped_orders', 0)
+            total_updated = late_orders_count + not_shipped_orders_count
+            
+            if total_updated > 0:
+                message = f'تم تحديث {total_updated} طلب في متجرك ({late_orders_count} متأخر، {not_shipped_orders_count} لم يتم الشحن)'
+                logger.info(f"✅ {message}")
+            else:
+                message = 'لا توجد طلبات متأخرة أو لم يتم شحنها تحتاج تحديث في متجرك'
+                logger.info(f"✅ {message}")
         else:
-            message = 'لا توجد طلبات متأخرة تحتاج تحديث في متجرك'
-            logger.info(f"✅ {message}")
+            # للحفاظ على التوافق مع الإصدارات القديمة
+            total_updated = result if isinstance(result, int) else 0
+            if total_updated > 0:
+                message = f'تم تحديث {total_updated} طلب إلى حالة متأخر في متجرك'
+                logger.info(f"✅ {message}")
+            else:
+                message = 'لا توجد طلبات متأخرة تحتاج تحديث في متجرك'
+                logger.info(f"✅ {message}")
+            late_orders_count = total_updated
+            not_shipped_orders_count = 0
             
         return {
             'success': True,
             'message': message,
-            'updated_count': updated_count,
+            'updated_count': total_updated,
+            'late_orders': late_orders_count,
+            'not_shipped_orders': not_shipped_orders_count,
             'store_id': store_id
         }
         
