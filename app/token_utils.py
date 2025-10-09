@@ -51,7 +51,7 @@ def set_token_cookies(response, access_token, refresh_token):
     access_expires_at = datetime.utcnow() + timedelta(minutes=15)
     
     # Refresh Token طويل الأجل (30 يومًا)
-    refresh_expires_seconds = timedelta(days=30).total_seconds()
+    refresh_expires_seconds = timedelta(days=10).total_seconds()
 
     response.set_cookie(
         'salla_access_token',

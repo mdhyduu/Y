@@ -154,22 +154,14 @@ from io import BytesIO
 import base64
 from flask import current_app
 import logging
-from .services.storage_service import do_storage # استيراد خدمة التخزين
+from .services.storage_service import do_storage  # استيراد خدمة التخزين
 
 # ... (بقية الاستيرادات كما هي)
 
 def generate_barcode(data, dpi=300):
     """إنشاء QR Code بدلاً من الباركود"""
     try:
-        # استخدام الرابط الكامل بدلاً من رقم الطلب فقط
-        base_url = "https://plankton-app-9im8u.ondigitalocean.app/"
-        
-        # إذا كان البيانات عبارة عن رقم طلب فقط، قم ببناء الرابط الكامل
-        if str(data).strip().isdigit():
-            data_str = f"{base_url}{data}"
-        else:
-            data_str = str(data).strip()
-            
+        data_str = str(data).strip()
         if not data_str:
             return None
 
@@ -192,9 +184,7 @@ def generate_barcode(data, dpi=300):
         buffer.seek(0)
 
         # رفع الصورة إلى DigitalOcean Spaces
-        # استخدام رقم الطلب فقط كاسم للملف لتجنب المشاكل
-        order_number = str(data).strip()
-        qr_code_url = do_storage.upload_qr_code(buffer, order_number, folder='qrcodes')
+        qr_code_url = do_storage.upload_qr_code(buffer, data_str, folder='qrcodes')
         
         if qr_code_url:
             logger.info(f"QR Code generated and uploaded successfully for: {data_str}")
@@ -221,7 +211,7 @@ def generate_and_store_qr_code(order_id, order_type='salla', store_id=None):
             
             logger.info(f"Attempting to generate QR code for order: {order_id_str}, type: {order_type}")
             
-            # إنشاء QR Code باستخدام الرابط الكامل
+            # إنشاء QR Code
             qr_code_url = generate_barcode(order_id_str)
             
             if not qr_code_url:
@@ -257,7 +247,7 @@ def generate_and_store_qr_code(order_id, order_type='salla', store_id=None):
                         params = {
                             'id': order_id_str,
                             'store_id': store_id,
-                            'qr_code_url': qr_code_url,
+                            'qr_code_url': qr_code_url,  # تخزين رابط QR Code
                             'barcode_generated_at': datetime.utcnow(),
                             'reference_id': reference_id
                         }
@@ -274,7 +264,7 @@ def generate_and_store_qr_code(order_id, order_type='salla', store_id=None):
                         
                         params = {
                             'id': order_id_str,
-                            'qr_code_url': qr_code_url,
+                            'qr_code_url': qr_code_url,  # تخزين رابط QR Code
                             'barcode_generated_at': datetime.utcnow()
                         }
                     
@@ -318,6 +308,7 @@ def generate_and_store_qr_code(order_id, order_type='salla', store_id=None):
     except Exception as e:
         logger.error(f"Error in generate_and_store_qr_code: {str(e)}")
         return None
+
 def get_cached_qr_code_url(order_id):
     """الحصول على رابط QR Code من التخزين المؤقت"""
     try:
@@ -536,7 +527,7 @@ def bulk_generate_and_store_qr_codes(order_ids, order_type='salla', store_id=Non
             try:
                 logger.info(f"Generating QR code for order: {order_id_str}")
                 
-                # إنشاء QR Code باستخدام الرابط الكامل
+                # إنشاء QR Code
                 qr_code_url = generate_barcode(order_id_str)
                 
                 if qr_code_url:
@@ -673,6 +664,8 @@ def bulk_generate_and_store_qr_codes(order_ids, order_type='salla', store_id=Non
     except Exception as e:
         logger.error(f"Error in bulk_generate_and_store_qr_codes: {str(e)}")
         return {}
+
+# للحفاظ على التوافق مع الكود القديم، يمكن إضافة دوال تحويل
 def get_barcodes_for_orders(order_ids):
     """واجهة متوافقة مع الكود القديم (ترجع QR Codes الآن)"""
     return get_qr_codes_for_orders_optimized(order_ids)
