@@ -1,6 +1,6 @@
 # app/scheduler_tasks.py
 from datetime import datetime, timedelta
-from .models import OrderStatusNote, OrderStatus, SallaOrder, db
+from .models import OrderStatusNote, OrderStatus, SallaOrder, SallaStatusChange, db
 import logging
 
 logger = logging.getLogger('salla_app')
@@ -9,7 +9,7 @@ def check_and_update_late_orders_for_store(store_id):
     """فحص الطلبات المتأخرة لمتجر محدد"""
     try:
         # حساب التواريخ
-        two_days_ago = datetime.utcnow() - timedelta(days=2)
+        two_days_ago = datetime.utcnow() - timedelta(days=3)
         three_days_ago = datetime.utcnow() - timedelta(days=3)
         
         logger.info(f"🔍 فحص الطلبات المتأخرة للمتجر {store_id}")
@@ -65,32 +65,45 @@ def check_and_update_late_orders_for_store(store_id):
         if not executed_status:
             logger.warning(f"⚠️ لم يتم العثور على حالة 'تم التنفيذ' في المتجر {store_id}")
         else:
-            # البحث عن طلبات Salla في هذا المتجر المحدد بحالة "تم التنفيذ" منذ أكثر من 3 أيام
+            # البحث عن طلبات Salla في هذا المتجر المحدد بحالة "تم التنفيذ"
             executed_salla_orders = SallaOrder.query.filter(
                 SallaOrder.store_id == store_id,
-                SallaOrder.status_id == executed_status.id,
-                SallaOrder.created_at <= three_days_ago
+                SallaOrder.status_id == executed_status.id
             ).all()
             
-            logger.info(f"📦 وجد {len(executed_salla_orders)} طلب في حالة تم التنفيذ منذ أكثر من 3 أيام")
+            logger.info(f"📦 وجد {len(executed_salla_orders)} طلب في حالة تم التنفيذ")
             
             for order in executed_salla_orders:
-                # التحقق من عدم وجود حالة "لم يتم الشحن" مسبقاً
-                existing_not_shipped_status = OrderStatusNote.query.filter_by(
+                # البحث عن تاريخ آخر تغيير للحالة إلى "تم التنفيذ"
+                status_change = SallaStatusChange.query.filter_by(
                     order_id=order.id,
-                    status_flag='not_shipped'
-                ).first()
+                    status_slug=executed_status.slug
+                ).order_by(SallaStatusChange.created_at.desc()).first()
                 
-                if not existing_not_shipped_status:
-                    # إضافة حالة "لم يتم الشحن" تلقائياً
-                    not_shipped_note = OrderStatusNote(
+                # استخدام تاريخ تغيير الحالة إذا وجد، وإلا استخدام تاريخ إنشاء الطلب
+                if status_change:
+                    status_change_date = status_change.created_at
+                else:
+                    status_change_date = order.created_at
+                
+                # التحقق إذا مرت 3 أيام أو أكثر منذ تغيير الحالة إلى "تم التنفيذ"
+                if status_change_date <= three_days_ago:
+                    # التحقق من عدم وجود حالة "لم يتم الشحن" مسبقاً
+                    existing_not_shipped_status = OrderStatusNote.query.filter_by(
                         order_id=order.id,
-                        status_flag='not_shipped',
-                        note=f'تم تعيين الحالة تلقائياً لأن الطلب في حالة تم التنفيذ منذ {order.created_at.strftime("%Y-%m-%d %H:%M")} ولم يتم شحنه'
-                    )
-                    db.session.add(not_shipped_note)
-                    not_shipped_orders_count += 1
-                    logger.info(f"🚫 تم تعيين حالة لم يتم الشحن تلقائياً للطلب {order.id}")
+                        status_flag='not_shipped'
+                    ).first()
+                    
+                    if not existing_not_shipped_status:
+                        # إضافة حالة "لم يتم الشحن" تلقائياً
+                        not_shipped_note = OrderStatusNote(
+                            order_id=order.id,
+                            status_flag='not_shipped',
+                            note=f'تم تعيين الحالة تلقائياً لأن الطلب في حالة تم التنفيذ منذ {status_change_date.strftime("%Y-%m-%d %H:%M")} ولم يتم شحنه'
+                        )
+                        db.session.add(not_shipped_note)
+                        not_shipped_orders_count += 1
+                        logger.info(f"🚫 تم تعيين حالة لم يتم الشحن تلقائياً للطلب {order.id}")
         
         if late_orders_count > 0 or not_shipped_orders_count > 0:
             db.session.commit()
@@ -107,8 +120,6 @@ def check_and_update_late_orders_for_store(store_id):
         db.session.rollback()
         logger.error(f"❌ خطأ في فحص الطلبات المتأخرة للمتجر {store_id}: {str(e)}")
         return {'late_orders': 0, 'not_shipped_orders': 0}
-        
-        
 def handle_order_completion(store_id, order_id, new_status_slug):
     """معالجة اكتمال الطلب وإزالة الحالات المتأخرة ولم يتم الشحن"""
     try:
