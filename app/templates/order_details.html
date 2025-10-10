@@ -751,43 +751,7 @@ document.addEventListener('click', function(e) {
   }
 });
 
-document.addEventListener('DOMContentLoaded', function() {
-  // إضافة تأكيد لتحميل العنوان
-  const downloadAddressBtn = document.querySelector('a[href*="download_addresses_pdf"]');
-  if (downloadAddressBtn) {
-    downloadAddressBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      const downloadUrl = this.href;
-      
-      Swal.fire({
-        title: 'تحميل العنوان',
-        text: 'جاري تحميل ملف العناوين...',
-        icon: 'info',
-        showCancelButton: true,
-        confirmButtonText: 'تحميل',
-        cancelButtonText: 'إلغاء'
-      }).then((result) => {
-        if (result.isConfirmed) {
-          // إنشاء رابط تحميل مخفي
-          const link = document.createElement('a');
-          link.href = downloadUrl;
-          link.style.display = 'none';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          
-          Swal.fire({
-            title: 'تم البدء في التحميل',
-            text: 'سيبدأ تحميل ملف PDF shortly',
-            icon: 'success',
-            timer: 2000,
-            showConfirmButton: false
-          });
-        }
-      });
-    });
-  }
-});
+
 
 // دالة معالجة تحديث حالة المنتج
 function handleProductStatusUpdate(form) {
