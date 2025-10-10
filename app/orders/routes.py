@@ -723,7 +723,7 @@ def order_details(order_id):
 
 @orders_bp.route('/<order_id>/shipping_policy/<int:shipment_index>')
 def download_shipping_policy(order_id, shipment_index=0):
-    """تحميل البوليصة كملف PDF"""
+    """تحميل البوليصة كملف PDF مع تحسين الذاكرة"""
     user, current_employee = get_user_from_cookies()
     
     if not user:
@@ -759,12 +759,20 @@ def download_shipping_policy(order_id, shipment_index=0):
         }
         
         policy_url = shipment['shipping_policy_url']
-        response = requests.get(policy_url, headers=headers, timeout=30, stream=True)
+        
+        # استخدام stream مع chunk_size محدد
+        response = requests.get(policy_url, headers=headers, timeout=60, stream=True)
         
         if response.status_code == 200:
-            content_type = response.headers.get('content-type', '')
-            file_data = BytesIO(response.content)
+            # استخدام طريقة أكثر أماناً للتعامل مع الملفات الكبيرة
+            file_data = BytesIO()
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    file_data.write(chunk)
             
+            file_data.seek(0)
+            
+            content_type = response.headers.get('content-type', '')
             mimetype = 'application/pdf'
             if 'pdf' not in content_type.lower() and not policy_url.lower().endswith('.pdf'):
                 mimetype = content_type
@@ -773,18 +781,27 @@ def download_shipping_policy(order_id, shipment_index=0):
                 file_data,
                 as_attachment=True,
                 download_name=filename,
-                mimetype=mimetype
+                mimetype=mimetype,
+                as_attachment=True,
+                conditional=True  # إضافة conditional response
             )
         else:
             flash('فشل في تحميل البوليصة', 'error')
             return redirect(url_for('orders.order_details', order_id=order_id))
 
+    except requests.exceptions.Timeout:
+        flash('انتهت مهلة تحميل البوليصة. يرجى المحاولة مرة أخرى.', 'error')
+        logger.error(f"Timeout while downloading shipping policy for order {order_id}")
+        return redirect(url_for('orders.order_details', order_id=order_id))
+    except requests.exceptions.RequestException as e:
+        flash('فشل في تحميل البوليصة due to a network error.', 'error')
+        logger.error(f"Network error while downloading shipping policy for order {order_id}: {str(e)}")
+        return redirect(url_for('orders.order_details', order_id=order_id))
     except Exception as e:
         error_msg = f"خطأ في تحميل البوليصة: {str(e)}"
         flash(error_msg, "error")
-        logger.exception(f"Error downloading shipping policy: {str(e)}")
+        logger.exception(f"Error downloading shipping policy for order {order_id}: {str(e)}")
         return redirect(url_for('orders.order_details', order_id=order_id))
-
 # ===== دوال معالجة Webhook =====
 def extract_store_id_from_webhook(webhook_data):
     """استخراج معرف المتجر من بيانات Webhook"""
