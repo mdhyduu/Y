@@ -722,7 +722,7 @@ def order_details(order_id):
         return redirect(url_for('orders.index'))
 @orders_bp.route('/<order_id>/shipping_policy/<int:shipment_index>')
 def download_shipping_policy(order_id, shipment_index=0):
-    """تحميل البوليصة كملف PDF مباشرة بدون أي إضافات"""
+    """تحميل البوليصة كملف PDF مع تحسين الذاكرة"""
     user, current_employee = get_user_from_cookies()
     
     if not user:
@@ -730,34 +730,27 @@ def download_shipping_policy(order_id, shipment_index=0):
         return redirect(url_for('user_auth.login'))
 
     try:
-        # جلب بيانات الطلب
         order = SallaOrder.query.filter_by(id=str(order_id), store_id=user.store_id).first()
         if not order:
             flash('الطلب غير موجود', 'error')
             return redirect(url_for('orders.index'))
 
-        # استخراج معلومات الشحن
-        order_data = order.full_order_data or {}
-        shipping_info = extract_shipping_info(order_data)
-        
-        # التحقق من وجود الشحنة المطلوبة
+        shipping_info = extract_shipping_info(order.full_order_data or {})
         shipment_details = shipping_info.get('shipment_details', [])
+        
         if shipment_index >= len(shipment_details):
             flash('بيانات الشحن غير موجودة', 'error')
             return redirect(url_for('orders.order_details', order_id=order_id))
 
         shipment = shipment_details[shipment_index]
         
-        # التحقق من وجود بوليصة شحن
         if not shipment.get('has_shipping_policy') or not shipment.get('shipping_policy_url'):
             flash('لا توجد بوليصة شحن متاحة', 'error')
             return redirect(url_for('orders.order_details', order_id=order_id))
 
-        # استخدام reference_id كاسم للملف
         reference_id = order.reference_id or order.id
         filename = f"بوليصة_شحن_{reference_id}.pdf"
 
-        # جلب ملف البوليصة مباشرة
         access_token = ensure_valid_access_token(user)
         headers = {
             'Authorization': f'Bearer {access_token}',
@@ -765,36 +758,48 @@ def download_shipping_policy(order_id, shipment_index=0):
         }
         
         policy_url = shipment['shipping_policy_url']
-        response = requests.get(policy_url, headers=headers, timeout=30, stream=True)
+        
+        # استخدام stream مع chunk_size محدد
+        response = requests.get(policy_url, headers=headers, timeout=60, stream=True)
         
         if response.status_code == 200:
-            # التحقق من أن الملف هو PDF
+            # استخدام طريقة أكثر أماناً للتعامل مع الملفات الكبيرة
+            file_data = BytesIO()
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    file_data.write(chunk)
+            
+            file_data.seek(0)
+            
             content_type = response.headers.get('content-type', '')
-            if 'pdf' in content_type.lower() or policy_url.lower().endswith('.pdf'):
-                pdf_data = BytesIO(response.content)
-                return send_file(
-                    pdf_data,
-                    as_attachment=True,
-                    download_name=filename,
-                    mimetype='application/pdf'
-                )
-            else:
-                # إذا لم يكن PDF، نعيد الملف كما هو بدون تحويل
-                file_data = BytesIO(response.content)
-                return send_file(
-                    file_data,
-                    as_attachment=True,
-                    download_name=filename,
-                    mimetype=content_type
-                )
+            mimetype = 'application/pdf'
+            if 'pdf' not in content_type.lower() and not policy_url.lower().endswith('.pdf'):
+                mimetype = content_type
+            
+            return send_file(
+                file_data,
+                as_attachment=True,
+                download_name=filename,
+                mimetype=mimetype,
+                as_attachment=True,
+                conditional=True  # إضافة conditional response
+            )
         else:
             flash('فشل في تحميل البوليصة', 'error')
             return redirect(url_for('orders.order_details', order_id=order_id))
 
+    except requests.exceptions.Timeout:
+        flash('انتهت مهلة تحميل البوليصة. يرجى المحاولة مرة أخرى.', 'error')
+        logger.error(f"Timeout while downloading shipping policy for order {order_id}")
+        return redirect(url_for('orders.order_details', order_id=order_id))
+    except requests.exceptions.RequestException as e:
+        flash('فشل في تحميل البوليصة due to a network error.', 'error')
+        logger.error(f"Network error while downloading shipping policy for order {order_id}: {str(e)}")
+        return redirect(url_for('orders.order_details', order_id=order_id))
     except Exception as e:
         error_msg = f"خطأ في تحميل البوليصة: {str(e)}"
         flash(error_msg, "error")
-        logger.exception(f"Error downloading shipping policy: {str(e)}")
+        logger.exception(f"Error downloading shipping policy for order {order_id}: {str(e)}")
         return redirect(url_for('orders.order_details', order_id=order_id))
 # ===== دوال معالجة Webhook =====
 def extract_store_id_from_webhook(webhook_data):
