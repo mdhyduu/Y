@@ -20,12 +20,14 @@
     
 
     
-    <!-- زر معاينة العناوين -->
-    <a href="{{ url_for('orders.preview_addresses_html', order_ids=order.id) }}" 
-       class="btn btn-info btn-sm" target="_blank">
-      <i class="fas fa-address-card ms-1"></i> معاينة العنوان
-    </a>
-    
+
+<!-- زر تحميل العناوين -->
+<a href="{{ url_for('orders.download_addresses_pdf', order_ids=order.id) }}" 
+   class="btn btn-info btn-sm">
+  <i class="fas fa-download ms-1"></i> تحميل العنوان
+</a>
+
+
     <!-- زر العودة الأصلي -->
     <a href="{{ url_for('orders.index') }}" class="btn btn-outline-secondary btn-sm">
       <i class="fas fa-arrow-left ms-1"></i> العودة للطلبات
@@ -746,6 +748,44 @@ document.addEventListener('click', function(e) {
     e.preventDefault();
     const form = e.target.closest('.cancel-product-status-form');
     handleProductStatusCancel(form);
+  }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+  // إضافة تأكيد لتحميل العنوان
+  const downloadAddressBtn = document.querySelector('a[href*="download_addresses_pdf"]');
+  if (downloadAddressBtn) {
+    downloadAddressBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      const downloadUrl = this.href;
+      
+      Swal.fire({
+        title: 'تحميل العنوان',
+        text: 'جاري تحميل ملف العناوين...',
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'تحميل',
+        cancelButtonText: 'إلغاء'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          // إنشاء رابط تحميل مخفي
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          link.style.display = 'none';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          Swal.fire({
+            title: 'تم البدء في التحميل',
+            text: 'سيبدأ تحميل ملف PDF shortly',
+            icon: 'success',
+            timer: 2000,
+            showConfirmButton: false
+          });
+        }
+      });
+    });
   }
 });
 
