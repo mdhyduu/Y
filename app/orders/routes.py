@@ -723,7 +723,7 @@ def order_details(order_id):
 
 @orders_bp.route('/<order_id>/shipping_policy/<int:shipment_index>')
 def download_shipping_policy(order_id, shipment_index=0):
-    """تحميل البوليصة عبر التوجيه المباشر إلى رابط سلة"""
+    """تحميل البوليصة كملف PDF"""
     user, current_employee = get_user_from_cookies()
     
     if not user:
@@ -749,26 +749,42 @@ def download_shipping_policy(order_id, shipment_index=0):
             flash('لا توجد بوليصة شحن متاحة', 'error')
             return redirect(url_for('orders.order_details', order_id=order_id))
 
-        # الحل الجديد: التوجيه المباشر إلى رابط البوليصة
-        policy_url = shipment['shipping_policy_url']
-        
-        # إضافة التوكن للتحقق من الصلاحية إذا لزم الأمر
+        reference_id = order.reference_id or order.id
+        filename = f"بوليصة_شحن_{reference_id}.pdf"
+
         access_token = ensure_valid_access_token(user)
-        if access_token:
-            # إذا كان الرابط يحتاج توكن، نضيفه كمعامل
-            if '?' in policy_url:
-                policy_url += f'&access_token={access_token}'
-            else:
-                policy_url += f'?access_token={access_token}'
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Accept': 'application/pdf,application/octet-stream'
+        }
         
-        # توجيه المستخدم مباشرة إلى رابط البوليصة
-        return redirect(policy_url)
+        policy_url = shipment['shipping_policy_url']
+        response = requests.get(policy_url, headers=headers, timeout=30, stream=True)
+        
+        if response.status_code == 200:
+            content_type = response.headers.get('content-type', '')
+            file_data = BytesIO(response.content)
+            
+            mimetype = 'application/pdf'
+            if 'pdf' not in content_type.lower() and not policy_url.lower().endswith('.pdf'):
+                mimetype = content_type
+            
+            return send_file(
+                file_data,
+                as_attachment=True,
+                download_name=filename,
+                mimetype=mimetype
+            )
+        else:
+            flash('فشل في تحميل البوليصة', 'error')
+            return redirect(url_for('orders.order_details', order_id=order_id))
 
     except Exception as e:
-        error_msg = f"خطأ في الوصول إلى البوليصة: {str(e)}"
+        error_msg = f"خطأ في تحميل البوليصة: {str(e)}"
         flash(error_msg, "error")
-        logger.exception(f"Error accessing shipping policy: {str(e)}")
+        logger.exception(f"Error downloading shipping policy: {str(e)}")
         return redirect(url_for('orders.order_details', order_id=order_id))
+
 # ===== دوال معالجة Webhook =====
 def extract_store_id_from_webhook(webhook_data):
     """استخراج معرف المتجر من بيانات Webhook"""
