@@ -5,33 +5,7 @@
 {% block content %}
 <div class="content-container p-4">
     <!-- البطاقات والإحصائيات -->
-    <div class="d-grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        <div class="card stat-card d-flex flex-row align-items-center p-3">
-            <div class="stat-icon bg-primary text-white d-flex align-items-center justify-content-center rounded me-3" style="width: 50px; height: 50px;">
-                <i class="fas fa-shopping-bag"></i>
-            </div>
-            <div class="stat-info">
-                <h4 class="mb-1">{{ total_orders }}</h4>
-                <p class="mb-1 text-secondary">إجمالي الطلبات</p>
-                <div class="stat-trend text-success small">
-                    <i class="fas fa-arrow-up"></i> {{ order_trend }}% زيادة عن الشهر الماضي
-                </div>
-            </div>
-        </div>
-        
-        <div class="card stat-card d-flex flex-row align-items-center p-3">
-            <div class="stat-icon bg-success text-white d-flex align-items-center justify-content-center rounded me-3" style="width: 50px; height: 50px;">
-                <i class="fas fa-check-circle"></i>
-            </div>
-            <div class="stat-info">
-                <h4 class="mb-1">{{ completed_count }}</h4>
-                <p class="mb-1 text-secondary">طلبات تم التنفيذ</p>
-                <div class="stat-trend text-success small">
-                    <i class="fas fa-arrow-up"></i> {{ completed_trend }}% زيادة عن الأسبوع الماضي
-                </div>
-            </div>
-        </div>
-        
+    <div class="d-grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-4 mb-4">
         <div class="card stat-card d-flex flex-row align-items-center p-3">
             <div class="stat-icon bg-warning text-white d-flex align-items-center justify-content-center rounded me-3" style="width: 50px; height: 50px;">
                 <i class="fas fa-motorcycle"></i>
@@ -46,19 +20,6 @@
                 </div>
             </div>
         </div>
-        
-        <div class="card stat-card d-flex flex-row align-items-center p-3">
-            <div class="stat-icon bg-danger text-white d-flex align-items-center justify-content-center rounded me-3" style="width: 50px; height: 50px;">
-                <i class="fas fa-clock"></i>
-            </div>
-            <div class="stat-info">
-                <h4 class="mb-1">{{ in_progress_count }}</h4>
-                <p class="mb-1 text-secondary">طلبات قيد التنفيذ</p>
-                <div class="stat-trend text-success small">
-                    <i class="fas fa-arrow-up"></i> {{ new_orders_today }} طلبات جديدة
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- محتوى اللوحة -->
@@ -69,7 +30,7 @@
                 <h5 class="mb-0"><i class="fas fa-motorcycle me-2"></i> مناديب التوصيل</h5>
                 {% if is_delivery_manager %}
                 <a href="{{ url_for('delivery.manage_delivery_employees') }}">
-                    <button class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i> إضافة مندوب جديد</button>
+                    <button class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i> إدارة المناديب</button>
                 </a>
                 {% endif %}
             </div>
@@ -79,10 +40,10 @@
                         <thead>
                             <tr>
                                 <th>اسم المندوب</th>
+                                <th>البريد الإلكتروني</th>
                                 <th>الهاتف</th>
                                 <th>المنطقة</th>
                                 <th>الحالة</th>
-                                <th>الطلبات النشطة</th>
                                 {% if is_delivery_manager %}
                                 <th>الإجراءات</th>
                                 {% endif %}
@@ -94,9 +55,10 @@
                                 <td>
                                     <div class="d-flex align-items-center">
                                         <img src="https://ui-avatars.com/api/?name={{ emp.name }}&background=10AC84&color=fff" width="35" height="35" class="rounded-circle me-2">
-                                        {{ emp.email }}
+                                        {{ emp.name }}
                                     </div>
                                 </td>
+                                <td>{{ emp.email }}</td>
                                 <td>{{ emp.phone or 'غير متوفر' }}</td>
                                 <td>{{ emp.region or 'غير محدد' }}</td>
                                 <td>
@@ -106,17 +68,25 @@
                                     <span class="badge bg-danger">غير نشط</span>
                                     {% endif %}
                                 </td>
-                                <td>
-                                    {% set active_orders_count = emp.assignments|length %}
-                                    <span class="badge bg-primary">{{ active_orders_count }} طلبات</span>
-                                </td>
                                 {% if is_delivery_manager %}
                                 <td>
-                                    <button class="btn btn-sm btn-outline-primary me-1"><i class="fas fa-eye"></i></button>
-                                    <button class="btn btn-sm btn-outline-secondary me-1"><i class="fas fa-edit"></i></button>
-                                    <button class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                                    <button class="btn btn-sm btn-outline-primary me-1" title="عرض التفاصيل">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary me-1" title="تعديل">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" title="حذف">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
                                 </td>
                                 {% endif %}
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="{% if is_delivery_manager %}6{% else %}5{% endif %}" class="text-center text-muted">
+                                    لا توجد مناديب توصيل
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -125,97 +95,48 @@
             </div>
         </div>
 
-        <!-- قسم طلبات التوصيل -->
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center">
-                    <h5 class="mb-0 me-3"><i class="fas fa-shopping-bag me-2"></i> طلبات التوصيل النشطة</h5>
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="checkbox" id="selectAllCheckbox">
-                        <label class="form-check-label small" for="selectAllCheckbox">تحديد الكل</label>
-                    </div>
-                </div>
-                <div>
-                    <button id="assignMultipleBtn" class="btn btn-warning btn-sm me-2" style="display: none;" data-bs-toggle="modal" data-bs-target="#assignMultipleModal">
-                        <i class="fas fa-user-plus me-1"></i> إسناد المحدد
-                    </button>
-                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#filterOrdersModal">
-                        <i class="fas fa-filter me-1"></i> تصفية
-                    </button>
-                </div>
-            </div>
-            <div class="card-body">
-               <ul class="nav nav-tabs mb-3" role="tablist" id="orders-tabs">
-                    <li class="nav-item" role="presentation">
-                        <a class="nav-link {% if not selected_status_id %}active{% endif %}" 
-                           href="#" data-status-id="">
-                            جميع الطلبات <span class="badge bg-secondary ms-1">{{ total_orders }}</span>
-                        </a>
-                    </li>
-                    {% for status in default_status_stats %}
-                    <li class="nav-item" role="presentation">
-                        <a class="nav-link {% if selected_status_id == status.id %}active{% endif %}" 
-                           href="#" data-status-id="{{ status.id }}">
-                            {{ status.name }} <span class="badge bg-secondary ms-1">{{ status.count }}</span>
-                        </a>
-                    </li>
-                    {% endfor %}
-                </ul>
-                <!-- حاوية الطلبات التي سيتم تحديثها عبر AJAX -->
-                <div id="orders-container">
-                    {% include 'orders_partial.html' %}
-                </div>
-            </div>
-        </div>
-
-        <!-- قسم الخريطة -->
+        <!-- قسم المعلومات -->
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="fas fa-map me-2"></i> خريطة التوصيل</h5>
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i> معلومات النظام</h5>
             </div>
             <div class="card-body">
-                <div id="delivery-map" style="height: 400px; background-color: #f8f9fa; display: flex; align-items: center; justify-content: center;">
-                    <div class="text-center text-muted">
-                        <i class="fas fa-map-marked-alt fa-3x mb-3"></i>
-                        <p>خريطة التوصيل ستظهر هنا</p>
-                    </div>
+                <div class="alert alert-info">
+                    <h6 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>ملاحظة</h6>
+                    <p class="mb-0">
+                        تم إيقاف نظام إدارة الطلبات والإحالات مؤقتاً. 
+                        {% if is_delivery_manager %}
+                        يمكنك إدارة مناديب التوصيل من خلال زر "إدارة المناديب".
+                        {% else %}
+                        يرجى التواصل مع مدير النظام للحصول على التفاصيل.
+                        {% endif %}
+                    </p>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- مودال إسناد طلب واحد -->
-<div class="modal fade" id="assignOrderModal" tabindex="-1" aria-labelledby="assignOrderModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="assignOrderModalLabel">إسناد الطلب</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" id="assignModalContent">
-                <div class="text-center">
-                    <div class="spinner-border" role="status">
-                        <span class="visually-hidden">جاري التحميل...</span>
+                
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-user-shield text-primary me-3 fa-lg"></i>
+                            <div>
+                                <h6 class="mb-1">الدور الحالي</h6>
+                                <p class="mb-0 text-muted">
+                                    {% if is_delivery_manager %}
+                                    مدير توصيل
+                                    {% else %}
+                                    مندوب توصيل
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- مودال إسناد متعدد الطلبات -->
-<div class="modal fade" id="assignMultipleModal" tabindex="-1" aria-labelledby="assignMultipleModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="assignMultipleModalLabel">إسناد الطلبات المحددة</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" id="assignMultipleModalContent">
-                <div class="text-center">
-                    <div class="spinner-border" role="status">
-                        <span class="visually-hidden">جاري التحميل...</span>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-store text-success me-3 fa-lg"></i>
+                            <div>
+                                <h6 class="mb-1">المتجر</h6>
+                                <p class="mb-0 text-muted">{{ current_user.store.name if current_user.store else 'غير محدد' }}</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -226,246 +147,6 @@
 
 {% block scripts %}
 <script>
-// دالة للحصول على CSRF token
-// دالة للحصول على CSRF token
-// دالة للحصول على CSRF token
-function getCSRFToken() {
-    const csrfToken = document.querySelector('meta[name="csrf-token"]');
-    return csrfToken ? csrfToken.getAttribute('content') : '';
-}
-
-// إدارة اختيار الطلبات
-function initOrderSelection() {
-    const assignMultipleBtn = document.getElementById('assignMultipleBtn');
-    const checkboxes = document.querySelectorAll('.order-checkbox');
-    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
-    
-    function updateAssignButton() {
-        const selectedCount = document.querySelectorAll('.order-checkbox:checked').length;
-        if (selectedCount > 0) {
-            assignMultipleBtn.style.display = 'block';
-            assignMultipleBtn.innerHTML = `<i class="fas fa-user-plus me-1"></i> إسناد المحدد (${selectedCount})`;
-        } else {
-            assignMultipleBtn.style.display = 'none';
-        }
-        
-        if (selectAllCheckbox) {
-            const totalCheckboxes = document.querySelectorAll('.order-checkbox').length;
-            selectAllCheckbox.checked = selectedCount > 0 && selectedCount === totalCheckboxes;
-            selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < totalCheckboxes;
-        }
-    }
-    
-    checkboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', updateAssignButton);
-    });
-    
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', function() {
-            const checkboxes = document.querySelectorAll('.order-checkbox');
-            checkboxes.forEach(checkbox => {
-                checkbox.checked = this.checked;
-            });
-            updateAssignButton();
-        });
-    }
-    
-    updateAssignButton();
-}
-
-// EVENT DELEGATION للتعامل مع جميع الأزرار الديناميكية
-function initGlobalEventDelegation() {
-    // التعامل مع أزرار الإسناد الفردي
-    document.addEventListener('click', function(e) {
-        const assignBtn = e.target.closest('.assign-btn');
-        if (assignBtn) {
-            e.preventDefault();
-            const orderId = assignBtn.getAttribute('data-order-id');
-            console.log('إسناد طلب:', orderId);
-            
-            fetch(`/delivery/assign_order_modal/${orderId}`)
-                .then(response => {
-                    if (!response.ok) throw new Error('Network error');
-                    return response.text();
-                })
-                .then(html => {
-                    document.getElementById('assignModalContent').innerHTML = html;
-                    const modal = new bootstrap.Modal(document.getElementById('assignOrderModal'));
-                    modal.show();
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('assignModalContent').innerHTML = 
-                        '<div class="alert alert-danger">حدث خطأ أثناء تحميل المحتوى</div>';
-                    const modal = new bootstrap.Modal(document.getElementById('assignOrderModal'));
-                    modal.show();
-                });
-        }
-        
-        // التعامل مع أزرار التسليم
-        const deliverBtn = e.target.closest('.delivery-action-btn');
-        if (deliverBtn && deliverBtn.getAttribute('data-action') === 'deliver') {
-            e.preventDefault();
-            const orderId = deliverBtn.getAttribute('data-order-id');
-            console.log('تسليم طلب:', orderId);
-            
-            if (confirm('هل تريد تأكيد تسليم هذا الطلب؟')) {
-                fetch(`/delivery/mark_delivered/${orderId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRFToken': getCSRFToken()
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showToast('success', 'تم تسليم الطلب بنجاح');
-                        setTimeout(() => location.reload(), 1000);
-                    } else {
-                        showToast('error', 'فشل في تأكيد التسليم: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showToast('error', 'حدث خطأ أثناء تأكيد التسليم');
-                });
-            }
-        }
-        
-        // التعامل مع أزرار العرض (التفاصيل)
-        const viewBtn = e.target.closest('.view-order-btn');
-        if (viewBtn) {
-            e.preventDefault();
-            const orderId = viewBtn.getAttribute('data-order-id');
-            const url = `/orders/${orderId}`;
-            window.open(url, '_blank');
-        }
-    });
-}
-
-// التعامل مع تبويبات التصفية
-function initOrderTabs() {
-    const ordersTabs = document.getElementById('orders-tabs');
-    if (ordersTabs) {
-        ordersTabs.addEventListener('click', function(e) {
-            e.preventDefault();
-            const target = e.target.closest('a');
-            if (!target) return;
-            
-            document.querySelectorAll('#orders-tabs a').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
-            target.classList.add('active');
-            const statusId = target.getAttribute('data-status-id');
-            
-            const ordersContainer = document.getElementById('orders-container');
-            ordersContainer.innerHTML = `
-                <div class="text-center py-5">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">جاري التحميل...</span>
-                    </div>
-                    <p class="text-muted mt-2">جاري تحميل الطلبات...</p>
-                </div>
-            `;
-            
-            fetch(`/dashboard/filter_orders?status_id=${statusId}`)
-                .then(response => response.text())
-                .then(html => {
-                    ordersContainer.innerHTML = html;
-                    // إعادة تهيئة اختيار الطلبات فقط
-                    initOrderSelection();
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    ordersContainer.innerHTML = `
-                        <div class="alert alert-danger text-center">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            حدث خطأ أثناء تحميل الطلبات
-                        </div>
-                    `;
-                });
-        });
-    }
-}
-
-// معالجة الإسناد المتعدد
-function initBulkAssignment() {
-    const assignMultipleBtn = document.getElementById('assignMultipleBtn');
-    if (assignMultipleBtn) {
-        assignMultipleBtn.addEventListener('click', function() {
-            const selectedOrders = Array.from(document.querySelectorAll('.order-checkbox:checked'))
-                .map(checkbox => checkbox.getAttribute('data-order-id'));
-            
-            if (selectedOrders.length === 0) {
-                showToast('warning', 'يرجى تحديد طلبات للإسناد');
-                return;
-            }
-            
-            fetch('/delivery/assign_multiple_orders_modal', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCSRFToken()
-                },
-                body: JSON.stringify({ order_ids: selectedOrders })
-            })
-            .then(response => response.text())
-            .then(html => {
-                document.getElementById('assignMultipleModalContent').innerHTML = html;
-                const modal = new bootstrap.Modal(document.getElementById('assignMultipleModal'));
-                modal.show();
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('assignMultipleModalContent').innerHTML = 
-                    '<div class="alert alert-danger">حدث خطأ أثناء تحميل المحتوى</div>';
-                const modal = new bootstrap.Modal(document.getElementById('assignMultipleModal'));
-                modal.show();
-            });
-        });
-    }
-}
-
-// دالة لعرض الإشعارات
-function showToast(type, message) {
-    // إنشاء toast ديناميكي إذا لم يكن موجوداً
-    let toastContainer = document.getElementById('toastContainer');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.id = 'toastContainer';
-        toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
-        document.body.appendChild(toastContainer);
-    }
-    
-    const toastId = 'toast-' + Date.now();
-    const bgColor = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : 'bg-warning';
-    const icon = type === 'success' ? 'fa-check' : type === 'error' ? 'fa-exclamation-triangle' : 'fa-info';
-    
-    const toastHTML = `
-        <div id="${toastId}" class="toast align-items-center text-white ${bgColor} border-0" role="alert">
-            <div class="d-flex">
-                <div class="toast-body">
-                    <i class="fas ${icon} me-2"></i>${message}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            </div>
-        </div>
-    `;
-    
-    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-    const toastElement = document.getElementById(toastId);
-    const toast = new bootstrap.Toast(toastElement);
-    toast.show();
-    
-    // إزالة الـ toast من DOM بعد الاختفاء
-    toastElement.addEventListener('hidden.bs.toast', function () {
-        toastElement.remove();
-    });
-}
-
 // تأثيرات الرسوم المتحركة
 function initAnimations() {
     document.querySelectorAll('.card').forEach(card => {
@@ -484,37 +165,9 @@ function initAnimations() {
     }, 500);
 }
 
-// إعادة تعيين المودال عند الإغلاق
-function initModalReset() {
-    const assignOrderModal = document.getElementById('assignOrderModal');
-    if (assignOrderModal) {
-        assignOrderModal.addEventListener('hidden.bs.modal', function () {
-            document.getElementById('assignModalContent').innerHTML = 
-                '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">جاري التحميل...</span></div></div>';
-        });
-    }
-    
-    const assignMultipleModal = document.getElementById('assignMultipleModal');
-    if (assignMultipleModal) {
-        assignMultipleModal.addEventListener('hidden.bs.modal', function () {
-            document.getElementById('assignMultipleModalContent').innerHTML = 
-                '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">جاري التحميل...</span></div></div>';
-        });
-    }
-}
-
 // التهيئة الرئيسية عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', function() {
     initAnimations();
-    initOrderSelection();
-    initGlobalEventDelegation(); // هذا هو الأهم!
-    initOrderTabs();
-    initBulkAssignment();
-    initModalReset();
-    
-    // جعل الدوال متاحة عالمياً
-    window.initOrderSelection = initOrderSelection;
-    window.showToast = showToast;
 });
 </script>
 {% endblock %}
