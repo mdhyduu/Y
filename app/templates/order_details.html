@@ -1131,5 +1131,35 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
+// استبدال دالة تحميل البوليصة الحالية
+function downloadShippingPolicy(orderId, shipmentIndex = 0) {
+    const downloadBtn = $(`#shipping-policy-btn-${orderId}`);
+    const originalText = downloadBtn.html();
+    
+    downloadBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري التحميل');
+
+    $.ajax({
+        url: `/orders/${orderId}/shipping_policy/${shipmentIndex}`,
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .done(function(response) {
+        if (response.success) {
+            // فتح الرابط في نافذة جديدة
+            window.open(response.policy_url, '_blank', 'noopener,noreferrer');
+            showSweetAlert('success', 'تم فتح البوليصة', 'تم فتح البوليصة في نافذة جديدة');
+        } else {
+            showSweetAlert('error', 'خطأ', response.error);
+        }
+    })
+    .fail(function(error) {
+        showSweetAlert('error', 'خطأ في الاتصال', 'فشل في تحميل البوليصة');
+    })
+    .always(function() {
+        downloadBtn.prop('disabled', false).html(originalText);
+    });
+}
 </script>
 {% endblock %}
