@@ -1157,7 +1157,7 @@ def riyadh_orders():
         return response
     
     # التحقق من أن المستخدم موظف تسليم أو مدير تسليم
-    if not employee or employee.role not in ['delivery_manager', 'delivery', 'is_admin']:
+    if not employee or employee.role not in ['delivery_manager', 'delivery']:
         flash('غير مصرح بالوصول لهذه الصفحة', 'error')
         return redirect(url_for('orders.index'))
     
@@ -1219,6 +1219,15 @@ def riyadh_orders():
         # جلب البيانات الإضافية
         order_statuses = OrderStatus.query.filter_by(store_id=user.store_id).order_by(OrderStatus.sort).all()
         
+        # جلب المندوبين الذين أضافهم المدير الحالي فقط
+        delivery_employees = []
+        if employee.role == 'delivery_manager':
+            delivery_employees = Employee.query.filter_by(
+                store_id=user.store_id, 
+                role='delivery',
+                added_by=employee.id  # فقط المندوبين الذين أضافهم هذا المدير
+            ).all()
+        
         # للمديرين فقط يمكنهم رؤية جميع الموظفين، للموظف العادي فقط حالاته
         if employee.role == 'delivery_manager':
             employees = Employee.query.filter_by(store_id=user.store_id, is_active=True).all()
@@ -1245,11 +1254,12 @@ def riyadh_orders():
         template_data = {
             'orders': processed_orders, 
             'employees': employees,
+            'delivery_employees': delivery_employees,  # إضافة هذا المتغير
             'custom_statuses': custom_statuses,
             'pagination': pagination,
             'filters': filters,
             'order_statuses': order_statuses,
-            'is_reviewer': False,  # هذه الصفحة مخصصة للتسليم فقط
+            'is_reviewer': False,
             'is_delivery_personnel': True,
             'current_employee': employee,
             'page_title': 'طلبات الرياض'
@@ -1258,7 +1268,7 @@ def riyadh_orders():
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return render_template('orders_partial.html', **template_data)
         
-        return render_template('riyadh_orders.html', **template_data)
+        return render_template('riyadh_orders.html', **template_data)  # تأكد من استخدام القالب الصحيح
     
     except Exception as e:
         error_msg = f'حدث خطأ غير متوقع: {str(e)}'
