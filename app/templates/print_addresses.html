@@ -34,7 +34,7 @@
             background: white;
             border: 2px solid #000;
             border-radius: 4px;
-            padding: 8px; 
+            padding: 5px; /* تم التخفيض من 8px */
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -46,8 +46,8 @@
         /* رأس البوليصة - إبراز رقم الطلب */
         .header-section {
             border-bottom: 2px solid #000;
-            padding-bottom: 5px;
-            margin-bottom: 8px;
+            padding-bottom: 3px; /* تم التخفيض من 5px */
+            margin-bottom: 5px; /* تم التخفيض من 8px */
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -71,6 +71,8 @@
         /* أقسام العنوان - تقليل المسافات */
         .address-details-container {
             flex-grow: 1;
+            margin-bottom: 0; /* إزالة المسافة السفلية */
+            padding-bottom: 0; /* إزالة الحشوة السفلية */
         }
 
         .section-title {
@@ -80,36 +82,38 @@
             background: #007bff; 
             padding: 3px 5px;
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 3px; /* تم التخفيض من 5px */
             text-align: center;
         }
 
         .recipient-details {
             font-size: 13px;
-            line-height: 1.5;
+            line-height: 1.4; /* تم التخفيض من 1.5 */
             padding-right: 5px;
+            margin-bottom: 0; /* إزالة المسافة السفلية */
+            padding-bottom: 0; /* إزالة الحشوة السفلية */
         }
 
         .recipient-details strong {
             display: block;
             font-size: 15px;
             color: #000;
-            margin-bottom: 5px;
+            margin-bottom: 3px; /* تم التخفيض من 5px */
             border-bottom: 1px dashed #ddd;
-            padding-bottom: 3px;
+            padding-bottom: 2px; /* تم التخفيض من 3px */
         }
 
         /* تفاصيل العنوان الكامل */
         .full-address-text {
             display: block;
-            padding: 8px;
+            padding: 5px; /* تم التخفيض من 8px */
             border: 1px solid #000;
             border-radius: 4px;
             background: #f9f9f9;
             font-size: 14px;
             line-height: 1.4;
-            min-height: 40px;
-            margin-top: 5px;
+            min-height: 35px; /* تم التخفيض من 40px */
+            margin-top: 3px; /* تم التخفيض من 5px */
             font-weight: bold;
         }
 
@@ -117,18 +121,18 @@
         .extra-info-line {
             display: flex;
             justify-content: space-between;
-            margin-top: 8px;
+            margin-top: 5px; /* تم التخفيض من 8px */
             font-size: 12px;
             font-weight: bold;
-            margin-bottom: 10px; /* إضافة مسافة قبل الباركود */
+            margin-bottom: 3px; /* تم التخفيض بشكل كبير من 10px */
         }
         
         /* الباركود والقسم السفلي - تم التكبير هنا */
         .barcode-section {
-            padding-top: 5px;
+            padding-top: 2px; /* تم التخفيض من 5px */
             text-align: center;
             /* جعل الباركود جزء من حدود البطاقة */
-            margin: 0 -8px -8px -8px; 
+            margin: 0 -5px -5px -5px; /* تم تعديل الهوامش السالبة */
             background: #fff; /* خلفية بيضاء لضمان وضوح الباركود */
             border-top: 1px solid #000;
         }
@@ -137,8 +141,8 @@
             max-width: 100%; /* استخدام أقصى عرض ممكن */
             height: 120px; /* زيادة كبيرة في ارتفاع الباركود (كان 90px) */
             object-fit: contain;
-            margin-bottom: 5px;
-            padding: 5px 0;
+            margin-bottom: 3px; /* تم التخفيض من 5px */
+            padding: 3px 0; /* تم التخفيض من 5px 0 */
         }
 
         .barcode-number {
@@ -146,7 +150,7 @@
             font-size: 18px; /* زيادة حجم رقم الباركود (كان 16px) */
             font-weight: bold;
             display: block;
-            padding-bottom: 5px;
+            padding-bottom: 3px; /* تم التخفيض من 5px */
         }
 
         /* وسائل الإعلام للطباعة النهائية */
@@ -166,23 +170,47 @@
                 margin: 0;
                 height: 14.85cm; 
                 width: 10.5cm;
-                padding: 5px;
+                padding: 3px; /* تم التخفيض من 5px */
                 box-sizing: border-box;
                 page-break-inside: avoid;
                 break-inside: avoid;
             }
+            
+            .header-section {
+                padding-bottom: 2px; /* تخفيض إضافي للطباعة */
+                margin-bottom: 3px; /* تخفيض إضافي للطباعة */
+            }
+            
+            .address-details-container {
+                margin-bottom: 0;
+            }
+            
+            .recipient-details {
+                margin-bottom: 0;
+            }
+            
             .barcode-section {
                 /* إزالة الهوامش السالبة عند الطباعة النهائية */
                 margin: 0; 
                 border-top: 1px solid #000;
+                padding-top: 1px; /* تخفيض إضافي للطباعة */
             }
+            
             .barcode-image {
                 height: 110px; /* تكبير الباركود في الطباعة */
+                margin-bottom: 2px; /* تخفيض إضافي للطباعة */
             }
+            
             .barcode-number {
                 font-size: 20px; /* تكبير رقم الباركود في الطباعة */
+                padding-bottom: 2px; /* تخفيض إضافي للطباعة */
             }
+            
             .print-info { display: none; }
+            
+            .extra-info-line {
+                margin-bottom: 2px; /* تخفيض إضافي للطباعة */
+            }
         }
     </style>
 </head>
