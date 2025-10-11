@@ -6,7 +6,7 @@
     <title>بوالص الشحن للطلبات (باركود كبير)</title>
     <style>
         /* التنسيق للطباعة */
-        @page {
+          @page {
             size: A4;
             margin: 0.3cm; /* تقليل هامش الصفحة */
         }
@@ -237,45 +237,51 @@
     <div class="page-container">
         {% for order in orders %}
         <div class="shipping-label-card">
+            
             <div class="header-section">
                 <div class="order-id">
                     الطلب #{{ order.reference_id }}
                 </div>
+                
                 <div class="reference-text">
                     مرجع الشحن
                 </div>
             </div>
             
-            <div class="card-content">
-                <div class="address-section">
-                    <div class="section-title">بيانات المستلم (To)</div>
-                    <div class="recipient-details">
-                        <strong>{{ order.address.name }} | جوال: {{ order.address.mobile }}</strong>
-                        <span class="full-address-text">
-                            {{ order.address.address }}
-                        </span>
-                        <div class="extra-info-line">
-                            {% if order.address.city %}
-                                <span>المدينة: **{{ order.address.city }}**</span>
-                            {% endif %}
-                            {% if order.address.country %}
-                                <span>الدولة: **{{ order.address.country }}**</span>
-                            {% endif %}
-                            {% if order.address.postal_code %}
-                                <span>الرمز البريدي: **{{ order.address.postal_code }}**</span>
-                            {% endif %}
-                        </div>
+            <div class="address-details-container">
+                <div class="section-title">بيانات المستلم (To)</div>
+                <div class="recipient-details">
+                    
+                    <strong>{{ order.address.name }} | جوال: {{ order.address.mobile }}</strong>
+                    
+                    <span class="full-address-text">
+                        {{ order.address.address }}
+                    </span>
+                    
+                    <div class="extra-info-line">
+                        {% if order.address.city %}
+                            <span>المدينة: **{{ order.address.city }}**</span>
+                        {% endif %}
+                        
+                        {% if order.address.country %}
+                            <span>الدولة: **{{ order.address.country }}**</span>
+                        {% endif %}
+                        
+                        {% if order.address.postal_code %}
+                            <span>الرمز البريدي: **{{ order.address.postal_code }}**</span>
+                        {% endif %}
                     </div>
+
                 </div>
-                
-                <div class="barcode-section">
-                    {% if order.barcode %}
-                    <img src="{{ order.barcode }}" alt="باركود الطلب {{ order.reference_id }}" class="barcode-image">
-                    <div class="barcode-number">
-                        {{ order.reference_id }}
-                    </div>
-                    {% endif %}
+            </div>
+            
+            <div class="barcode-section">
+                {% if order.barcode %}
+                <img src="{{ order.barcode }}" alt="باركود الطلب {{ order.reference_id }}" class="barcode-image">
+                <div class="barcode-number">
+                    {{ order.reference_id }}
                 </div>
+                {% endif %}
             </div>
         </div>
         {% endfor %}
