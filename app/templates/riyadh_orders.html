@@ -86,6 +86,16 @@
             </form>
         </div>
 
+        <!-- زر الإسناد للمدير فقط -->
+        {% if current_employee.role == 'delivery_manager' %}
+        <div class="d-flex p-3" id="quick-actions">
+            <button type="button" class="btn btn-success rounded-pill px-3 me-2" id="assign-orders-btn" disabled>
+                <i class="fas fa-user-check me-1"></i> 
+                <span id="selected-orders-count">0</span> إسناد
+            </button>
+        </div>
+        {% endif %}
+
         {% if orders %}
         <div class="table-responsive position-relative">
             <div id="table-loading" class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center d-none" style="z-index: 10;">
@@ -97,17 +107,22 @@
             <table class="table table-hover mb-0" id="orders-table">
                 <thead class="table">
                     <tr>
+                        {% if current_employee.role == 'delivery_manager' %}
                         <th width="5%" class="ps-4">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="select-all-header">
                             </div>
                         </th>
+                        {% endif %}
                         <th>رقم الطلب</th>
                         <th class="d-none d-md-table-cell">الحالة</th>
                         <th>الحالة المخصصة</th>
                         <th class="d-none d-lg-table-cell">طريقة الدفع</th>
                         <th>العلامات</th>
                         <th class="d-none d-md-table-cell">التاريخ</th>
+                        {% if current_employee.role == 'delivery_manager' %}
+                        <th class="d-none d-md-table-cell">المسند إليه</th>
+                        {% endif %}
                         <th width="15%" class="text-end pe-4">الإجراءات</th>
                     </tr>
                 </thead>
@@ -115,11 +130,13 @@
                 <tbody>
                     {% for order in orders %}
                     <tr data-order-id="{{ order.id }}" data-order-type="{{ order.type }}" data-order-status="{{ order.status.slug if order.status else 'unknown' }}" class="align-middle clickable-row">
+                        {% if current_employee.role == 'delivery_manager' %}
                         <td class="ps-4">
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}" data-type="{{ order.type }}">
                             </div>
                         </td>
+                        {% endif %}
                         <td>
                             <span class="fw-bold">#{{ order.reference_id }}</span>
                         </td>
@@ -205,6 +222,42 @@
                             </span>
                         </td>
                         
+                        {% if current_employee.role == 'delivery_manager' %}
+                        <td class="d-none d-md-table-cell">
+                            {% if order.assignments %}
+                                <div class="avatar-group">
+                                    {% for assignment in order.assignments[:3] %}
+                                        {% if assignment.employee.role == 'delivery' %}
+                                            <div class="avatar avatar-xs" data-bs-toggle="tooltip" 
+                                                 title="{{ assignment.employee.email }} (مندوب توصيل)">
+                                                <span class="avatar-text bg-success text-white">
+                                                    {{ assignment.employee.email|first|upper }}
+                                                </span>
+                                            </div>
+                                        {% else %}
+                                            <div class="avatar avatar-xs" data-bs-toggle="tooltip" 
+                                                 title="{{ assignment.employee.email }} (موظف عام)">
+                                                <span class="avatar-text bg-primary text-white">
+                                                    {{ assignment.employee.email|first|upper }}
+                                                </span>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if order.assignments|length > 3 %}
+                                        <div class="avatar avatar-xs" data-bs-toggle="tooltip" 
+                                             title="و {{ order.assignments|length - 3 }} أكثر">
+                                            <span class="avatar-text t text-dark">
+                                                +{{ order.assignments|length - 3 }}
+                                            </span>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span class="badge text-muted">غير مسند</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                        
                         <td class="text-end pe-4 actions-cell">
                             <div class="d-flex justify-content-end gap-2">
                                 {% if order.type == 'custom' %}
@@ -219,6 +272,15 @@
                                        title="عرض التفاصيل">
                                         <i class="fas fa-eye"></i>
                                     </a>
+                                {% endif %}
+                                
+                                {% if current_employee.role == 'delivery_manager' %}
+                                <button class="btn btn-sm btn-icon btn-outline-success rounded-circle assign-single-btn" 
+                                        data-order-id="{{ order.id }}" 
+                                        data-order-type="{{ order.type }}" 
+                                        title="إسناد سريع">
+                                    <i class="fas fa-user-plus"></i>
+                                </button>
                                 {% endif %}
                             </div>
                         </td>
@@ -299,6 +361,36 @@
         {% endif %}
     </div>
 </div>
+
+<!-- مودال الإسناد للمدير فقط -->
+{% if current_employee.role == 'delivery_manager' %}
+<div class="modal fade" id="assignModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">إسناد الطلبات المحددة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>سيتم إسناد <span id="selected-count-assign" class="fw-bold">0</span> طلب إلى المندوب المحدد.</p>
+                <div class="mb-3">
+                    <label for="employee-select" class="form-label">اختر المندوب:</label>
+                    <select class="form-select" id="employee-select">
+                        <option value="">اختر مندوب...</option>
+                        {% for employee in delivery_employees %}
+                        <option value="{{ employee.id }}">{{ employee.email }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="confirm-assign">تأكيد الإسناد</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js" integrity="sha384-DpVxUeeBWjUvUV1czyIHJAjh+jYUZFu2lLakbdua5vbwOrBGi1UgaKCHjTC+x3Ky" crossorigin="anonymous"></script>
@@ -381,56 +473,61 @@ $(document).ready(function () {
         const queryParams = buildQueryParams();
         window.location.href = `?${queryParams}`;
     }
-    
-    function syncData(url, successMessage, errorMessage) {
-        const btn = $(this);
-        const icon = btn.find('i');
-        const progressContainer = $('#sync-progress');
-        const progressBar = progressContainer.find('.progress-bar');
-        const detailsText = progressContainer.find('.sync-details');
 
-        btn.prop('disabled', true);
-        icon.addClass('fa-spin');
-        progressContainer.removeClass('d-none');
-        progressBar.css('width', '10%');
-        detailsText.text('جاري الاتصال بالخادم...');
+    // --- دوال الإسناد للمدير فقط ---
+    {% if current_employee.role == 'delivery_manager' %}
+    function updateAssignButtonState() {
+        const checkedCount = $('.order-checkbox:checked').length;
+        $('#selected-orders-count').text(checkedCount);
+        
+        const assignBtn = $('#assign-orders-btn');
+        assignBtn.prop('disabled', checkedCount === 0);
+        
+        if (checkedCount > 0) {
+            assignBtn.addClass('pulse-effect');
+            setTimeout(() => assignBtn.removeClass('pulse-effect'), 1000);
+        }
+    }
 
-        progressBar.animate({ width: "70%" }, 1500);
+    function getSelectedOrders() {
+        return $('.order-checkbox:checked').map((_, el) => {
+            const checkbox = $(el);
+            const orderId = checkbox.val();
+            const row = checkbox.closest('tr');
+            const orderType = row.data('order-type') || 'salla';
+            
+            if (!orderId || orderId === 'None') {
+                console.error('❌ قيمة الـ checkbox غير صالحة:', orderId);
+                return null;
+            }
+            
+            return {
+                id: orderId,
+                type: orderType
+            };
+        }).get().filter(order => order !== null);
+    }
 
-        $.ajax({
-            url: url,
+    function assignOrders(employeeId, orders) {
+        return $.ajax({
+            url: "{{ url_for('orders.assign_orders') }}",
             type: "POST",
             contentType: "application/json",
-            data: JSON.stringify({}),
-            headers: { 'X-CSRFToken': csrfToken }
-        })
-        .done(function(response) {
-            progressBar.css('width', '100%');
-            if (response.success) {
-                detailsText.text(response.message);
-                showSweetAlert('success', successMessage, response.message);
-                setTimeout(() => location.reload(), 2000);
-            } else {
-                showSweetAlert('error', errorMessage, response.error, 5000);
-                btn.prop('disabled', false);
-                icon.removeClass('fa-spin');
-                progressContainer.addClass('d-none');
-            }
-        })
-        .fail(function(xhr) {
-            progressBar.css('width', '100%');
-            const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم. تحقق من الشبكة.';
-            showSweetAlert('error', 'حدث خطأ فادح', errorMsg, 5000);
-            btn.prop('disabled', false);
-            icon.removeClass('fa-spin');
-            progressContainer.addClass('d-none');
+            headers: { 'X-CSRFToken': csrfToken },
+            data: JSON.stringify({
+                employee_id: employeeId,
+                orders: orders,
+                current_user_id: "{{ session.get('user_id') }}"
+            })
         });
     }
+    {% endif %}
 
     // --- الأحداث الرئيسية ---
 
-    // 1. تحديد الطلبات
-    $(document).on('change', '#select-all, #select-all-header', function() {
+    // 1. تحديد الطلبات (للمدير فقط)
+    {% if current_employee.role == 'delivery_manager' %}
+    $(document).on('change', '#select-all-header', function() {
         const isChecked = this.checked;
         $('.order-checkbox').prop('checked', isChecked);
         
@@ -439,20 +536,87 @@ $(document).ready(function () {
         } else {
             $('.order-checkbox').closest('tr').removeClass('selected-row');
         }
+        
+        updateAssignButtonState();
     });
 
     $(document).on('change', '.order-checkbox', function() {
         const allChecked = $('.order-checkbox:checked').length === $('.order-checkbox').length;
-        $('#select-all, #select-all-header').prop('checked', allChecked);
+        $('#select-all-header').prop('checked', allChecked);
         
         if ($(this).is(':checked')) {
             $(this).closest('tr').addClass('selected-row');
         } else {
             $(this).closest('tr').removeClass('selected-row');
         }
+        
+        updateAssignButtonState();
     });
+    {% endif %}
 
-    // 2. الفلاتر والبحث
+    // 2. إسناد الطلبات (للمدير فقط)
+    {% if current_employee.role == 'delivery_manager' %}
+    $(document).on('click', '#assign-orders-btn', function() {
+        const selectedOrders = getSelectedOrders();
+        
+        if (selectedOrders.length === 0) {
+            showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للإسناد');
+            return;
+        }
+
+        $('#selected-count-assign').text(selectedOrders.length);
+        $('#assignModal').modal('show');
+    });
+    
+    $(document).on('click', '.assign-single-btn', function(e) {
+        e.stopPropagation();
+        const orderId = $(this).data('order-id');
+        const orderType = $(this).data('order-type');
+        
+        const selectedOrders = [{ id: orderId, type: orderType }];
+        $('#selected-count-assign').text(1);
+        $('#assignModal').modal('show');
+    });
+    
+    $(document).on('click', '#confirm-assign', function() {
+        const employeeId = $('#employee-select').val();
+        const selectedOrders = getSelectedOrders();
+        
+        if (!employeeId) {
+            showSweetAlert('warning', 'تحذير', 'يجب اختيار مندوب للإسناد');
+            return;
+        }
+
+        if (selectedOrders.length === 0) {
+            showSweetAlert('warning', 'تحذير', 'لم يتم تحديد أي طلبات للإسناد');
+            return;
+        }
+
+        $('#assignModal').modal('hide');
+        
+        const assignBtn = $('#confirm-assign');
+        const originalText = assignBtn.html();
+        assignBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> جاري الإسناد');
+
+        assignOrders(employeeId, selectedOrders)
+            .done(function(response) {
+                if (response.success) {
+                    showSweetAlert('success', 'نجح الإسناد!', response.message);
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showSweetAlert('error', 'فشل الإسناد', response.error);
+                    assignBtn.prop('disabled', false).html(originalText);
+                }
+            })
+            .fail(function(xhr) {
+                const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم';
+                showSweetAlert('error', 'حدث خطأ', errorMsg);
+                assignBtn.prop('disabled', false).html(originalText);
+            });
+    });
+    {% endif %}
+
+    // 3. الفلاتر والبحث
     $(document).on('submit', '#advanced-filters', function(e) {
         e.preventDefault();
         reloadOrders();
@@ -462,12 +626,12 @@ $(document).ready(function () {
         reloadOrders();
     }, 300));
     
-    // 3. إعادة تعيين الفلاتر
+    // 4. إعادة تعيين الفلاتر
     $(document).on('click', '#reset-filters, #reset-filters-btn', function() {
         window.location.href = "{{ url_for('orders.riyadh_orders') }}";
     });
 
-    // 4. النقر على صف الجدول
+    // 5. النقر على صف الجدول
     $(document).on('click', '.clickable-row', function(e) {
         if ($(e.target).is('input, button, a, i') || $(e.target).closest('button, a, .actions-cell').length) {
             return;
@@ -486,7 +650,7 @@ $(document).ready(function () {
         window.location.href = url;
     });
     
-    // 5. البحث بالانتظار
+    // 6. البحث بالانتظار
     $(document).on('input', '#search-order-id', _.debounce(function() {
         const searchValue = $(this).val().trim();
         const previousValue = $(this).data('previous-value') || '';
@@ -495,6 +659,10 @@ $(document).ready(function () {
 
     // --- التشغيل عند تحميل الصفحة ---
     updateTimestamps();
+    
+    {% if current_employee.role == 'delivery_manager' %}
+    updateAssignButtonState();
+    {% endif %}
     
     setInterval(updateTimestamps, 60000);
     
