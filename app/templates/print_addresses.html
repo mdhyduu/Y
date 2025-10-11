@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بوالص الشحن للطلبات (باركود كبير)</title>
-    <style>
+    <title>بوالص الشحن للطلبات (باركود كبير</title>
+      <style>
         /* التنسيق للطباعة */
         @page {
             size: A4;
@@ -70,8 +70,9 @@
 
         /* أقسام العنوان - تقليل المسافات */
         .address-details-container {
-            flex-grow: 1;
-            margin-bottom: 0;
+            /* التعديل الأهم: منعها من التمدد وأخذ مساحة فارغة */
+            flex-grow: 0; 
+            margin-bottom: 3px; /* تم تعديله */
             padding-bottom: 0;
         }
 
@@ -90,7 +91,7 @@
             font-size: 13px;
             line-height: 1.4;
             padding-right: 5px;
-            margin-bottom: 0;
+            margin-bottom: 0; /* تم تعديله */
             padding-bottom: 0;
         }
 
@@ -112,7 +113,7 @@
             background: #f9f9f9;
             font-size: 14px;
             line-height: 1.4;
-            min-height: 35px;
+            min-height: auto; /* تم تعديله: السماح لها بالانكماش */
             margin-top: 3px;
             font-weight: bold;
         }
@@ -124,14 +125,15 @@
             margin-top: 5px;
             font-size: 12px;
             font-weight: bold;
-            margin-bottom: 0; /* تم التخفيض إلى الصفر */
+            margin-bottom: 0; 
         }
         
         /* الباركود والقسم السفلي - تم التكبير هنا */
         .barcode-section {
-            padding-top: 0; /* تم التخفيض إلى الصفر */
+            padding-top: 3px; /* تم تعديله: لترك مسافة بسيطة من العنوان */
             text-align: center;
-            margin: 0 -5px -5px -5px;
+            /* تم تعديله: إضافة هامش علوي بسيط */
+            margin: 3px -5px -5px -5px; 
             background: #fff;
             border-top: 1px solid #000;
         }
@@ -167,7 +169,7 @@
                 border: 1px solid #000;
                 box-shadow: none;
                 margin: 0;
-                height: 14.85cm; 
+                height: auto; /* التعديل الأهم: إزالة الارتفاع الثابت */
                 width: 10.5cm;
                 padding: 3px;
                 box-sizing: border-box;
@@ -181,7 +183,8 @@
             }
             
             .address-details-container {
-                margin-bottom: 0;
+                /* التعديل: لضمان التماسك في الطباعة */
+                margin-bottom: 2px; 
             }
             
             .recipient-details {
@@ -189,13 +192,13 @@
             }
             
             .barcode-section {
-                margin: 0; 
+                margin: 0; /* تم تعديله */
                 border-top: 1px solid #000;
-                padding-top: 0; /* تم التخفيض إلى الصفر في الطباعة */
+                padding-top: 2px; /* تم تعديله */
             }
             
             .barcode-image {
-                height: 110px;
+                height: 100px; /* تم تعديله */
                 margin-bottom: 2px;
             }
             
@@ -207,10 +210,11 @@
             .print-info { display: none; }
             
             .extra-info-line {
-                margin-bottom: 0; /* تم التخفيض إلى الصفر في الطباعة */
+                margin-bottom: 0; 
             }
         }
     </style>
+
 </head>
 <body>
     <div class="page-container">
