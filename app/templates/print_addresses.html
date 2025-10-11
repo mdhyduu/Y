@@ -8,7 +8,7 @@
         /* التنسيق للطباعة */
         @page {
             size: A4;
-            margin: 0.5cm;
+            margin: 0.3cm; /* تقليل هامش الصفحة */
         }
 
         body {
@@ -23,97 +23,101 @@
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             grid-template-rows: repeat(2, 1fr);
-            gap: 10px; 
-            padding: 10px;
-            height: calc(100vh - 20px);
+            gap: 5px; /* تقليل الفجوات بين البطاقات */
+            padding: 5px;
+            height: calc(100vh - 10px);
             box-sizing: border-box;
         }
 
         /* بطاقة البوليصة - التركيز على المعلومات الأساسية */
         .shipping-label-card {
             background: white;
-            border: 2px solid #000;
-            border-radius: 4px;
-            padding: 5px;
+            border: 1px solid #000;
+            border-radius: 3px;
+            padding: 3px;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
             page-break-inside: avoid;
             break-inside: avoid;
             overflow: hidden;
+            height: 100%;
         }
 
         /* رأس البوليصة - إبراز رقم الطلب */
         .header-section {
-            border-bottom: 2px solid #000;
-            padding-bottom: 3px;
-            margin-bottom: 5px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 2px;
+            margin-bottom: 3px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
         .order-id {
-            font-size: 20px;
+            font-size: 16px;
             font-weight: 900;
             color: #d9534f;
         }
 
         .reference-text {
-            font-size: 12px;
+            font-size: 10px;
             font-weight: bold;
             color: #333;
             background: #f1f1f1;
-            padding: 3px 6px;
-            border-radius: 3px;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+
+        /* محتوى البطاقة الرئيسي */
+        .card-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
         }
 
         /* أقسام العنوان - تقليل المسافات */
-        .address-details-container {
-            flex-grow: 1;
+        .address-section {
+            flex: 1;
             margin-bottom: 0;
-            padding-bottom: 0;
         }
 
         .section-title {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: bold;
             color: #fff;
             background: #007bff; 
-            padding: 3px 5px;
+            padding: 2px 4px;
             display: block;
-            margin-bottom: 3px;
+            margin-bottom: 2px;
             text-align: center;
         }
 
         .recipient-details {
-            font-size: 13px;
-            line-height: 1.4;
-            padding-right: 5px;
+            font-size: 12px;
+            line-height: 1.3;
             margin-bottom: 0;
-            padding-bottom: 0;
         }
 
         .recipient-details strong {
             display: block;
-            font-size: 15px;
+            font-size: 13px;
             color: #000;
-            margin-bottom: 3px;
+            margin-bottom: 2px;
             border-bottom: 1px dashed #ddd;
-            padding-bottom: 2px;
+            padding-bottom: 1px;
         }
 
         /* تفاصيل العنوان الكامل */
         .full-address-text {
             display: block;
-            padding: 5px;
+            padding: 3px;
             border: 1px solid #000;
-            border-radius: 4px;
+            border-radius: 3px;
             background: #f9f9f9;
-            font-size: 14px;
-            line-height: 1.4;
-            min-height: 35px;
-            margin-top: 3px;
+            font-size: 12px;
+            line-height: 1.3;
+            min-height: 30px;
+            margin-top: 2px;
             font-weight: bold;
         }
 
@@ -121,54 +125,55 @@
         .extra-info-line {
             display: flex;
             justify-content: space-between;
-            margin-top: 5px;
-            font-size: 12px;
+            margin-top: 3px;
+            font-size: 10px;
             font-weight: bold;
-            margin-bottom: 0; /* تم التخفيض إلى الصفر */
+            margin-bottom: 0;
         }
         
-        /* الباركود والقسم السفلي - تم التكبير هنا */
+        /* الباركود والقسم السفلي */
         .barcode-section {
-            padding-top: 0; /* تم التخفيض إلى الصفر */
+            margin-top: 2px;
             text-align: center;
-            margin: 0 -5px -5px -5px;
-            background: #fff;
             border-top: 1px solid #000;
+            padding-top: 2px;
         }
 
         .barcode-image {
             max-width: 100%;
-            height: 120px;
+            height: auto;
+            max-height: 80px;
             object-fit: contain;
-            margin-bottom: 3px;
-            padding: 3px 0;
         }
 
         .barcode-number {
             font-family: 'Courier New', monospace;
-            font-size: 18px;
+            font-size: 14px;
             font-weight: bold;
             display: block;
-            padding-bottom: 3px;
+            margin-top: 2px;
         }
 
         /* وسائل الإعلام للطباعة النهائية */
         @media print {
-            body { background: white; }
+            body { 
+                background: white; 
+                margin: 0;
+                padding: 0;
+            }
+            
             .page-container { 
                 padding: 0; 
                 gap: 0; 
-                height: auto;
-                page-break-inside: avoid;
-                break-inside: avoid;
+                height: 100vh;
+                page-break-after: always;
             }
 
             .shipping-label-card {
                 border: 1px solid #000;
-                box-shadow: none;
                 margin: 0;
-                height: 14.85cm; 
-                width: 10.5cm;
+                height: 50vh; /* استخدام نصف ارتفاع الصفحة */
+                width: 50vw; /* استخدام نصف عرض الصفحة */
                 padding: 3px;
                 box-sizing: border-box;
                 page-break-inside: avoid;
@@ -176,38 +181,54 @@
             }
             
             .header-section {
-                padding-bottom: 2px;
-                margin-bottom: 3px;
-            }
-            
-            .address-details-container {
-                margin-bottom: 0;
-            }
-            
-            .recipient-details {
-                margin-bottom: 0;
-            }
-            
-            .barcode-section {
-                margin: 0; 
-                border-top: 1px solid #000;
-                padding-top: 0; /* تم التخفيض إلى الصفر في الطباعة */
-            }
-            
-            .barcode-image {
-                height: 110px;
+                padding-bottom: 1px;
                 margin-bottom: 2px;
             }
             
-            .barcode-number {
-                font-size: 20px;
-                padding-bottom: 2px;
+            .order-id {
+                font-size: 14px;
             }
             
-            .print-info { display: none; }
+            .reference-text {
+                font-size: 9px;
+            }
+            
+            .section-title {
+                font-size: 9px;
+            }
+            
+            .recipient-details {
+                font-size: 11px;
+            }
+            
+            .recipient-details strong {
+                font-size: 12px;
+            }
+            
+            .full-address-text {
+                font-size: 11px;
+                min-height: 25px;
+            }
             
             .extra-info-line {
-                margin-bottom: 0; /* تم التخفيض إلى الصفر في الطباعة */
+                font-size: 9px;
+            }
+            
+            .barcode-section {
+                margin-top: 1px;
+                padding-top: 1px;
+            }
+            
+            .barcode-image {
+                max-height: 70px;
+            }
+            
+            .barcode-number {
+                font-size: 12px;
+            }
+            
+            .print-info { 
+                display: none; 
             }
         }
     </style>
@@ -216,51 +237,45 @@
     <div class="page-container">
         {% for order in orders %}
         <div class="shipping-label-card">
-            
             <div class="header-section">
                 <div class="order-id">
                     الطلب #{{ order.reference_id }}
                 </div>
-                
                 <div class="reference-text">
                     مرجع الشحن
                 </div>
             </div>
             
-            <div class="address-details-container">
-                <div class="section-title">بيانات المستلم (To)</div>
-                <div class="recipient-details">
-                    
-                    <strong>{{ order.address.name }} | جوال: {{ order.address.mobile }}</strong>
-                    
-                    <span class="full-address-text">
-                        {{ order.address.address }}
-                    </span>
-                    
-                    <div class="extra-info-line">
-                        {% if order.address.city %}
-                            <span>المدينة: **{{ order.address.city }}**</span>
-                        {% endif %}
-                        
-                        {% if order.address.country %}
-                            <span>الدولة: **{{ order.address.country }}**</span>
-                        {% endif %}
-                        
-                        {% if order.address.postal_code %}
-                            <span>الرمز البريدي: **{{ order.address.postal_code }}**</span>
-                        {% endif %}
+            <div class="card-content">
+                <div class="address-section">
+                    <div class="section-title">بيانات المستلم (To)</div>
+                    <div class="recipient-details">
+                        <strong>{{ order.address.name }} | جوال: {{ order.address.mobile }}</strong>
+                        <span class="full-address-text">
+                            {{ order.address.address }}
+                        </span>
+                        <div class="extra-info-line">
+                            {% if order.address.city %}
+                                <span>المدينة: **{{ order.address.city }}**</span>
+                            {% endif %}
+                            {% if order.address.country %}
+                                <span>الدولة: **{{ order.address.country }}**</span>
+                            {% endif %}
+                            {% if order.address.postal_code %}
+                                <span>الرمز البريدي: **{{ order.address.postal_code }}**</span>
+                            {% endif %}
+                        </div>
                     </div>
-
                 </div>
-            </div>
-            
-            <div class="barcode-section">
-                {% if order.barcode %}
-                <img src="{{ order.barcode }}" alt="باركود الطلب {{ order.reference_id }}" class="barcode-image">
-                <div class="barcode-number">
-                    {{ order.reference_id }}
+                
+                <div class="barcode-section">
+                    {% if order.barcode %}
+                    <img src="{{ order.barcode }}" alt="باركود الطلب {{ order.reference_id }}" class="barcode-image">
+                    <div class="barcode-number">
+                        {{ order.reference_id }}
+                    </div>
+                    {% endif %}
                 </div>
-                {% endif %}
             </div>
         </div>
         {% endfor %}
