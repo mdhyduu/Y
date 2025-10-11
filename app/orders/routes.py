@@ -1143,3 +1143,125 @@ def order_status_webhook():
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         db.session.close()
+        
+        
+@orders_bp.route('/riyadh')
+def riyadh_orders():
+    user, employee = get_user_from_cookies()
+    
+    if not user:
+        flash('الرجاء تسجيل الدخول أولاً', 'error')
+        response = make_response(redirect(url_for('user_auth.login')))
+        response.set_cookie('user_id', '', expires=0)
+        response.set_cookie('is_admin', '', expires=0)
+        return response
+    
+    # التحقق من أن المستخدم موظف تسليم أو مدير تسليم
+    if not employee or employee.role not in ['delivery_manager', 'delivery', 'is_admin']:
+        flash('غير مصرح بالوصول لهذه الصفحة', 'error')
+        return redirect(url_for('orders.index'))
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 25, type=int) 
+    
+    if page < 1: 
+        page = 1
+    if per_page not in [10, 25, 50, 100, 125, 150, 200, 250, 300]: 
+        per_page = 25
+    
+    if not user.salla_access_token:
+        flash('المتجر غير مرتبط بسلة', 'error')
+        return redirect(url_for('user_auth.logout'))
+    
+    try:
+        # بناء الاستعلام الأساسي للطلبات في الرياض فقط
+        orders_query = SallaOrder.query.filter_by(store_id=user.store_id).options(
+            selectinload(SallaOrder.status),
+            selectinload(SallaOrder.assignments).selectinload(OrderAssignment.employee)
+        )
+        
+        # فلتر الطلبات في الرياض فقط
+        orders_query = orders_query.join(OrderAddress).filter(
+            OrderAddress.city == 'الرياض',
+            OrderAddress.address_type == 'receiver'
+        )
+        
+        # التحقق من صلاحيات الموظف (إذا لم يكن مدير تسليم، يرى فقط الطلبات المعينة له)
+        if employee.role == 'delivery':
+            assignment_exists = exists().where(
+                and_(
+                    OrderAssignment.order_id == SallaOrder.id,
+                    OrderAssignment.employee_id == employee.id
+                )
+            )
+            orders_query = orders_query.filter(assignment_exists)
+        
+        # تطبيق الفلاتر
+        filters = {
+            'status': request.args.get('status', ''),
+            'employee': request.args.get('employee', ''),
+            'custom_status': request.args.get('custom_status', ''),
+            'date_from': request.args.get('date_from', ''),
+            'date_to': request.args.get('date_to', ''),
+            'search': request.args.get('search', '')
+        }
+        
+        orders_query = apply_orders_filters(orders_query, filters)
+        orders_query = orders_query.order_by(nullslast(db.desc(SallaOrder.created_at)))
+        
+        # التقسيم إلى صفحات
+        pagination_obj = orders_query.paginate(page=page, per_page=per_page, error_out=False)
+        orders = pagination_obj.items
+        
+        # معالجة الطلبات للعرض
+        processed_orders = [process_order_for_display(order) for order in orders]
+        
+        # جلب البيانات الإضافية
+        order_statuses = OrderStatus.query.filter_by(store_id=user.store_id).order_by(OrderStatus.sort).all()
+        
+        # للمديرين فقط يمكنهم رؤية جميع الموظفين، للموظف العادي فقط حالاته
+        if employee.role == 'delivery_manager':
+            employees = Employee.query.filter_by(store_id=user.store_id, is_active=True).all()
+            custom_statuses = EmployeeCustomStatus.query.join(Employee).filter(
+                Employee.store_id == user.store_id
+            ).all()
+        else:
+            employees = []
+            custom_statuses = EmployeeCustomStatus.query.filter_by(employee_id=employee.id).all()
+        
+        pagination = {
+            'page': pagination_obj.page,
+            'per_page': pagination_obj.per_page,
+            'total_items': pagination_obj.total,
+            'total_pages': pagination_obj.pages,
+            'has_prev': pagination_obj.has_prev,
+            'has_next': pagination_obj.has_next,
+            'prev_page': pagination_obj.prev_num,
+            'next_page': pagination_obj.next_num,
+            'start_item': (pagination_obj.page - 1) * pagination_obj.per_page + 1,
+            'end_item': min(pagination_obj.page * pagination_obj.per_page, pagination_obj.total)
+        }
+        
+        template_data = {
+            'orders': processed_orders, 
+            'employees': employees,
+            'custom_statuses': custom_statuses,
+            'pagination': pagination,
+            'filters': filters,
+            'order_statuses': order_statuses,
+            'is_reviewer': False,  # هذه الصفحة مخصصة للتسليم فقط
+            'is_delivery_personnel': True,
+            'current_employee': employee,
+            'page_title': 'طلبات الرياض'
+        }
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return render_template('orders_partial.html', **template_data)
+        
+        return render_template('orders.html', **template_data)
+    
+    except Exception as e:
+        error_msg = f'حدث خطأ غير متوقع: {str(e)}'
+        flash(error_msg, 'error')
+        logger.exception(error_msg)
+        return redirect(url_for('orders.index'))
