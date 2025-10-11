@@ -1258,7 +1258,7 @@ def riyadh_orders():
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return render_template('orders_partial.html', **template_data)
         
-        return render_template('orders.html', **template_data)
+        return render_template('riyadh_orders.html', **template_data)
     
     except Exception as e:
         error_msg = f'حدث خطأ غير متوقع: {str(e)}'
