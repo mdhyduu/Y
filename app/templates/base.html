@@ -42,7 +42,10 @@
       <a class="nav-link {% if request.path == url_for('orders.manage_employee_status') %}active{% endif %}" href="{{ url_for('orders.manage_employee_status') }}">
         <i class="fas fa-tags"></i> حالات الطلبات
       </a>
-      
+      <!-- في القائمة الجانبية في base.html -->
+<a class="nav-link {% if request.path == url_for('orders.riyadh_orders') %}active{% endif %}" href="{{ url_for('orders.riyadh_orders') }}">
+    <i class="fas fa-map-marker-alt"></i> طلبات الرياض
+</a>
       {% if is_reviewer %}
         <a class="nav-link {% if request.path == url_for('orders.manage_note_status') %}active{% endif %}" href="{{ url_for('orders.manage_note_status') }}">
           <i class="fas fa-tags"></i>التنبيهات 

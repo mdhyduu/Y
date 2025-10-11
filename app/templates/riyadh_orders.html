@@ -1,0 +1,508 @@
+{% extends 'base.html' %}
+{% block styles %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/orders.css') }}">
+{% endblock %}
+
+{% block content %} 
+<div class="card shadow-lg mb-4 border-0">
+    <div class="card-header py-3 bg-gradient-primary text-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold">
+                <i class="fas fa-tasks me-2"></i>طلبات الرياض - موظفي التسليم
+            </h6>
+            <div class="d-flex align-items-center">
+                <div id="sync-progress" class="me-3 d-none">
+                    <div class="progress" style="height: 6px; width: 150px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-white" 
+                             role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <small class="sync-details text-white-50 mt-1 d-block"></small>
+                </div>
+                <button class="btn btn-primary btn-sm rounded-pill me-2" id="sync-statuses-btn">
+                    <i class="fas fa-list-alt me-1"></i>
+                </button>
+                <button class="btn btn-primary btn-sm rounded-pill" id="sync-orders-btn">
+                    <i class="fas fa-sync-alt me-1"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body p-0">
+        <div class="p-4 border-bottom">
+            <form id="advanced-filters" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label for="search-order-id" class="form-label small text-muted mb-1">بحث سريع</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent"><i class="fas fa-search"></i></span>
+                        <input type="text" id="search-order-id" class="form-control border-start-0" 
+                               placeholder="ابحث برقم الطلب..." value="{{ filters.search }}"
+                               data-debounce="500">
+                    </div>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="filter-order-status" class="form-label small text-muted mb-1">حالة الطلب</label>
+                    <select id="filter-order-status" class="form-select">
+                        <option value="">الكل</option>
+                        {% for status in order_statuses %}
+                            <option value="{{ status.slug }}" {% if filters.status == status.slug %}selected{% endif %}>
+                                {{ status.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label for="filter-special-status" class="form-label small text-muted mb-1"> تنبيهات</label>
+                    <select id="filter-special-status" class="form-select">
+                        <option value="">الكل</option>
+                        <option value="late" {% if filters.status == 'late' %}selected{% endif %}>متأخرة</option>
+                        <option value="missing" {% if filters.status == 'missing' %}selected{% endif %}>واصل ناقص</option>
+                        <option value="not_shipped" {% if filters.status == 'not_shipped' %}selected{% endif %}>لم يشحن</option>
+                        <option value="refunded" {% if filters.status == 'refunded' %}selected{% endif %}>مرتجعات</option>
+                    </select>
+                </div>
+                  
+                <div class="col-md-3">
+                    <label class="form-label small text-muted mb-1">الفترة الزمنية</label>
+                    <div class="input-daterange input-group">
+                        <input type="date" class="form-control form-control-sm rounded-start" 
+                               id="date-from" name="date_from" value="{{ filters.date_from }}">
+                        <span class="input-group-text">إلى</span>
+                        <input type="date" class="form-control form-control-sm rounded-end" 
+                               id="date-to" name="date_to" value="{{ filters.date_to }}">
+                    </div>
+                </div>
+                  
+                <div class="col-md-2 d-flex">
+                    <button type="submit" class="btn btn-primary me-2 flex-grow-1">
+                        <i class="fas fa-filter me-1"></i> تطبيق
+                    </button>
+                    <button type="button" id="reset-filters" class="btn btn-outline-secondary">
+                        <i class="fas fa-undo"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {% if orders %}
+        <div class="table-responsive position-relative">
+            <div id="table-loading" class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center d-none" style="z-index: 10;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">جاري التحميل...</span>
+                </div>
+            </div>
+
+            <table class="table table-hover mb-0" id="orders-table">
+                <thead class="table">
+                    <tr>
+                        <th width="5%" class="ps-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="select-all-header">
+                            </div>
+                        </th>
+                        <th>رقم الطلب</th>
+                        <th class="d-none d-md-table-cell">الحالة</th>
+                        <th>الحالة المخصصة</th>
+                        <th class="d-none d-lg-table-cell">طريقة الدفع</th>
+                        <th>العلامات</th>
+                        <th class="d-none d-md-table-cell">التاريخ</th>
+                        <th width="15%" class="text-end pe-4">الإجراءات</th>
+                    </tr>
+                </thead>
+                
+                <tbody>
+                    {% for order in orders %}
+                    <tr data-order-id="{{ order.id }}" data-order-type="{{ order.type }}" data-order-status="{{ order.status.slug if order.status else 'unknown' }}" class="align-middle clickable-row">
+                        <td class="ps-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input order-checkbox" value="{{ order.id }}" data-type="{{ order.type }}">
+                            </div>
+                        </td>
+                        <td>
+                            <span class="fw-bold">#{{ order.reference_id }}</span>
+                        </td>
+                        <td class="d-none d-md-table-cell">
+                            {% if order.status %}
+                                <span class="status-badge status-{{ order.status.slug }}" 
+                                      data-bs-toggle="tooltip" 
+                                      title="{{ order.status.name }} ({{ order.status.type }})">
+                                    <i class="fas fa-circle me-1 small"></i>
+                                    {{ order.status.name }}
+                                </span>
+                            {% else %}
+                                <span class="status-badge status-unknown" data-bs-toggle="tooltip" title="حالة غير معروفة">
+                                    <i class="fas fa-circle me-1 small"></i>
+                                    غير محدد
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if order.employee_statuses %}
+                                {% set last_custom_status = order.employee_statuses | sort(attribute='created_at', reverse=true) | first %}
+                                <span class="badge rounded-pill" style="background-color: {{ last_custom_status.status.color }}; color: white">
+                                    {{ last_custom_status.status.name }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted small">-</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td class="d-none d-lg-table-cell">
+                            {% if order.payment_method %}
+                                {% set payment_class = "payment-" + (order.payment_method.replace('_', '-') if order.payment_method else 'unknown') %}
+                                <span class="payment-method-badge {{ payment_class }}" data-bs-toggle="tooltip" title="{{ order.payment_method_name }}">
+                                    {% if order.payment_method == 'tabby_installment' %}
+                                        <i class="fas fa-credit-card payment-icon"></i>تابي
+                                    {% elif order.payment_method == 'mada' %}
+                                        <i class="fas fa-credit-card payment-icon"></i>مدى
+                                    {% elif order.payment_method == 'visa' or order.payment_method == 'mastercard' %}
+                                        <i class="fab fa-cc-visa payment-icon"></i>بطاقة
+                                    {% elif order.payment_method == 'cash' %}
+                                        <i class="fas fa-money-bill-wave payment-icon"></i>نقدي
+                                    {% elif order.payment_method == 'bank' %}
+                                        <i class="fas fa-university payment-icon"></i>بنكي
+                                    {% else %}
+                                        <i class="fas fa-wallet payment-icon"></i>{{ order.payment_method_name|default('غير محدد', true)|truncate(10) }}
+                                    {% endif %}
+                                </span>
+                            {% else %}
+                                <span class="payment-method-badge payment-unknown" data-bs-toggle="tooltip" title="طريقة دفع غير محددة">
+                                    <i class="fas fa-wallet payment-icon"></i>غير محدد
+                                </span>
+                            {% endif %}
+                        </td>
+                        
+                        <td>
+                            {% set last_note = order.status_notes | sort(attribute='created_at', reverse=true) | first %}
+                            {% if last_note %}
+                                <div class="d-flex align-items-center">
+                                    {% if last_note.custom_status %}
+                                        <span class="badge rounded-pill me-1" 
+                                              style="background-color: {{ last_note.custom_status.color }}; color: white">
+                                            {{ last_note.custom_status.name }}
+                                        </span>
+                                    {% elif last_note.status_flag %}
+                                        {% set flag_class = "badge-" + last_note.status_flag %}
+                                        {% set flag_text = {
+                                            'late': 'متأخر',
+                                            'missing': 'واصل ناقص',
+                                            'refunded': 'مرتجع',
+                                            'not_shipped': 'لم يشحن'
+                                        }.get(last_note.status_flag, last_note.status_flag) %}
+                                        <span class="badge {{ flag_class }} fw-normal me-1">{{ flag_text }}</span>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span class="text-muted small">-</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td class="d-none d-md-table-cell">
+                            <span class="time-ago small" data-bs-toggle="tooltip" title="{{ order.raw_created_at|format_date }}">
+                                {{ order.created_at }}
+                            </span>
+                        </td>
+                        
+                        <td class="text-end pe-4 actions-cell">
+                            <div class="d-flex justify-content-end gap-2">
+                                {% if order.type == 'custom' %}
+                                    <a href="{{ url_for('orders.custom_order_details', order_id=order.id) }}"
+                                       class="btn btn-sm btn-icon btn-outline-primary rounded-circle"
+                                       title="عرض التفاصيل">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                {% else %}
+                                    <a href="{{ url_for('orders.order_details', order_id=order.id) }}"
+                                       class="btn btn-sm btn-icon btn-outline-primary rounded-circle"
+                                       title="عرض التفاصيل">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center p-4 border-top">
+            <div class="d-flex align-items-center">
+                <span class="text-muted small me-3">العناصر لكل صفحة:</span>
+                <select class="form-select form-select-sm w-auto" id="per-page-select">
+                    <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10</option>
+                    <option value="25" {% if pagination.per_page == 25 %}selected{% endif %}>25</option>
+                    <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if pagination.per_page == 100 %}selected{% endif %}>100</option>
+                    <option value="125" {% if pagination.per_page == 125 %}selected{% endif %}>125</option>
+                    <option value="150" {% if pagination.per_page == 150 %}selected{% endif %}>150</option>
+                    <option value="200" {% if pagination.per_page == 200 %}selected{% endif %}>200</option>
+                    <option value="250" {% if pagination.per_page == 250 %}selected{% endif %}>250</option>
+                    <option value="300" {% if pagination.per_page == 300 %}selected{% endif %}>300</option>
+                </select>
+            </div>
+            
+            <div class="d-flex flex-column align-items-end">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination pagination-sm justify-content-center mb-1">
+                        {% if pagination.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ pagination.prev_page }}&per_page={{ pagination.per_page }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.employee %}&employee={{ filters.employee }}{% endif %}{% if filters.custom_status %}&custom_status={{ filters.custom_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.search %}&search={{ filters.search }}{% endif %}{% if filters.order_type %}&order_type={{ filters.order_type }}{% endif %}">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled"><a class="page-link" href="#"><i class="fas fa-chevron-right"></i></a></li>
+                        {% endif %}
+                          
+                        {% set start_page = [1, pagination.page - 2]|max %}
+                        {% set end_page = [pagination.total_pages, pagination.page + 2]|min %}
+                        {% for p in range(start_page, end_page + 1) %}
+                            <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                                <a class="page-link" href="?page={{ p }}&per_page={{ pagination.per_page }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.employee %}&employee={{ filters.employee }}{% endif %}{% if filters.custom_status %}&custom_status={{ filters.custom_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.search %}&search={{ filters.search }}{% endif %}{% if filters.order_type %}&order_type={{ filters.order_type }}{% endif %}">
+                                    {{ p }}
+                                </a>
+                            </li>
+                        {% endfor %}
+
+                        {% if pagination.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ pagination.next_page }}&per_page={{ pagination.per_page }}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.employee %}&employee={{ filters.employee }}{% endif %}{% if filters.custom_status %}&custom_status={{ filters.custom_status }}{% endif %}{% if filters.date_from %}&date_from={{ filters.date_from }}{% endif %}{% if filters.date_to %}&date_to={{ filters.date_to }}{% endif %}{% if filters.search %}&search={{ filters.search }}{% endif %}{% if filters.order_type %}&order_type={{ filters.order_type }}{% endif %}">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled"><a class="page-link" href="#"><i class="fas fa-chevron-left"></i></a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                <div class="text-muted small">
+                    عرض {{ pagination.start_item }}-{{ pagination.end_item }} من {{ pagination.total_items }}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <div class="mb-4">
+                <i class="fas fa-shopping-bag fa-4x text-gray-300"></i>
+            </div>
+            <h4 class="mb-3 text-gray-600">لا توجد طلبات لعرضها</h4>
+            <p class="text-muted mb-4">
+                لم يتم العثور على طلبات تطابق معايير البحث الخاصة بك.
+            </p>
+            <button type="button" class="btn btn-primary rounded-pill px-4" id="reset-filters-btn">
+                <i class="fas fa-undo me-2"></i>إعادة تعيين الفلاتر
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js" integrity="sha384-DpVxUeeBWjUvUV1czyIHJAjh+jYUZFu2lLakbdua5vbwOrBGi1UgaKCHjTC+x3Ky" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js" integrity="sha384-ssUzPQXjLHLO39a9AiuwxnnyDxIvOMUxEQpqfreUaW7jLEdDAXiF6UooZRO53F6Z" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/dayjs@1/locale/ar.js" integrity="sha384-WOFOhfe03USRUKDbteptsFbkQE1Sisvl6Amq1jey7Pwrbr//TWZ676qtUweo1usp" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" integrity="sha384-ms4yaO2qHEUIRbq8CXAqtz3qhnO7nYo/xAWv23Zx/iX9tT+nvVZP66kSXwT/7a0J" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js" integrity="sha384-H6KKS1H1WwuERMSm+54dYLzjg0fKqRK5ZRyASdbrI/lwrCc6bXEmtGYr5SwvP1pZ" crossorigin="anonymous"></script>
+
+<script>
+$(document).ready(function () {
+    // --- المتغيرات العامة ---
+    const csrfToken = "{{ csrf_token() }}";
+    
+    // --- تهيئة المكتبات ---
+    dayjs.extend(dayjs_plugin_relativeTime);
+    dayjs.locale('ar');
+    
+    // --- تهيئة الأدوات ---
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // --- الوظائف المساعدة ---
+    function updateTimestamps() {
+        document.querySelectorAll('.time-ago').forEach(el => {
+            const dateStr = el.getAttribute('title');
+            if (dateStr) {
+                el.textContent = dayjs(dateStr).fromNow();
+            }
+        });
+    }
+
+    function showSweetAlert(icon, title, text = '', timer = 3000) {
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: timer,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+                toast.addEventListener('mouseenter', Swal.stopTimer)
+                toast.addEventListener('mouseleave', Swal.resumeTimer)
+            }
+        });
+        
+        Toast.fire({
+            icon: icon,
+            title: title,
+            text: text
+        });
+    }
+    
+    function buildQueryParams() {
+        const params = new URLSearchParams();
+        
+        const status = $('#filter-order-status').val();
+        const search = $('#search-order-id').val();
+        const dateFrom = $('#date-from').val();
+        const dateTo = $('#date-to').val();
+        const perPage = $('#per-page-select').val();
+        
+        if (status) params.set('status', status);
+        if (search) params.set('search', search);
+        if (dateFrom) params.set('date_from', dateFrom);
+        if (dateTo) params.set('date_to', dateTo);
+        if (perPage) params.set('per_page', perPage);
+        
+        const specialStatus = $('#filter-special-status').val();
+        if (specialStatus) params.set('status', specialStatus);
+        
+        return params.toString();
+    }
+    
+    function reloadOrders(showLoading = true) {
+        if (showLoading) {
+            $('#table-loading').removeClass('d-none');
+        }
+        
+        const queryParams = buildQueryParams();
+        window.location.href = `?${queryParams}`;
+    }
+    
+    function syncData(url, successMessage, errorMessage) {
+        const btn = $(this);
+        const icon = btn.find('i');
+        const progressContainer = $('#sync-progress');
+        const progressBar = progressContainer.find('.progress-bar');
+        const detailsText = progressContainer.find('.sync-details');
+
+        btn.prop('disabled', true);
+        icon.addClass('fa-spin');
+        progressContainer.removeClass('d-none');
+        progressBar.css('width', '10%');
+        detailsText.text('جاري الاتصال بالخادم...');
+
+        progressBar.animate({ width: "70%" }, 1500);
+
+        $.ajax({
+            url: url,
+            type: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({}),
+            headers: { 'X-CSRFToken': csrfToken }
+        })
+        .done(function(response) {
+            progressBar.css('width', '100%');
+            if (response.success) {
+                detailsText.text(response.message);
+                showSweetAlert('success', successMessage, response.message);
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                showSweetAlert('error', errorMessage, response.error, 5000);
+                btn.prop('disabled', false);
+                icon.removeClass('fa-spin');
+                progressContainer.addClass('d-none');
+            }
+        })
+        .fail(function(xhr) {
+            progressBar.css('width', '100%');
+            const errorMsg = xhr.responseJSON?.error || 'فشل الاتصال بالخادم. تحقق من الشبكة.';
+            showSweetAlert('error', 'حدث خطأ فادح', errorMsg, 5000);
+            btn.prop('disabled', false);
+            icon.removeClass('fa-spin');
+            progressContainer.addClass('d-none');
+        });
+    }
+
+    // --- الأحداث الرئيسية ---
+
+    // 1. تحديد الطلبات
+    $(document).on('change', '#select-all, #select-all-header', function() {
+        const isChecked = this.checked;
+        $('.order-checkbox').prop('checked', isChecked);
+        
+        if (isChecked) {
+            $('.order-checkbox').closest('tr').addClass('selected-row');
+        } else {
+            $('.order-checkbox').closest('tr').removeClass('selected-row');
+        }
+    });
+
+    $(document).on('change', '.order-checkbox', function() {
+        const allChecked = $('.order-checkbox:checked').length === $('.order-checkbox').length;
+        $('#select-all, #select-all-header').prop('checked', allChecked);
+        
+        if ($(this).is(':checked')) {
+            $(this).closest('tr').addClass('selected-row');
+        } else {
+            $(this).closest('tr').removeClass('selected-row');
+        }
+    });
+
+    // 2. الفلاتر والبحث
+    $(document).on('submit', '#advanced-filters', function(e) {
+        e.preventDefault();
+        reloadOrders();
+    });
+    
+    $(document).on('change', '#filter-order-status, #filter-special-status, #per-page-select', _.debounce(function() {
+        reloadOrders();
+    }, 300));
+    
+    // 3. إعادة تعيين الفلاتر
+    $(document).on('click', '#reset-filters, #reset-filters-btn', function() {
+        window.location.href = "{{ url_for('orders.riyadh_orders') }}";
+    });
+
+    // 4. النقر على صف الجدول
+    $(document).on('click', '.clickable-row', function(e) {
+        if ($(e.target).is('input, button, a, i') || $(e.target).closest('button, a, .actions-cell').length) {
+            return;
+        }
+        
+        const orderId = $(this).data('order-id');
+        const orderType = $(this).data('order-type');
+        
+        let url;
+        if (orderType === 'custom') {
+            url = "{{ url_for('orders.custom_order_details', order_id=0) }}".replace('0', orderId);
+        } else {
+            url = "{{ url_for('orders.order_details', order_id=0) }}".replace('0', orderId);
+        }
+        
+        window.location.href = url;
+    });
+    
+    // 5. البحث بالانتظار
+    $(document).on('input', '#search-order-id', _.debounce(function() {
+        const searchValue = $(this).val().trim();
+        const previousValue = $(this).data('previous-value') || '';
+        
+    }, 300));
+
+    // --- التشغيل عند تحميل الصفحة ---
+    updateTimestamps();
+    
+    setInterval(updateTimestamps, 60000);
+    
+    if (window.innerWidth < 768) {
+        $('.sidebar').removeClass('show');
+        $('.sidebar__backdrop').removeClass('show');
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}
